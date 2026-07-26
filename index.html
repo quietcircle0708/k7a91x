@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enhance & Slay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">Enhance <span>&</span> Slay</div>
+    <div class="topbar-right">
+      <button class="nav-btn" id="openDungeonBtn">⚔️ 던전</button>
+      <button class="nav-btn" id="openInventoryBtn"><svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14"><path d="M9.5 3h5l1.2 3.2H8.3L9.5 3z"/><path d="M6.2 8.4c0-1 .6-1.9 1.5-2.3l.6-.3h7.4l.6.3c.9.4 1.5 1.3 1.5 2.3 0 6.2-2.4 11.6-5.8 11.6s-5.8-5.4-5.8-11.6z"/></svg> 인벤토리</button>
+      <button class="nav-btn" id="openShopBtn">🛒 상점</button>
+      <div class="gold-badge"><span class="dot"></span><span id="goldText">0</span> G</div>
+    </div>
+  </div>
+
+  <div id="forgeView">
+    <div id="townToast" class="town-toast"></div>
+    <div class="forge-card" id="forgeCard">
+      <button class="stat-peek-btn" id="openStatsBtn" title="캐릭터 정보"><svg class="icon-svg" viewBox="0 0 24 24" width="16" height="16" style="margin-right:0;"><circle cx="12" cy="7.5" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></button>
+      <button class="stat-peek-btn settings-peek-btn" id="openSettingsBtn" title="설정">⚙️</button>
+      <div id="curseBadgeForge" class="curse-badge" style="display:none;">
+        <span class="curse-badge-icon">💀</span>
+        <span class="curse-badge-time" id="curseBadgeForgeTime">0:00</span>
+        <span class="tooltip">망자의 저주<br><span id="curseBadgeForgeDesc"></span></span>
+      </div>
+      <div id="emptyNotice" class="empty-notice" style="display:none;">
+        장착한 무기가 없습니다.<br>인벤토리에서 무기를 <b>강화 선택</b>하세요.
+        <br>
+        <div style="display:flex; gap:8px; justify-content:center; margin-top:10px; flex-wrap:wrap;">
+          <button class="nav-btn" id="goInventoryBtn"><svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14"><path d="M9.5 3h5l1.2 3.2H8.3L9.5 3z"/><path d="M6.2 8.4c0-1 .6-1.9 1.5-2.3l.6-.3h7.4l.6.3c.9.4 1.5 1.3 1.5 2.3 0 6.2-2.4 11.6-5.8 11.6s-5.8-5.4-5.8-11.6z"/></svg> 인벤토리로 이동</button>
+          <button class="nav-btn" id="quickBuySwordBtn">🗡️ 검 구매 (100 G)</button>
+        </div>
+      </div>
+
+      <div class="tier-label" id="tierLabel">평범한 검</div>
+      <div class="level-display" id="levelDisplay">+0</div>
+      <div class="item-name" id="itemName">롱소드 +0</div>
+
+      <div class="equip-row" id="equipRow"></div>
+
+      <div class="sword-stage" id="swordStage">
+        <div class="sword-visual" id="swordVisual">
+          <img id="swordImg" class="sword-img" src="assets/sword/longsword.png" alt="장착 무기">
+        </div>
+      </div>
+
+      <div class="stat-row"><span>공격력 <b id="atkText">10</b></span></div>
+      <div class="stat-row">
+        <span>공격속도 <span class="u-tip"><b id="atkSpeedText">0.5</b><span class="tooltip" id="atkSpeedTooltip">1초에 0.5만큼 공격</span></span></span>
+      </div>
+      <div class="stat-row" id="critStatWrap" style="display:none;">
+        <span>치명타 확률 <b id="critText">0%</b></span>
+      </div>
+      <div class="odds-row" id="oddsRow"></div>
+
+      <div class="msg" id="msgText"></div>
+
+      <button class="btn btn-main" id="enhanceBtn">강화하기</button>
+      <div class="cost-skip-row">
+        <div class="cost-line" id="costLine">비용: 70 G</div>
+      </div>
+      <div class="skip-row">
+        <button class="skip-toggle" id="skipToggleBtn">⏭ 연출 스킵: 꺼짐</button>
+        <button class="skip-toggle" id="autoRebuyToggleBtn">🗡️ 판매 후 자동 구매: 꺼짐</button>
+      </div>
+
+      <button class="btn btn-sell" id="sellBtn">아이템 판매</button>
+
+      <div class="scroll-title">보호 장치</div>
+
+      <div class="scroll-card charm">
+        <div class="scroll-head">
+          <span class="scroll-name-wrap">
+            <span class="scroll-name charm">네레스의 집념이 서린 쇠조각</span>
+            <span class="tooltip">전설의 대장장이 네레스의 집념이 담겨졌던 파편. 강화 실패시 단계가 하락되지 않는다.</span>
+          </span>
+          <span class="scroll-count">보유 <span id="charmCount">0</span>개</span>
+        </div>
+        <div class="scroll-body">
+          <button class="scroll-buy" id="buyCharmBtn">구매 (<span id="charmPrice">1500</span> G)</button>
+          <button class="scroll-toggle charm" id="toggleCharmBtn">사용 안 함</button>
+        </div>
+      </div>
+
+      <div class="scroll-card blessing">
+        <div class="scroll-head">
+          <span class="scroll-name-wrap">
+            <span class="scroll-name blessing">네레스의 축복이 서린 보석</span>
+            <span class="tooltip">전설의 대장장이 네레스가, 축복을 담아 세공한 보석. 강화 실패시 무기가 파괴되지 않는다.</span>
+          </span>
+          <span class="scroll-count">보유 <span id="blessingCount">0</span>개</span>
+        </div>
+        <div class="scroll-body">
+          <button class="scroll-buy" id="buyBlessingBtn">구매 (<span id="blessingPrice">15000</span> G)</button>
+          <button class="scroll-toggle blessing" id="toggleBlessingBtn">사용 안 함</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger-title">대장간 기록부</div>
+      <div class="ledger-grid">
+        <div class="ledger-item"><span class="k">최고 기록</span><span class="v" id="bestLevel">+0</span></div>
+        <div class="ledger-item"><span class="k">전설 달성</span><span class="v" id="legendCount">0회</span></div>
+        <div class="ledger-item"><span class="k">총 시도</span><span class="v" id="totalAttempts">0회</span></div>
+        <div class="ledger-item"><span class="k">파괴 횟수</span><span class="v" id="totalDestroys">0회</span></div>
+        <div class="ledger-item"><span class="k">몬스터 처치</span><span class="v" id="totalKills">0마리</span></div>
+        <div class="ledger-item"><span class="k">누적 판매액</span><span class="v" id="totalSold">0 G</span></div>
+        <div class="ledger-item"><span class="k">보유 골드</span><span class="v" id="goldLedger">0 G</span></div>
+      </div>
+    </div>
+
+    <div class="reset-link" id="resetLink">처음부터 다시 시작</div>
+  </div>
+
+  <div id="shopView" style="display:none;">
+    <button class="back-btn back-from-shop">← 대장간으로 돌아가기</button>
+    <div class="shop-card">
+      <div class="shop-title">떠돌이 상인의 좌판</div>
+      <div class="shop-sub">무기와 강화에 도움을 주는 아티팩트를 판매합니다.</div>
+
+      <div id="weaponShopList"></div>
+
+      <div class="scroll-card artifact">
+        <div class="scroll-head">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="artifact-icon-box">🌾</div>
+            <span class="scroll-name-wrap">
+              <span class="scroll-name artifact">아주르의 강아지풀 반지</span>
+              <span class="tooltip">마법사 아주르가 마력을 불어넣어 줄기를 꼬아 만든 반지.</span>
+            </span>
+          </div>
+          <span class="scroll-count" id="ringOwnedTag"></span>
+        </div>
+        <div class="effect-line">
+          강화 실패 시, <span class="u-tip">아주 낮은 확률<span class="tooltip">2%</span></span>로 강화 단계 하락을 막아준다.
+        </div>
+        <div class="scroll-body">
+          <button class="scroll-buy" id="buyRingBtn" style="flex:1;">구매 (25,000 G)</button>
+        </div>
+      </div>
+
+      <div class="scroll-card">
+        <div class="scroll-head">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">💠</div>
+            <span class="scroll-name-wrap">
+              <span class="scroll-name txt-shard">마석 파편</span>
+              <span class="tooltip">마물의 심장에서 추출한 마석의 파편. (획득: 다람쥐굴, 쥐굴)</span>
+            </span>
+          </div>
+          <span class="scroll-count">보유 <span id="shardCount">0</span>개</span>
+        </div>
+        <div class="scroll-body">
+          <button class="scroll-buy" id="sellShardBtn" style="flex:1;">전부 판매 (개당 50 G)</button>
+        </div>
+      </div>
+
+      <div class="scroll-card">
+        <div class="scroll-head">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">🔷</div>
+            <span class="scroll-name-wrap">
+              <span class="scroll-name txt-shard">마석 조각</span>
+              <span class="tooltip">마물의 심장에서 추출한 마석의 조각 (획득: 에픽 몬스터 고유 드랍)</span>
+            </span>
+          </div>
+          <span class="scroll-count">보유 <span id="shardPieceCount">0</span>개</span>
+        </div>
+        <div class="scroll-body">
+          <button class="scroll-buy" id="sellShardPieceBtn" style="flex:1;">전부 판매 (개당 100 G)</button>
+        </div>
+      </div>
+
+      <div class="scroll-card">
+        <div class="scroll-head">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">🧪</div>
+            <span class="scroll-name-wrap">
+              <span class="scroll-name" style="color:var(--forge-cream);">[하급]체력 회복 플라스크</span>
+              <span class="tooltip">사용시 2초에 걸쳐 최대 체력의 25%를 회복한다</span>
+            </span>
+          </div>
+          <span class="scroll-count">보유 <span id="hpFlaskCount">0</span>개</span>
+        </div>
+        <div class="scroll-body">
+          <button class="scroll-buy" id="buyHpFlaskBtn" style="flex:1;">구매 (70 G)</button>
+          <button class="scroll-buy" id="sellHpFlaskBtn" style="flex:1;">전부 판매 (개당 35 G)</button>
+        </div>
+      </div>
+
+      <div class="scroll-card">
+        <div class="scroll-head">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="artifact-icon-box" style="background:#142230; border-color:#4fa3d1;">💧</div>
+            <span class="scroll-name-wrap">
+              <span class="scroll-name" style="color:var(--forge-cream);">[하급]마나 회복 플라스크</span>
+              <span class="tooltip">사용시 2초에 걸쳐 최대 마나의 25%를 회복한다</span>
+            </span>
+          </div>
+          <span class="scroll-count">보유 <span id="mpFlaskCount">0</span>개</span>
+        </div>
+        <div class="scroll-body">
+          <button class="scroll-buy" id="buyMpFlaskBtn" style="flex:1;">구매 (70 G)</button>
+          <button class="scroll-buy" id="sellMpFlaskBtn" style="flex:1;">전부 판매 (개당 35 G)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="inventoryView" style="display:none;">
+    <button class="back-btn back-from-inv">← 대장간으로 돌아가기</button>
+    <div class="inv-card-wrap">
+      <div class="shop-title">인벤토리</div>
+      <div class="inv-tabs">
+        <button class="inv-tab-btn active" id="invTabBtnWeapon" data-tab="weapon">무기</button>
+        <button class="inv-tab-btn" id="invTabBtnArtifact" data-tab="artifact">아티팩트</button>
+        <button class="inv-tab-btn" id="invTabBtnConsumable" data-tab="consumable">소비</button>
+        <button class="inv-tab-btn" id="invTabBtnMisc" data-tab="misc">기타</button>
+      </div>
+
+      <div class="inv-tab-panel" id="invTabWeapon">
+        <div class="inv-count" id="invCount">0 / 10</div>
+        <div id="inventoryList"></div>
+      </div>
+      <div class="inv-tab-panel" id="invTabArtifact" style="display:none;">
+        <div class="inv-count" id="artifactCount">0 / 3</div>
+        <div id="artifactList"></div>
+      </div>
+      <div class="inv-tab-panel" id="invTabConsumable" style="display:none;">
+        <div id="consumableList"></div>
+      </div>
+      <div class="inv-tab-panel" id="invTabMisc" style="display:none;">
+        <div id="miscList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dungeonListView" style="display:none;">
+    <button class="back-btn back-from-dlist">← 대장간으로 돌아가기</button>
+    <div class="shop-card">
+      <div class="shop-title">던전 입구</div>
+      <div class="shop-sub">사냥하여 골드와 아이템을 얻어보세요.</div>
+      <div id="noWeaponForDungeon" class="empty-notice" style="display:none;">
+        장착한 무기가 없어 사냥을 나갈 수 없습니다.<br>인벤토리에서 무기를 먼저 장착하세요.
+      </div>
+      <div id="dungeonList"></div>
+    </div>
+  </div>
+
+  <div id="huntView" style="display:none;">
+    <button class="back-btn" id="exitHuntBtn">← 던전 나가기</button>
+    <div class="forge-card" id="huntCard">
+      <div id="curseBadgeHunt" class="curse-badge" style="display:none;">
+        <span class="curse-badge-icon">💀</span>
+        <span class="curse-badge-time" id="curseBadgeHuntTime">0:00</span>
+        <span class="tooltip">망자의 저주<br><span id="curseBadgeHuntDesc"></span></span>
+      </div>
+      <div class="tier-label" id="huntDungeonName">다람쥐 굴</div>
+
+      <div class="hunt-char-panel">
+        <div class="char-stat-row big" style="margin-bottom:2px;"><span>캐릭터 레벨</span><span class="v" id="huntPlayerLevel">Lv.1</span></div>
+        <div class="player-bar-label">체력 <span id="huntHpText">100 / 100</span></div>
+        <div class="player-bar-wrap"><div class="player-bar-fill hp" id="huntHpBar"></div></div>
+        <div class="player-bar-label">마나 <span id="huntMpText">50 / 50</span></div>
+        <div class="player-bar-wrap"><div class="player-bar-fill mp" id="huntMpBar"></div></div>
+        <div class="player-bar-label">경험치 <span id="huntExpText">0%</span></div>
+        <div class="player-bar-wrap"><div class="player-bar-fill exp" id="huntExpBar"></div></div>
+      </div>
+
+      <div class="hunter-info" id="hunterInfo">장착 무기: - (공격력 -)</div>
+
+      <button class="btn btn-main" id="startExploreBtn" style="width:auto; padding:10px 24px; margin:0 auto 10px; display:block;">탐험 시작</button>
+
+      <div class="monster-stage" id="monsterStage">
+        <div id="spawnToast"></div>
+        <div class="monster-icon" id="monsterIcon">🐿️</div>
+      </div>
+
+      <div class="monster-name-row">
+        <span id="monsterName">다람쥐</span>
+        <span class="monster-lv" id="monsterLv">Lv.1</span>
+      </div>
+      <div class="hp-bar-wrap">
+        <div class="hp-bar-fill" id="hpBarFill"></div>
+      </div>
+      <div class="hp-text" id="hpText">200 / 200</div>
+      <div class="status-badge-row" id="statusBadgeRow"></div>
+      <div class="quickslot-row" id="quickSlotRow"></div>
+
+      <div class="msg" id="huntMsg"></div>
+    </div>
+  </div>
+
+  <div id="killResultModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box kill-modal">
+      <div class="kill-modal-header">
+        <div class="kill-monster-icon" id="krIcon">🐿️</div>
+        <div>
+          <div class="modal-title" id="krTitle">다람쥐 처치!</div>
+          <div class="kill-monster-lv" id="krLevel">Lv.1</div>
+        </div>
+        <span class="inv-peek-wrap">
+          <button class="inv-peek-btn" type="button"><svg class="icon-svg" viewBox="0 0 24 24" width="15" height="15" style="margin-right:0;"><path d="M9.5 3h5l1.2 3.2H8.3L9.5 3z"/><path d="M6.2 8.4c0-1 .6-1.9 1.5-2.3l.6-.3h7.4l.6.3c.9.4 1.5 1.3 1.5 2.3 0 6.2-2.4 11.6-5.8 11.6s-5.8-5.4-5.8-11.6z"/></svg></button>
+          <span class="tooltip" id="krInvTooltip">인벤토리</span>
+        </span>
+      </div>
+      <div class="kill-rewards" id="krRewards"></div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="krStopBtn">전투 중단</button>
+        <button class="btn btn-main" id="krContinueBtn" style="width:auto; padding:10px 18px;">탐험 계속</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="leaveConfirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">전투 중단 확인</div>
+      <div class="modal-body">이동하면 현재 진행 중인 전투를 포기하게 됩니다!!</div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="leaveConfirmStopBtn">전투 중단</button>
+        <button class="btn btn-main" id="leaveConfirmContinueBtn" style="width:auto; padding:10px 18px;">탐험 계속</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deathModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">사망</div>
+      <div class="modal-body" id="deathModalBody"></div>
+      <div class="modal-actions">
+        <button class="btn btn-main" id="respawnBtn" style="width:auto; padding:10px 24px;">마을에서 부활</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sellConfirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">판매 확인</div>
+      <div class="modal-body" id="sellConfirmBody"></div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="sellConfirmNoBtn">취소</button>
+        <button class="btn btn-main" id="sellConfirmYesBtn" style="width:auto; padding:10px 18px;">판매</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="charStatsModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box char-stats-modal">
+      <div class="modal-title">캐릭터 정보</div>
+      <div id="charStatsBody" class="char-stats-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-main" id="closeStatsBtn" style="width:auto; padding:10px 24px;">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box settings-modal">
+      <div class="modal-title">설정</div>
+      <div class="settings-layout">
+        <div class="settings-cat-list" id="settingsCategoryList"></div>
+        <div class="settings-body" id="settingsBody"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-main" id="closeSettingsBtn" style="width:auto; padding:10px 24px;">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="quickSlotPickerModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">퀵슬롯에 등록할 아이템</div>
+      <div id="quickSlotPickerList" class="quickslot-picker-list"></div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="closeQuickSlotPickerBtn">닫기</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- 스크립트 로드 순서 중요: 아래 순서를 바꾸면 안 됨 (뒤 파일이 앞 파일의 함수/데이터를 참조함) -->
+<script src="js/data.js"></script>
+<script src="js/formulas.js"></script>
+<script src="js/state.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/render.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/dungeon.js"></script>
+<script src="js/navigation.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

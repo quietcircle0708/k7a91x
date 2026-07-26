@@ -1,0 +1,199 @@
+// ============================================================
+// navigation.js — 화면 전환, 인벤토리 탭, 캐릭터 정보/퀵슬롯 모달
+// 어느 화면(view)을 보여줄지, 전투 중 이탈 확인 등 내비게이션과
+// 모달 열고 닫기를 담당. 실제 게임 로직 변경은 없음.
+// ============================================================
+
+function showView(name){
+  if(currentView === 'hunt' && name !== 'hunt'){
+    stopHuntLoop();
+    closeKillResultModal();
+    hunt.dungeon = null;
+    hunt.monster = null;
+    hunt.paused = false;
+    hunt.started = false;
+  }
+  el('forgeView').style.display = name === 'forge' ? 'block' : 'none';
+  el('shopView').style.display = name === 'shop' ? 'block' : 'none';
+  el('inventoryView').style.display = name === 'inventory' ? 'block' : 'none';
+  el('dungeonListView').style.display = name === 'dungeonlist' ? 'block' : 'none';
+  el('huntView').style.display = name === 'hunt' ? 'block' : 'none';
+  currentView = name;
+  if(name === 'dungeonlist') renderDungeonList();
+  if(name === 'hunt') renderHunt();
+  render();
+}
+
+let pendingNavTarget = null;
+function isActivelyFighting(){
+  return currentView === 'hunt' && hunt.started && !!hunt.monster && hunt.monster.hp > 0 && el('killResultModal').style.display !== 'flex';
+}
+function guardedNav(name){
+  if(isActivelyFighting()){
+    pendingNavTarget = name;
+    hunt.paused = true;
+    el('leaveConfirmModal').style.display = 'flex';
+    return;
+  }
+  showView(name);
+}
+function confirmLeaveBattle(){
+  el('leaveConfirmModal').style.display = 'none';
+  const target = pendingNavTarget || 'dungeonlist';
+  pendingNavTarget = null;
+  showView(target);
+}
+function cancelLeaveBattle(){
+  el('leaveConfirmModal').style.display = 'none';
+  pendingNavTarget = null;
+  if(currentView === 'hunt') hunt.paused = false;
+}
+
+function openShop(){ if(isEnhancing) return; guardedNav('shop'); }
+function openInventory(){ if(isEnhancing) return; guardedNav('inventory'); }
+function openDungeonList(){ if(isEnhancing) return; guardedNav('dungeonlist'); }
+function closeToForge(){ showView('forge'); }
+
+// ---- 인벤토리 탭 ----
+function switchInvTab(tab){
+  el('invTabWeapon').style.display = tab === 'weapon' ? 'block' : 'none';
+  el('invTabArtifact').style.display = tab === 'artifact' ? 'block' : 'none';
+  el('invTabConsumable').style.display = tab === 'consumable' ? 'block' : 'none';
+  el('invTabMisc').style.display = tab === 'misc' ? 'block' : 'none';
+  el('invTabBtnWeapon').classList.toggle('active', tab === 'weapon');
+  el('invTabBtnArtifact').classList.toggle('active', tab === 'artifact');
+  el('invTabBtnConsumable').classList.toggle('active', tab === 'consumable');
+  el('invTabBtnMisc').classList.toggle('active', tab === 'misc');
+}
+
+// ---- 퀵슬롯 등록 모달 ----
+let pendingQuickSlotIndex = null;
+function openQuickSlotPicker(idx){
+  pendingQuickSlotIndex = idx;
+  const list = el('quickSlotPickerList');
+  list.innerHTML = Object.values(CONSUMABLES).map(item => `
+    <button class="quickslot-pick-item" data-item="${item.id}">
+      <span style="font-size:20px;">${item.icon}</span>
+      <span>${item.name} <span style="color:var(--forge-cream-dim);">×${(state.consumables && state.consumables[item.id]) || 0}</span></span>
+    </button>
+  `).join('');
+  el('quickSlotPickerModal').style.display = 'flex';
+}
+function closeQuickSlotPicker(){
+  el('quickSlotPickerModal').style.display = 'none';
+  pendingQuickSlotIndex = null;
+}
+
+// ---- 캐릭터 정보 모달 & 스탯 분배 ----
+// '적용'을 누르기 전까지는 draftStats/draftStatPoints(임시 값)만 바뀌고 실제 state는 그대로 유지됨.
+let draftStats = null;
+let draftStatPoints = null;
+function allocateStat(key){
+  if(!draftStats) return;
+  if((draftStatPoints || 0) <= 0) return;
+  if(!(key in draftStats)) return;
+  draftStats[key]++;
+  draftStatPoints--;
+  renderCharStats();
+}
+// 적용: draft 값을 실제 state에 반영하고 저장
+function applyStatAlloc(){
+  if(!draftStats) return;
+  ensurePlayerVitals();
+  state.stats = { str: draftStats.str, agi: draftStats.agi, int: draftStats.int };
+  state.statPoints = draftStatPoints;
+  // 스탯으로 늘어난 최대 체력/마나만큼 그대로 채워줌 (아직 피해를 입는 시스템이 없으므로 항상 풀피 유지)
+  state.playerHp = effectiveMaxHp(state.playerLevel);
+  state.playerMp = effectiveMaxMp(state.playerLevel);
+  saveState();
+  draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+  draftStatPoints = state.statPoints;
+  renderCharStats();
+}
+// 초기화: 이번에 임시로 찍었던 포인트를 되돌려 마지막으로 적용된 상태에서 다시 찍을 수 있게 함
+function resetStatAlloc(){
+  if(!draftStats) return;
+  draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+  draftStatPoints = state.statPoints || 0;
+  renderCharStats();
+}
+// 전체 초기화: 마지막으로 '적용'되어 실제 저장된 스탯까지 포함해 지금까지 찍은 모든 포인트를 되돌림.
+// draft만 바뀌므로 실제로 확정되려면 여전히 '적용'을 눌러야 함.
+function resetStatAllocFull(){
+  if(!draftStats) return;
+  const totalPoints = (state.statPoints || 0) + (state.stats.str || 0) + (state.stats.agi || 0) + (state.stats.int || 0);
+  draftStats = { str: 0, agi: 0, int: 0 };
+  draftStatPoints = totalPoints;
+  renderCharStats();
+}
+function openCharStats(){
+  draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+  draftStatPoints = state.statPoints || 0;
+  renderCharStats();
+  el('charStatsModal').style.display = 'flex';
+}
+function closeCharStats(){
+  // 적용하지 않은 임시 배분은 버림
+  draftStats = null;
+  draftStatPoints = null;
+  el('charStatsModal').style.display = 'none';
+}
+
+// ---- 설정 모달 ----
+let activeSettingsCategory = SETTINGS_SCHEMA.length > 0 ? SETTINGS_SCHEMA[0].id : null;
+function openSettings(){
+  renderSettings();
+  el('settingsModal').style.display = 'flex';
+}
+function closeSettings(){
+  el('settingsModal').style.display = 'none';
+}
+function switchSettingsCategory(catId){
+  activeSettingsCategory = catId;
+  renderSettings();
+}
+function toggleSetting(id){
+  if(!state.settings) state.settings = {};
+  state.settings[id] = !state.settings[id];
+  renderSettings();
+  saveState();
+}
+// stepper 타입 설정값을 증감(min/max/step은 SETTINGS_SCHEMA에서 조회)
+function adjustSetting(id, dir){
+  let itemDef = null;
+  SETTINGS_SCHEMA.forEach(cat => cat.items.forEach(it => {
+    if(it.type === 'stepper-row'){
+      it.fields.forEach(f => { if(f.id === id) itemDef = f; });
+    } else if(it.id === id){
+      itemDef = it;
+    }
+  }));
+  if(!itemDef) return;
+  if(!state.settings) state.settings = {};
+  const current = state.settings[id] != null ? state.settings[id] : itemDef.default;
+  const next = dir === 'up' ? current + itemDef.step : current - itemDef.step;
+  state.settings[id] = Math.max(itemDef.min, Math.min(itemDef.max, next));
+  renderSettings();
+  saveState();
+}
+
+// ---- 판매 확인 모달 ----
+// 장비/소비 아이템 판매 시 공통으로 쓰는 확인창. openSellConfirm(라벨, 가격, 확정시 실행할 함수)로 호출.
+let pendingSellAction = null;
+function openSellConfirm(itemLabel, price, onConfirm){
+  pendingSellAction = onConfirm;
+  el('sellConfirmBody').textContent = `정말 ${itemLabel}을(를) ${price.toLocaleString()}G에 판매하시겠습니까? 판매 후 재구매 불가능합니다!`;
+  el('sellConfirmModal').style.display = 'flex';
+}
+function closeSellConfirm(){
+  el('sellConfirmModal').style.display = 'none';
+  pendingSellAction = null;
+}
+function confirmSell(){
+  const action = pendingSellAction;
+  closeSellConfirm();
+  if(action) action();
+}
+function cancelSell(){
+  closeSellConfirm();
+}

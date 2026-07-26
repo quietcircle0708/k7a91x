@@ -1,0 +1,570 @@
+// ============================================================
+// data.js — 게임 데이터 테이블 및 상수
+// 새 무기/몬스터/던전/아이템을 추가하거나 밸런스(수치)를 조정할 때는
+// 이 파일만 수정하면 됩니다. 계산 로직은 formulas.js를 참고하세요.
+// ============================================================
+
+const MAX_LEVEL = 9;
+const INV_MAX = 10;
+const RING_CHANCE = 2;
+
+// 장비 타입. 지금은 '무기'만 있지만 나중에 방어구 등 다른 장비 타입이 추가될 수 있음.
+const EQUIPMENT_TYPES = { weapon: '무기' };
+
+// 무기 종류(카테고리) 구분: 양손 검 / 검 / 단검 / 지팡이. 무기 "이름"과는 별개의 개념.
+const WEAPON_KINDS = { two_handed_sword: '양손 검', sword: '검', dagger: '단검', staff: '지팡이' };
+
+// 무기 등급(레어도). 색상만 우선 정의 — 텍스트 테두리 강조 등 시각 효과는 추후 추가 예정.
+const WEAPON_GRADES = {
+  normal: { label: '일반', color: '#ffffff' },
+  rare:   { label: '레어', color: '#8fd0ff' },
+  epic:   { label: '에픽', color: '#a066d6' },
+  unique: { label: '유니크', color: '#ff8a3d' },
+};
+
+// 무기 이미지 파일 경로 규칙. WEAPON_TYPES의 image 필드는 파일명만 가짐(확장자/경로 제외).
+// 해당 이름의 파일이 없으면 WEAPON_IMAGE_FALLBACK을 사용(런타임에 <img onerror>로 자동 대체).
+const WEAPON_IMAGE_DIR = 'assets/sword/';
+const WEAPON_IMAGE_EXT = '.png';
+const WEAPON_IMAGE_FALLBACK = 'common_shortsword';
+
+// 무기 종류 도감. 새로운 옵션(필드)이 필요해지면 이 객체에 항목만 추가하면 됨 — 언제든 확장 가능한 구조.
+// ---- 항목 설명 ----
+// desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고) / weaponKind: 무기 종류(WEAPON_KINDS) /
+// grade: 무기 등급(WEAPON_GRADES) / attackPower: 공격력 / attackSpeed: 공격 속도 / critRate: 치명타 확률(%) /
+// purchasable: 상점 구매 가능 여부(true면 상점에 자동 등록) / sellPrice: 판매 가격(플레이어가 상점에 파는 가격.
+// 상점 구매가는 이 값의 2배로 자동 계산됨) / levelReq: 레벨 제한(이 수치 "이상"이어야 구매 가능) / image: 이미지 파일명
+// ---- 아래는 기존 강화 단계별(+0~+9) 수치 — 이번 개편에서 값은 건드리지 않음, 추후 새 체계로 정리 예정 ----
+// atk/speed/crit: 단계별 공격력/공격속도/치명타확률 배열 / cost: 단계별 강화 비용 / sell: 단계별 판매가 / odds: 단계별 강화 확률
+const WEAPON_TYPES = {
+  longsword: {
+    id: 'longsword', name: '롱소드', desc: '균형 잡힌 장검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 28, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 100, levelReq: 1,
+    image: 'common_longsword',
+    atk:   [10, 21, 39, 63, 93, 130, 182, 242, 315, 400],
+    speed: [0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1, 1.1, 1.2],
+    crit:  [0, 0, 0, 0, 0, 1, 2, 3, 4, 5],
+    cost:  [80, 150, 260, 450, 750, 1600, 2800, 4500, 7500],
+    sell:  [50, 280, 500, 1250, 2500, 4000, 9000, 27000, 68000, 136000],
+    odds: [
+      [95, 5, 0, 0], [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0],
+      [50, 45, 5, 0], [40, 30, 29, 1], [25, 30, 29, 1], [20, 20, 40, 20],
+    ],
+  },
+  greatsword: {
+    id: 'greatsword', name: '그레이트 소드', desc: '강력한 일격을 위한 대검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'rare', // 레어
+    attackPower: 34, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 500, levelReq: 5,
+    image: 'rare_greatsword',
+    atk:   [14, 28, 52, 82, 121, 182, 273, 339, 441, 560],
+    speed: [0.4, 0.5, 0.57, 0.65, 0.7, 0.7, 0.7, 0.9, 1, 1.1],
+    crit:  [0, 0, 0, 0, 0, 1, 5, 5, 5, 10],
+    cost:  [180, 312, 540, 900, 1920, 3360, 5400, 9000, 18000],
+    sell:  [336, 660, 1500, 3000, 4800, 10800, 32400, 81600, 163200, 243000],
+    odds: [
+      [92, 8, 0, 0], [85, 15, 0, 0], [80, 20, 0, 0], [72, 28, 0, 0], [62, 38, 0, 0],
+      [50, 40, 10, 0], [35, 35, 29, 1], [25, 30, 40, 5], [15, 25, 45, 15],
+    ],
+  },
+  // ---- 아래 두 무기는 강화 단계별 증가 공식이 아직 없어서, 우선 +0(기본) 값만 담아둠.
+  // cost/odds가 비어있으면(강화 데이터 없음) 강화 화면에서 "강화 준비 중"으로 자동 표시됨(render.js 참고).
+  shortsword: {
+    id: 'shortsword', name: '숏소드', desc: '한 손으로 휘두르는 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 20, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 100, levelReq: 1,
+    image: 'common_shortsword',
+    atk: [20], speed: [0.8], crit: [5], sell: [100],
+    cost: [], odds: [],
+  },
+  dagger: {
+    id: 'dagger', name: '대거', desc: '짧은 두 개의 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'normal', // 일반
+    attackPower: 18, attackSpeed: 1.2, critRate: 10,
+    purchasable: true, sellPrice: 100, levelReq: 1,
+    image: 'common_dagger',
+    atk: [18], speed: [1.2], crit: [10], sell: [100],
+    cost: [], odds: [],
+  },
+};
+
+// ============================================================
+// 강화 단계별 공격력/공격속도/치명타 계산 공식
+// 일반/레어/에픽 등급에 적용됨. 유니크 등급은 이 공식을 쓰지 않고 무기마다 고유 값을 직접 넣을 예정이라 대상에서 제외.
+// 필요한 보정값이 아직 없는 무기 종류(예: 지팡이, 구상 중)도 자동으로 제외되고 기존 값이 그대로 유지됨.
+// ============================================================
+
+// 1. 강화 단계 구간별 공격력 배율 (index = 강화단계, [0]은 사용 안 함)
+const ENHANCE_ATK_STEP_MULT = [null, 1.8, 1.5, 1.3, 1.3, 1.3, 1.3, 1.3, 1.4, 1.4];
+
+// 2. 무기 종류별 공격력 곱연산 보정 (지팡이는 구상 단계라 비워둠)
+const WEAPON_KIND_ATK_MULT = { sword: 1, two_handed_sword: 1.014, dagger: 0.96, staff: null };
+
+// 2. 무기 종류별 강화 구간(+1~+8)당 공격속도 증가량 — 합연산. index 0 = +1, ... index 7 = +8 (+9는 표에 없어 증가분 0)
+const WEAPON_KIND_ATKSPEED_STEP = {
+  sword:            [0.05, 0, 0.05, 0, 0.05, 0, 0.1, 0.1],
+  two_handed_sword: [0.02, 0, 0.02, 0, 0.02, 0, 0.02, 0.05],
+  dagger:           [0.1, 0, 0.1, 0, 0.1, 0, 0.1, 0.1],
+  staff: null,
+};
+
+// 2. 무기 종류별 강화 구간(+1~+8)당 치명타 확률 증가량(%p) — 합연산. index 0 = +1, ... index 7 = +8 (+9는 증가분 0)
+const WEAPON_KIND_CRIT_STEP = {
+  sword:            [0, 1, 0, 1, 0, 1, 1, 1],
+  two_handed_sword: [0, 1, 0, 1, 0, 1, 1, 1],
+  dagger:           [1, 1, 1, 1, 1, 1, 1, 2],
+  staff: null,
+};
+
+// 3. 무기 등급별 공격력 곱연산 보정 (+1부터 매 단계 적용). 공격력에만 적용되고 공격속도/치명타에는 영향 없음.
+const WEAPON_GRADE_ATK_MULT = { normal: 1, rare: 1.02, epic: 1.03, unique: null };
+
+// 무기 하나의 +0~+9 공격력/공격속도/치명타 배열을 공식대로 계산.
+// 필요한 보정값이 없으면(유니크 등급이거나, 아직 정의되지 않은 무기 종류) null을 반환 — 그 경우 기존 값을 그대로 둠.
+function computeWeaponLevelStats(w){
+  const kindAtkMult = WEAPON_KIND_ATK_MULT[w.weaponKind];
+  const gradeAtkMult = WEAPON_GRADE_ATK_MULT[w.grade];
+  const atkSpeedSteps = WEAPON_KIND_ATKSPEED_STEP[w.weaponKind];
+  const critSteps = WEAPON_KIND_CRIT_STEP[w.weaponKind];
+  if(kindAtkMult == null || gradeAtkMult == null || atkSpeedSteps == null || critSteps == null) return null;
+
+  const atk = [w.attackPower];
+  const speed = [w.attackSpeed];
+  const crit = [w.critRate];
+  for(let lv = 1; lv <= 9; lv++){
+    const stepMult = ENHANCE_ATK_STEP_MULT[lv];
+    // +1의 공격력 = +0의 공격력 × 강화단계배율 × 무기 보정 × 무기 등급 보정 (소수 첫째자리에서 반올림), 이후 단계도 동일하게 재귀 적용
+    atk.push(Math.round(atk[lv - 1] * stepMult * kindAtkMult * gradeAtkMult));
+    speed.push(Math.round((speed[lv - 1] + (atkSpeedSteps[lv - 1] || 0)) * 100) / 100);
+    crit.push(crit[lv - 1] + (critSteps[lv - 1] || 0));
+  }
+  return { atk, speed, crit };
+}
+
+// WEAPON_TYPES 전체에 위 공식을 적용해서 atk/speed/crit 배열을 새로 채움(대상 아닌 무기는 기존 값 유지)
+Object.values(WEAPON_TYPES).forEach(w => {
+  const computed = computeWeaponLevelStats(w);
+  if(computed){
+    w.atk = computed.atk;
+    w.speed = computed.speed;
+    w.crit = computed.crit;
+  }
+});
+
+// ============================================================
+// [1단계] 무기 등급별 강화 확률/강화 비용 — 데이터 테이블만 우선 추가.
+// 아직 어디에도 연결되지 않은 새 데이터임 — 기존 코드(odds/cost 사용처)는 전혀 건드리지 않음.
+// 다음 단계에서 이 데이터로 배열을 계산하는 함수를 추가하고, 마지막 단계에서 WEAPON_TYPES에 연결할 예정.
+// ============================================================
+
+// 등급별 강화 확률 표. 각 배열의 index 0=+1, index 8=+9. 값 순서: [성공%, 유지%, 하락%, 파괴%]
+// 일반과 레어는 같은 표를 사용(같은 배열을 그대로 참조 — 데이터 중복 방지)
+const GRADE_ENHANCE_ODDS_NORMAL_RARE = [
+  [95, 5, 0, 0], [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0],
+  [50, 45, 5, 0], [40, 30, 29, 1], [25, 30, 40, 5], [20, 20, 50, 10],
+];
+const GRADE_ENHANCE_ODDS_EPIC = [
+  [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [60, 40, 0, 0], [50, 40, 10, 0],
+  [40, 45, 15, 0], [30, 30, 29, 2], [20, 30, 40, 10], [15, 25, 40, 20],
+];
+const GRADE_ENHANCE_ODDS_UNIQUE = [
+  [80, 20, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0], [55, 45, 0, 0], [45, 30, 25, 0],
+  [35, 30, 35, 0], [25, 40, 31, 4], [15, 30, 45, 10], [5, 25, 50, 20],
+];
+const GRADE_ENHANCE_ODDS = {
+  normal: GRADE_ENHANCE_ODDS_NORMAL_RARE,
+  rare: GRADE_ENHANCE_ODDS_NORMAL_RARE,
+  epic: GRADE_ENHANCE_ODDS_EPIC,
+  unique: GRADE_ENHANCE_ODDS_UNIQUE,
+};
+
+// 강화 비용 공식용 상수.
+// +0 강화비용(시드값) = 무기의 판매 가격(sellPrice) × 2 × 0.4
+// 이후 강화비용 = 이전 단계 강화비용 × 단계 배율 × 등급 보너스 (다음 단계에서 계산 함수로 구현 예정)
+// 단계 배율: index = 강화 단계(0~9)
+const ENHANCE_COST_STEP_MULT = [1, 1.5, 1.4, 1.5, 1.5, 1.5, 1.6, 1.6, 1.7, 1.7];
+// 등급 보너스
+const GRADE_COST_MULT = { normal: 1, rare: 1.15, epic: 1.3, unique: 1.5 };
+
+// ============================================================
+// [2단계] 위 데이터로 실제 배열을 계산하는 함수. 아직 WEAPON_TYPES에는 연결하지 않음(3단계에서 연결 예정).
+// 독립적으로 호출해서 바로 테스트 가능한 순수 함수들.
+// ============================================================
+
+// 무기 하나의 강화 비용 배열(길이 9)을 계산.
+// +0 강화비용(시드값) = sellPrice × 2 × 0.4, 이후 이전 단계 비용 × 단계배율 × 등급보너스를 9단계 반복.
+// 등급 데이터가 없거나 sellPrice가 없으면 null 반환.
+function computeGradeCost(sellPrice, grade){
+  const gradeMult = GRADE_COST_MULT[grade];
+  if(gradeMult == null || !(sellPrice > 0)) return null;
+  const cost = [];
+  let prev = sellPrice * 2 * 0.4; // +0 강화비용(시드값)
+  for(let lv = 1; lv <= 9; lv++){
+    prev = Math.round(prev * ENHANCE_COST_STEP_MULT[lv] * gradeMult);
+    cost.push(prev); // index0 = 0→1 비용, ... index8 = 8→9 비용
+  }
+  return cost;
+}
+
+// 등급에 해당하는 강화 확률표를 조회. 없는 등급이면 null.
+function resolveGradeOdds(grade){
+  return GRADE_ENHANCE_ODDS[grade] || null;
+}
+
+// ============================================================
+// [3단계 - 최종] WEAPON_TYPES 전체에 등급별 강화 확률/비용 공식을 연결.
+// 무기에 enhanceOverride({odds, cost})가 명시적으로 등록된 경우에만 그 값을 우선 적용하고,
+// 그 외에는 전부(롱소드/그레이트소드 포함) 등급 공식으로 계산해서 odds/cost를 새로 채움.
+// ============================================================
+Object.values(WEAPON_TYPES).forEach(w => {
+  if(w.enhanceOverride){
+    if(w.enhanceOverride.odds) w.odds = w.enhanceOverride.odds;
+    if(w.enhanceOverride.cost) w.cost = w.enhanceOverride.cost;
+    return;
+  }
+  const gradeOdds = resolveGradeOdds(w.grade);
+  const gradeCost = computeGradeCost(w.sellPrice, w.grade);
+  if(gradeOdds) w.odds = gradeOdds;
+  if(gradeCost) w.cost = gradeCost;
+});
+
+// ============================================================
+// 강화 단계별 판매 가격 공식
+// +0 판매가 = 무기의 기본 판매 가격(sellPrice) 그대로 사용.
+// +1 이상 판매가 = 기본 판매 가격 + (평균 기대비용 × 강화 단계별 판매 배율).
+// 기존 강화 시스템(cost/odds, 강화 진행 로직)은 전혀 건드리지 않고, 그 값을 그대로 읽어서 계산만 함.
+// ============================================================
+
+// 강화 단계별 판매 배율. index = 강화 단계(1~9). 무기 종류/등급과 무관하게 고정값.
+const ENHANCE_SELL_STEP_MULT = [null, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.35, 1.35, 1.35];
+
+// 선형연립방정식 Ax=b를 가우스 소거법(부분 피벗팅)으로 푸는 범용 함수.
+// 평균 기대비용 계산 전용으로 쓰지만, 그 자체로는 강화 시스템과 무관한 독립적인 수학 유틸리티.
+function solveLinearSystem(A, b){
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for(let col = 0; col < n; col++){
+    let pivot = col;
+    for(let r = col + 1; r < n; r++){
+      if(Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
+    }
+    [M[col], M[pivot]] = [M[pivot], M[col]];
+    const pv = M[col][col];
+    if(Math.abs(pv) < 1e-12) continue; // 특이 행렬 방지용 안전장치(정상적인 확률표에서는 발생하지 않음)
+    for(let c = col; c <= n; c++) M[col][c] /= pv;
+    for(let r = 0; r < n; r++){
+      if(r === col) continue;
+      const factor = M[r][col];
+      if(factor === 0) continue;
+      for(let c = col; c <= n; c++) M[r][c] -= factor * M[col][c];
+    }
+  }
+  return M.map(row => row[n]);
+}
+
+// 현재 강화 비용(cost)/강화 확률(odds)을 그대로 사용해, 목표 강화 단계(+1~+최대단계)까지 도달하는
+// "평균 기대비용"을 각각 계산. 파괴가 발생하면 재획득비용(reacquireCost)을 내고 +0부터 같은 목표까지
+// 다시 강화하는 전체 비용(자기 자신, E_0)이 다시 더해지는 재귀 구조라, 단계별로 연립방정식을 세워서 품.
+// (기존 강화 진행 로직과는 완전히 분리된 독립 계산 함수 — cost/odds 값만 입력받아 결과만 반환함)
+function computeAverageExpectedCosts(cost, odds, reacquireCost){
+  const maxLevel = Math.min(cost.length, odds.length);
+  const results = [];
+  for(let target = 1; target <= maxLevel; target++){
+    const n = target; // 미지수: 0부터 target까지, 각 단계(0~target-1)에서의 기대비용 E_0 ... E_(n-1)
+    const A = Array.from({ length: n }, () => new Array(n).fill(0));
+    const b = new Array(n).fill(0);
+    for(let i = 0; i < n; i++){
+      const [ps, pt, pd, px] = odds[i].map(v => v / 100);
+      A[i][i] += 1 - pt;              // 유지: 같은 자리에 머무름
+      A[i][Math.max(i - 1, 0)] -= pd; // 하락: 한 단계 아래로 (0 밑으로는 안 내려감)
+      A[i][0] -= px;                  // 파괴: 재획득 후 다시 0부터
+      if(i + 1 < n) A[i][i + 1] -= ps; // 성공: 목표(n)에 도달하면 그 이후 비용은 0이라 항이 없음
+      b[i] = cost[i] + px * reacquireCost;
+    }
+    results.push(solveLinearSystem(A, b)[0]); // E_0 = 0부터 target까지의 평균 기대비용
+  }
+  return results; // index0 = +1까지 기대비용, ... index(maxLevel-1) = +maxLevel까지 기대비용
+}
+
+// 무기 하나의 강화 단계별 판매가 배열(길이 10, index=강화단계)을 계산.
+// 평균 기대비용은 w.avgExpectedCost에 캐시해서, 이후 같은 실행(세션) 동안 재계산 없이 재사용.
+function computeWeaponSellPrices(w){
+  if(!w.cost || w.cost.length === 0 || !w.odds || w.odds.length === 0) return null; // 강화 데이터가 없으면 계산 불가(예: 강화 준비 중인 무기)
+  const reacquireCost = (w.sellPrice || 0) * 2; // 무기 재획득 비용 = 기본 판매 가격 × 2
+  const avgCosts = computeAverageExpectedCosts(w.cost, w.odds, reacquireCost);
+  w.avgExpectedCost = avgCosts; // 계산 결과 저장(캐시) — 강화 비용/확률이 바뀌지 않는 한 다시 계산하지 않음
+  const sell = [w.sellPrice]; // +0 판매가 = 기본 판매 가격 그대로
+  for(let lv = 1; lv <= avgCosts.length; lv++){
+    sell.push(Math.round(w.sellPrice + avgCosts[lv - 1] * ENHANCE_SELL_STEP_MULT[lv]));
+  }
+  return sell;
+}
+
+// WEAPON_TYPES 전체(롱소드/그레이트소드 포함)에 판매가 공식을 연결
+Object.values(WEAPON_TYPES).forEach(w => {
+  const sell = computeWeaponSellPrices(w);
+  if(sell) w.sell = sell;
+});
+
+// ---- 캐릭터 레벨 시스템 ----
+const PLAYER_MAX_LEVEL = 99;
+const STAT_POINTS_PER_LEVEL = 4;
+
+// 몬스터 등급
+const MONSTER_GRADES = {
+  normal: { label: '일반', color: '#ffffff', goldBonus: 0 },
+  epic:   { label: '에픽', color: '#a066d6', goldBonus: 0.20 },
+  named:  { label: '네임드', color: '#ff8fc7', goldBonus: 0.35 },
+};
+
+// 획득 가능한 아티팩트(장비) 도감
+const ARTIFACT_SLOT_MAX = 3;
+const ARTIFACTS = {
+  ring: {
+    id: 'ring', name: '아주르의 강아지풀 반지', icon: '🌾',
+    desc: '마법사 아주르가 마력을 불어넣어 줄기를 꼬아 만든 반지.',
+    effectText: '강화 실패 시, 아주 낮은 확률(2%)로 강화 단계 하락을 막아준다.',
+  },
+  batwing: {
+    id: 'batwing', name: '박쥐 날개', icon: '🦇',
+    desc: '흡혈 박쥐(에픽)의 단단한 날개.',
+    effectText: '공격속도 5% 증가',
+  },
+};
+
+// 소비 아이템(플라스크 등) 도감
+const QUICK_SLOT_COUNT = 2;
+const CONSUMABLES = {
+  hpFlask: {
+    id: 'hpFlask', name: '[하급]체력 회복 플라스크', class: '플라스크', icon: '🧪',
+    desc: '사용시 2초에 걸쳐 최대 체력의 25%를 회복한다',
+    buyPrice: 70, sellPrice: 35,
+    effect: { type: 'healHp', percent: 25, durationMs: 2000 },
+  },
+  mpFlask: {
+    id: 'mpFlask', name: '[하급]마나 회복 플라스크', class: '플라스크', icon: '💧',
+    desc: '사용시 2초에 걸쳐 최대 마나의 25%를 회복한다',
+    buyPrice: 70, sellPrice: 35,
+    effect: { type: 'healMp', percent: 25, durationMs: 2000 },
+  },
+};
+
+// 기타 아이템 도감
+const MISC_ITEMS = {
+  manaFragment: {
+    id: 'manaFragment', name: '마석 파편', icon: '💠',
+    desc: '마물의 심장에서 추출한 마석의 파편.',
+    source: '다람쥐굴, 쥐굴',
+    sellPrice: 50,
+  },
+  manaShard: {
+    id: 'manaShard', name: '마석 조각', icon: '🔷',
+    desc: '마물의 심장에서 추출한 마석의 조각',
+    source: '에픽 몬스터 고유 드랍',
+    sellPrice: 100,
+  },
+};
+
+// ---- 상태 이상(디버프) 클래스 ----
+// 앞으로 종류가 계속 추가될 예정. 새 상태 이상은 이 객체에 항목만 추가하면 됨.
+const STATUS_EFFECTS = {
+  poison: {
+    id: 1,
+    name: '중독',
+    icon: '☠️',
+    color: '#7fd67f', // 초록 계열
+    tickIntervalMs: 1000,        // 1초마다
+    maxTicks: 5,                 // 최대 5초(=5틱) 지속
+    damagePercentOfMaxHp: 1,     // 매 틱 최대 체력의 1% 피해
+  },
+};
+
+// 모험가의 유해 템플릿: 무기 드랍 시 강화단계별 가중치
+const RELIC_TEMPLATES = {
+  relic_sword_1: { levelWeights: [ [1, 40], [2, 30], [3, 20] ] },
+  relic_sword_2: { levelWeights: [ [2, 40], [3, 30], [4, 20] ] },
+  relic_sword_3: { levelWeights: [ [2, 20], [3, 30], [4, 30], [5, 20] ] },
+};
+
+// 개별 몬스터 테이블 (체력은 등급 공식으로 통일 계산, 고유 드랍만 몬스터가 직접 가짐)
+const MONSTERS = {
+  squirrel: {
+    id: 'squirrel', name: '다람쥐', icon: '🐿️', grade: 'normal',
+    uniqueDrops: [],
+  },
+  rat: {
+    id: 'rat', name: '쥐', icon: '🐀', grade: 'normal',
+    uniqueDrops: [],
+  },
+  bat: {
+    id: 'bat', name: '박쥐', icon: '🦇', grade: 'epic',
+    extraGoldBonus: 0.10, // 등급 보너스 위에 추가로 붙는 골드 보너스
+    uniqueDrops: [
+      { type: 'artifact', artifactId: 'batwing', chance: 10 },
+    ],
+  },
+  blue_snake: {
+    id: 'blue_snake', name: '청사', icon: '🐍', grade: 'normal',
+    uniqueDrops: [],
+  },
+  tailless_snake: {
+    id: 'tailless_snake', name: '꼬리잘린 뱀', icon: '🐍', grade: 'normal',
+    uniqueDrops: [],
+  },
+  rattlesnake: {
+    id: 'rattlesnake', name: '방울뱀', icon: '🐍', grade: 'epic',
+    uniqueDrops: [],
+  },
+  blue_deer: {
+    id: 'blue_deer', name: '청록수', icon: '🦌', grade: 'normal',
+    uniqueDrops: [],
+  },
+  red_deer: {
+    id: 'red_deer', name: '적록수', icon: '🦌', grade: 'normal',
+    uniqueDrops: [],
+  },
+  three_eyed_deer: {
+    id: 'three_eyed_deer', name: '세개의 눈을 가진 사슴', icon: '🦌', grade: 'epic',
+    uniqueDrops: [],
+  },
+};
+
+// 던전 테이블
+const DUNGEONS = [
+  {
+    id: 'squirrel_hole',
+    name: '다람쥐굴',
+    icon: '🐿️',
+    desc: '숲에서 으스나무의 알 수 없는 힘에 빨려들어온 다람쥐들이 사는 굴입니다. 이들은 이성이 없고 침입자를 무차별적으로 공격합니다.',
+    monsters: [
+      { id: 'squirrel', chance: 100, levelMin: 1, levelMax: 3 },
+    ],
+    // 등급별 공통 드랍 규칙: 모험가의 유해(무기) 확률/템플릿, 마석 파편 확률
+    dropTable: {
+      normal: { relicChance: 10, relicTemplate: 'relic_sword_1', shardChance: 20 },
+    },
+  },
+  {
+    id: 'rat_den',
+    name: '쥐굴',
+    icon: '🐀',
+    desc: '하수도 깊은 곳에 자리 잡은 쥐떼의 소굴입니다. 가끔 흡혈 박쥐가 함께 서식하기도 합니다.',
+    monsters: [
+      { id: 'rat', chance: 80, levelMin: 3, levelMax: 5 },
+      { id: 'bat', chance: 20, levelMin: 6, levelMax: 6 },
+    ],
+    dropTable: {
+      normal: { relicChance: 12, relicTemplate: 'relic_sword_1', shardChance: 21 },
+      epic:   { relicChance: 12, relicTemplate: 'relic_sword_2', shardChance: 21 },
+    },
+  },
+  {
+    id: 'snake_den',
+    name: '뱀굴',
+    icon: '🐍',
+    desc: '습하고 어두운 동굴 깊은 곳에 뱀들이 똬리를 튼 소굴입니다. 방울뱀의 독은 매우 위험합니다.',
+    monsters: [
+      { id: 'blue_snake', chance: 40, levelMin: 6, levelMax: 9 },
+      { id: 'tailless_snake', chance: 40, levelMin: 6, levelMax: 9 },
+      { id: 'rattlesnake', chance: 20, levelMin: 10, levelMax: 10 },
+    ],
+    dropTable: {
+      normal: { relicChance: 12, relicTemplate: 'relic_sword_2', shardChance: 25 },
+      epic:   { relicChance: 12, relicTemplate: 'relic_sword_3', shardChance: 25 },
+    },
+  },
+  {
+    id: 'deer_den',
+    name: '사슴굴',
+    icon: '🦌',
+    desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다. 세 개의 눈을 가진 사슴은 예사롭지 않은 기운을 뿜습니다.',
+    monsters: [
+      { id: 'blue_deer', chance: 40, levelMin: 10, levelMax: 15 },
+      { id: 'red_deer', chance: 40, levelMin: 10, levelMax: 15 },
+      { id: 'three_eyed_deer', chance: 20, levelMin: 16, levelMax: 16 },
+    ],
+    dropTable: {
+      normal: { relicChance: 12, relicTemplate: 'relic_sword_2', shardChance: 25 },
+      epic:   { relicChance: 12, relicTemplate: 'relic_sword_3', shardChance: 25 },
+    },
+  },
+];
+
+// 모든 몬스터 공통 규칙
+const MONSTER_BASE_GOLD = 100;       // 1레벨 몬스터의 기본 드랍 골드
+const MONSTER_GOLD_GROWTH = 0.12;    // 레벨당 골드 가중치 (+12%)
+const MONSTER_GOLD_VARIANCE = 0.15;  // 최종 드랍 골드 랜덤 편차 (±15%)
+const MONSTER_ATTACK_SPEED = 0.5;    // 몬스터 공격속도(초당 공격 횟수) = 2초에 1번
+
+// 강화단계 그룹별 표시 이름(대장간 화면 상단 라벨, 인벤토리 카드 등에서 사용)
+const TIER_META = [
+  { label:"평범한 검" },
+  { label:"기운이 감도는 검" },
+  { label:"신비로운 검" },
+  { label:"타오르는 검" },
+  { label:"전설의 검" },
+];
+
+// 강화 단계(+0~+9)별 무기 발광 효과. PNG 이미지 자체는 건드리지 않고, 무기 이미지에 CSS filter만 적용해서 표현함
+// (drop-shadow 기본, 필요 시 brightness/saturate/blur 등을 filter 체인에 추가). 배경 전체가 아니라 무기 이미지 자체에만
+// 적용되므로 이미지 알파(투명 영역)를 넘어서 번지지 않음.
+// - glowColor: 대표 색상(폼멜 보석 색, 연기 색상 등에도 재사용)
+// - glow: swordVisual에 적용할 filter 값
+// - smoke: 연기 파티클 표시 여부
+const ENHANCE_LEVEL_EFFECTS = [
+  /* +0 */ { glowColor: null,      glow: "none" },
+  /* +1 */ { glowColor: "#ffffff", glow: "drop-shadow(0 0 6px #ffffffb0)" },
+  /* +2 */ { glowColor: "#ffffff", glow: "drop-shadow(0 0 9px #ffffffd0) brightness(1.05)" },
+  /* +3 */ { glowColor: "#8fd0ff", glow: "drop-shadow(0 0 9px #8fd0ffb0)" },
+  /* +4 */ { glowColor: "#8fd0ff", glow: "drop-shadow(0 0 12px #8fd0ffd0) brightness(1.05)", smoke: true },
+  /* +5 */ { glowColor: "#a066d6", glow: "drop-shadow(0 0 12px #a066d6b0)", smoke: true },
+  /* +6 */ { glowColor: "#a066d6", glow: "drop-shadow(0 0 15px #a066d6d0) brightness(1.05) saturate(1.1)", smoke: true },
+  /* +7 */ { glowColor: "#ff6a3d", glow: "drop-shadow(0 0 15px #ff6a3db0)", smoke: true },
+  /* +8 */ { glowColor: "#ff6a3d", glow: "drop-shadow(0 0 18px #ff6a3dd0) brightness(1.08) saturate(1.15)", smoke: true },
+  /* +9 */ { glowColor: "#e0b13c", glow: "drop-shadow(0 0 22px #e0b13cee) drop-shadow(0 0 8px #ffffff) brightness(1.1) saturate(1.2)", smoke: true },
+];
+
+// 저장소 키
+const STORAGE_KEY = 'forge-state-v5';
+
+// ---- 설정 시스템 ----
+// 카테고리(예: 전투) 안에 메뉴(예: 회복 설정)들이 들어가는 구조.
+// 새 카테고리/메뉴를 추가할 때는 이 배열에 항목만 추가하면 됨 — 모달 UI, 저장 로직은 자동으로 반영됨.
+// 각 항목: id(state.settings에 저장될 키), label(표시 이름), desc(설명),
+// type('toggle' | 'stepper' | 'stepper-row'), default(기본값).
+// stepper-row는 여러 개의 스테퍼(fields)를 한 줄에 배치할 때 사용 — 각 field는 min/max/step/unit/default 필요.
+const SETTINGS_SCHEMA = [
+  {
+    id: 'combat',
+    label: '전투',
+    icon: '⚔️',
+    items: [
+      {
+        id: 'autoHeal',
+        label: '회복 설정',
+        desc: '설정 값에 따라, 퀵슬롯에 등록된 플라스크를 사용합니다.',
+        type: 'toggle',
+        default: false,
+      },
+      {
+        id: 'healThresholds',
+        type: 'stepper-row',
+        fields: [
+          { id: 'autoHealThreshold', label: '체력 설정', min: 10, max: 90, step: 5, unit: '%', default: 50 },
+          { id: 'autoManaThreshold', label: '마나 설정', min: 10, max: 90, step: 5, unit: '%', default: 50 },
+        ],
+      },
+    ],
+  },
+];
