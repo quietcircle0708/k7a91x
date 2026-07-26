@@ -19,21 +19,31 @@ function meetsWeaponLevelReq(type, playerLevel){ return playerLevel >= (wpn(type
 function weaponImagePath(type){ return WEAPON_IMAGE_DIR + wpn(type).image + WEAPON_IMAGE_EXT; }
 function weaponImageFallbackPath(){ return WEAPON_IMAGE_DIR + WEAPON_IMAGE_FALLBACK + WEAPON_IMAGE_EXT; }
 
-// ---- 착용 제한(레벨/힘) ----
-// 착용 제한 안내 문구. 필요한 조건이 없으면(레벨 제한 1 이하 & 힘 제한 없음) null 반환.
+// ---- 착용 제한(레벨 + 무기 종류별 요구 스탯) ----
+// 무기 종류에 따른 요구 스탯 목록을 계산 (레벨 제한 × 배율, 소수점 반올림, 강화 단계와 무관)
+function weaponStatRequirements(type){
+  const w = wpn(type);
+  const formula = WEAPON_KIND_STAT_REQ[w.weaponKind];
+  if(!formula || !w.levelReq) return [];
+  return formula
+    .map(f => ({ stat: f.stat, amount: Math.round(w.levelReq * f.mult) }))
+    .filter(r => r.amount > 0);
+}
+// 착용 제한 안내 문구. 필요한 조건이 없으면 null 반환.
 function weaponRequirementText(type){
   const w = wpn(type);
   const parts = [];
   if(w.levelReq && w.levelReq > 1) parts.push(`레벨 ${w.levelReq} 이상`);
-  if(w.strReq && w.strReq > 0) parts.push(`힘 ${w.strReq} 이상`);
+  weaponStatRequirements(type).forEach(r => parts.push(`${STAT_LABELS[r.stat]} ${r.amount} 이상`));
   return parts.length ? parts.join(', ') : null;
 }
-// 착용(장착) 조건 충족 여부 — 레벨 + 힘 스탯 모두 확인. 상점 구매 가능 여부(meetsWeaponLevelReq, 레벨만 확인)와는 별개.
-function meetsWeaponEquipRequirements(type, playerLevel, playerStr){
+// 착용(장착) 조건 충족 여부 — 레벨 + 무기 종류별 요구 스탯 모두 확인.
+// playerStats는 { str, agi, int } 형태. 상점 구매 가능 여부(meetsWeaponLevelReq, 레벨만 확인)와는 별개.
+function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
   const w = wpn(type);
   if(w.levelReq && playerLevel < w.levelReq) return false;
-  if(w.strReq && (playerStr || 0) < w.strReq) return false;
-  return true;
+  const stats = playerStats || {};
+  return weaponStatRequirements(type).every(r => (stats[r.stat] || 0) >= r.amount);
 }
 
 // ---- 무기 툴팁(인벤토리/상점/던전 등 모든 화면 공통) ----

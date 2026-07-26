@@ -207,7 +207,7 @@ function renderInventoryList(){
     const itemColor = (ENHANCE_LEVEL_EFFECTS[item.level] && ENHANCE_LEVEL_EFFECTS[item.level].glowColor) || '#888';
     const isEquipped = item.id === state.equippedId;
     const sellVal = sellValueFor(type, item.level);
-    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, (state.stats && state.stats.str) || 0);
+    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, state.stats);
     const equipDisabled = isEquipped || !reqOk;
     const equipBtnHtml = `<button class="inv-btn equip ${isEquipped?'active':''}" data-action="equip" data-id="${item.id}" ${equipDisabled?'disabled':''}>${isEquipped?'장착 중':'강화 선택'}</button>`;
     const equipBtnFinal = (!isEquipped && !reqOk)

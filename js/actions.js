@@ -172,7 +172,7 @@ function equipItem(id){
   const item = state.inventory.find(i => i.id === id);
   if(!item) return;
   const type = item.type || 'longsword';
-  if(!meetsWeaponEquipRequirements(type, state.playerLevel, (state.stats && state.stats.str) || 0)) return;
+  if(!meetsWeaponEquipRequirements(type, state.playerLevel, state.stats)) return;
   state.equippedId = id;
   showMsg('', '');
   render();

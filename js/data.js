@@ -14,6 +14,16 @@ const EQUIPMENT_TYPES = { weapon: '무기' };
 // 무기 종류(카테고리) 구분: 양손 검 / 검 / 단검 / 지팡이. 무기 "이름"과는 별개의 개념.
 const WEAPON_KINDS = { two_handed_sword: '양손 검', sword: '검', dagger: '단검', staff: '지팡이' };
 
+// 무기 종류별 착용 요구 스탯 공식. 레벨 제한(levelReq)에 배율을 곱해서 계산(소수점 반올림), 강화 단계와 무관.
+// stat: 'str'(힘) | 'agi'(민첩) | 'int'(지능)
+const WEAPON_KIND_STAT_REQ = {
+  sword:            [{ stat: 'str', mult: 2 }, { stat: 'agi', mult: 0.5 }],
+  two_handed_sword: [{ stat: 'str', mult: 3 }],
+  dagger:           [{ stat: 'str', mult: 1 }, { stat: 'agi', mult: 2 }],
+  staff:            [{ stat: 'int', mult: 3 }],
+};
+const STAT_LABELS = { str: '힘', agi: '민첩', int: '지능' };
+
 // 무기 등급(레어도). 색상만 우선 정의 — 텍스트 테두리 강조 등 시각 효과는 추후 추가 예정.
 const WEAPON_GRADES = {
   normal: { label: '일반', color: '#ffffff' },
