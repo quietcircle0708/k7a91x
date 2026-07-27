@@ -32,6 +32,16 @@ const WEAPON_GRADES = {
   unique: { label: '유니크', color: '#ff8a3d' },
 };
 
+// ---- 무기 이름 색상 ----
+// 무기 이름 색상 = 무기 등급 색상이 기본. 단, 강화 단계 색상의 "가치"가 더 높으면 그 색으로 대체됨.
+// 가치 순서(낮음→높음): 흰색 < 하늘색 < 보라색 < 주황색 < 금색. (무기 이미지 발광 효과와는 별개의 시스템)
+const NAME_COLOR_RANK = { white: 1, sky: 2, purple: 3, orange: 4, gold: 5 };
+const NAME_COLOR_HEX = { white: '#ffffff', sky: '#8fd0ff', purple: '#a066d6', orange: '#ff8a3d', gold: '#e0b13c' };
+// 무기 등급별 이름 색상 키
+const GRADE_NAME_COLOR_KEY = { normal: 'white', rare: 'sky', epic: 'purple', unique: 'orange' };
+// 강화 단계(0~9)별 이름 색상 키
+const ENHANCE_NAME_COLOR_KEY = ['white', 'white', 'white', 'sky', 'sky', 'purple', 'purple', 'orange', 'orange', 'gold'];
+
 // 무기 이미지 파일 경로 규칙. WEAPON_TYPES의 image 필드는 파일명만 가짐(확장자/경로 제외).
 // 해당 이름의 파일이 없으면 WEAPON_IMAGE_FALLBACK을 사용(런타임에 <img onerror>로 자동 대체).
 const WEAPON_IMAGE_DIR = 'assets/sword/';

@@ -10,6 +10,15 @@ function wpn(type){ return WEAPON_TYPES[type] || WEAPON_TYPES.longsword; }
 function weaponKindLabel(type){ return WEAPON_KINDS[wpn(type).weaponKind] || ''; }
 function weaponGradeLabel(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.label : ''; }
 function weaponGradeColor(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.color : '#ffffff'; }
+// 무기 이름 색상: 등급 색상이 기본, 강화 단계 색상의 가치가 더 높으면 그 색으로 대체.
+// 하드코딩 없이 GRADE_NAME_COLOR_KEY/ENHANCE_NAME_COLOR_KEY 표만 보고 계산 — 새 무기/등급 추가해도 그대로 동작.
+function weaponNameColor(type, level){
+  const w = wpn(type);
+  const gradeKey = GRADE_NAME_COLOR_KEY[w.grade] || 'white';
+  const levelKey = ENHANCE_NAME_COLOR_KEY[level] || 'white';
+  const finalKey = NAME_COLOR_RANK[levelKey] > NAME_COLOR_RANK[gradeKey] ? levelKey : gradeKey;
+  return NAME_COLOR_HEX[finalKey];
+}
 function weaponName(type){ return wpn(type).name; }
 // 상점 구매가 = 판매가(sellPrice) × 2
 function weaponBuyPrice(type){ return (wpn(type).sellPrice || 0) * 2; }
@@ -59,7 +68,7 @@ function buildWeaponTooltipHtml(type, level){
 
   // 1. 등급 + 이름 (+강화단계)
   const nameLine = (grade ? `[${grade.label}] ` : '') + w.name + ' +' + lvl;
-  html += `<div style="color:${grade ? grade.color : 'var(--forge-cream)'}; font-weight:700; margin-bottom:4px;">${nameLine}</div>`;
+  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:4px;">${nameLine}</div>`;
 
   // 2. 장비 설명
   if(w.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${w.desc}</div>`;

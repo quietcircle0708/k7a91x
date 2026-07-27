@@ -61,9 +61,10 @@ function render(){
     const levelEffect = ENHANCE_LEVEL_EFFECTS[level] || ENHANCE_LEVEL_EFFECTS[0];
 
     el('levelDisplay').textContent = '+' + level;
-    el('levelDisplay').style.color = level === MAX_LEVEL ? 'var(--forge-gold)' : (levelEffect.glowColor || 'var(--forge-cream)');
+    el('levelDisplay').style.color = weaponNameColor(type, level);
     el('tierLabel').textContent = meta.label;
     el('itemName').textContent = weaponName(type) + ' +' + level;
+    el('itemName').style.color = weaponNameColor(type, level);
     const atkNext = level < MAX_LEVEL ? atkFor(type, level+1) : null;
     el('atkText').innerHTML = formatStatDelta(atkFor(type, level), atkNext, null, '');
 
@@ -204,7 +205,7 @@ function renderInventoryList(){
     const type = item.type || 'longsword';
     const tier = tierOf(item.level);
     const meta = TIER_META[tier];
-    const itemColor = (ENHANCE_LEVEL_EFFECTS[item.level] && ENHANCE_LEVEL_EFFECTS[item.level].glowColor) || '#888';
+    const itemColor = weaponNameColor(type, item.level);
     const isEquipped = item.id === state.equippedId;
     const sellVal = sellValueFor(type, item.level);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, state.stats);
@@ -737,13 +738,14 @@ function renderWeaponShopList(){
     const capOk = state.inventory.length < INV_MAX;
     const disabled = !levelOk || !capOk || state.gold < buyPrice;
     const tag = !levelOk ? `Lv.${w.levelReq} 필요` : (!capOk ? '인벤토리 가득참' : '');
+    const nameColor = weaponNameColor(w.id, 0);
     return `
       <div class="scroll-card">
         <div class="scroll-head">
           <div style="display:flex; align-items:center; gap:12px;">
-            <div class="artifact-icon-box" style="background:#242424; border-color:${grade.color};">🗡️</div>
+            <div class="artifact-icon-box" style="background:#242424; border-color:${nameColor};">🗡️</div>
             <span class="weapon-name-wrap">
-              <span class="scroll-name" style="color:${grade.color};">${w.name}</span>
+              <span class="scroll-name" style="color:${nameColor};">${w.name}</span>
               <span class="tooltip">${buildWeaponTooltipHtml(w.id, 0)}</span>
             </span>
           </div>
