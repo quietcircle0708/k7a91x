@@ -217,17 +217,20 @@ function buyArtifact(id, btn){
   purchaseEffect(btn || null);
   render(); saveState();
 }
-// 상점에 등록된(purchasable) 무기를 구매. 가격은 sellPrice×2, 레벨 제한(levelReq)도 함께 확인.
+// 상점에 등록된(purchasable) 무기를 구매. 가격은 sellPrice×2. 아이템 레벨(levelReq)은 "착용" 조건일 뿐
+// 구매/강화와는 무관하므로, 레벨이 낮아도 구매해서 인벤토리에 넣고 강화할 수 있음.
 function buyWeapon(typeId, btn){
   const w = WEAPON_TYPES[typeId];
   if(!w || !w.purchasable) return;
-  if(!meetsWeaponLevelReq(typeId, state.playerLevel)) return;
   const price = weaponBuyPrice(typeId);
   if(state.gold < price || state.inventory.length >= INV_MAX) return;
   state.gold -= price;
   const newItem = { id: state.nextItemId++, level: 0, type: typeId };
   state.inventory.push(newItem);
-  if(state.equippedId === null) state.equippedId = newItem.id;
+  // 장착 중인 무기가 없을 때만 자동 장착하되, 착용 조건(레벨/요구 스탯)을 만족할 때만 실제로 장착함.
+  if(state.equippedId === null && meetsWeaponEquipRequirements(typeId, state.playerLevel, state.stats)){
+    state.equippedId = newItem.id;
+  }
   purchaseEffect(btn || null);
   render(); saveState();
 }

@@ -22,8 +22,6 @@ function weaponNameColor(type, level){
 function weaponName(type){ return wpn(type).name; }
 // 상점 구매가 = 판매가(sellPrice) × 2
 function weaponBuyPrice(type){ return (wpn(type).sellPrice || 0) * 2; }
-// 레벨 제한 충족 여부 (levelReq 이상이어야 함)
-function meetsWeaponLevelReq(type, playerLevel){ return playerLevel >= (wpn(type).levelReq || 1); }
 // 무기 이미지 경로(파일명 기준). 실제로 파일이 있는지는 <img onerror>에서 최종 확인/대체함.
 function weaponImagePath(type){ return WEAPON_IMAGE_DIR + wpn(type).image + WEAPON_IMAGE_EXT; }
 function weaponImageFallbackPath(){ return WEAPON_IMAGE_DIR + WEAPON_IMAGE_FALLBACK + WEAPON_IMAGE_EXT; }
@@ -46,8 +44,8 @@ function weaponRequirementText(type){
   weaponStatRequirements(type).forEach(r => parts.push(`${STAT_LABELS[r.stat]} ${r.amount} 이상`));
   return parts.length ? parts.join(', ') : null;
 }
-// 착용(장착) 조건 충족 여부 — 레벨 + 무기 종류별 요구 스탯 모두 확인.
-// playerStats는 { str, agi, int } 형태. 상점 구매 가능 여부(meetsWeaponLevelReq, 레벨만 확인)와는 별개.
+// 착용(장착) 조건 충족 여부 — 아이템 레벨(플레이어 레벨 이상 필요) + 무기 종류별 요구 스탯 모두 확인.
+// playerStats는 { str, agi, int } 형태. 구매/강화는 이 조건과 무관하게 항상 가능하며, 이 함수는 "장착" 액션에서만 사용됨.
 function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
   const w = wpn(type);
   if(w.levelReq && playerLevel < w.levelReq) return false;
@@ -66,9 +64,12 @@ function buildWeaponTooltipHtml(type, level){
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  // 1. 등급 + 이름 (+강화단계)
-  const nameLine = (grade ? `[${grade.label}] ` : '') + w.name + ' +' + lvl;
-  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:4px;">${nameLine}</div>`;
+  // 1. 이름 (+강화단계) — 무기 이름 색상 효과 적용
+  const nameLine = w.name + ' +' + lvl;
+  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+
+  // 1-2. 등급 — 이름과 별도 줄, 등급 색상 효과 적용
+  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
 
   // 2. 장비 설명
   if(w.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${w.desc}</div>`;

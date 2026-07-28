@@ -14,7 +14,7 @@ const EQUIPMENT_TYPES = { weapon: '무기' };
 // 무기 종류(카테고리) 구분: 양손 검 / 검 / 단검 / 지팡이. 무기 "이름"과는 별개의 개념.
 const WEAPON_KINDS = { two_handed_sword: '양손 검', sword: '검', dagger: '단검', staff: '지팡이' };
 
-// 무기 종류별 착용 요구 스탯 공식. 레벨 제한(levelReq)에 배율을 곱해서 계산(소수점 반올림), 강화 단계와 무관.
+// 무기 종류별 착용 요구 스탯 공식. 아이템 레벨(levelReq)에 배율을 곱해서 계산(소수점 반올림), 강화 단계와 무관.
 // stat: 'str'(힘) | 'agi'(민첩) | 'int'(지능)
 const WEAPON_KIND_STAT_REQ = {
   sword:            [{ stat: 'str', mult: 2 }, { stat: 'agi', mult: 0.5 }],
@@ -53,8 +53,10 @@ const WEAPON_IMAGE_FALLBACK = 'common_shortsword';
 // desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고) / weaponKind: 무기 종류(WEAPON_KINDS) /
 // grade: 무기 등급(WEAPON_GRADES) / attackPower: 공격력 / attackSpeed: 공격 속도 / critRate: 치명타 확률(%) /
 // purchasable: 상점 구매 가능 여부(true면 상점에 자동 등록) / sellPrice: 판매 가격(플레이어가 상점에 파는 가격.
-// 상점 구매가는 이 값의 2배로 자동 계산됨) / levelReq: 레벨 제한(이 수치 "이상"이어야 구매 가능) / image: 이미지 파일명
-// ---- 아래는 기존 강화 단계별(+0~+9) 수치 — 이번 개편에서 값은 건드리지 않음, 추후 새 체계로 정리 예정 ----
+// 상점 구매가는 이 값의 2배로 자동 계산됨) / levelReq: 아이템 레벨(착용하려면 플레이어 레벨이 이 수치 "이상"이어야 함. 구매/강화는 레벨과 무관하게 항상 가능) / image: 이미지 파일명
+// ---- 아래 강화 단계별(+0~+9) 수치는 전부 공식으로 자동 계산되어 채워짐 — 여기에 적는 값은
+// "+0(기본) 값"뿐이며, 나머지는 아래 forEach들이 attackPower/attackSpeed/critRate/sellPrice/grade/
+// weaponKind를 기준으로 계산해서 덮어씀. 직접 배열 전체를 적어둘 필요 없음(적어도 무시되고 재계산됨).
 // atk/speed/crit: 단계별 공격력/공격속도/치명타확률 배열 / cost: 단계별 강화 비용 / sell: 단계별 판매가 / odds: 단계별 강화 확률
 const WEAPON_TYPES = {
   longsword: {
@@ -65,15 +67,8 @@ const WEAPON_TYPES = {
     attackPower: 28, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 100, levelReq: 1,
     image: 'common_longsword',
-    atk:   [10, 21, 39, 63, 93, 130, 182, 242, 315, 400],
-    speed: [0.5, 0.55, 0.6, 0.65, 0.7, 0.8, 0.9, 1, 1.1, 1.2],
-    crit:  [0, 0, 0, 0, 0, 1, 2, 3, 4, 5],
-    cost:  [80, 150, 260, 450, 750, 1600, 2800, 4500, 7500],
-    sell:  [50, 280, 500, 1250, 2500, 4000, 9000, 27000, 68000, 136000],
-    odds: [
-      [95, 5, 0, 0], [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0],
-      [50, 45, 5, 0], [40, 30, 29, 1], [25, 30, 29, 1], [20, 20, 40, 20],
-    ],
+    atk: [28], speed: [0.6], crit: [10], sell: [100],
+    cost: [], odds: [],
   },
   greatsword: {
     id: 'greatsword', name: '그레이트 소드', desc: '강력한 일격을 위한 대검',
@@ -83,15 +78,8 @@ const WEAPON_TYPES = {
     attackPower: 34, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 5,
     image: 'rare_greatsword',
-    atk:   [14, 28, 52, 82, 121, 182, 273, 339, 441, 560],
-    speed: [0.4, 0.5, 0.57, 0.65, 0.7, 0.7, 0.7, 0.9, 1, 1.1],
-    crit:  [0, 0, 0, 0, 0, 1, 5, 5, 5, 10],
-    cost:  [180, 312, 540, 900, 1920, 3360, 5400, 9000, 18000],
-    sell:  [336, 660, 1500, 3000, 4800, 10800, 32400, 81600, 163200, 243000],
-    odds: [
-      [92, 8, 0, 0], [85, 15, 0, 0], [80, 20, 0, 0], [72, 28, 0, 0], [62, 38, 0, 0],
-      [50, 40, 10, 0], [35, 35, 29, 1], [25, 30, 40, 5], [15, 25, 45, 15],
-    ],
+    atk: [34], speed: [0.6], crit: [10], sell: [500],
+    cost: [], odds: [],
   },
   // ---- 아래 두 무기는 강화 단계별 증가 공식이 아직 없어서, 우선 +0(기본) 값만 담아둠.
   // cost/odds가 비어있으면(강화 데이터 없음) 강화 화면에서 "강화 준비 중"으로 자동 표시됨(render.js 참고).
@@ -220,7 +208,7 @@ const GRADE_ENHANCE_ODDS = {
 // 단계 배율: index = 강화 단계(0~9)
 const ENHANCE_COST_STEP_MULT = [1, 1.5, 1.4, 1.5, 1.5, 1.5, 1.6, 1.6, 1.7, 1.7];
 // 등급 보너스
-const GRADE_COST_MULT = { normal: 1, rare: 1.15, epic: 1.3, unique: 1.5 };
+const GRADE_COST_MULT = { normal: 1, rare: 1.015, epic: 1.025, unique: 1.03 };
 
 // ============================================================
 // [2단계] 위 데이터로 실제 배열을 계산하는 함수. 아직 WEAPON_TYPES에는 연결하지 않음(3단계에서 연결 예정).
@@ -228,16 +216,24 @@ const GRADE_COST_MULT = { normal: 1, rare: 1.15, epic: 1.3, unique: 1.5 };
 // ============================================================
 
 // 무기 하나의 강화 비용 배열(길이 9)을 계산.
-// +0 강화비용(시드값) = sellPrice × 2 × 0.4, 이후 이전 단계 비용 × 단계배율 × 등급보너스를 9단계 반복.
-// 등급 데이터가 없거나 sellPrice가 없으면 null 반환.
-function computeGradeCost(sellPrice, grade){
+// +0 강화비용(시드값)은 sellPrice가 아니라 "아이템 레벨(levelReq)"만으로 결정됨:
+//   아이템 레벨 = 1  → 시드값 = 100 × 2 × 0.4
+//   아이템 레벨 > 1  → 시드값 = (100 + 아이템 레벨 × 10) × 2 × 0.4
+// 이후 단계는 기존과 동일하게 "이전 단계 비용 × 단계배율 × 등급보너스"를 9단계 반복(그레이드 보너스는
+// 첫 단계(0→1)에는 적용되지 않고, 1→2 단계부터 적용됨 — 이후 단계 계산 방식 자체는 변경하지 않음).
+// 반올림은 각 단계의 "표시값"에만 적용하고, 다음 단계 계산에는 반올림 전의 정밀한 값을 그대로 이어서 사용함
+// (매 단계마다 반올림된 값을 누적하면 오차가 쌓여 최종 단계에서 결과가 어긋나기 때문).
+// 등급 데이터가 없으면 null 반환.
+function computeGradeCost(itemLevel, grade){
   const gradeMult = GRADE_COST_MULT[grade];
-  if(gradeMult == null || !(sellPrice > 0)) return null;
+  if(gradeMult == null) return null;
+  const base = itemLevel === 1 ? 100 : (100 + itemLevel * 10);
   const cost = [];
-  let prev = sellPrice * 2 * 0.4; // +0 강화비용(시드값)
-  for(let lv = 1; lv <= 9; lv++){
-    prev = Math.round(prev * ENHANCE_COST_STEP_MULT[lv] * gradeMult);
-    cost.push(prev); // index0 = 0→1 비용, ... index8 = 8→9 비용
+  let precise = base * 2 * 0.4; // +0 강화비용(시드값) — 0→1 단계 비용은 이 값 그대로(배율 미적용)
+  cost.push(Math.round(precise));
+  for(let lv = 1; lv <= 8; lv++){
+    precise = precise * ENHANCE_COST_STEP_MULT[lv] * gradeMult;
+    cost.push(Math.round(precise)); // index0 = 0→1 비용, ... index8 = 8→9 비용
   }
   return cost;
 }
@@ -259,7 +255,7 @@ Object.values(WEAPON_TYPES).forEach(w => {
     return;
   }
   const gradeOdds = resolveGradeOdds(w.grade);
-  const gradeCost = computeGradeCost(w.sellPrice, w.grade);
+  const gradeCost = computeGradeCost(w.levelReq || 1, w.grade);
   if(gradeOdds) w.odds = gradeOdds;
   if(gradeCost) w.cost = gradeCost;
 });
@@ -580,7 +576,7 @@ const ENHANCE_LEVEL_EFFECTS = [
   /* +6 */ { glowColor: "#a066d6", glow: "drop-shadow(0 0 15px #a066d6d0) brightness(1.05) saturate(1.1)", smoke: true },
   /* +7 */ { glowColor: "#ff6a3d", glow: "drop-shadow(0 0 15px #ff6a3db0)", smoke: true },
   /* +8 */ { glowColor: "#ff6a3d", glow: "drop-shadow(0 0 18px #ff6a3dd0) brightness(1.08) saturate(1.15)", smoke: true },
-  /* +9 */ { glowColor: "#e0b13c", glow: "drop-shadow(0 0 22px #e0b13cee) drop-shadow(0 0 8px #ffffff) brightness(1.1) saturate(1.2)", smoke: true },
+  /* +9 */ { glowColor: "#c9950f", glow: "drop-shadow(0 0 22px #c9950fee) drop-shadow(0 0 10px #f2b90fcc) brightness(1.05) saturate(1.35)", smoke: true },
 ];
 
 // 저장소 키

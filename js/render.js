@@ -202,7 +202,7 @@ function renderInventoryList(){
         <div class="inv-icon" style="border-color:${itemColor};">🗡️</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name">${weaponName(type)} <span class="inv-level" style="color:${itemColor};">+${item.level}</span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}</span>
+            <span class="inv-name" style="color:${itemColor};">${weaponName(type)} <span class="inv-level" style="color:${itemColor};">+${item.level}</span></span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
             <span class="tooltip">${buildWeaponTooltipHtml(type, item.level)}</span>
           </span>
           <div class="inv-sub">${meta.label}</div>
@@ -751,10 +751,10 @@ function buildShopCardHtml(tabId, id){
 function buildWeaponShopCardHtml(typesTable, id){
   const w = typesTable[id];
   const buyPrice = (w.sellPrice || 0) * 2;
-  const levelOk = w.levelReq ? state.playerLevel >= w.levelReq : true;
   const capOk = state.inventory.length < INV_MAX;
-  const disabled = !levelOk || !capOk || state.gold < buyPrice;
-  const tag = !levelOk ? `Lv.${w.levelReq} 필요` : (!capOk ? '인벤토리 가득참' : '');
+  // 아이템 레벨(levelReq)은 "착용" 조건일 뿐이라 구매를 막지 않음 — 인벤토리 공간/골드만 확인.
+  const disabled = !capOk || state.gold < buyPrice;
+  const tag = !capOk ? '인벤토리 가득참' : (w.levelReq && w.levelReq > 1 ? `아이템 Lv.${w.levelReq}` : '');
   const nameColor = weaponNameColor(id, 0);
   return `
     <div class="scroll-card">
