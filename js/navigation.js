@@ -66,6 +66,30 @@ function switchInvTab(tab){
   el('invTabBtnMisc').classList.toggle('active', tab === 'misc');
 }
 
+// ---- 상점 탭/정렬 ----
+function switchShopTab(tabId){
+  shopUI.tab = tabId;
+  closeShopFilterMenu();
+  renderShopTab();
+}
+function setShopFilter(filterId){
+  shopUI.filter = filterId;
+  closeShopFilterMenu();
+  renderShopTab();
+}
+function toggleShopSortDir(){
+  shopUI.dir = shopUI.dir === 'asc' ? 'desc' : 'asc';
+  renderShopTab();
+}
+function toggleShopFilterMenu(){
+  shopFilterMenuOpen = !shopFilterMenuOpen;
+  el('shopFilterMenu').style.display = shopFilterMenuOpen ? 'block' : 'none';
+}
+function closeShopFilterMenu(){
+  shopFilterMenuOpen = false;
+  el('shopFilterMenu').style.display = 'none';
+}
+
 // ---- 퀵슬롯 등록 모달 ----
 let pendingQuickSlotIndex = null;
 function openQuickSlotPicker(idx){

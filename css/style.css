@@ -289,6 +289,32 @@
   .back-btn:hover{ color: var(--forge-cream); border-color: var(--forge-gold); }
   .artifact-icon-box{ width:46px; height:46px; border-radius:10px; background:#2c2415; border:1px solid var(--forge-gold); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
 
+  /* ---- shop: 탭 / 필터 / 정렬 ---- */
+  .shop-head-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .shop-sort-controls{ display:flex; gap:8px; flex-shrink:0; }
+  .shop-filter-wrap{ position:relative; }
+  .shop-filter-btn{
+    background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+    border-radius:8px; padding:7px 10px; font-size:11.5px; cursor:pointer; white-space:nowrap;
+  }
+  .shop-filter-btn:hover{ border-color: var(--forge-gold); color: var(--forge-cream); }
+  .shop-filter-menu{
+    position:absolute; top:calc(100% + 6px); right:0; z-index:20; min-width:130px;
+    background:#0e0b09; border:1px solid var(--forge-line); border-radius:8px; overflow:hidden;
+  }
+  .shop-filter-item{
+    display:block; width:100%; text-align:left; background:none; border:none; color: var(--forge-cream-dim);
+    padding:9px 12px; font-size:12px; cursor:pointer;
+  }
+  .shop-filter-item:hover{ background: var(--forge-panel-2); color: var(--forge-cream); }
+  .shop-filter-item.active{ color: var(--forge-gold); }
+  .shop-tabs{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .shop-tab-btn{
+    flex:1; min-width:60px; background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+    border-radius:8px; padding:8px 4px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .shop-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+
   /* ---- inventory ---- */
   .inv-tabs{ display:flex; gap:8px; margin-bottom:14px; }
   .inv-tab-btn{

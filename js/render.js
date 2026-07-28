@@ -149,25 +149,8 @@ function render(){
   el('autoRebuyToggleBtn').textContent = '🗡️ 판매 후 자동 구매: ' + (state.autoRebuy ? '켜짐' : '꺼짐');
   el('autoRebuyToggleBtn').classList.toggle('on', state.autoRebuy);
 
-  // 상점
-  el('buyRingBtn').disabled = ownsArtifact('ring') || state.artifacts.length >= ARTIFACT_SLOT_MAX || state.gold < 25000;
-  el('buyRingBtn').textContent = ownsArtifact('ring') ? '보유 중' : (state.artifacts.length >= ARTIFACT_SLOT_MAX ? '아티팩트 슬롯 부족' : '구매 (25,000 G)');
-  el('ringOwnedTag').textContent = ownsArtifact('ring') ? '보유함' : '';
-  renderWeaponShopList();
-  el('hpFlaskCount').textContent = (state.consumables && state.consumables.hpFlask) || 0;
-  el('buyHpFlaskBtn').textContent = `구매 (${CONSUMABLES.hpFlask.buyPrice} G)`;
-  el('buyHpFlaskBtn').disabled = state.gold < CONSUMABLES.hpFlask.buyPrice;
-  el('sellHpFlaskBtn').textContent = `전부 판매 (개당 ${CONSUMABLES.hpFlask.sellPrice} G)`;
-  el('sellHpFlaskBtn').disabled = !((state.consumables && state.consumables.hpFlask) > 0);
-  el('mpFlaskCount').textContent = (state.consumables && state.consumables.mpFlask) || 0;
-  el('buyMpFlaskBtn').textContent = `구매 (${CONSUMABLES.mpFlask.buyPrice} G)`;
-  el('buyMpFlaskBtn').disabled = state.gold < CONSUMABLES.mpFlask.buyPrice;
-  el('sellMpFlaskBtn').textContent = `전부 판매 (개당 ${CONSUMABLES.mpFlask.sellPrice} G)`;
-  el('sellMpFlaskBtn').disabled = !((state.consumables && state.consumables.mpFlask) > 0);
-  el('shardCount').textContent = state.manaFragments || 0;
-  el('sellShardBtn').disabled = !(state.manaFragments > 0);
-  el('shardPieceCount').textContent = state.manaShards || 0;
-  el('sellShardPieceBtn').disabled = !(state.manaShards > 0);
+  // 상점 (탭/정렬 포함 통합 렌더링)
+  renderShopTab();
 
   // 인벤토리
   el('invCount').textContent = state.inventory.length + ' / ' + INV_MAX;
@@ -724,36 +707,137 @@ function renderDeathCurseBadge(){
   });
 }
 
-// ---- 상점: 구매 가능한 무기 자동 등록 ----
-// WEAPON_TYPES 중 purchasable:true인 항목을 찾아 상점 카드로 그림. 새 무기를 추가하고
-// purchasable:true로 표시하기만 하면 이 함수가 알아서 상점에 등록해줌 — 여기는 건드릴 필요 없음.
-function renderWeaponShopList(){
-  const wrap = el('weaponShopList');
-  if(!wrap) return;
-  const list = Object.values(WEAPON_TYPES).filter(w => w.purchasable);
-  wrap.innerHTML = list.map(w => {
-    const grade = WEAPON_GRADES[w.grade] || WEAPON_GRADES.normal;
-    const buyPrice = weaponBuyPrice(w.id);
-    const levelOk = meetsWeaponLevelReq(w.id, state.playerLevel);
-    const capOk = state.inventory.length < INV_MAX;
-    const disabled = !levelOk || !capOk || state.gold < buyPrice;
-    const tag = !levelOk ? `Lv.${w.levelReq} 필요` : (!capOk ? '인벤토리 가득참' : '');
-    const nameColor = weaponNameColor(w.id, 0);
-    return `
-      <div class="scroll-card">
-        <div class="scroll-head">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="artifact-icon-box" style="background:#242424; border-color:${nameColor};">🗡️</div>
-            <span class="weapon-name-wrap">
-              <span class="scroll-name" style="color:${nameColor};">${w.name}</span>
-              <span class="tooltip">${buildWeaponTooltipHtml(w.id, 0)}</span>
-            </span>
-          </div>
-          <span class="scroll-count">${tag}</span>
+// ============================================================
+// ---- 상점: 탭/정렬 통합 렌더링 ----
+// 새 아이템은 각 도감(WEAPON_TYPES/ARMOR_TYPES/CONSUMABLES/ARTIFACTS/MISC_ITEMS)에
+// purchasable:true(또는 기타 탭은 그냥 등록)로 추가하기만 하면 이 함수들이 알아서 상점에 표시함.
+// 아이템 이름/ID로 분기하는 하드코딩은 없음 — 카드 템플릿만 탭별로 다를 뿐, 목록 자체는
+// formulas.js의 shopEntriesForTab()이 데이터 기반으로 뽑아줌.
+// ============================================================
+
+function renderShopTab(){
+  if(!el('shopItemsList')) return; // 상점 화면 DOM이 아직 없는 초기 타이밍 방어
+
+  SHOP_TABS.forEach(t => {
+    const btn = document.querySelector(`.shop-tab-btn[data-tab="${t.id}"]`);
+    if(btn) btn.classList.toggle('active', shopUI.tab === t.id);
+  });
+  const filterDef = SHOP_SORT_FIELDS.find(f => f.id === shopUI.filter) || SHOP_SORT_FIELDS[0];
+  el('shopFilterLabel').textContent = filterDef.label;
+  el('shopSortDirBtn').textContent = shopUI.dir === 'asc' ? '↑ 오름차순' : '↓ 내림차순';
+  el('shopFilterMenu').innerHTML = SHOP_SORT_FIELDS.map(f => `
+    <button class="shop-filter-item ${shopUI.filter === f.id ? 'active' : ''}" data-filter="${f.id}">${f.label}</button>
+  `).join('');
+
+  const entries = sortShopEntries(shopEntriesForTab(shopUI.tab), shopUI.filter, shopUI.dir);
+  const wrap = el('shopItemsList');
+  if(entries.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">${shopUI.tab === 'armor' ? '아직 준비된 방어구가 없습니다.' : '표시할 아이템이 없습니다.'}</div>`;
+    return;
+  }
+  wrap.innerHTML = entries.map(entry => buildShopCardHtml(shopUI.tab, entry.id)).join('');
+}
+
+function buildShopCardHtml(tabId, id){
+  if(tabId === 'weapon') return buildWeaponShopCardHtml(WEAPON_TYPES, id);
+  if(tabId === 'armor') return buildWeaponShopCardHtml(ARMOR_TYPES, id);
+  if(tabId === 'consumable') return buildConsumableShopCardHtml(id);
+  if(tabId === 'artifact') return buildArtifactShopCardHtml(id);
+  if(tabId === 'misc') return buildMiscShopCardHtml(id);
+  return '';
+}
+
+// 무기/방어구 공통 카드(장비류). typesTable을 인자로 받아서 방어구 데이터가 생기면 그대로 재사용됨.
+function buildWeaponShopCardHtml(typesTable, id){
+  const w = typesTable[id];
+  const buyPrice = (w.sellPrice || 0) * 2;
+  const levelOk = w.levelReq ? state.playerLevel >= w.levelReq : true;
+  const capOk = state.inventory.length < INV_MAX;
+  const disabled = !levelOk || !capOk || state.gold < buyPrice;
+  const tag = !levelOk ? `Lv.${w.levelReq} 필요` : (!capOk ? '인벤토리 가득참' : '');
+  const nameColor = weaponNameColor(id, 0);
+  return `
+    <div class="scroll-card">
+      <div class="scroll-head">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="artifact-icon-box" style="background:#242424; border-color:${nameColor};">🗡️</div>
+          <span class="weapon-name-wrap">
+            <span class="scroll-name" style="color:${nameColor};">${w.name}</span>
+            <span class="tooltip">${buildWeaponTooltipHtml(id, 0)}</span>
+          </span>
         </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" data-action="buy-weapon" data-type="${w.id}" style="flex:1;" ${disabled ? 'disabled' : ''}>구매 (${buyPrice.toLocaleString()} G)</button>
+        <span class="scroll-count">${tag}</span>
+      </div>
+      <div class="scroll-body">
+        <button class="scroll-buy" data-action="buy-weapon" data-type="${id}" style="flex:1;" ${disabled ? 'disabled' : ''}>구매 (${buyPrice.toLocaleString()} G)</button>
+      </div>
+    </div>`;
+}
+
+function buildConsumableShopCardHtml(id){
+  const item = CONSUMABLES[id];
+  const owned = (state.consumables && state.consumables[id]) || 0;
+  return `
+    <div class="scroll-card">
+      <div class="scroll-head">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">${item.icon}</div>
+          <span class="scroll-name-wrap">
+            <span class="scroll-name" style="color:var(--forge-cream);">${item.name}</span>
+            <span class="tooltip">${item.desc}</span>
+          </span>
         </div>
-      </div>`;
-  }).join('');
+        <span class="scroll-count">보유 ${owned}개</span>
+      </div>
+      <div class="scroll-body">
+        <button class="scroll-buy" data-action="buy-consumable" data-type="${id}" style="flex:1;" ${state.gold < item.buyPrice ? 'disabled' : ''}>구매 (${item.buyPrice} G)</button>
+        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>전부 판매 (개당 ${item.sellPrice} G)</button>
+      </div>
+    </div>`;
+}
+
+function buildArtifactShopCardHtml(id){
+  const a = ARTIFACTS[id];
+  const owned = ownsArtifact(id);
+  const slotFull = state.artifacts.length >= ARTIFACT_SLOT_MAX;
+  const disabled = owned || slotFull || state.gold < a.buyPrice;
+  const btnText = owned ? '보유 중' : (slotFull ? '아티팩트 슬롯 부족' : `구매 (${a.buyPrice.toLocaleString()} G)`);
+  return `
+    <div class="scroll-card artifact">
+      <div class="scroll-head">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="artifact-icon-box">${a.icon}</div>
+          <span class="scroll-name-wrap">
+            <span class="scroll-name artifact">${a.name}</span>
+            <span class="tooltip">${a.desc}</span>
+          </span>
+        </div>
+        <span class="scroll-count">${owned ? '보유함' : ''}</span>
+      </div>
+      <div class="effect-line">${a.effectText}</div>
+      <div class="scroll-body">
+        <button class="scroll-buy" data-action="buy-artifact" data-type="${id}" style="flex:1;" ${disabled ? 'disabled' : ''}>${btnText}</button>
+      </div>
+    </div>`;
+}
+
+function buildMiscShopCardHtml(id){
+  const item = MISC_ITEMS[id];
+  const owned = state[item.stateKey] || 0;
+  return `
+    <div class="scroll-card">
+      <div class="scroll-head">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${item.icon}</div>
+          <span class="scroll-name-wrap">
+            <span class="scroll-name txt-shard">${item.name}</span>
+            <span class="tooltip">${item.desc} (획득: ${item.source})</span>
+          </span>
+        </div>
+        <span class="scroll-count">보유 ${owned}개</span>
+      </div>
+      <div class="scroll-body">
+        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>전부 판매 (개당 ${item.sellPrice} G)</button>
+      </div>
+    </div>`;
 }

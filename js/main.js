@@ -10,22 +10,42 @@ el('toggleCharmBtn').addEventListener('click', toggleCharm);
 el('toggleBlessingBtn').addEventListener('click', toggleBlessing);
 el('buyCharmBtn').addEventListener('click', (e)=> buyCharm(e.currentTarget));
 el('buyBlessingBtn').addEventListener('click', (e)=> buyBlessing(e.currentTarget));
-el('buyRingBtn').addEventListener('click', (e)=> buyRing(e.currentTarget));
-el('sellShardBtn').addEventListener('click', sellAllShards);
-el('sellShardPieceBtn').addEventListener('click', sellAllManaShards);
 el('invTabBtnWeapon').addEventListener('click', ()=> switchInvTab('weapon'));
 el('invTabBtnArtifact').addEventListener('click', ()=> switchInvTab('artifact'));
 el('invTabBtnConsumable').addEventListener('click', ()=> switchInvTab('consumable'));
 el('invTabBtnMisc').addEventListener('click', ()=> switchInvTab('misc'));
-el('weaponShopList').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action="buy-weapon"]');
-  if(!btn || btn.disabled) return;
-  buyWeapon(btn.dataset.type, btn);
+// ---- 상점 탭 / 정렬 ----
+el('shopTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  switchShopTab(btn.dataset.tab);
 });
-el('buyHpFlaskBtn').addEventListener('click', (e)=> buyFlask('hpFlask', e.currentTarget));
-el('buyMpFlaskBtn').addEventListener('click', (e)=> buyFlask('mpFlask', e.currentTarget));
-el('sellHpFlaskBtn').addEventListener('click', (e)=> sellAllFlask('hpFlask', e.currentTarget));
-el('sellMpFlaskBtn').addEventListener('click', (e)=> sellAllFlask('mpFlask', e.currentTarget));
+el('shopFilterBtn').addEventListener('click', toggleShopFilterMenu);
+el('shopFilterMenu').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-filter]');
+  if(!btn) return;
+  setShopFilter(btn.dataset.filter);
+});
+el('shopSortDirBtn').addEventListener('click', toggleShopSortDir);
+document.addEventListener('click', (e)=>{
+  if(!shopFilterMenuOpen) return;
+  if(e.target.closest('.shop-filter-wrap')) return;
+  closeShopFilterMenu();
+});
+// 상점 품목 목록: 탭에 관계없이 data-action으로 구매/판매를 한 번에 위임 처리
+// (새 탭/아이템이 추가돼도 render.js가 알맞은 data-action을 붙여주므로 여기는 수정할 필요 없음)
+el('shopItemsList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn || btn.disabled) return;
+  const type = btn.dataset.type;
+  switch(btn.dataset.action){
+    case 'buy-weapon': buyWeapon(type, btn); break;
+    case 'buy-consumable': buyFlask(type, btn); break;
+    case 'sell-consumable': sellAllFlask(type, btn); break;
+    case 'buy-artifact': buyArtifact(type, btn); break;
+    case 'sell-misc': sellAllMisc(type, btn); break;
+  }
+});
 el('skipToggleBtn').addEventListener('click', toggleSkip);
 el('autoRebuyToggleBtn').addEventListener('click', toggleAutoRebuy);
 el('openShopBtn').addEventListener('click', openShop);

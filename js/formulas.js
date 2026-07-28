@@ -103,6 +103,50 @@ function costFor(type, level){ return wpn(type).cost[level]; }
 function sellValueFor(type, level){ return wpn(type).sell[level]; }
 function oddsFor(type, level){ return wpn(type).odds[level]; }
 
+// ---- 상점 품목 목록 (탭별) ----
+// 각 아이템을 정렬에 필요한 최소 정보 { id, price, levelReq }로 정규화해서 반환.
+// price/levelReq를 어떻게 뽑는지만 여기서 관리하고, 실제 카드 HTML은 render.js가 그림.
+// 장비류(무기/방어구) 공통: purchasable:true인 항목만, 가격은 상점 구매가, levelReq는 착용 레벨 제한.
+function shopEquipmentEntries(typesTable){
+  return Object.values(typesTable)
+    .filter(w => w.purchasable)
+    .map(w => ({ id: w.id, price: (w.sellPrice || 0) * 2, levelReq: w.levelReq || 1 }));
+}
+// 소비 아이템: 상점 구매가(buyPrice) 기준. 착용 레벨 제한 개념이 없으므로 levelReq는 null.
+function shopConsumableEntries(){
+  return Object.values(CONSUMABLES).map(c => ({ id: c.id, price: c.buyPrice, levelReq: null }));
+}
+// 아티팩트: purchasable:true(=buyPrice 있음)인 항목만 상점에 노출. 몬스터 드랍 전용은 제외됨.
+function shopArtifactEntries(){
+  return Object.values(ARTIFACTS).filter(a => a.purchasable).map(a => ({ id: a.id, price: a.buyPrice, levelReq: null }));
+}
+// 기타 아이템: 판매 전용 탭. 보유한(개수>0) 아이템만 노출하고, 가격은 판매가(sellPrice) 기준으로 정렬함.
+function shopMiscEntries(){
+  return Object.values(MISC_ITEMS)
+    .filter(m => (state[m.stateKey] || 0) > 0)
+    .map(m => ({ id: m.id, price: m.sellPrice, levelReq: null }));
+}
+// 탭 id로 해당 탭에 표시할 정규화된 아이템 목록을 조회. 새 탭이 SHOP_TABS에 추가되면 이 분기도 함께 추가.
+function shopEntriesForTab(tabId){
+  if(tabId === 'weapon') return shopEquipmentEntries(WEAPON_TYPES);
+  if(tabId === 'armor') return shopEquipmentEntries(ARMOR_TYPES);
+  if(tabId === 'consumable') return shopConsumableEntries();
+  if(tabId === 'artifact') return shopArtifactEntries();
+  if(tabId === 'misc') return shopMiscEntries();
+  return [];
+}
+// 필터(price/levelReq) + 방향(asc/desc)에 따라 엔트리 목록을 정렬해서 새 배열로 반환.
+// levelReq가 없는 아이템(소비/아티팩트/기타)에 레벨 필터를 적용해도 에러 없이 동작하도록 null은 맨 뒤로 취급.
+function sortShopEntries(entries, filterId, dir){
+  const sorted = [...entries].sort((a, b) => {
+    const av = filterId === 'levelReq' ? (a.levelReq == null ? Infinity : a.levelReq) : a.price;
+    const bv = filterId === 'levelReq' ? (b.levelReq == null ? Infinity : b.levelReq) : b.price;
+    return av - bv;
+  });
+  if(dir === 'desc') sorted.reverse();
+  return sorted;
+}
+
 // ---- 캐릭터 레벨 시스템 ----
 function playerBaseHp(level){
   return Math.round(100 + 4900 * Math.pow((level - 1) / 98, 1.35));

@@ -206,10 +206,14 @@ function buyBlessing(btn){
 }
 
 // ---- 상점 구매/판매 ----
-function buyRing(btn){
-  if(ownsArtifact('ring') || state.artifacts.length >= ARTIFACT_SLOT_MAX || state.gold < 25000) return;
-  state.gold -= 25000;
-  state.artifacts.push('ring');
+// 상점에서 구매 가능한(purchasable:true) 아티팩트를 구매. 특정 아티팩트 이름/ID에 의존하지 않음 —
+// ARTIFACTS 데이터에 purchasable:true + buyPrice만 넣으면 이 함수가 그대로 처리함.
+function buyArtifact(id, btn){
+  const a = ARTIFACTS[id];
+  if(!a || !a.purchasable) return;
+  if(ownsArtifact(id) || state.artifacts.length >= ARTIFACT_SLOT_MAX || state.gold < a.buyPrice) return;
+  state.gold -= a.buyPrice;
+  state.artifacts.push(id);
   purchaseEffect(btn || null);
   render(); saveState();
 }
@@ -256,22 +260,17 @@ function performSellAllFlask(id, btn){
   purchaseEffect(btn || null);
   render(); saveState();
 }
-function sellAllShards(){
-  const count = state.manaFragments || 0;
+// 기타 아이템(MISC_ITEMS)을 전부 판매. stateKey로 보유 수량이 저장된 state 필드를 조회하므로
+// 새 기타 아이템이 추가돼도 이 함수는 수정할 필요 없음.
+function sellAllMisc(id, btn){
+  const item = MISC_ITEMS[id];
+  if(!item) return;
+  const count = state[item.stateKey] || 0;
   if(count <= 0) return;
-  const total = count * MISC_ITEMS.manaFragment.sellPrice;
+  const total = count * item.sellPrice;
   state.gold += total;
-  state.manaFragments = 0;
-  purchaseEffect(el('sellShardBtn'));
-  render(); saveState();
-}
-function sellAllManaShards(){
-  const count = state.manaShards || 0;
-  if(count <= 0) return;
-  const total = count * MISC_ITEMS.manaShard.sellPrice;
-  state.gold += total;
-  state.manaShards = 0;
-  purchaseEffect(el('sellShardPieceBtn'));
+  state[item.stateKey] = 0;
+  purchaseEffect(btn || null);
   render(); saveState();
 }
 

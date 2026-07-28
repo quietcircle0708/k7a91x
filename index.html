@@ -124,95 +124,29 @@
   <div id="shopView" style="display:none;">
     <button class="back-btn back-from-shop">← 대장간으로 돌아가기</button>
     <div class="shop-card">
-      <div class="shop-title">떠돌이 상인의 좌판</div>
-      <div class="shop-sub">무기와 강화에 도움을 주는 아티팩트를 판매합니다.</div>
-
-      <div id="weaponShopList"></div>
-
-      <div class="scroll-card artifact">
-        <div class="scroll-head">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="artifact-icon-box">🌾</div>
-            <span class="scroll-name-wrap">
-              <span class="scroll-name artifact">아주르의 강아지풀 반지</span>
-              <span class="tooltip">마법사 아주르가 마력을 불어넣어 줄기를 꼬아 만든 반지.</span>
-            </span>
+      <div class="shop-head-row">
+        <div>
+          <div class="shop-title">떠돌이 상인의 좌판</div>
+          <div class="shop-sub">무기와 강화에 도움을 주는 아티팩트를 판매합니다.</div>
+        </div>
+        <div class="shop-sort-controls">
+          <div class="shop-filter-wrap">
+            <button class="shop-filter-btn" id="shopFilterBtn">필터: <span id="shopFilterLabel">가격</span> ▾</button>
+            <div class="shop-filter-menu" id="shopFilterMenu" style="display:none;"></div>
           </div>
-          <span class="scroll-count" id="ringOwnedTag"></span>
-        </div>
-        <div class="effect-line">
-          강화 실패 시, <span class="u-tip">아주 낮은 확률<span class="tooltip">2%</span></span>로 강화 단계 하락을 막아준다.
-        </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" id="buyRingBtn" style="flex:1;">구매 (25,000 G)</button>
+          <button class="shop-filter-btn" id="shopSortDirBtn">↑ 오름차순</button>
         </div>
       </div>
 
-      <div class="scroll-card">
-        <div class="scroll-head">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">💠</div>
-            <span class="scroll-name-wrap">
-              <span class="scroll-name txt-shard">마석 파편</span>
-              <span class="tooltip">마물의 심장에서 추출한 마석의 파편. (획득: 다람쥐굴, 쥐굴)</span>
-            </span>
-          </div>
-          <span class="scroll-count">보유 <span id="shardCount">0</span>개</span>
-        </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" id="sellShardBtn" style="flex:1;">전부 판매 (개당 50 G)</button>
-        </div>
+      <div class="shop-tabs" id="shopTabs">
+        <button class="shop-tab-btn active" data-tab="weapon">무기</button>
+        <button class="shop-tab-btn" data-tab="armor">방어구</button>
+        <button class="shop-tab-btn" data-tab="consumable">소비</button>
+        <button class="shop-tab-btn" data-tab="artifact">아티팩트</button>
+        <button class="shop-tab-btn" data-tab="misc">기타</button>
       </div>
 
-      <div class="scroll-card">
-        <div class="scroll-head">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">🔷</div>
-            <span class="scroll-name-wrap">
-              <span class="scroll-name txt-shard">마석 조각</span>
-              <span class="tooltip">마물의 심장에서 추출한 마석의 조각 (획득: 에픽 몬스터 고유 드랍)</span>
-            </span>
-          </div>
-          <span class="scroll-count">보유 <span id="shardPieceCount">0</span>개</span>
-        </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" id="sellShardPieceBtn" style="flex:1;">전부 판매 (개당 100 G)</button>
-        </div>
-      </div>
-
-      <div class="scroll-card">
-        <div class="scroll-head">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">🧪</div>
-            <span class="scroll-name-wrap">
-              <span class="scroll-name" style="color:var(--forge-cream);">[하급]체력 회복 플라스크</span>
-              <span class="tooltip">사용시 2초에 걸쳐 최대 체력의 25%를 회복한다</span>
-            </span>
-          </div>
-          <span class="scroll-count">보유 <span id="hpFlaskCount">0</span>개</span>
-        </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" id="buyHpFlaskBtn" style="flex:1;">구매 (70 G)</button>
-          <button class="scroll-buy" id="sellHpFlaskBtn" style="flex:1;">전부 판매 (개당 35 G)</button>
-        </div>
-      </div>
-
-      <div class="scroll-card">
-        <div class="scroll-head">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="artifact-icon-box" style="background:#142230; border-color:#4fa3d1;">💧</div>
-            <span class="scroll-name-wrap">
-              <span class="scroll-name" style="color:var(--forge-cream);">[하급]마나 회복 플라스크</span>
-              <span class="tooltip">사용시 2초에 걸쳐 최대 마나의 25%를 회복한다</span>
-            </span>
-          </div>
-          <span class="scroll-count">보유 <span id="mpFlaskCount">0</span>개</span>
-        </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" id="buyMpFlaskBtn" style="flex:1;">구매 (70 G)</button>
-          <button class="scroll-buy" id="sellMpFlaskBtn" style="flex:1;">전부 판매 (개당 35 G)</button>
-        </div>
-      </div>
+      <div id="shopItemsList"></div>
     </div>
   </div>
 

@@ -119,6 +119,11 @@ const WEAPON_TYPES = {
   },
 };
 
+// 방어구 종류 도감. 현재는 등록된 방어구가 없음(빈 객체) — 상점 "방어구" 탭은 이 표가 비어있는 동안
+// 자동으로 빈 탭이 됨. WEAPON_TYPES와 동일한 필드 구조(equipType:'armor', purchasable 등)로 항목을
+// 추가하면 상점 코드를 건드리지 않고도 자동으로 목록에 표시됨.
+const ARMOR_TYPES = {};
+
 // ============================================================
 // 강화 단계별 공격력/공격속도/치명타 계산 공식
 // 일반/레어/에픽 등급에 적용됨. 유니크 등급은 이 공식을 쓰지 않고 무기마다 고유 값을 직접 넣을 예정이라 대상에서 제외.
@@ -131,19 +136,19 @@ const ENHANCE_ATK_STEP_MULT = [null, 1.8, 1.5, 1.3, 1.3, 1.3, 1.3, 1.3, 1.4, 1.4
 // 2. 무기 종류별 공격력 곱연산 보정 (지팡이는 구상 단계라 비워둠)
 const WEAPON_KIND_ATK_MULT = { sword: 1, two_handed_sword: 1.014, dagger: 0.96, staff: null };
 
-// 2. 무기 종류별 강화 구간(+1~+8)당 공격속도 증가량 — 합연산. index 0 = +1, ... index 7 = +8 (+9는 표에 없어 증가분 0)
+// 2. 무기 종류별 강화 구간(+1~+9)당 공격속도 증가량 — 합연산. index 0 = +1, ... index 8 = +9
 const WEAPON_KIND_ATKSPEED_STEP = {
-  sword:            [0.05, 0, 0.05, 0, 0.05, 0, 0.1, 0.1],
-  two_handed_sword: [0.02, 0, 0.02, 0, 0.02, 0, 0.02, 0.05],
-  dagger:           [0.1, 0, 0.1, 0, 0.1, 0, 0.1, 0.1],
+  sword:            [0.05, 0, 0.05, 0, 0.05, 0, 0.05, 0.1, 0.1],
+  two_handed_sword: [0.02, 0, 0.02, 0, 0.02, 0, 0.02, 0.02, 0.05],
+  dagger:           [0.1, 0, 0.1, 0, 0.1, 0, 0.1, 0.1, 0.1],
   staff: null,
 };
 
-// 2. 무기 종류별 강화 구간(+1~+8)당 치명타 확률 증가량(%p) — 합연산. index 0 = +1, ... index 7 = +8 (+9는 증가분 0)
+// 2. 무기 종류별 강화 구간(+1~+9)당 치명타 확률 증가량(%p) — 합연산. index 0 = +1, ... index 8 = +9
 const WEAPON_KIND_CRIT_STEP = {
-  sword:            [0, 1, 0, 1, 0, 1, 1, 1],
-  two_handed_sword: [0, 1, 0, 1, 0, 1, 1, 1],
-  dagger:           [1, 1, 1, 1, 1, 1, 1, 2],
+  sword:            [0, 1, 0, 1, 0, 1, 0, 1, 1],
+  two_handed_sword: [0, 1, 0, 1, 0, 1, 0, 1, 1],
+  dagger:           [1, 1, 1, 1, 1, 1, 1, 1, 2],
   staff: null,
 };
 
@@ -350,11 +355,14 @@ const MONSTER_GRADES = {
 
 // 획득 가능한 아티팩트(장비) 도감
 const ARTIFACT_SLOT_MAX = 3;
+// purchasable:true + buyPrice가 있는 아티팩트만 상점 "아티팩트" 탭에 자동으로 등록됨(박쥐 날개처럼
+// 몬스터 드랍 전용 아티팩트는 필드를 비워두면 상점에 나타나지 않음).
 const ARTIFACTS = {
   ring: {
     id: 'ring', name: '아주르의 강아지풀 반지', icon: '🌾',
     desc: '마법사 아주르가 마력을 불어넣어 줄기를 꼬아 만든 반지.',
     effectText: '강화 실패 시, 아주 낮은 확률(2%)로 강화 단계 하락을 막아준다.',
+    purchasable: true, buyPrice: 25000,
   },
   batwing: {
     id: 'batwing', name: '박쥐 날개', icon: '🦇',
@@ -381,20 +389,40 @@ const CONSUMABLES = {
 };
 
 // 기타 아이템 도감
+// stateKey: 보유 개수가 저장되는 state의 필드 이름. 상점/판매 로직이 이 값만 보고 동작하므로
+// 새 기타 아이템을 추가할 때 stateKey에 맞는 state 필드만 준비하면 코드 수정 없이 자동 연결됨.
 const MISC_ITEMS = {
   manaFragment: {
     id: 'manaFragment', name: '마석 파편', icon: '💠',
     desc: '마물의 심장에서 추출한 마석의 파편.',
     source: '다람쥐굴, 쥐굴',
-    sellPrice: 50,
+    sellPrice: 50, stateKey: 'manaFragments',
   },
   manaShard: {
     id: 'manaShard', name: '마석 조각', icon: '🔷',
     desc: '마물의 심장에서 추출한 마석의 조각',
     source: '에픽 몬스터 고유 드랍',
-    sellPrice: 100,
+    sellPrice: 100, stateKey: 'manaShards',
   },
 };
+
+// ---- 상점 품목 분류 탭 ----
+// 새 탭이 필요해지면 이 배열에 항목만 추가하면 됨. 실제로 어떤 아이템이 어느 탭에 뜨는지는
+// formulas.js의 shopEntriesForTab()이 각 도감(WEAPON_TYPES/ARMOR_TYPES/CONSUMABLES/ARTIFACTS/MISC_ITEMS)의
+// purchasable 여부(또는 판매 전용 규칙)를 보고 자동으로 결정함 — 아이템 이름/ID로 분기하지 않음.
+const SHOP_TABS = [
+  { id: 'weapon', label: '무기' },
+  { id: 'armor', label: '방어구' },
+  { id: 'consumable', label: '소비' },
+  { id: 'artifact', label: '아티팩트' },
+  { id: 'misc', label: '기타' },
+];
+
+// 상점 정렬 기준 목록 (필터 드롭다운에 그대로 표시됨)
+const SHOP_SORT_FIELDS = [
+  { id: 'price', label: '가격' },
+  { id: 'levelReq', label: '착용 제한 레벨' },
+];
 
 // ---- 상태 이상(디버프) 클래스 ----
 // 앞으로 종류가 계속 추가될 예정. 새 상태 이상은 이 객체에 항목만 추가하면 됨.
