@@ -59,10 +59,12 @@ function switchInvTab(tab){
   el('invTabWeapon').style.display = tab === 'weapon' ? 'block' : 'none';
   el('invTabArtifact').style.display = tab === 'artifact' ? 'block' : 'none';
   el('invTabConsumable').style.display = tab === 'consumable' ? 'block' : 'none';
+  el('invTabStone').style.display = tab === 'stone' ? 'block' : 'none';
   el('invTabMisc').style.display = tab === 'misc' ? 'block' : 'none';
   el('invTabBtnWeapon').classList.toggle('active', tab === 'weapon');
   el('invTabBtnArtifact').classList.toggle('active', tab === 'artifact');
   el('invTabBtnConsumable').classList.toggle('active', tab === 'consumable');
+  el('invTabBtnStone').classList.toggle('active', tab === 'stone');
   el('invTabBtnMisc').classList.toggle('active', tab === 'misc');
 }
 

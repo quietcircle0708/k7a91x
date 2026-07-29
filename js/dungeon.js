@@ -193,11 +193,9 @@ function killMonster(){
       result.weaponDrop = null; // 인벤토리가 가득 차 드랍 무산
     }
   }
-  if(result.manaFragmentQty > 0){
-    state.manaFragments = (state.manaFragments || 0) + result.manaFragmentQty;
-  }
-  if(result.manaShardQty > 0){
-    state.manaShards = (state.manaShards || 0) + result.manaShardQty;
+  if(result.stoneDrop){
+    const item = MISC_ITEMS[result.stoneDrop.itemId];
+    state[item.stateKey] = (state[item.stateKey] || 0) + result.stoneDrop.qty;
   }
   if(result.artifactDropId){
     grantArtifactSafe(result.artifactDropId);
@@ -233,11 +231,9 @@ function openKillResultModal(monsterDef, level, result){
     const itemName = `${weaponName(result.weaponDrop.type)} +${result.weaponDrop.level}`;
     rewardsHtml += `<div>${monsterDef.name}에게서 <span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
   }
-  if(result.manaFragmentQty > 0){
-    rewardsHtml += `<div><span class="txt-shard">${MISC_ITEMS.manaFragment.name}</span> +${result.manaFragmentQty} 획득</div>`;
-  }
-  if(result.manaShardQty > 0){
-    rewardsHtml += `<div><span class="txt-shard">${MISC_ITEMS.manaShard.name}</span> +${result.manaShardQty} 획득</div>`;
+  if(result.stoneDrop){
+    const item = MISC_ITEMS[result.stoneDrop.itemId];
+    rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${result.stoneDrop.qty} 획득</div>`;
   }
   if(result.artifactDropId){
     const art = ARTIFACTS[result.artifactDropId];

@@ -13,6 +13,7 @@ el('buyBlessingBtn').addEventListener('click', (e)=> buyBlessing(e.currentTarget
 el('invTabBtnWeapon').addEventListener('click', ()=> switchInvTab('weapon'));
 el('invTabBtnArtifact').addEventListener('click', ()=> switchInvTab('artifact'));
 el('invTabBtnConsumable').addEventListener('click', ()=> switchInvTab('consumable'));
+el('invTabBtnStone').addEventListener('click', ()=> switchInvTab('stone'));
 el('invTabBtnMisc').addEventListener('click', ()=> switchInvTab('misc'));
 // ---- 상점 탭 / 정렬 ----
 el('shopTabs').addEventListener('click', (e)=>{

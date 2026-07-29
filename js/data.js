@@ -388,21 +388,33 @@ const CONSUMABLES = {
   },
 };
 
-// 기타 아이템 도감
+// 재료성 아이템 도감(기타/마석 등 인벤토리·상점 하단 탭에 노출되는 아이템)
 // stateKey: 보유 개수가 저장되는 state의 필드 이름. 상점/판매 로직이 이 값만 보고 동작하므로
-// 새 기타 아이템을 추가할 때 stateKey에 맞는 state 필드만 준비하면 코드 수정 없이 자동 연결됨.
+// 새 아이템을 추가할 때 stateKey에 맞는 state 필드만 준비하면 코드 수정 없이 자동 연결됨.
+// itemClass: 아이템 분류(ITEM_CLASS_LABELS 참고) — 인벤토리/상점의 "마석"/"기타" 탭 분기는
+// 아이템 이름이 아니라 이 값만 보고 자동으로 결정됨.
+// grade: 마석류 아이템의 등급(WEAPON_GRADES와 동일한 키 체계를 공유 — 이름 색상 공식도 그대로 재사용).
+const ITEM_CLASS_LABELS = { stone: '마석' };
 const MISC_ITEMS = {
   manaFragment: {
-    id: 'manaFragment', name: '마석 파편', icon: '💠',
-    desc: '마물의 심장에서 추출한 마석의 파편.',
-    source: '다람쥐굴, 쥐굴',
+    id: 'manaFragment', name: '마석 파편', icon: '💠', itemClass: 'stone', grade: 'normal',
+    desc: '마물의 부서진 심장 파편',
     sellPrice: 50, stateKey: 'manaFragments',
   },
   manaShard: {
-    id: 'manaShard', name: '마석 조각', icon: '🔷',
-    desc: '마물의 심장에서 추출한 마석의 조각',
-    source: '에픽 몬스터 고유 드랍',
+    id: 'manaShard', name: '마석 조각', icon: '💠', itemClass: 'stone', grade: 'rare',
+    desc: '마물의 부서진 심장 조각',
     sellPrice: 100, stateKey: 'manaShards',
+  },
+  manaCrystal: {
+    id: 'manaCrystal', name: '마석 결정', icon: '💠', itemClass: 'stone', grade: 'epic',
+    desc: '마물의 심장 결정',
+    sellPrice: 200, stateKey: 'manaCrystals',
+  },
+  manaStone: {
+    id: 'manaStone', name: '마석', icon: '💠', itemClass: 'stone', grade: 'unique',
+    desc: '온전한 마물의 심장',
+    sellPrice: 1000, stateKey: 'manaStones',
   },
 };
 
@@ -415,6 +427,7 @@ const SHOP_TABS = [
   { id: 'armor', label: '방어구' },
   { id: 'consumable', label: '소비' },
   { id: 'artifact', label: '아티팩트' },
+  { id: 'stone', label: '마석' },
   { id: 'misc', label: '기타' },
 ];
 
@@ -447,6 +460,18 @@ const RELIC_LEVEL_WEIGHT_DECAY = 0.8; // 등록된 아이템 레벨이 한 단�
 // 지금은 별도 공식 없이 하드코딩된 확률표를 사용(추후 공식으로 교체 가능하도록 이 표만 바꾸면 됨).
 const RELIC_ENHANCE_LEVEL_CHANCE = [
   [0, 20], [1, 20], [2, 20], [3, 15], [4, 15], [5, 10],
+];
+
+// 마석 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
+// (예전의 던전별 드랍 확률·에픽 몬스터 확정 드랍 규칙은 삭제되고 이 전역 설정으로 대체됨)
+const STONE_DROP_CHANCE = 20;   // 몬스터 처치 시 마석 드랍 판정 확률(%)
+const STONE_DROP_BASE_QTY = 1;  // 기본 드랍 수량(에픽 등급 몬스터는 formulas.js에서 이 값의 2배를 지급)
+// 마석 등급 선택 공식(몬스터 레벨 기준). 위에서부터 순서대로 검사해 조건에 맞는 첫 구간의 등급을 사용함.
+// maxLevel이 null이면 그 구간은 상한이 없는 것으로 처리됨.
+// 지금은 테스트용 공식이며, 레벨 구간이나 등급을 바꾸고 싶으면 이 배열만 수정하면 됨(다른 코드 수정 불필요).
+const STONE_GRADE_RULES = [
+  { minLevel: 1, maxLevel: 9, grade: 'normal' },
+  { minLevel: 10, maxLevel: null, grade: 'rare' },
 ];
 
 // 개별 몬스터 테이블.
@@ -516,8 +541,8 @@ const MONSTERS = {
 // levelRange: 일반 등급 몬스터의 등장 레벨 = 몬스터 자체 레벨 ~ (몬스터 자체 레벨 + levelRange), 그 구간 내에서
 //   레벨별 등장 확률은 모두 동일함. 에픽(그 외 등급) 몬스터는 이 범위를 적용하지 않고 몬스터 데이터의
 //   고정 레벨(level)로만 등장함.
-// dropTable: 마석 파편 드랍 규칙(등급별) — 이 부분은 이번 개편 대상이 아니라 그대로 유지함(추후 별도 수정 예정).
-// 모험가의 유해(무기) 드랍은 더 이상 던전별 설정을 쓰지 않고 위의 RELIC_* 전역 설정값으로 통일됨.
+// dropTable(마석 파편 드랍 규칙)은 더 이상 던전별로 관리하지 않고, 아래 전역 설정(STONE_* / STONE_GRADE_RULES)으로 통일됨.
+// 모험가의 유해(무기) 드랍도 마찬가지로 던전별 설정을 쓰지 않고 위의 RELIC_* 전역 설정값으로 통일됨.
 const DUNGEONS = [
   {
     id: 'squirrel_hole',
@@ -526,10 +551,6 @@ const DUNGEONS = [
     desc: '숲에서 으스나무의 알 수 없는 힘에 빨려들어온 다람쥐들이 사는 굴입니다. 이들은 이성이 없고 침입자를 무차별적으로 공격합니다.',
     monsters: ['squirrel'],
     levelRange: 2,
-    // 등급별 공통 드랍 규칙: 모험가의 유해(무기) 확률/템플릿, 마석 파편 확률
-    dropTable: {
-      normal: { shardChance: 20 },
-    },
   },
   {
     id: 'rat_den',
@@ -538,10 +559,6 @@ const DUNGEONS = [
     desc: '하수도 깊은 곳에 자리 잡은 쥐떼의 소굴입니다. 가끔 흡혈 박쥐가 함께 서식하기도 합니다.',
     monsters: ['rat', 'bat'],
     levelRange: 2,
-    dropTable: {
-      normal: { shardChance: 21 },
-      epic:   { shardChance: 21 },
-    },
   },
   {
     id: 'snake_den',
@@ -550,10 +567,6 @@ const DUNGEONS = [
     desc: '습하고 어두운 동굴 깊은 곳에 뱀들이 똬리를 튼 소굴입니다. 방울뱀의 독은 매우 위험합니다.',
     monsters: ['blue_snake', 'tailless_snake', 'rattlesnake'],
     levelRange: 2,
-    dropTable: {
-      normal: { shardChance: 25 },
-      epic:   { shardChance: 25 },
-    },
   },
   {
     id: 'deer_den',
@@ -562,10 +575,6 @@ const DUNGEONS = [
     desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다. 세 개의 눈을 가진 사슴은 예사롭지 않은 기운을 뿜습니다.',
     monsters: ['blue_deer', 'red_deer', 'three_eyed_deer'],
     levelRange: 2,
-    dropTable: {
-      normal: { shardChance: 25 },
-      epic:   { shardChance: 25 },
-    },
   },
 ];
 

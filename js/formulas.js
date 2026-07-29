@@ -97,6 +97,36 @@ function buildWeaponTooltipHtml(type, level){
   html += `</div>`;
   return html;
 }
+// ---- 마석(재료) 이름 색상 · 툴팁 ----
+// 마석은 강화 단계가 없으므로 무기처럼 이름 색상을 등급/강화 단계 중 더 높은 쪽으로 섞지 않고,
+// 무기 등급 색상 공식(WEAPON_GRADES)을 그대로 재사용해 등급 색상만 적용함.
+function stoneGradeInfo(id){ return WEAPON_GRADES[MISC_ITEMS[id].grade]; }
+function stoneNameColor(id){ const g = stoneGradeInfo(id); return g ? g.color : '#ffffff'; }
+// 마석 툴팁: 레이아웃/줄바꿈/서식은 buildWeaponTooltipHtml과 동일하게 유지하고, 표시 항목만
+// 이름/등급/아이템 분류/설명/판매 가격으로 구성함.
+function buildStoneTooltipHtml(id){
+  const item = MISC_ITEMS[id];
+  const grade = stoneGradeInfo(id);
+  let html = `<div style="text-align:center;">`;
+
+  // 1. 이름 — 등급 색상 효과 적용
+  html += `<div style="color:${stoneNameColor(id)}; font-weight:700; margin-bottom:2px;">${item.name}</div>`;
+
+  // 2. 등급 — 이름과 별도 줄, 등급 색상 효과 적용
+  if(grade) html += `<div style="color:${grade.color}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+
+  // 3. 설명
+  if(item.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${item.desc}</div>`;
+
+  // 4. 아이템 분류
+  html += wtipRow('아이템 분류', ITEM_CLASS_LABELS[item.itemClass] || '');
+
+  // 5. 판매 가격 — 기존 아이템과 동일한 형식(G 단위, 천단위 구분)
+  html += wtipRow('판매 가격', item.sellPrice.toLocaleString() + 'G');
+
+  html += `</div>`;
+  return html;
+}
 function atkFor(type, level){ return wpn(type).atk[level]; }
 function atkSpeedFor(type, level){ return wpn(type).speed[level]; }
 function critChanceFor(type, level){ return wpn(type).crit[level]; }
@@ -121,10 +151,16 @@ function shopConsumableEntries(){
 function shopArtifactEntries(){
   return Object.values(ARTIFACTS).filter(a => a.purchasable).map(a => ({ id: a.id, price: a.buyPrice, levelReq: null }));
 }
-// 기타 아이템: 판매 전용 탭. 보유한(개수>0) 아이템만 노출하고, 가격은 판매가(sellPrice) 기준으로 정렬함.
+// 마석 탭: 판매 전용 탭. 아이템 분류(itemClass)가 'stone'이고 보유한(개수>0) 아이템만 노출, 판매가 기준 정렬.
+function shopStoneEntries(){
+  return Object.values(MISC_ITEMS)
+    .filter(m => m.itemClass === 'stone' && (state[m.stateKey] || 0) > 0)
+    .map(m => ({ id: m.id, price: m.sellPrice, levelReq: null }));
+}
+// 기타 아이템: 판매 전용 탭. 마석(itemClass 'stone')은 제외하고, 보유한(개수>0) 아이템만 노출, 판매가 기준 정렬.
 function shopMiscEntries(){
   return Object.values(MISC_ITEMS)
-    .filter(m => (state[m.stateKey] || 0) > 0)
+    .filter(m => m.itemClass !== 'stone' && (state[m.stateKey] || 0) > 0)
     .map(m => ({ id: m.id, price: m.sellPrice, levelReq: null }));
 }
 // 탭 id로 해당 탭에 표시할 정규화된 아이템 목록을 조회. 새 탭이 SHOP_TABS에 추가되면 이 분기도 함께 추가.
@@ -133,6 +169,7 @@ function shopEntriesForTab(tabId){
   if(tabId === 'armor') return shopEquipmentEntries(ARMOR_TYPES);
   if(tabId === 'consumable') return shopConsumableEntries();
   if(tabId === 'artifact') return shopArtifactEntries();
+  if(tabId === 'stone') return shopStoneEntries();
   if(tabId === 'misc') return shopMiscEntries();
   return [];
 }
@@ -194,12 +231,23 @@ function rollGoldDrop(level, multiplier){
   const spread = base * MONSTER_GOLD_VARIANCE;
   return Math.round(base - spread + Math.random() * spread * 2);
 }
-// 에픽 몬스터는 마석 파편/조각을 확정적으로 드랍한다 (레벨에 따라 종류/개수가 달라짐)
-function epicShardDrop(level){
-  if(level <= 10) return { item: 'manaFragment', qty: 1 };
-  if(level <= 19) return { item: 'manaShard', qty: 1 };
-  if(level <= 29) return { item: 'manaShard', qty: 2 };
-  return { item: 'manaShard', qty: 4 }; // 30레벨 이상
+// 마석 등급 선택(전역 공식). STONE_GRADE_RULES(data.js)를 위에서부터 순서대로 검사해 몬스터 레벨이
+// 속하는 첫 구간의 등급을 반환함 — 레벨 구간이나 등급을 바꾸고 싶으면 데이터(STONE_GRADE_RULES)만
+// 수정하면 되고, 이 함수나 드랍 판정 로직은 건드릴 필요가 없음.
+function pickStoneGrade(level){
+  const rule = STONE_GRADE_RULES.find(r => level >= r.minLevel && (r.maxLevel == null || level <= r.maxLevel));
+  return rule ? rule.grade : STONE_GRADE_RULES[STONE_GRADE_RULES.length - 1].grade;
+}
+// 마석 드랍 판정(전역 공식). 1) STONE_DROP_CHANCE 확률로 드랍 판정 → 2) 성공 시 pickStoneGrade로 등급 결정
+// → 3) 해당 등급의 마석 아이템(MISC_ITEMS 중 itemClass:'stone')을 조회 → 4) 기본 수량(STONE_DROP_BASE_QTY),
+// 단 에픽 등급 몬스터는 수량 2배. 실패하면 null을 반환.
+function rollStoneDrop(level, monsterGrade){
+  if(Math.random() * 100 >= STONE_DROP_CHANCE) return null;
+  const grade = pickStoneGrade(level);
+  const item = Object.values(MISC_ITEMS).find(m => m.itemClass === 'stone' && m.grade === grade);
+  if(!item) return null;
+  const qty = monsterGrade === 'epic' ? STONE_DROP_BASE_QTY * 2 : STONE_DROP_BASE_QTY;
+  return { itemId: item.id, qty };
 }
 
 // ---- 몬스터 체력/공격력 ----
@@ -361,27 +409,17 @@ function resolveWeaponRelicDrop(monsterLevel){
   const enhanceLevel = pickWeighted(RELIC_ENHANCE_LEVEL_CHANCE);
   return { type: weaponType.id, level: enhanceLevel };
 }
-// 몬스터 처치 시 모든 드랍(골드/모험가의 유해/마석 파편/몬스터 고유 드랍)을 판정
+// 몬스터 처치 시 모든 드랍(골드/모험가의 유해/마석/몬스터 고유 드랍)을 판정
 function resolveDrops(monsterDef, dungeon, level){
   const grade = monsterDef.grade;
   const gradeInfo = MONSTER_GRADES[grade];
-  const dropCfg = (dungeon.dropTable && dungeon.dropTable[grade]) || dungeon.dropTable.normal;
 
   const goldMultiplier = 1 + gradeInfo.goldBonus + (monsterDef.extraGoldBonus || 0);
   const gold = rollGoldDrop(level, goldMultiplier);
 
   const weaponDrop = resolveWeaponRelicDrop(level); // { type, level } 또는 null
 
-  let manaFragmentQty = 0;
-  let manaShardQty = 0;
-  if(grade === 'epic'){
-    // 에픽 몬스터는 마석 파편/조각을 확정적으로 드랍 (레벨에 따라 종류/개수 결정)
-    const drop = epicShardDrop(level);
-    if(drop.item === 'manaFragment') manaFragmentQty += drop.qty;
-    else manaShardQty += drop.qty;
-  } else if(dropCfg && Math.random() * 100 < dropCfg.shardChance){
-    manaFragmentQty += 1;
-  }
+  const stoneDrop = rollStoneDrop(level, grade); // { itemId, qty } 또는 null(전역 공식, 던전/등급별 개별 설정 없음)
 
   // drops 중 artifactId가 있는 항목만 실제 아티팩트 지급 판정 대상(재료류 드랍은 아직 별도 아이템
   // 시스템이 없어 여기서는 판정하지 않음 — 몬스터 데이터 자체는 이미 표시용으로 갖고 있음).
@@ -393,7 +431,7 @@ function resolveDrops(monsterDef, dungeon, level){
     }
   }
 
-  return { gold, weaponDrop, manaFragmentQty, manaShardQty, artifactDropId };
+  return { gold, weaponDrop, stoneDrop, artifactDropId };
 }
 
 // ---- 한국어 조사 처리 ----

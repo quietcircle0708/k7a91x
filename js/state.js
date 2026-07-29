@@ -14,6 +14,8 @@ let state = {
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
   manaFragments: 0,    // 마석 파편 보유 개수
   manaShards: 0,       // 마석 조각 보유 개수
+  manaCrystals: 0,     // 마석 결정 보유 개수
+  manaStones: 0,       // 마석 보유 개수
   skipEffects: false,
   autoRebuy: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
@@ -236,7 +238,7 @@ function resetGame(){
     gold: 1000, inventory: [ { id: 1, level: 0, type: 'longsword' } ], equippedId: 1, nextItemId: 2,
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
-    artifacts: [], manaFragments: 0, manaShards: 0,
+    artifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
     skipEffects:false, autoRebuy:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },

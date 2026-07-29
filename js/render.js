@@ -157,6 +157,7 @@ function render(){
   renderInventoryList();
   renderArtifactList();
   renderConsumableList();
+  renderStoneList();
   renderMiscList();
 
   // 강화 진행 중에는 다른 조작 잠금
@@ -236,12 +237,14 @@ function renderArtifactList(){
   }).join('');
 }
 
+// 기타 탭: 아이템 분류(itemClass)가 'stone'이 아닌 재료성 아이템만 표시. 아이템 이름으로 분기하지 않으므로
+// 새 기타 아이템을 MISC_ITEMS에 등록하기만 하면 자동으로 여기 노출됨.
 function renderMiscList(){
   const wrap = el('miscList');
-  const entries = [
-    { item: MISC_ITEMS.manaFragment, count: state.manaFragments || 0 },
-    { item: MISC_ITEMS.manaShard, count: state.manaShards || 0 },
-  ].filter(e => e.count > 0);
+  const entries = Object.values(MISC_ITEMS)
+    .filter(item => item.itemClass !== 'stone')
+    .map(item => ({ item, count: state[item.stateKey] || 0 }))
+    .filter(e => e.count > 0);
   if(entries.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 기타 아이템이 없습니다.</div>`;
     return;
@@ -252,7 +255,31 @@ function renderMiscList(){
       <div class="inv-info">
         <div class="inv-name"><span class="txt-shard">${item.name}</span> ×${count}</div>
         <div class="inv-sub">${item.desc}</div>
-        <div class="inv-sub">획득 장소: ${item.source}</div>
+        <div class="inv-sub">상점에서 개당 ${item.sellPrice}G에 판매할 수 있어요.</div>
+      </div>
+    </div>`).join('');
+}
+
+// 마석 탭: 아이템 분류가 'stone'인 아이템만 표시(기타 탭과 동일한 UI 구조).
+// 이름에는 등급 색상을 적용하고, 무기 툴팁과 동일한 레이아웃/서식의 전용 툴팁(hover)을 붙임.
+function renderStoneList(){
+  const wrap = el('stoneList');
+  const entries = Object.values(MISC_ITEMS)
+    .filter(item => item.itemClass === 'stone')
+    .map(item => ({ item, count: state[item.stateKey] || 0 }))
+    .filter(e => e.count > 0);
+  if(entries.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">보유한 마석 아이템이 없습니다.</div>`;
+    return;
+  }
+  wrap.innerHTML = entries.map(({ item, count }) => `
+    <div class="inv-card">
+      <div class="inv-icon" style="border-color: var(--forge-line);">${item.icon}</div>
+      <div class="inv-info">
+        <div class="inv-name weapon-name-wrap">
+          <span style="color:${stoneNameColor(item.id)};">${item.name}</span> ×${count}
+          <span class="tooltip">${buildStoneTooltipHtml(item.id)}</span>
+        </div>
         <div class="inv-sub">상점에서 개당 ${item.sellPrice}G에 판매할 수 있어요.</div>
       </div>
     </div>`).join('');
@@ -476,6 +503,16 @@ function relicDropTooltip(d){
     + `등급: 일반 ${RELIC_GRADE_CHANCE.normal}% · 레어 ${RELIC_GRADE_CHANCE.rare}% · 에픽 ${RELIC_GRADE_CHANCE.epic}%<br>`
     + `이 던전 몬스터(${rangeText})와 가까운 아이템 레벨의 장비일수록 더 잘 나옵니다.`;
 }
+// 마석 드랍도 이제 던전마다 다르지 않고 전역 설정(STONE_*)을 그대로 사용하므로,
+// 던전 화면에는 그 전역 규칙 + 이 던전 몬스터들의 대략적인 레벨대만 안내함.
+function stoneDropTooltip(d){
+  const range = dungeonLevelRange(d);
+  const rangeText = range.min === range.max ? `Lv.${range.min}` : `Lv.${range.min}~${range.max}`;
+  return `<span class="txt-shard">마석</span><br>`
+    + `처치 시 ${STONE_DROP_CHANCE}% 확률로 마석을 획득합니다.<br>`
+    + `등급은 몬스터 레벨에 따라 결정되며, 에픽 등급 몬스터는 수량이 2배입니다.<br>`
+    + `이 던전 몬스터(${rangeText})의 레벨에 맞는 등급이 나옵니다.`;
+}
 function buildDungeonDropIcons(d){
   const icons = [];
 
@@ -491,32 +528,10 @@ function buildDungeonDropIcons(d){
     tooltip: relicDropTooltip(d),
   });
 
-  // 마석 파편 / 마석 조각: 일반 등급은 확률 드랍, 에픽 등급은 레벨에 따라 확정 드랍
-  const manaNotes = {}; // itemId -> [note, ...]
-  const grades = Object.keys(d.dropTable);
-  grades.forEach(g => {
-    if(g === 'epic'){
-      d.monsters.filter(id => MONSTERS[id].grade === 'epic').forEach(id => {
-        const monsterDef = MONSTERS[id];
-        const epicLevel = monsterDef.level; // 에픽 몬스터는 고정 레벨로 등장
-        const drop = epicShardDrop(epicLevel);
-        const item = MISC_ITEMS[drop.item];
-        (manaNotes[item.id] = manaNotes[item.id] || []).push(
-          `${gradeSpan('epic')} ${monsterDef.name} 처치 시 확정 획득 (${drop.qty}개)`
-        );
-      });
-    } else {
-      (manaNotes[MISC_ITEMS.manaFragment.id] = manaNotes[MISC_ITEMS.manaFragment.id] || []).push(
-        `${gradeSpan(g)} 몬스터 처치 시 획득할 수 있습니다.`
-      );
-    }
-  });
-  Object.keys(manaNotes).forEach(itemId => {
-    const item = MISC_ITEMS[itemId];
-    icons.push({
-      icon: item.icon,
-      tooltip: `<span class="txt-shard">${item.name}</span><br>${manaNotes[itemId].join('<br>')}`,
-    });
+  // 마석 - 전역 설정값 안내
+  icons.push({
+    icon: '💠',
+    tooltip: stoneDropTooltip(d),
   });
 
   // 몬스터별 고유 드랍(아티팩트 등)
@@ -746,6 +761,7 @@ function buildShopCardHtml(tabId, id){
   if(tabId === 'armor') return buildWeaponShopCardHtml(ARMOR_TYPES, id);
   if(tabId === 'consumable') return buildConsumableShopCardHtml(id);
   if(tabId === 'artifact') return buildArtifactShopCardHtml(id);
+  if(tabId === 'stone') return buildStoneShopCardHtml(id);
   if(tabId === 'misc') return buildMiscShopCardHtml(id);
   return '';
 }
@@ -834,7 +850,30 @@ function buildMiscShopCardHtml(id){
           <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${item.icon}</div>
           <span class="scroll-name-wrap">
             <span class="scroll-name txt-shard">${item.name}</span>
-            <span class="tooltip">${item.desc} (획득: ${item.source})</span>
+            <span class="tooltip">${item.desc}</span>
+          </span>
+        </div>
+        <span class="scroll-count">보유 ${owned}개</span>
+      </div>
+      <div class="scroll-body">
+        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>전부 판매 (개당 ${item.sellPrice} G)</button>
+      </div>
+    </div>`;
+}
+
+// 마석 상점 카드: 기타 탭 카드와 동일한 UI 구조를 사용하되, 이름에 등급 색상을 적용하고
+// 무기 툴팁과 동일한 레이아웃/서식의 전용 툴팁(이름/등급/아이템 분류/설명/판매 가격)을 붙임.
+function buildStoneShopCardHtml(id){
+  const item = MISC_ITEMS[id];
+  const owned = state[item.stateKey] || 0;
+  return `
+    <div class="scroll-card">
+      <div class="scroll-head">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${item.icon}</div>
+          <span class="weapon-name-wrap">
+            <span class="scroll-name" style="color:${stoneNameColor(id)};">${item.name}</span>
+            <span class="tooltip">${buildStoneTooltipHtml(id)}</span>
           </span>
         </div>
         <span class="scroll-count">보유 ${owned}개</span>
