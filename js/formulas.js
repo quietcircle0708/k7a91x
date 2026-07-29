@@ -430,7 +430,14 @@ function resolveWeaponRelicDrop(monsterLevel){
   const enhanceLevel = pickWeighted(RELIC_ENHANCE_LEVEL_CHANCE);
   return { type: weaponType.id, level: enhanceLevel };
 }
-// 몬스터 처치 시 모든 드랍(골드/모험가의 유해/마석/몬스터 고유 드랍)을 판정
+// 몬스터 데이터의 drops 항목(name) 중 재료성 아이템(MISC_ITEMS)에 등록된 이름과 일치하는 것을 찾음.
+// 이름 기반으로 매칭하므로, MISC_ITEMS에 새 재료 아이템을 추가하고 몬스터의 drops에 같은 이름만
+// 등록하면 별도 코드 수정 없이 자동으로 연결됨.
+function miscItemByName(name){
+  return Object.values(MISC_ITEMS).find(it => it.name === name) || null;
+}
+
+// 몬스터 처치 시 모든 드랍(골드/모험가의 유해/마석/몬스터 고유 드랍/재료 아이템)을 판정
 function resolveDrops(monsterDef, dungeon, level){
   const grade = monsterDef.grade;
   const gradeInfo = MONSTER_GRADES[grade];
@@ -442,8 +449,7 @@ function resolveDrops(monsterDef, dungeon, level){
 
   const stoneDrop = rollStoneDrop(level, grade); // { itemId, qty } 또는 null(전역 공식, 던전/등급별 개별 설정 없음)
 
-  // drops 중 artifactId가 있는 항목만 실제 아티팩트 지급 판정 대상(재료류 드랍은 아직 별도 아이템
-  // 시스템이 없어 여기서는 판정하지 않음 — 몬스터 데이터 자체는 이미 표시용으로 갖고 있음).
+  // drops 중 artifactId가 있는 항목만 실제 아티팩트 지급 판정 대상.
   let artifactDropId = null;
   for(const drop of (monsterDef.drops || [])){
     if(drop.artifactId && canGrantArtifact(drop.artifactId) && Math.random() * 100 < drop.chance){
@@ -452,7 +458,18 @@ function resolveDrops(monsterDef, dungeon, level){
     }
   }
 
-  return { gold, weaponDrop, stoneDrop, artifactDropId };
+  // drops 중 artifactId가 없는 항목(도토리/쥐고기 등 재료류)은 MISC_ITEMS에 등록된 재료 아이템으로 취급하여,
+  // 각 항목마다 독립적으로 확률을 판정함(하나의 몬스터가 여러 개를 동시에 드랍할 수도, 하나도 드랍 안 할 수도 있음).
+  const miscDrops = [];
+  for(const drop of (monsterDef.drops || [])){
+    if(drop.artifactId) continue; // 아티팩트 드랍은 위에서 이미 별도 처리됨
+    if(Math.random() * 100 < drop.chance){
+      const item = miscItemByName(drop.name);
+      if(item) miscDrops.push({ itemId: item.id, name: item.name, icon: item.icon, qty: 1 });
+    }
+  }
+
+  return { gold, weaponDrop, stoneDrop, artifactDropId, miscDrops };
 }
 
 // ---- 한국어 조사 처리 ----
