@@ -200,12 +200,6 @@ function killMonster(){
   if(result.artifactDropId){
     grantArtifactSafe(result.artifactDropId);
   }
-  if(result.miscDrops && result.miscDrops.length){
-    for(const drop of result.miscDrops){
-      const item = MISC_ITEMS[drop.itemId];
-      state[item.stateKey] = (state[item.stateKey] || 0) + drop.qty;
-    }
-  }
 
   let expGained = monsterExp(level);
   if(curseActive) expGained = Math.round(expGained * DEATH_CURSE_MULTIPLIER);
@@ -244,11 +238,6 @@ function openKillResultModal(monsterDef, level, result){
   if(result.artifactDropId){
     const art = ARTIFACTS[result.artifactDropId];
     rewardsHtml += `<div><span class="reward-artifact">${monsterDef.name}${josaEulReul(monsterDef.name)} 처치하고 신비로운 ${art.name}${josaEulReul(art.name)} 획득했습니다!</span></div>`;
-  }
-  if(result.miscDrops && result.miscDrops.length){
-    for(const drop of result.miscDrops){
-      rewardsHtml += `<div><span class="txt-shard">${drop.icon} ${drop.name}</span> +${drop.qty} 획득</div>`;
-    }
   }
   if(state.inventory.length >= INV_MAX){
     rewardsHtml += `<div class="reward-note">무기 인벤토리가 가득 찼습니다.</div>`;
