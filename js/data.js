@@ -349,6 +349,10 @@ const MONSTER_GRADES = {
   named:  { label: '네임드', color: '#ff8fc7', goldBonus: 0.35 },
 };
 
+// 등급별 몬스터 등장 확률(전역 설정값). 던전마다 따로 설정하지 않고 모든 던전이 이 값을 공유함.
+// 한 던전 안에 같은 등급 몬스터가 여러 마리면, 그 등급의 확률을 마리 수만큼 균등하게 나눠 가짐.
+const MONSTER_GRADE_SPAWN_CHANCE = { normal: 80, epic: 20 };
+
 // 획득 가능한 아티팩트(장비) 도감
 const ARTIFACT_SLOT_MAX = 3;
 // purchasable:true + buyPrice가 있는 아티팩트만 상점 "아티팩트" 탭에 자동으로 등록됨(박쥐 날개처럼
@@ -434,113 +438,133 @@ const STATUS_EFFECTS = {
   },
 };
 
-// 모험가의 유해 템플릿: 무기 드랍 시 강화단계별 가중치
-const RELIC_TEMPLATES = {
-  relic_sword_1: { levelWeights: [ [1, 40], [2, 30], [3, 20] ] },
-  relic_sword_2: { levelWeights: [ [2, 40], [3, 30], [4, 20] ] },
-  relic_sword_3: { levelWeights: [ [2, 20], [3, 30], [4, 30], [5, 20] ] },
-};
+// 모험가의 유해(무기) 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
+const RELIC_DROP_CHANCE = 10; // 몬스터 처치 시 장비 드랍 판정 확률(%)
+const RELIC_GRADE_CHANCE = { normal: 50, rare: 35, epic: 15 }; // 드랍 판정 성공 시, 장비 등급 선택 확률
+const RELIC_LEVEL_WINDOW = 10; // 후보 아이템 레벨 하한 = max(1, 몬스터 레벨 - 이 값)
+const RELIC_LEVEL_WEIGHT_DECAY = 0.8; // 등록된 아이템 레벨이 한 단계 낮아질 때마다 가중치 ×이 값(최고 레벨 가중치는 100)
+// 드랍된 장비의 강화 단계(+N) 확률. 등급과 무관하게 동일하게 적용되며 +5가 최대.
+// 지금은 별도 공식 없이 하드코딩된 확률표를 사용(추후 공식으로 교체 가능하도록 이 표만 바꾸면 됨).
+const RELIC_ENHANCE_LEVEL_CHANCE = [
+  [0, 20], [1, 20], [2, 20], [3, 15], [4, 15], [5, 10],
+];
 
-// 개별 몬스터 테이블 (체력은 등급 공식으로 통일 계산, 고유 드랍만 몬스터가 직접 가짐)
+// 개별 몬스터 테이블.
+// 체력/공격력은 등급 공식(MONSTER_GRADES)으로 먼저 계산한 뒤, 그 결과에 hpMult/atkMult를 곱해서 최종값을 냄.
+// 공격속도도 마찬가지로 기본 몬스터 공격속도(MONSTER_ATTACK_SPEED)에 speedMult를 곱해서 이 몬스터만의 공격속도를 냄.
+// drops: 이 몬스터를 처치했을 때 나오는 드랍 목록. 각 항목은 { name, chance }이며, chance는 항목별로 "개별" 판정함
+// (여러 개를 합쳐서 100%를 나누는 방식이 아니라, 각 항목마다 따로 확률을 굴림). artifactId가 있는 항목만 실제
+// 아티팩트 지급 로직(resolveDrops)과 연결되며, artifactId가 없는 항목(도토리/쥐고기 등 재료류)은 아직 실제
+// 아이템 데이터/인벤토리 시스템이 없어 현재는 표시용 데이터로만 존재함 — 추후 재료 아이템이 추가되면 연결 예정.
 const MONSTERS = {
   squirrel: {
-    id: 'squirrel', name: '다람쥐', icon: '🐿️', grade: 'normal',
-    uniqueDrops: [],
+    id: 'squirrel', name: '다람쥐', icon: '🐿️', grade: 'normal', level: 1,
+    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '도토리', chance: 50 } ],
   },
   rat: {
-    id: 'rat', name: '쥐', icon: '🐀', grade: 'normal',
-    uniqueDrops: [],
+    id: 'rat', name: '쥐', icon: '🐀', grade: 'normal', level: 3,
+    hpMult: 1.0, atkMult: 0.6, speedMult: 1.5,
+    drops: [ { name: '쥐고기', chance: 50 } ],
   },
   bat: {
-    id: 'bat', name: '박쥐', icon: '🦇', grade: 'epic',
-    extraGoldBonus: 0.10, // 등급 보너스 위에 추가로 붙는 골드 보너스
-    uniqueDrops: [
-      { type: 'artifact', artifactId: 'batwing', chance: 10 },
+    id: 'bat', name: '박쥐', icon: '🦇', grade: 'epic', level: 6,
+    extraGoldBonus: 0.10, // 등급 보너스 위에 추가로 붙는 골드 보너스(기존 그대로 유지)
+    hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
+    drops: [
+      { name: '박쥐고기', chance: 50 },
+      { name: '박쥐 날개', chance: 10, artifactId: 'batwing' },
     ],
   },
   blue_snake: {
-    id: 'blue_snake', name: '청사', icon: '🐍', grade: 'normal',
-    uniqueDrops: [],
+    id: 'blue_snake', name: '청사', icon: '🐍', grade: 'normal', level: 6,
+    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '뱀고기', chance: 50 } ],
   },
   tailless_snake: {
-    id: 'tailless_snake', name: '꼬리잘린 뱀', icon: '🐍', grade: 'normal',
-    uniqueDrops: [],
+    id: 'tailless_snake', name: '꼬리잘린 뱀', icon: '🐍', grade: 'normal', level: 6,
+    hpMult: 0.9, atkMult: 1.0, speedMult: 1.1,
+    drops: [ { name: '뱀고기', chance: 50 } ],
   },
   rattlesnake: {
-    id: 'rattlesnake', name: '방울뱀', icon: '🐍', grade: 'epic',
-    uniqueDrops: [],
+    id: 'rattlesnake', name: '방울뱀', icon: '🐍', grade: 'epic', level: 9,
+    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '뱀고기', chance: 50 } ],
   },
   blue_deer: {
-    id: 'blue_deer', name: '청록수', icon: '🦌', grade: 'normal',
-    uniqueDrops: [],
+    id: 'blue_deer', name: '청록수', icon: '🦌', grade: 'normal', level: 10,
+    hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
+    drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
   red_deer: {
-    id: 'red_deer', name: '적록수', icon: '🦌', grade: 'normal',
-    uniqueDrops: [],
+    id: 'red_deer', name: '적록수', icon: '🦌', grade: 'normal', level: 10,
+    hpMult: 1.0, atkMult: 0.5, speedMult: 2.0,
+    drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
   three_eyed_deer: {
-    id: 'three_eyed_deer', name: '세개의 눈을 가진 사슴', icon: '🦌', grade: 'epic',
-    uniqueDrops: [],
+    id: 'three_eyed_deer', name: '세개의 눈을 가진 사슴', icon: '🦌', grade: 'epic', level: 14,
+    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
 };
 
-// 던전 테이블
+
+// 던전 테이블.
+// monsters: 등장 몬스터 id 배열(그 안에서 몬스터별 등장확률/개별 레벨범위를 따로 설정하지 않음 —
+//   등급별 등장확률은 MONSTER_GRADE_SPAWN_CHANCE(전역)를 따르고, 레벨은 아래 levelRange로 결정됨).
+// icon: 비워두면(빈 문자열) 등장 몬스터 중 첫 번째의 아이콘을 자동으로 사용함(dungeonIcon() 참고).
+// levelRange: 일반 등급 몬스터의 등장 레벨 = 몬스터 자체 레벨 ~ (몬스터 자체 레벨 + levelRange), 그 구간 내에서
+//   레벨별 등장 확률은 모두 동일함. 에픽(그 외 등급) 몬스터는 이 범위를 적용하지 않고 몬스터 데이터의
+//   고정 레벨(level)로만 등장함.
+// dropTable: 마석 파편 드랍 규칙(등급별) — 이 부분은 이번 개편 대상이 아니라 그대로 유지함(추후 별도 수정 예정).
+// 모험가의 유해(무기) 드랍은 더 이상 던전별 설정을 쓰지 않고 위의 RELIC_* 전역 설정값으로 통일됨.
 const DUNGEONS = [
   {
     id: 'squirrel_hole',
     name: '다람쥐굴',
-    icon: '🐿️',
+    icon: '',
     desc: '숲에서 으스나무의 알 수 없는 힘에 빨려들어온 다람쥐들이 사는 굴입니다. 이들은 이성이 없고 침입자를 무차별적으로 공격합니다.',
-    monsters: [
-      { id: 'squirrel', chance: 100, levelMin: 1, levelMax: 3 },
-    ],
+    monsters: ['squirrel'],
+    levelRange: 2,
     // 등급별 공통 드랍 규칙: 모험가의 유해(무기) 확률/템플릿, 마석 파편 확률
     dropTable: {
-      normal: { relicChance: 10, relicTemplate: 'relic_sword_1', shardChance: 20 },
+      normal: { shardChance: 20 },
     },
   },
   {
     id: 'rat_den',
     name: '쥐굴',
-    icon: '🐀',
+    icon: '',
     desc: '하수도 깊은 곳에 자리 잡은 쥐떼의 소굴입니다. 가끔 흡혈 박쥐가 함께 서식하기도 합니다.',
-    monsters: [
-      { id: 'rat', chance: 80, levelMin: 3, levelMax: 5 },
-      { id: 'bat', chance: 20, levelMin: 6, levelMax: 6 },
-    ],
+    monsters: ['rat', 'bat'],
+    levelRange: 2,
     dropTable: {
-      normal: { relicChance: 12, relicTemplate: 'relic_sword_1', shardChance: 21 },
-      epic:   { relicChance: 12, relicTemplate: 'relic_sword_2', shardChance: 21 },
+      normal: { shardChance: 21 },
+      epic:   { shardChance: 21 },
     },
   },
   {
     id: 'snake_den',
     name: '뱀굴',
-    icon: '🐍',
+    icon: '',
     desc: '습하고 어두운 동굴 깊은 곳에 뱀들이 똬리를 튼 소굴입니다. 방울뱀의 독은 매우 위험합니다.',
-    monsters: [
-      { id: 'blue_snake', chance: 40, levelMin: 6, levelMax: 9 },
-      { id: 'tailless_snake', chance: 40, levelMin: 6, levelMax: 9 },
-      { id: 'rattlesnake', chance: 20, levelMin: 10, levelMax: 10 },
-    ],
+    monsters: ['blue_snake', 'tailless_snake', 'rattlesnake'],
+    levelRange: 2,
     dropTable: {
-      normal: { relicChance: 12, relicTemplate: 'relic_sword_2', shardChance: 25 },
-      epic:   { relicChance: 12, relicTemplate: 'relic_sword_3', shardChance: 25 },
+      normal: { shardChance: 25 },
+      epic:   { shardChance: 25 },
     },
   },
   {
     id: 'deer_den',
     name: '사슴굴',
-    icon: '🦌',
+    icon: '',
     desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다. 세 개의 눈을 가진 사슴은 예사롭지 않은 기운을 뿜습니다.',
-    monsters: [
-      { id: 'blue_deer', chance: 40, levelMin: 10, levelMax: 15 },
-      { id: 'red_deer', chance: 40, levelMin: 10, levelMax: 15 },
-      { id: 'three_eyed_deer', chance: 20, levelMin: 16, levelMax: 16 },
-    ],
+    monsters: ['blue_deer', 'red_deer', 'three_eyed_deer'],
+    levelRange: 2,
     dropTable: {
-      normal: { relicChance: 12, relicTemplate: 'relic_sword_2', shardChance: 25 },
-      epic:   { relicChance: 12, relicTemplate: 'relic_sword_3', shardChance: 25 },
+      normal: { shardChance: 25 },
+      epic:   { shardChance: 25 },
     },
   },
 ];
@@ -549,7 +573,7 @@ const DUNGEONS = [
 const MONSTER_BASE_GOLD = 100;       // 1레벨 몬스터의 기본 드랍 골드
 const MONSTER_GOLD_GROWTH = 0.12;    // 레벨당 골드 가중치 (+12%)
 const MONSTER_GOLD_VARIANCE = 0.15;  // 최종 드랍 골드 랜덤 편차 (±15%)
-const MONSTER_ATTACK_SPEED = 0.5;    // 몬스터 공격속도(초당 공격 횟수) = 2초에 1번
+const MONSTER_ATTACK_SPEED = 1.0;    // 몬스터 공격속도(초당 공격 횟수) = 1초에 1번
 
 // 강화단계 그룹별 표시 이름(대장간 화면 상단 라벨, 인벤토리 카드 등에서 사용)
 const TIER_META = [

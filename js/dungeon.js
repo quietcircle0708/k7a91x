@@ -26,11 +26,16 @@ function startExploration(){
 function spawnMonster(){
   const d = hunt.dungeon;
   if(!d) return;
-  const pick = pickSpawnMonster(d);
-  const monsterDef = MONSTERS[pick.id];
-  const level = pickSpawnLevel(pick.levelMin, pick.levelMax);
+  const monsterId = pickSpawnMonster(d);
+  const monsterDef = MONSTERS[monsterId];
+  // 일반 등급: 몬스터 레벨 ~ (몬스터 레벨 + 던전 레벨범위) 구간에서 균등 추첨 / 그 외 등급: 고정 레벨
+  const level = monsterDef.grade === 'normal'
+    ? pickSpawnLevel(monsterDef.level, monsterDef.level + (d.levelRange || 0))
+    : monsterDef.level;
   const maxHp = monsterHPFor(monsterDef, level);
-  const atk = monsterAtkFor(monsterDef, level);
+  // 몬스터 공격속도가 0.5→1.0(2초→1초당 1회)로 빨라진 밸런스 보정으로, 공격 빈도가 2배가 된 만큼
+  // 최종 공격력에만 0.5배를 곱해서 DPS를 맞춤(monsterAtkFor 공식 자체는 변경하지 않음).
+  const atk = Math.round(monsterAtkFor(monsterDef, level) * 0.5);
   hunt.monster = { monsterId: monsterDef.id, level, hp: maxHp, maxHp, atk, statusEffects: [] };
   const icon = el('monsterIcon');
   if(icon) icon.classList.remove('dead');
@@ -45,7 +50,11 @@ function startHuntLoop(){
   const equipped = getEquipped();
   const speed = equipped ? effectiveAtkSpeed(equipped.type || 'longsword', equipped.level) : 0.5;
   const intervalMs = Math.round(1000 / speed);
-  const monsterIntervalMs = Math.round(1000 / MONSTER_ATTACK_SPEED);
+  // 몬스터 공격속도 = 기본 몬스터 공격속도(MONSTER_ATTACK_SPEED) × 이 몬스터의 speedMult 계수
+  const monsterDef = hunt.monster ? MONSTERS[hunt.monster.monsterId] : null;
+  const monsterSpeedMult = (monsterDef && monsterDef.speedMult != null) ? monsterDef.speedMult : 1;
+  const monsterSpeed = MONSTER_ATTACK_SPEED * monsterSpeedMult;
+  const monsterIntervalMs = Math.round(1000 / monsterSpeed);
 
   // 플레이어 첫 공격: 전투 시작 0.5초 후, 이후 무기 공격속도 주기로 반복
   hunt.playerFirstAttackTimeout = setTimeout(() => {
@@ -53,7 +62,7 @@ function startHuntLoop(){
     hunt.timerId = setInterval(attackTick, intervalMs);
   }, 500);
 
-  // 몬스터 첫 공격: 전투 시작 1초 후, 이후 몬스터 공격속도(2초) 주기로 반복
+  // 몬스터 첫 공격: 전투 시작 1초 후, 이후 이 몬스터의 공격속도 주기로 반복
   hunt.monsterFirstAttackTimeout = setTimeout(() => {
     monsterAttackTick();
     hunt.monsterTimerId = setInterval(monsterAttackTick, monsterIntervalMs);
@@ -177,11 +186,11 @@ function killMonster(){
   if(curseActive) result.gold = Math.round(result.gold * DEATH_CURSE_MULTIPLIER);
   state.gold += result.gold;
 
-  if(result.weaponDropLevel !== null){
+  if(result.weaponDrop){
     if(state.inventory.length < INV_MAX){
-      state.inventory.push({ id: state.nextItemId++, level: result.weaponDropLevel, type: 'longsword' });
+      state.inventory.push({ id: state.nextItemId++, level: result.weaponDrop.level, type: result.weaponDrop.type });
     } else {
-      result.weaponDropLevel = null; // 인벤토리가 가득 차 드랍 무산
+      result.weaponDrop = null; // 인벤토리가 가득 차 드랍 무산
     }
   }
   if(result.manaFragmentQty > 0){
@@ -220,8 +229,8 @@ function openKillResultModal(monsterDef, level, result){
   if(result.levelsGained > 0){
     rewardsHtml += `<div class="reward-levelup">🎉 레벨업! Lv.${result.newPlayerLevel - result.levelsGained} → Lv.${result.newPlayerLevel}</div>`;
   }
-  if(result.weaponDropLevel !== null){
-    const itemName = `${weaponName('longsword')} +${result.weaponDropLevel}`;
+  if(result.weaponDrop){
+    const itemName = `${weaponName(result.weaponDrop.type)} +${result.weaponDrop.level}`;
     rewardsHtml += `<div>${monsterDef.name}에게서 <span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
   }
   if(result.manaFragmentQty > 0){

@@ -466,12 +466,15 @@ function gradeSpan(grade){
   const g = MONSTER_GRADES[grade];
   return `<span style="color:${g.color}; font-weight:700;">${g.label}</span>`;
 }
-function relicTooltipLine(dropCfg){
-  const tmpl = RELIC_TEMPLATES[dropCfg.relicTemplate];
-  const levels = tmpl.levelWeights.map(([lvl]) => lvl);
-  const min = Math.min(...levels), max = Math.max(...levels);
-  const range = min === max ? `+${min}` : `+${min}~+${max}`;
-  return `${weaponName('longsword')} ${range} 중 획득`;
+// 모험가의 유해는 이제 던전마다 다르지 않고 전역 설정(RELIC_*)을 그대로 사용하므로,
+// 던전 화면에는 그 전역 규칙 + 이 던전 몬스터들의 대략적인 레벨대만 안내함.
+function relicDropTooltip(d){
+  const range = dungeonLevelRange(d);
+  const rangeText = range.min === range.max ? `Lv.${range.min}` : `Lv.${range.min}~${range.max}`;
+  return `<span class="txt-relic">모험가의 유해</span><br>`
+    + `처치 시 ${RELIC_DROP_CHANCE}% 확률로 장비를 발견합니다.<br>`
+    + `등급: 일반 ${RELIC_GRADE_CHANCE.normal}% · 레어 ${RELIC_GRADE_CHANCE.rare}% · 에픽 ${RELIC_GRADE_CHANCE.epic}%<br>`
+    + `이 던전 몬스터(${rangeText})와 가까운 아이템 레벨의 장비일수록 더 잘 나옵니다.`;
 }
 function buildDungeonDropIcons(d){
   const icons = [];
@@ -482,24 +485,24 @@ function buildDungeonDropIcons(d){
     tooltip: `<span class="txt-gold">골드</span><br>몬스터 처치 시 골드를 획득합니다.`,
   });
 
-  // 모험가의 유해 (무기 드랍) - 등급별로 다른 템플릿을 쓸 수 있어 등급별로 나열
-  const grades = Object.keys(d.dropTable);
-  const relicLines = grades.map(g => `${gradeSpan(g)}: ${relicTooltipLine(d.dropTable[g])}`).join('<br>');
+  // 모험가의 유해 (무기 드랍) - 전역 설정값 안내
   icons.push({
     icon: '💀',
-    tooltip: `<span class="txt-relic">모험가의 유해</span><br>${relicLines}`,
+    tooltip: relicDropTooltip(d),
   });
 
   // 마석 파편 / 마석 조각: 일반 등급은 확률 드랍, 에픽 등급은 레벨에 따라 확정 드랍
   const manaNotes = {}; // itemId -> [note, ...]
+  const grades = Object.keys(d.dropTable);
   grades.forEach(g => {
     if(g === 'epic'){
-      d.monsters.filter(m => MONSTERS[m.id].grade === 'epic').forEach(m => {
-        const epicLevel = m.levelMin; // 현재 에픽 몬스터는 모두 고정 레벨로 등장
+      d.monsters.filter(id => MONSTERS[id].grade === 'epic').forEach(id => {
+        const monsterDef = MONSTERS[id];
+        const epicLevel = monsterDef.level; // 에픽 몬스터는 고정 레벨로 등장
         const drop = epicShardDrop(epicLevel);
         const item = MISC_ITEMS[drop.item];
         (manaNotes[item.id] = manaNotes[item.id] || []).push(
-          `${gradeSpan('epic')} ${MONSTERS[m.id].name} 처치 시 확정 획득 (${drop.qty}개)`
+          `${gradeSpan('epic')} ${monsterDef.name} 처치 시 확정 획득 (${drop.qty}개)`
         );
       });
     } else {
@@ -517,10 +520,10 @@ function buildDungeonDropIcons(d){
   });
 
   // 몬스터별 고유 드랍(아티팩트 등)
-  d.monsters.forEach(m => {
-    const monsterDef = MONSTERS[m.id];
-    (monsterDef.uniqueDrops || []).forEach(drop => {
-      if(drop.type === 'artifact'){
+  d.monsters.forEach(id => {
+    const monsterDef = MONSTERS[id];
+    (monsterDef.drops || []).forEach(drop => {
+      if(drop.artifactId){
         const a = ARTIFACTS[drop.artifactId];
         icons.push({
           icon: a.icon,
@@ -544,11 +547,11 @@ function renderDungeonList(){
   const wrap = el('dungeonList');
   wrap.innerHTML = DUNGEONS.map(d => {
     const range = dungeonLevelRange(d);
-    const monsterNames = d.monsters.map(m => MONSTERS[m.id].name).join(', ');
+    const monsterNames = d.monsters.map(id => MONSTERS[id].name).join(', ');
     return `
     <div class="dungeon-card">
       <div class="dungeon-head">
-        <div class="dungeon-icon">${d.icon}</div>
+        <div class="dungeon-icon">${dungeonIcon(d)}</div>
         <span class="dungeon-name-wrap">
           <span class="dungeon-name">${d.name}</span>
           <span class="tooltip">${d.desc}</span>

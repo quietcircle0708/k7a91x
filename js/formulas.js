@@ -213,7 +213,8 @@ function normalMonsterHP(level){
 }
 function monsterHPFor(monsterDef, level){
   const base = normalMonsterHP(level);
-  return monsterDef.grade === 'epic' ? Math.round(base * 3) : base;
+  const gradeApplied = monsterDef.grade === 'epic' ? Math.round(base * 3) : base;
+  return Math.round(gradeApplied * (monsterDef.hpMult != null ? monsterDef.hpMult : 1));
 }
 // 몬스터 공격력: 플레이어가 레벨업마다 힘 1포인트를 투자한다고 가정했을 때의 예상 체력을 기준으로,
 // 동레벨 일반 몬스터에게 평균 8대를 맞으면 쓰러지도록 역산. 에픽은 동레벨 일반의 1.3배.
@@ -225,7 +226,8 @@ function monsterAtk(level){
 
 function monsterAtkFor(monsterDef, level){
   const base = monsterAtk(level);
-  return monsterDef.grade === 'epic' ? Math.round(base * 1.3) : base;
+  const gradeApplied = monsterDef.grade === 'epic' ? Math.round(base * 1.3) : base;
+  return Math.round(gradeApplied * (monsterDef.atkMult != null ? monsterDef.atkMult : 1));
 }
 
 // ---- 레벨 차이 보정 ----
@@ -256,37 +258,49 @@ function monsterDamageMultiplier(levelDiff){
 }
 
 // ---- 던전/스폰 추첨 ----
+// 던전 화면에 표시할 "등장 몬스터 레벨" 범위. 일반 등급은 몬스터레벨~몬스터레벨+levelRange,
+// 에픽(그 외 등급)은 몬스터 고정 레벨 하나만 가지므로 그 값 자체가 min=max가 됨.
 function dungeonLevelRange(d){
-  const mins = d.monsters.map(m => m.levelMin);
-  const maxs = d.monsters.map(m => m.levelMax);
-  return { min: Math.min(...mins), max: Math.max(...maxs) };
+  const levels = [];
+  d.monsters.forEach(id => {
+    const m = MONSTERS[id];
+    if(m.grade === 'normal'){
+      levels.push(m.level, m.level + (d.levelRange || 0));
+    } else {
+      levels.push(m.level);
+    }
+  });
+  return { min: Math.min(...levels), max: Math.max(...levels) };
 }
-// 등장 레벨 가중 추첨: 레벨이 높을수록 등장 확률이 조금 낮아짐
+// 던전 아이콘: 비어있으면 등장 몬스터 중 첫 번째의 아이콘을 그대로 사용
+function dungeonIcon(d){
+  return d.icon || (d.monsters.length ? MONSTERS[d.monsters[0]].icon : '');
+}
+// 등장 레벨 추첨: 구간 내 모든 레벨이 동일한 확률(균등 분포)
 function pickSpawnLevel(levelMin, levelMax){
-  const weights = [];
-  let total = 0;
-  for(let l = levelMin; l <= levelMax; l++){
-    const w = levelMax - l + 1;
-    weights.push({ level: l, w });
-    total += w;
-  }
-  let r = Math.random() * total;
-  for(const item of weights){
-    if(r < item.w) return item.level;
-    r -= item.w;
-  }
-  return levelMax;
+  return levelMin + Math.floor(Math.random() * (levelMax - levelMin + 1));
 }
-// 던전 몬스터 목록 중 하나를 확률에 따라 추첨 ({id, chance, levelMin, levelMax} 반환)
+// 던전 등장 몬스터 중 하나를 추첨. 등급별 등장확률은 전역 설정(MONSTER_GRADE_SPAWN_CHANCE)을 따르고,
+// 한 던전에 같은 등급 몬스터가 여럿이면 그 등급 확률을 마리 수만큼 균등하게 나눠 가짐.
 function pickSpawnMonster(dungeon){
-  const list = dungeon.monsters;
-  const total = list.reduce((s, m) => s + m.chance, 0);
+  const byGrade = {};
+  dungeon.monsters.forEach(id => {
+    const grade = MONSTERS[id].grade;
+    (byGrade[grade] = byGrade[grade] || []).push(id);
+  });
+  const weighted = [];
+  Object.keys(byGrade).forEach(grade => {
+    const gradeChance = MONSTER_GRADE_SPAWN_CHANCE[grade] || 0;
+    const each = gradeChance / byGrade[grade].length;
+    byGrade[grade].forEach(id => weighted.push({ id, chance: each }));
+  });
+  const total = weighted.reduce((s, w) => s + w.chance, 0);
   let r = Math.random() * total;
-  for(const m of list){
-    if(r < m.chance) return m;
-    r -= m.chance;
+  for(const w of weighted){
+    if(r < w.chance) return w.id;
+    r -= w.chance;
   }
-  return list[list.length - 1];
+  return weighted[weighted.length - 1].id;
 }
 // 가중치 쌍 배열([값, 가중치])에서 하나를 추첨
 function pickWeighted(pairs){
@@ -298,6 +312,55 @@ function pickWeighted(pairs){
   }
   return pairs[pairs.length - 1][0];
 }
+// 목록 중 targetLevel과 아이템 레벨 차이가 가장 작은 무기들만 남김(동률이면 전부 후보로 남음)
+function nearestLevelCandidates(list, targetLevel){
+  if(list.length === 0) return [];
+  let minDiff = Infinity;
+  list.forEach(w => { const diff = Math.abs(w.levelReq - targetLevel); if(diff < minDiff) minDiff = diff; });
+  return list.filter(w => Math.abs(w.levelReq - targetLevel) === minDiff);
+}
+// 모험가의 유해(무기) 드랍 판정.
+// 1) RELIC_DROP_CHANCE 확률로 드랍 판정 → 2) RELIC_GRADE_CHANCE로 장비 등급 선택 →
+// 3) 그 등급 중 아이템 레벨이 [max(1, 몬스터레벨-RELIC_LEVEL_WINDOW), 몬스터레벨] 구간인 후보만 필터 →
+//    (후보가 없으면 폴백: ① 같은 등급 안에서 레벨 구간 제한 없이 몬스터 레벨과 가장 가까운 아이템 레벨로 대체
+//     ② 그래도 없으면(해당 등급 무기가 아예 없음) 등급 상관없이 몬스터 레벨과 가장 가까운 무기로 대체) →
+// 4) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계 낮아질 때마다 ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨 →
+// 5) 그 레벨(+같은 등급, 폴백된 경우는 폴백된 등급)에 해당하는 무기 중 하나를 무작위로 선택 →
+// 6) RELIC_ENHANCE_LEVEL_CHANCE 확률표로 강화 단계(+0~+5)를 등급과 무관하게 별도로 추첨.
+function resolveWeaponRelicDrop(monsterLevel){
+  if(Math.random() * 100 >= RELIC_DROP_CHANCE) return null;
+
+  const grade = pickWeighted(Object.entries(RELIC_GRADE_CHANCE));
+
+  const minLevel = Math.max(1, monsterLevel - RELIC_LEVEL_WINDOW);
+  const maxLevel = monsterLevel;
+  let candidates = Object.values(WEAPON_TYPES).filter(w =>
+    w.grade === grade && w.levelReq >= minLevel && w.levelReq <= maxLevel
+  );
+  if(candidates.length === 0){
+    // 폴백 ①: 레벨 구간 제한을 풀고, 같은 등급 안에서 가장 가까운 레벨로 대체
+    candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES).filter(w => w.grade === grade), monsterLevel);
+  }
+  if(candidates.length === 0){
+    // 폴백 ②: 이 등급에 등록된 무기가 아예 없으면(현재 에픽처럼), 등급도 무시하고 가장 가까운 레벨로 대체
+    candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES), monsterLevel);
+  }
+  if(candidates.length === 0) return null; // 등록된 무기가 하나도 없는 극단적인 경우
+
+  const levels = [...new Set(candidates.map(w => w.levelReq))].sort((a, b) => b - a); // 높은 레벨부터
+  let weight = 100;
+  const levelWeightPairs = levels.map(lv => {
+    const pair = [lv, weight];
+    weight *= RELIC_LEVEL_WEIGHT_DECAY;
+    return pair;
+  });
+  const chosenLevel = pickWeighted(levelWeightPairs);
+
+  const pool = candidates.filter(w => w.levelReq === chosenLevel);
+  const weaponType = pool[Math.floor(Math.random() * pool.length)];
+  const enhanceLevel = pickWeighted(RELIC_ENHANCE_LEVEL_CHANCE);
+  return { type: weaponType.id, level: enhanceLevel };
+}
 // 몬스터 처치 시 모든 드랍(골드/모험가의 유해/마석 파편/몬스터 고유 드랍)을 판정
 function resolveDrops(monsterDef, dungeon, level){
   const grade = monsterDef.grade;
@@ -307,11 +370,7 @@ function resolveDrops(monsterDef, dungeon, level){
   const goldMultiplier = 1 + gradeInfo.goldBonus + (monsterDef.extraGoldBonus || 0);
   const gold = rollGoldDrop(level, goldMultiplier);
 
-  let weaponDropLevel = null;
-  if(dropCfg && Math.random() * 100 < dropCfg.relicChance){
-    const tmpl = RELIC_TEMPLATES[dropCfg.relicTemplate];
-    weaponDropLevel = pickWeighted(tmpl.levelWeights);
-  }
+  const weaponDrop = resolveWeaponRelicDrop(level); // { type, level } 또는 null
 
   let manaFragmentQty = 0;
   let manaShardQty = 0;
@@ -324,15 +383,17 @@ function resolveDrops(monsterDef, dungeon, level){
     manaFragmentQty += 1;
   }
 
+  // drops 중 artifactId가 있는 항목만 실제 아티팩트 지급 판정 대상(재료류 드랍은 아직 별도 아이템
+  // 시스템이 없어 여기서는 판정하지 않음 — 몬스터 데이터 자체는 이미 표시용으로 갖고 있음).
   let artifactDropId = null;
-  for(const drop of (monsterDef.uniqueDrops || [])){
-    if(drop.type === 'artifact' && canGrantArtifact(drop.artifactId) && Math.random() * 100 < drop.chance){
+  for(const drop of (monsterDef.drops || [])){
+    if(drop.artifactId && canGrantArtifact(drop.artifactId) && Math.random() * 100 < drop.chance){
       artifactDropId = drop.artifactId;
       break;
     }
   }
 
-  return { gold, weaponDropLevel, manaFragmentQty, manaShardQty, artifactDropId };
+  return { gold, weaponDrop, manaFragmentQty, manaShardQty, artifactDropId };
 }
 
 // ---- 한국어 조사 처리 ----
