@@ -237,12 +237,13 @@ function renderArtifactList(){
   }).join('');
 }
 
-// 기타 탭: 아이템 분류(itemClass)가 'stone'이 아닌 재료성 아이템만 표시. 아이템 이름으로 분기하지 않으므로
+// 기타 탭: 아이템 분류(itemClass)가 'misc'인 재료성 아이템만 표시. 아이템 이름으로 분기하지 않으므로
 // 새 기타 아이템을 MISC_ITEMS에 등록하기만 하면 자동으로 여기 노출됨.
+// 이름에는 무기 툴팁과 동일한 레이아웃/서식의 전용 툴팁(hover)을 붙임.
 function renderMiscList(){
   const wrap = el('miscList');
   const entries = Object.values(MISC_ITEMS)
-    .filter(item => item.itemClass !== 'stone')
+    .filter(item => item.itemClass === 'misc')
     .map(item => ({ item, count: state[item.stateKey] || 0 }))
     .filter(e => e.count > 0);
   if(entries.length === 0){
@@ -253,8 +254,10 @@ function renderMiscList(){
     <div class="inv-card">
       <div class="inv-icon" style="border-color: var(--forge-line);">${item.icon}</div>
       <div class="inv-info">
-        <div class="inv-name"><span class="txt-shard">${item.name}</span> ×${count}</div>
-        <div class="inv-sub">${item.desc}</div>
+        <div class="inv-name weapon-name-wrap">
+          <span class="txt-shard">${item.name}</span> ×${count}
+          <span class="tooltip">${buildMiscTooltipHtml(item.id)}</span>
+        </div>
         <div class="inv-sub">상점에서 개당 ${item.sellPrice}G에 판매할 수 있어요.</div>
       </div>
     </div>`).join('');
@@ -848,9 +851,9 @@ function buildMiscShopCardHtml(id){
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${item.icon}</div>
-          <span class="scroll-name-wrap">
+          <span class="weapon-name-wrap">
             <span class="scroll-name txt-shard">${item.name}</span>
-            <span class="tooltip">${item.desc}</span>
+            <span class="tooltip">${buildMiscTooltipHtml(id)}</span>
           </span>
         </div>
         <span class="scroll-count">보유 ${owned}개</span>

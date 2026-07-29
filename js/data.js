@@ -393,8 +393,8 @@ const CONSUMABLES = {
 // 새 아이템을 추가할 때 stateKey에 맞는 state 필드만 준비하면 코드 수정 없이 자동 연결됨.
 // itemClass: 아이템 분류(ITEM_CLASS_LABELS 참고) — 인벤토리/상점의 "마석"/"기타" 탭 분기는
 // 아이템 이름이 아니라 이 값만 보고 자동으로 결정됨.
-// grade: 마석류 아이템의 등급(WEAPON_GRADES와 동일한 키 체계를 공유 — 이름 색상 공식도 그대로 재사용).
-const ITEM_CLASS_LABELS = { stone: '마석' };
+// grade: 마석류 아이템의 등급(WEAPON_GRADES와 동일한 키 체계를 공유 — 이름 색상 공식도 그대로 재사용). 기타(misc) 아이템은 등급이 없음.
+const ITEM_CLASS_LABELS = { stone: '마석', misc: '기타' };
 const MISC_ITEMS = {
   manaFragment: {
     id: 'manaFragment', name: '마석 파편', icon: '💠', itemClass: 'stone', grade: 'normal',
@@ -415,6 +415,36 @@ const MISC_ITEMS = {
     id: 'manaStone', name: '마석', icon: '💠', itemClass: 'stone', grade: 'unique',
     desc: '온전한 마물의 심장',
     sellPrice: 1000, stateKey: 'manaStones',
+  },
+  acorn: {
+    id: 'acorn', name: '도토리', icon: '🌰', itemClass: 'misc',
+    desc: '다람쥐의 먹이',
+    sellPrice: 5, stateKey: 'acorns',
+  },
+  ratMeat: {
+    id: 'ratMeat', name: '쥐고기', icon: '🍖', itemClass: 'misc',
+    desc: '쥐의 고기',
+    sellPrice: 10, stateKey: 'ratMeats',
+  },
+  batMeat: {
+    id: 'batMeat', name: '박쥐고기', icon: '🍖', itemClass: 'misc',
+    desc: '박쥐의 고기',
+    sellPrice: 100, stateKey: 'batMeats',
+  },
+  snakeMeat: {
+    id: 'snakeMeat', name: '뱀고기', icon: '🍖', itemClass: 'misc',
+    desc: '뱀의 고기',
+    sellPrice: 15, stateKey: 'snakeMeats',
+  },
+  deerMeat: {
+    id: 'deerMeat', name: '사슴고기', icon: '🍖', itemClass: 'misc',
+    desc: '사슴의 고기',
+    sellPrice: 20, stateKey: 'deerMeats',
+  },
+  deerAntler: {
+    id: 'deerAntler', name: '녹용', icon: '🦴', itemClass: 'misc',
+    desc: '약재로 사용되는 귀한 재료',
+    sellPrice: 200, stateKey: 'deerAntlers',
   },
 };
 
