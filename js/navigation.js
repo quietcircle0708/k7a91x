@@ -9,7 +9,8 @@ function showView(name){
     stopHuntLoop();
     closeKillResultModal();
     hunt.dungeon = null;
-    hunt.monster = null;
+    hunt.monsters = [];
+    hunt.targetId = null;
     hunt.stage = 1;
     hunt.chestOpened = false;
     hunt.paused = false;
@@ -28,7 +29,7 @@ function showView(name){
 
 let pendingNavTarget = null;
 function isActivelyFighting(){
-  return currentView === 'hunt' && hunt.started && !!hunt.monster && hunt.monster.hp > 0 && el('killResultModal').style.display !== 'flex';
+  return currentView === 'hunt' && hunt.started && hunt.monsters.length > 0 && el('killResultModal').style.display !== 'flex';
 }
 function guardedNav(name){
   if(isActivelyFighting()){

@@ -183,27 +183,29 @@ function playerHitEffect(dmg){
   setTimeout(() => { panel.classList.remove('player-hit'); p.remove(); }, 850);
 }
 
-function monsterHitEffect(dmg, isCrit){
-  const icon = el('monsterIcon');
-  icon.classList.remove('hit'); void icon.offsetWidth; icon.classList.add('hit');
-  const stage = el('monsterStage');
+function monsterHitEffect(instanceId, dmg, isCrit){
+  const icon = el('monster-icon-' + instanceId);
+  const slot = el('monster-slot-' + instanceId);
+  if(icon){ icon.classList.remove('hit'); void icon.offsetWidth; icon.classList.add('hit'); }
+  if(!slot) return;
   const p = document.createElement('div');
   p.className = 'dmg-popup float' + (isCrit ? ' crit' : '');
   p.textContent = (isCrit ? '치명타! -' : '-') + dmg;
   p.style.left = (42 + Math.random() * 16) + '%';
-  stage.appendChild(p);
+  slot.appendChild(p);
   setTimeout(() => p.remove(), 850);
 }
 
 // 상태이상(중독 등) 틱 데미지 숫자를 화면에 띄움 (실제 데미지 계산/처치 판정은 dungeon.js의 startStatusTicker가 담당)
-function statusTickEffect(dmg, color){
-  const stage = el('monsterStage');
+function statusTickEffect(instanceId, dmg, color){
+  const slot = el('monster-slot-' + instanceId);
+  if(!slot) return;
   const p = document.createElement('div');
   p.className = 'dmg-popup float';
   p.style.color = color;
   p.textContent = '-' + dmg;
   p.style.left = (42 + Math.random() * 16) + '%';
-  stage.appendChild(p);
+  slot.appendChild(p);
   setTimeout(() => p.remove(), 850);
 }
 

@@ -641,40 +641,72 @@ function renderHunt(){
   const isTreasureStage = hunt.stage === DUNGEON_TREASURE_STAGE;
   const chestEl = el('treasureChest');
   const hintEl = el('treasureHint');
-  const monsterIconEl = el('monsterIcon');
   const combatPanel = el('huntCombatPanel');
   const showChest = isTreasureStage && !hunt.chestOpened;
   if(chestEl) chestEl.style.display = showChest ? 'block' : 'none';
   if(hintEl) hintEl.style.display = showChest ? 'block' : 'none';
-  if(monsterIconEl) monsterIconEl.style.display = isTreasureStage ? 'none' : 'block';
   // 몬스터 정보(이름/체력/능력치)는 몬스터가 실제로 존재할 때만 표시 — 입장 메시지 대기 중엔 숨겨져 있다가
-  // 몬스터 이미지가 등장하는 순간(spawnMonster) 함께 나타남
-  if(combatPanel) combatPanel.style.display = (isTreasureStage || !hunt.monster) ? 'none' : 'block';
+  // 몬스터 이미지가 등장하는 순간(spawnMonsters) 함께 나타남
+  if(combatPanel) combatPanel.style.display = (isTreasureStage || hunt.monsters.length === 0) ? 'none' : 'block';
+}
 
-  if(!hunt.monster) return; // 입장/조우 메시지 대기 중이거나 숨겨진 장소라 몬스터가 없으면 여기서 종료
-
-  const monsterDef = MONSTERS[hunt.monster.monsterId];
+// 개체 하나의 몬스터 슬롯 HTML을 생성(이름/등급색/레벨·공격력/체력바/체력텍스트/상태배지 틀).
+// 새로 등장할 때만 사용(전투 중 매 틱마다 이걸로 다시 그리면 진행 중이던 애니메이션이 끊기므로,
+// 이미 떠 있는 슬롯의 체력 등은 updateMonsterSlot()으로 가볍게만 갱신함).
+function buildMonsterSlotHtml(instance){
+  const monsterDef = MONSTERS[instance.monsterId];
   const grade = MONSTER_GRADES[monsterDef.grade];
-  el('monsterIcon').textContent = monsterDef.icon;
-  el('monsterName').textContent = monsterDef.name;
-  el('monsterName').style.color = grade.color;
-  el('monsterLv').textContent = 'Lv.' + hunt.monster.level + ' · 공격력 ' + hunt.monster.atk;
-  const pct = Math.max(0, Math.min(100, (hunt.monster.hp / hunt.monster.maxHp) * 100));
-  el('hpBarFill').style.width = pct + '%';
-  el('hpText').textContent = Math.max(0, hunt.monster.hp) + ' / ' + hunt.monster.maxHp;
+  const pct = Math.max(0, Math.min(100, (instance.hp / instance.maxHp) * 100));
+  const targetedClass = instance.instanceId === hunt.targetId ? ' targeted' : '';
+  return `
+    <div class="monster-slot${targetedClass}" id="monster-slot-${instance.instanceId}" data-instance-id="${instance.instanceId}">
+      <div class="monster-icon spawn-in" id="monster-icon-${instance.instanceId}">${monsterDef.icon}</div>
+      <div class="monster-name-row">
+        <span class="monster-name" style="color:${grade.color};">${monsterDef.name}</span>
+        <span class="monster-lv" id="monster-lv-${instance.instanceId}">Lv.${instance.level} · 공격력 ${instance.atk}</span>
+      </div>
+      <div class="hp-bar-wrap"><div class="hp-bar-fill" id="monster-hpfill-${instance.instanceId}" style="width:${pct}%"></div></div>
+      <div class="hp-text" id="monster-hptext-${instance.instanceId}">${Math.max(0, instance.hp)} / ${instance.maxHp}</div>
+      <div class="status-badge-row" id="monster-status-${instance.instanceId}"></div>
+    </div>`;
+}
+// 몬스터 그룹 전체를 새로 그림. 스폰 시(spawnMonsters) 1회만 호출 — 전투 중 체력 갱신 등은
+// updateMonsterSlot()이 개별 요소만 건드리므로 이 함수를 다시 호출하지 않음.
+function renderMonsterRow(){
+  const row = el('monsterRow');
+  if(!row) return;
+  row.className = 'monster-row count-' + hunt.monsters.length;
+  row.innerHTML = hunt.monsters.map(buildMonsterSlotHtml).join('');
+}
+// 개체 하나의 체력바/체력텍스트만 갱신(전투 중 매 틱마다 사용 — 슬롯 전체를 다시 그리지 않아
+// 진행 중인 피격/사망 애니메이션이 끊기지 않음)
+function updateMonsterSlot(instance){
+  const fill = el('monster-hpfill-' + instance.instanceId);
+  const text = el('monster-hptext-' + instance.instanceId);
+  const pct = Math.max(0, Math.min(100, (instance.hp / instance.maxHp) * 100));
+  if(fill) fill.style.width = pct + '%';
+  if(text) text.textContent = Math.max(0, instance.hp) + ' / ' + instance.maxHp;
+}
+// 공격 대상 선택 표시(빨간 테두리)만 갱신 — 슬롯을 다시 그리지 않고 클래스만 토글함
+function updateTargetHighlight(){
+  document.querySelectorAll('#monsterRow .monster-slot').forEach(slot => {
+    slot.classList.toggle('targeted', Number(slot.dataset.instanceId) === hunt.targetId);
+  });
 }
 
 function renderStatusBadges(){
-  const row = el('statusBadgeRow');
-  if(!row) return;
-  if(!hunt.monster || !hunt.monster.statusEffects || hunt.monster.statusEffects.length === 0){
-    row.innerHTML = '';
-    return;
-  }
-  row.innerHTML = hunt.monster.statusEffects.map(s => {
-    const def = STATUS_EFFECTS[s.key];
-    return `<span class="status-badge" style="color:${def.color}; border-color:${def.color};">${def.icon} ${def.name} ${s.ticksRemaining}s</span>`;
-  }).join('');
+  hunt.monsters.forEach(instance => {
+    const row = el('monster-status-' + instance.instanceId);
+    if(!row) return;
+    if(!instance.statusEffects || instance.statusEffects.length === 0){
+      row.innerHTML = '';
+      return;
+    }
+    row.innerHTML = instance.statusEffects.map(s => {
+      const def = STATUS_EFFECTS[s.key];
+      return `<span class="status-badge" style="color:${def.color}; border-color:${def.color};">${def.icon} ${def.name} ${s.ticksRemaining}s</span>`;
+    }).join('');
+  });
 }
 
 // 킬 결과 모달에 보여줄 인벤토리 미리보기 HTML

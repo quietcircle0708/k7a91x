@@ -638,6 +638,16 @@ const STAGE_GRADE_CHANCE = {
   10: { normal: 0,  epic: 100 },
 };
 
+// ---- 전투 개편: 복수 몬스터 동시 등장 ----
+const MONSTER_COUNT_MAX = 3; // 전투 중 동시에 등장 가능한 최대 몬스터 수
+
+// 전투 시작 시 동시에 등장하는 몬스터 수 확률(전역 설정, 합계 100). 언제든 쉽게 바꿀 수 있도록 별도 상수로 관리함.
+const MONSTER_COUNT_CHANCE = { 1: 70, 2: 25, 3: 5 };
+
+// 에픽 몬스터가 확정 스폰되는 스테이지(5, 10)는 예외적으로 항상 1마리만 등장함.
+// 11스테이지(숨겨진 장소)는 몬스터가 아예 등장하지 않으므로 이 표와 무관함(별도 처리).
+const MONSTER_COUNT_FORCED_SINGLE_STAGES = [5, 10];
+
 // 스테이지 입장 메시지. {name}은 던전 이름으로 치환됨(1스테이지 전용).
 const STAGE_ENTER_MSG = {
   first: '{name}에 발을 들입니다.',   // 1스테이지

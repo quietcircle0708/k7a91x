@@ -485,6 +485,30 @@ function pickStageGrade(stageNum){
   const chance = STAGE_GRADE_CHANCE[stageNum] || { normal: 100, epic: 0 };
   return Math.random() * 100 < chance.epic ? 'epic' : 'normal';
 }
+// 전투 시작 시 등장할 몬스터 수(1~MONSTER_COUNT_MAX)를 스테이지 기준으로 추첨.
+// 에픽 몬스터가 확정 스폰되는 스테이지(MONSTER_COUNT_FORCED_SINGLE_STAGES)는 항상 1마리만 반환함.
+function pickMonsterCount(stageNum){
+  if(MONSTER_COUNT_FORCED_SINGLE_STAGES.includes(stageNum)) return 1;
+  const pairs = Object.entries(MONSTER_COUNT_CHANCE).map(([count, chance]) => [Number(count), chance]);
+  return pickWeighted(pairs);
+}
+// 몬스터 개체 수(pickMonsterCount 결과)만큼 등급(일반/에픽)을 순서대로 결정.
+// 에픽 등급은 한 전투 그룹에 최대 1마리만 허용되므로, 먼저 에픽이 결정되면 그 이후 등장분은
+// 등급 추첨 없이 전부 일반 등급으로 고정함(기존 pickStageGrade 확률 공식 자체는 그대로 사용).
+function pickStageMonsterGrades(stageNum, count){
+  const grades = [];
+  let epicUsed = false;
+  for(let i = 0; i < count; i++){
+    if(epicUsed){
+      grades.push('normal');
+      continue;
+    }
+    const grade = pickStageGrade(stageNum);
+    if(grade === 'epic') epicUsed = true;
+    grades.push(grade);
+  }
+  return grades;
+}
 // 던전의 최소 레벨(가장 낮은 등장 몬스터 레벨) 기준 골드에 배율/편차를 적용한 숨겨진 장소 보상 골드 계산.
 function rollTreasureGold(minLevel){
   const base = monsterGoldBase(minLevel) * TREASURE_GOLD_MULT;

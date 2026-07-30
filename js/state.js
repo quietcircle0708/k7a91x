@@ -29,7 +29,7 @@ let state = {
 };
 let isEnhancing = false;
 let currentView = 'forge';
-let hunt = { dungeon: null, monster: null, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null };
+let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null };
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
 let shopUI = { tab: 'weapon', filter: 'price', dir: 'asc' };
 let shopFilterMenuOpen = false;
@@ -233,7 +233,7 @@ function resetGame(){
   el('resetLink').style.opacity = '';
   stopHuntLoop();
   stopDeathCurseTicker();
-  hunt = { dungeon: null, monster: null, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null };
+  hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null };
 
   state = {
     gold: 1000, inventory: [ { id: 1, level: 0, type: 'longsword' } ], equippedId: 1, nextItemId: 2,

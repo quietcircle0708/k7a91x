@@ -282,7 +282,7 @@ function sellAllMisc(id, btn){
 // 해당 회복 플라스크를 기존 useFlask() 함수로 1개만 자동 사용한다.
 function checkAutoHeal(){
   if(!state.settings || !state.settings.autoHeal) return;
-  if(currentView !== 'hunt' || !hunt.started || !hunt.monster) return; // 마을/상점/인벤토리 등 전투 외 상태에서는 동작 안 함
+  if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return; // 마을/상점/인벤토리 등 전투 외 상태에서는 동작 안 함
   ensurePlayerVitals();
   autoHealTry('hpFlask', 'autoHealThreshold', state.playerHp, effectiveMaxHp(state.playerLevel));
   autoHealTry('mpFlask', 'autoManaThreshold', state.playerMp, effectiveMaxMp(state.playerLevel));

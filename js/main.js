@@ -60,6 +60,11 @@ document.querySelector('.back-from-inv').addEventListener('click', closeToForge)
 document.querySelector('.back-from-dlist').addEventListener('click', closeToForge);
 el('exitHuntBtn').addEventListener('click', ()=> guardedNav('dungeonlist'));
 el('treasureChest').addEventListener('click', clickTreasureChest);
+el('monsterRow').addEventListener('click', (e)=>{
+  const slot = e.target.closest('.monster-slot[data-instance-id]');
+  if(!slot) return;
+  selectTarget(Number(slot.dataset.instanceId));
+});
 el('leaveConfirmStopBtn').addEventListener('click', confirmLeaveBattle);
 el('leaveConfirmContinueBtn').addEventListener('click', cancelLeaveBattle);
 el('openStatsBtn').addEventListener('click', openCharStats);

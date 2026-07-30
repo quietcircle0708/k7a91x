@@ -431,8 +431,19 @@
     30%{ transform: translate(-50%,-8px) scale(1.5); }
     100%{ opacity:0; transform: translate(-50%,-50px) scale(1.1); }
   }
-  .monster-name-row{ display:flex; justify-content:center; align-items:baseline; gap:8px; margin-bottom:8px; }
-  #monsterName{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:17px; }
+  .monster-row{ display:flex; justify-content:center; align-items:flex-start; gap:8px; margin-bottom:6px; }
+  .monster-slot{ display:flex; flex-direction:column; align-items:center; flex:1 1 0; min-width:0; max-width:170px; cursor:pointer; position:relative; }
+  .monster-row.count-2 .monster-slot .monster-icon{ font-size:56px; }
+  .monster-row.count-3 .monster-slot .monster-icon{ font-size:44px; }
+  .monster-slot.targeted .monster-icon{
+    outline: 3px solid #ff3b3b; outline-offset:5px; border-radius:14px;
+    filter: drop-shadow(0 0 8px rgba(255,59,59,.75));
+  }
+  .monster-slot .monster-name-row{ margin-bottom:6px; font-size:12px; }
+  .monster-slot .hp-text{ margin-bottom:10px; }
+  .monster-slot .status-badge-row{ margin:-4px 0 10px; }
+  .monster-name-row{ display:flex; justify-content:center; align-items:baseline; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+  .monster-name{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:17px; }
   .monster-lv{ font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--forge-cream-dim); }
   .hp-bar-wrap{ width:100%; height:14px; background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:999px; overflow:hidden; margin-bottom:6px; }
   .hp-bar-fill{ height:100%; width:100%; background: linear-gradient(90deg, #ff6a3d, #c13c3c); transition: width .25s ease-out; }
