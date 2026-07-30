@@ -294,59 +294,115 @@ function autoHealTry(flaskId, thresholdKey, current, max){
   const inQuickSlot = Array.isArray(state.quickSlots) && state.quickSlots.includes(flaskId);
   if(!inQuickSlot) return; // 퀵슬롯에 등록돼 있지 않으면 동작 안 함
   if(!(state.consumables && state.consumables[flaskId] > 0)) return; // 보유 수량이 없으면 동작 안 함
-  const alreadyHealing = flaskId === 'hpFlask' ? hpFlaskHealTimer : mpFlaskHealTimer;
-  if(alreadyHealing) return; // 같은 종류 회복이 이미 진행 중이면 중복 발동 안 함
-  useFlask(flaskId); // 기존 사용 함수 재사용 — 1회 호출 = 1개만 사용, 수동 사용과 동일한 경로
+  useFlask(flaskId); // 기존 사용 함수 재사용 — 1회 호출 = 1개만 사용, 수동 사용과 동일한 경로.
+  // 쿨타임 중이면 useFlask 내부에서 조용히 무시되므로, 자동 회복도 쿨타임이 끝날 때까지 자연히 대기하게 됨.
+}
+
+// ---- 플라스크 공통 사용 쿨타임 ----
+// 아이템 id별로 관리(플라스크별 쿨타임은 독립적). 특정 id를 하드코딩하지 않으므로 새 플라스크가
+// CONSUMABLES에 추가되면 별도 코드 수정 없이 동일하게 적용됨. 저장 대상 아님(런타임 전용 — 새로고침 시 초기화되어도 무방).
+let flaskCooldownUntil = {};
+function isFlaskOnCooldown(id){
+  return (flaskCooldownUntil[id] || 0) > Date.now();
+}
+function flaskCooldownRemainingSec(id){
+  const remainMs = (flaskCooldownUntil[id] || 0) - Date.now();
+  return remainMs > 0 ? remainMs / 1000 : 0;
+}
+function startFlaskCooldown(id){
+  flaskCooldownUntil[id] = Date.now() + FLASK_COOLDOWN_MS;
 }
 
 // ---- 소비 아이템 사용 ----
-// 플라스크 사용: 1초 간격 2틱으로 나눠 최대치의 일부를 서서히 회복
-// 플라스크 회복 타이머(체력/마나 각각) 추적용. 겹침/누적을 막고 전투 종료 시 확실히 정리하기 위함.
-let hpFlaskHealTimer = null;
-let mpFlaskHealTimer = null;
+// 플라스크 사용: 1초 간격 여러 틱으로 나눠 최대치의 일부를 서서히 회복.
+// hp/mp 각각 진행 중인 회복 상태(healState)를 추적 — 겹침 방지 및 전투 종료 시 잔여 회복량 즉시 지급에 사용.
+let hpFlaskHeal = null; // { timerId, perTick, ticksLeft, isHp } 또는 null(진행 중인 회복 없음)
+let mpFlaskHeal = null;
 function useFlask(id){
   const item = CONSUMABLES[id];
   if(!item) return;
+  if(isFlaskOnCooldown(id)) return; // 쿨타임 중이면 수동/자동 사용 모두 무시
   if(!state.consumables) state.consumables = { hpFlask: 0, mpFlask: 0 };
   if((state.consumables[id] || 0) <= 0) return;
   state.consumables[id]--;
+  startFlaskCooldown(id);
   ensurePlayerVitals();
   render();
   saveState();
 
   const isHp = item.effect.type === 'healHp';
-  // 같은 종류의 회복이 이미 진행 중이면 먼저 정리 — 회복 타이머가 겹쳐 쌓이며 계속 회복되는 것처럼 보이는 버그 방지
-  if(isHp && hpFlaskHealTimer){ clearInterval(hpFlaskHealTimer); hpFlaskHealTimer = null; }
-  if(!isHp && mpFlaskHealTimer){ clearInterval(mpFlaskHealTimer); mpFlaskHealTimer = null; }
+  // 같은 종류의 회복이 이미 진행 중이면, 버리지 않고 남은 회복량을 먼저 즉시 전부 적용한 뒤 새 회복을 시작함
+  // (플레이어는 언제나 사용한 플라스크의 전체 회복량을 보장받아야 하므로).
+  flushFlaskHeal(isHp ? 'hp' : 'mp');
 
   const ticks = Math.max(1, Math.round(item.effect.durationMs / 1000));
   const maxVal = isHp ? effectiveMaxHp(state.playerLevel) : effectiveMaxMp(state.playerLevel);
   const totalHeal = Math.round(maxVal * item.effect.percent / 100);
   const perTick = Math.round(totalHeal / ticks);
-  let ticksLeft = ticks;
-  const timer = setInterval(() => {
-    if(isHp){
-      state.playerHp = Math.min(effectiveMaxHp(state.playerLevel), (state.playerHp || 0) + perTick);
-    } else {
-      state.playerMp = Math.min(effectiveMaxMp(state.playerLevel), (state.playerMp || 0) + perTick);
-    }
-    renderHuntCharPanel();
-    renderCharStats();
-    saveState();
-    ticksLeft--;
-    if(ticksLeft <= 0){
-      clearInterval(timer);
-      if(isHp) hpFlaskHealTimer = null; else mpFlaskHealTimer = null;
+  const healState = { timerId: null, perTick, ticksLeft: ticks, isHp };
+  healState.timerId = setInterval(() => {
+    applyFlaskHealTick(healState);
+    healState.ticksLeft--;
+    if(healState.ticksLeft <= 0){
+      clearInterval(healState.timerId);
+      if(isHp) hpFlaskHeal = null; else mpFlaskHeal = null;
     }
   }, 1000);
-  if(isHp) hpFlaskHealTimer = timer; else mpFlaskHealTimer = timer;
+  if(isHp) hpFlaskHeal = healState; else mpFlaskHeal = healState;
 }
 
-// 전투가 끝나거나(던전 나가기/사망) 새로 시작될 때(stopHuntLoop가 항상 그 시작점에서 호출됨) 진행 중이던
-// 플라스크 회복 타이머를 정리. 이걸 안 하면 예전 회복 타이머가 백그라운드에 남아 계속 체력을 채우는 버그가 생김.
+// 회복 상태(healState) 기준으로 1틱만큼 실제 체력/마나를 채움
+function applyFlaskHealTick(healState){
+  if(healState.isHp){
+    state.playerHp = Math.min(effectiveMaxHp(state.playerLevel), (state.playerHp || 0) + healState.perTick);
+  } else {
+    state.playerMp = Math.min(effectiveMaxMp(state.playerLevel), (state.playerMp || 0) + healState.perTick);
+  }
+  renderHuntCharPanel();
+  renderCharStats();
+  saveState();
+}
+
+// 진행 중인 회복 효과가 있다면, 남은 틱의 회복량을 전부 즉시 적용한 뒤 타이머/상태를 종료함.
+// type: 'hp' | 'mp' | 'all'. 설정된 회복량은 항상 전부 보장되어야 하므로(강제 취소로 회복량을 버리지 않음),
+// 전투 종료 시점(사망/던전 나가기/몬스터 처치)과 같은 종류 회복을 재사용하는 시점 모두 이 함수로 정리함.
+function flushFlaskHeal(type){
+  if((type === 'hp' || type === 'all') && hpFlaskHeal){
+    clearInterval(hpFlaskHeal.timerId);
+    for(let i = 0; i < hpFlaskHeal.ticksLeft; i++) applyFlaskHealTick(hpFlaskHeal);
+    hpFlaskHeal = null;
+  }
+  if((type === 'mp' || type === 'all') && mpFlaskHeal){
+    clearInterval(mpFlaskHeal.timerId);
+    for(let i = 0; i < mpFlaskHeal.ticksLeft; i++) applyFlaskHealTick(mpFlaskHeal);
+    mpFlaskHeal = null;
+  }
+}
+
+// 전투가 끝나거나(던전 나가기/사망/몬스터 처치) 새로 시작될 때(startHuntLoop가 항상 그 시작점에서
+// stopHuntLoop를 호출함) 진행 중이던 플라스크 회복을 정리. 강제로 버리지 않고, 남아있는 회복량을
+// 먼저 전부 적용한 뒤(flushFlaskHeal) 종료함으로써 플레이어가 전체 회복량을 보장받도록 함.
+// (생존 상태로 전투가 끝난 경우에만 사용 — 사망으로 전투가 끝난 경우는 discardFlaskHeal을 사용)
 function stopFlaskHealTimers(){
-  if(hpFlaskHealTimer){ clearInterval(hpFlaskHealTimer); hpFlaskHealTimer = null; }
-  if(mpFlaskHealTimer){ clearInterval(mpFlaskHealTimer); mpFlaskHealTimer = null; }
+  flushFlaskHeal('all');
+}
+
+// 사망으로 전투가 종료된 경우 전용: 남은 회복량을 적용하지 않고 즉시 폐기하며, HP는 건드리지 않음.
+// type: 'hp' | 'mp' | 'all'
+function discardFlaskHeal(type){
+  if((type === 'hp' || type === 'all') && hpFlaskHeal){
+    clearInterval(hpFlaskHeal.timerId);
+    hpFlaskHeal = null;
+  }
+  if((type === 'mp' || type === 'all') && mpFlaskHeal){
+    clearInterval(mpFlaskHeal.timerId);
+    mpFlaskHeal = null;
+  }
+}
+// 사망 시 플라스크 관련 상태값(회복 진행 상태 + 쿨타임)을 모두 초기화
+function resetFlaskStateOnDeath(){
+  discardFlaskHeal('all');
+  flaskCooldownUntil = {};
 }
 
 // ---- 강화 화면 토글 옵션 ----

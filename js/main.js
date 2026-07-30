@@ -136,4 +136,8 @@ el('quickSlotPickerList').addEventListener('click', (e)=>{
 });
 el('closeQuickSlotPickerBtn').addEventListener('click', closeQuickSlotPicker);
 
+// 플라스크 쿨타임 표시(2.0→1.9→…→0.1)를 위한 실시간 갱신. 퀵슬롯이 없는 화면에서는
+// updateQuickSlotCooldowns() 내부에서 el('quickSlotRow')가 조용히 무시하므로 항상 켜둬도 무방함.
+setInterval(updateQuickSlotCooldowns, 100);
+
 loadState();

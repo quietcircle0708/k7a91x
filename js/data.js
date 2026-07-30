@@ -373,6 +373,10 @@ const ARTIFACTS = {
 
 // 소비 아이템(플라스크 등) 도감
 const QUICK_SLOT_COUNT = 2;
+// 모든 플라스크(현재 등록된 것 + 앞으로 추가될 것)에 공통으로 적용되는 사용 쿨타임(ms).
+// 특정 플라스크 id를 분기하지 않고 useFlask()가 이 값을 그대로 사용하므로, 새 플라스크를
+// CONSUMABLES에 추가하기만 하면 별도 코드 수정 없이 동일한 쿨타임 시스템이 적용됨.
+const FLASK_COOLDOWN_MS = 2000;
 const CONSUMABLES = {
   hpFlask: {
     id: 'hpFlask', name: '[하급]체력 회복 플라스크', class: '플라스크', icon: '🧪',

@@ -384,15 +384,47 @@ function renderQuickSlots(){
       return `<div class="quickslot-wrap"><button class="quickslot-btn empty" data-action="assign" data-slot="${idx}">+</button></div>`;
     }
     const count = (state.consumables && state.consumables[itemId]) || 0;
+    const cooldownLeft = flaskCooldownRemainingSec(itemId);
+    const onCooldown = cooldownLeft > 0;
     return `
       <div class="quickslot-wrap">
-        <button class="quickslot-btn filled" data-action="use" data-item="${itemId}" ${count <= 0 ? 'disabled' : ''} title="${item.name}">
-          <span class="quickslot-icon">${item.icon}</span>
-          <span class="quickslot-count">${count}</span>
+        <button class="quickslot-btn filled" data-action="use" data-item="${itemId}" ${(count <= 0 || onCooldown) ? 'disabled' : ''} title="${item.name}">
+          <span class="quickslot-icon" style="${onCooldown ? 'visibility:hidden;' : ''}">${item.icon}</span>
+          <span class="quickslot-count" style="${onCooldown ? 'visibility:hidden;' : ''}">${count}</span>
+          <span class="quickslot-cooldown" style="display:${onCooldown ? 'flex' : 'none'};">${cooldownLeft.toFixed(1)}</span>
         </button>
         <button class="quickslot-clear" data-action="clear" data-slot="${idx}" title="슬롯 비우기">×</button>
       </div>`;
   }).join('');
+}
+
+// renderQuickSlots()는 전체 innerHTML을 다시 그리므로 매 프레임 부르기엔 무겁다.
+// 쿨타임 초 단위 실시간 표시(2.0→1.9→…→0.1)를 위해, 이미 그려진 버튼의 쿨타임 표시 영역만
+// 가볍게 갱신하는 전용 함수. main.js에서 짧은 주기로 반복 호출됨.
+function updateQuickSlotCooldowns(){
+  const row = el('quickSlotRow');
+  if(!row) return;
+  row.querySelectorAll('.quickslot-btn.filled').forEach(btn => {
+    const itemId = btn.dataset.item;
+    const remain = flaskCooldownRemainingSec(itemId);
+    const cooldownEl = btn.querySelector('.quickslot-cooldown');
+    const iconEl = btn.querySelector('.quickslot-icon');
+    const countEl = btn.querySelector('.quickslot-count');
+    if(!cooldownEl) return;
+    if(remain > 0){
+      cooldownEl.textContent = remain.toFixed(1);
+      cooldownEl.style.display = 'flex';
+      if(iconEl) iconEl.style.visibility = 'hidden';
+      if(countEl) countEl.style.visibility = 'hidden';
+      btn.disabled = true;
+    } else {
+      cooldownEl.style.display = 'none';
+      if(iconEl) iconEl.style.visibility = '';
+      if(countEl) countEl.style.visibility = '';
+      const count = (state.consumables && state.consumables[itemId]) || 0;
+      btn.disabled = count <= 0;
+    }
+  });
 }
 
 // draft(임시 배분)가 마지막으로 적용된 state.stats와 다른지 여부 — 적용/초기화 버튼 활성화 판단용
@@ -442,9 +474,9 @@ function renderCharStats(){
     <div class="player-bar-wrap"><div class="player-bar-fill exp" style="width:${expPct}%;"></div></div>
     <div class="char-stat-divider"></div>
     <div class="char-stat-row"><span>사용 가능 포인트</span><span class="v" style="color:var(--forge-gold);">${draftStatPoints || 0}</span></div>
-    ${renderStatAllocRow('str', '힘', draftStats.str)}
-    ${renderStatAllocRow('agi', '민첩', draftStats.agi)}
-    ${renderStatAllocRow('int', '지능', draftStats.int)}
+    ${renderStatAllocRow('str', '힘', (draftStats || state.stats).str)}
+    ${renderStatAllocRow('agi', '민첩', (draftStats || state.stats).agi)}
+    ${renderStatAllocRow('int', '지능', (draftStats || state.stats).int)}
     <div class="stat-alloc-actions">
       <button class="nav-btn" data-action="reset-stats-full" ${hasAnyStatInvestment() ? '' : 'disabled'}>전체 초기화</button>
       <div class="stat-alloc-actions-right">

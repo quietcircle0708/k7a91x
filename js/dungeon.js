@@ -70,13 +70,16 @@ function startHuntLoop(){
 
   startStatusTicker();
 }
-function stopHuntLoop(){
+// flaskEndMode: 'flush'(기본, 생존 상태로 전투 종료 — 남은 회복량 즉시 적용 후 종료) |
+//               'discard'(사망으로 전투 종료 — 남은 회복량 적용 없이 폐기, HP 변경 없음)
+function stopHuntLoop(flaskEndMode = 'flush'){
   if(hunt.timerId){ clearInterval(hunt.timerId); hunt.timerId = null; }
   if(hunt.playerFirstAttackTimeout){ clearTimeout(hunt.playerFirstAttackTimeout); hunt.playerFirstAttackTimeout = null; }
   if(hunt.monsterTimerId){ clearInterval(hunt.monsterTimerId); hunt.monsterTimerId = null; }
   if(hunt.monsterFirstAttackTimeout){ clearTimeout(hunt.monsterFirstAttackTimeout); hunt.monsterFirstAttackTimeout = null; }
   stopStatusTicker();
-  stopFlaskHealTimers();
+  if(flaskEndMode === 'discard') resetFlaskStateOnDeath();
+  else stopFlaskHealTimers();
 }
 
 function attackTick(){
@@ -121,7 +124,7 @@ function monsterAttackTick(){
 
 // ---- 사망 처리 ----
 function playerDied(){
-  stopHuntLoop();
+  stopHuntLoop('discard'); // 사망 시에는 남은 플라스크 회복량을 적용하지 않고 폐기(HP 변경 없음)
   hunt.paused = true;
   const monsterDef = hunt.monster ? MONSTERS[hunt.monster.monsterId] : null;
   openDeathModal(monsterDef);
@@ -180,6 +183,9 @@ function killMonster(){
   const icon = el('monsterIcon');
   icon.classList.add('dead');
   hunt.paused = true;
+  // 몬스터 처치 = 이번 전투의 종료 시점. 보상 창에 머무는 동안 회복 틱이 계속 반복되던 버그 수정:
+  // 진행 중인 플라스크 회복이 있으면 남은 회복량을 즉시 전부 적용한 뒤 확실히 종료함.
+  stopFlaskHealTimers();
 
   const result = resolveDrops(monsterDef, dungeon, level);
   const curseActive = isDeathCurseActive();

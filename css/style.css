@@ -437,6 +437,11 @@
   .quickslot-btn.filled:disabled{ opacity:.4; cursor:not-allowed; }
   .quickslot-icon{ font-size:18px; line-height:1; }
   .quickslot-count{ font-size:10px; font-family:'JetBrains Mono', monospace; color: var(--forge-cream-dim); margin-top:2px; }
+  .quickslot-cooldown{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:700; font-family:'JetBrains Mono', monospace; color: var(--forge-gold);
+    background: rgba(0,0,0,.55); border-radius:10px; pointer-events:none;
+  }
   .quickslot-clear{
     position:absolute; top:-6px; right:-6px; width:16px; height:16px; border-radius:50%;
     background: var(--forge-blood); border:1px solid #7a1f1f; color:#fff; font-size:10px; line-height:1;
