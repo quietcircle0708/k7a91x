@@ -621,11 +621,10 @@ function renderDungeonList(){
 // ---- 던전(사냥) 전투 화면 ----
 function renderHunt(){
   const d = hunt.dungeon;
-  if(!d || !hunt.monster) return;
-  const monsterDef = MONSTERS[hunt.monster.monsterId];
-  const grade = MONSTER_GRADES[monsterDef.grade];
+  if(!d) return;
+  el('huntDungeonName').textContent = d.name + ' - ' + stageLabel(hunt.stage);
+
   const equipped = getEquipped();
-  el('huntDungeonName').textContent = d.name;
   if(equipped){
     const lv = equipped.level;
     const type = equipped.type || 'longsword';
@@ -638,6 +637,24 @@ function renderHunt(){
   } else {
     el('hunterInfo').textContent = '장착 무기 없음';
   }
+
+  const isTreasureStage = hunt.stage === DUNGEON_TREASURE_STAGE;
+  const chestEl = el('treasureChest');
+  const hintEl = el('treasureHint');
+  const monsterIconEl = el('monsterIcon');
+  const combatPanel = el('huntCombatPanel');
+  const showChest = isTreasureStage && !hunt.chestOpened;
+  if(chestEl) chestEl.style.display = showChest ? 'block' : 'none';
+  if(hintEl) hintEl.style.display = showChest ? 'block' : 'none';
+  if(monsterIconEl) monsterIconEl.style.display = isTreasureStage ? 'none' : 'block';
+  // 몬스터 정보(이름/체력/능력치)는 몬스터가 실제로 존재할 때만 표시 — 입장 메시지 대기 중엔 숨겨져 있다가
+  // 몬스터 이미지가 등장하는 순간(spawnMonster) 함께 나타남
+  if(combatPanel) combatPanel.style.display = (isTreasureStage || !hunt.monster) ? 'none' : 'block';
+
+  if(!hunt.monster) return; // 입장/조우 메시지 대기 중이거나 숨겨진 장소라 몬스터가 없으면 여기서 종료
+
+  const monsterDef = MONSTERS[hunt.monster.monsterId];
+  const grade = MONSTER_GRADES[monsterDef.grade];
   el('monsterIcon').textContent = monsterDef.icon;
   el('monsterName').textContent = monsterDef.name;
   el('monsterName').style.color = grade.color;
@@ -645,8 +662,6 @@ function renderHunt(){
   const pct = Math.max(0, Math.min(100, (hunt.monster.hp / hunt.monster.maxHp) * 100));
   el('hpBarFill').style.width = pct + '%';
   el('hpText').textContent = Math.max(0, hunt.monster.hp) + ' / ' + hunt.monster.maxHp;
-  const startBtn = el('startExploreBtn');
-  if(startBtn) startBtn.style.display = hunt.started ? 'none' : 'block';
 }
 
 function renderStatusBadges(){

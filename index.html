@@ -217,23 +217,26 @@
 
       <div class="hunter-info" id="hunterInfo">장착 무기: - (공격력 -)</div>
 
-      <button class="btn btn-main" id="startExploreBtn" style="width:auto; padding:10px 24px; margin:0 auto 10px; display:block;">탐험 시작</button>
-
       <div class="monster-stage" id="monsterStage">
         <div id="spawnToast"></div>
         <div class="monster-icon" id="monsterIcon">🐿️</div>
+        <div class="monster-icon treasure-chest" id="treasureChest" style="display:none;">🎁</div>
       </div>
 
-      <div class="monster-name-row">
-        <span id="monsterName">다람쥐</span>
-        <span class="monster-lv" id="monsterLv">Lv.1</span>
+      <div class="treasure-hint" id="treasureHint" style="display:none;">던전 구석진 곳에서 반짝이는 상자를 발견했다.... 열어볼까?</div>
+
+      <div id="huntCombatPanel">
+        <div class="monster-name-row">
+          <span id="monsterName">다람쥐</span>
+          <span class="monster-lv" id="monsterLv">Lv.1</span>
+        </div>
+        <div class="hp-bar-wrap">
+          <div class="hp-bar-fill" id="hpBarFill"></div>
+        </div>
+        <div class="hp-text" id="hpText">200 / 200</div>
+        <div class="status-badge-row" id="statusBadgeRow"></div>
+        <div class="quickslot-row" id="quickSlotRow"></div>
       </div>
-      <div class="hp-bar-wrap">
-        <div class="hp-bar-fill" id="hpBarFill"></div>
-      </div>
-      <div class="hp-text" id="hpText">200 / 200</div>
-      <div class="status-badge-row" id="statusBadgeRow"></div>
-      <div class="quickslot-row" id="quickSlotRow"></div>
 
       <div class="msg" id="huntMsg"></div>
     </div>
@@ -254,7 +257,7 @@
       </div>
       <div class="kill-rewards" id="krRewards"></div>
       <div class="modal-actions">
-        <button class="nav-btn" id="krStopBtn">전투 중단</button>
+        <button class="nav-btn" id="krStopBtn">마을 귀환</button>
         <button class="btn btn-main" id="krContinueBtn" style="width:auto; padding:10px 18px;">탐험 계속</button>
       </div>
     </div>

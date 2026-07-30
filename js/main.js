@@ -59,7 +59,7 @@ document.querySelector('.back-from-shop').addEventListener('click', closeToForge
 document.querySelector('.back-from-inv').addEventListener('click', closeToForge);
 document.querySelector('.back-from-dlist').addEventListener('click', closeToForge);
 el('exitHuntBtn').addEventListener('click', ()=> guardedNav('dungeonlist'));
-el('startExploreBtn').addEventListener('click', startExploration);
+el('treasureChest').addEventListener('click', clickTreasureChest);
 el('leaveConfirmStopBtn').addEventListener('click', confirmLeaveBattle);
 el('leaveConfirmContinueBtn').addEventListener('click', cancelLeaveBattle);
 el('openStatsBtn').addEventListener('click', openCharStats);
@@ -89,8 +89,8 @@ el('charStatsBody').addEventListener('click', (e)=>{
 el('respawnBtn').addEventListener('click', respawnAtVillage);
 el('sellConfirmYesBtn').addEventListener('click', confirmSell);
 el('sellConfirmNoBtn').addEventListener('click', cancelSell);
-el('krStopBtn').addEventListener('click', killResultStop);
-el('krContinueBtn').addEventListener('click', killResultContinue);
+el('krStopBtn').addEventListener('click', returnToVillage);
+el('krContinueBtn').addEventListener('click', advanceStage);
 el('dungeonList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-id]');
   if(!btn || btn.disabled) return;

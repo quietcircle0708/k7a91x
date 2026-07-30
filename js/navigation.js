@@ -10,6 +10,8 @@ function showView(name){
     closeKillResultModal();
     hunt.dungeon = null;
     hunt.monster = null;
+    hunt.stage = 1;
+    hunt.chestOpened = false;
     hunt.paused = false;
     hunt.started = false;
   }

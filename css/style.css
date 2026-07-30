@@ -395,6 +395,26 @@
   }
   .monster-icon.dead{ animation: monster-dead .4s forwards; }
   @keyframes monster-dead{ to{ transform: scale(0) rotate(30deg); opacity:0; } }
+  .monster-icon.spawn-hidden{ opacity:0; }
+  .monster-icon.spawn-in{ animation: monster-spawn-in .5s ease-out; }
+  @keyframes monster-spawn-in{
+    from{ opacity:0; transform: scale(.8); }
+    to{ opacity:1; transform: scale(1); }
+  }
+  #huntCombatPanel.spawn-in{ animation: panel-fade-in .5s ease-out; }
+  @keyframes panel-fade-in{
+    from{ opacity:0; }
+    to{ opacity:1; }
+  }
+  .treasure-chest{ cursor:pointer; }
+  .treasure-chest.shake{ animation: chest-shake 1s; }
+  .treasure-hint{ text-align:center; font-size:12.5px; color: var(--forge-cream-dim); margin-bottom:10px; }
+  @keyframes chest-shake{
+    0%,100%{ transform: translateX(0) rotate(0); }
+    10%,30%,50%,70%{ transform: translateX(-6px) rotate(-6deg); }
+    20%,40%,60%,80%{ transform: translateX(6px) rotate(6deg); }
+    90%{ transform: translateX(-3px) rotate(-3deg); }
+  }
   .dmg-popup{
     position:absolute; left:50%; top:20%; font-family:'JetBrains Mono', monospace; font-weight:700;
     font-size:17px; color:#ffb84d; text-shadow: 0 0 6px rgba(0,0,0,.6); pointer-events:none; opacity:0;

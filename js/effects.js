@@ -208,16 +208,23 @@ function statusTickEffect(dmg, color){
 }
 
 let spawnToastTimeout = null;
-function showSpawnToast(monsterDef, level){
-  const grade = MONSTER_GRADES[monsterDef.grade];
+// 던전 내 팝업 공통 표시(스테이지 입장 메시지 등 단순 텍스트용). 노출 시간은 DUNGEON_MSG_DURATION_MS로 통일됨.
+function showDungeonMsg(text){
   const toast = el('spawnToast');
   if(!toast) return;
-  toast.textContent = `${grade.label}몬스터인 ${monsterDef.name}${josaIGa(monsterDef.name)} 출현했습니다!`;
-  toast.style.color = grade.color;
+  toast.innerHTML = text;
+  toast.style.color = '';
   toast.classList.remove('show'); void toast.offsetWidth;
   toast.classList.add('show');
   clearTimeout(spawnToastTimeout);
-  spawnToastTimeout = setTimeout(() => toast.classList.remove('show'), 1000);
+  spawnToastTimeout = setTimeout(() => toast.classList.remove('show'), DUNGEON_MSG_DURATION_MS);
+}
+// 몬스터 조우 메시지(랜덤 4종 중 1개, formulas.js의 pickEncounterMessage) 표시. 몬스터 이름 부분에만 등급 색상을 적용.
+function showEncounterToast(monsterDef){
+  const grade = MONSTER_GRADES[monsterDef.grade];
+  const msg = pickEncounterMessage(monsterDef.name);
+  const coloredName = `<span style="color:${grade.color};">${monsterDef.name}</span>`;
+  showDungeonMsg(msg.replace(monsterDef.name, coloredName));
 }
 
 // 마을(대장간) 화면 상단에 잠깐 뜨는 팝업 메시지 (예: 부활 후 안내)

@@ -349,10 +349,6 @@ const MONSTER_GRADES = {
   named:  { label: '네임드', color: '#ff8fc7', goldBonus: 0.35 },
 };
 
-// 등급별 몬스터 등장 확률(전역 설정값). 던전마다 따로 설정하지 않고 모든 던전이 이 값을 공유함.
-// 한 던전 안에 같은 등급 몬스터가 여러 마리면, 그 등급의 확률을 마리 수만큼 균등하게 나눠 가짐.
-const MONSTER_GRADE_SPAWN_CHANCE = { normal: 80, epic: 20 };
-
 // 획득 가능한 아티팩트(장비) 도감
 const ARTIFACT_SLOT_MAX = 3;
 // purchasable:true + buyPrice가 있는 아티팩트만 상점 "아티팩트" 탭에 자동으로 등록됨(박쥐 날개처럼
@@ -570,7 +566,7 @@ const MONSTERS = {
 
 // 던전 테이블.
 // monsters: 등장 몬스터 id 배열(그 안에서 몬스터별 등장확률/개별 레벨범위를 따로 설정하지 않음 —
-//   등급별 등장확률은 MONSTER_GRADE_SPAWN_CHANCE(전역)를 따르고, 레벨은 아래 levelRange로 결정됨).
+//   등급별 등장확률은 STAGE_GRADE_CHANCE(전역, 스테이지 번호 기준)를 따르고, 레벨은 아래 levelRange로 결정됨).
 // icon: 비워두면(빈 문자열) 등장 몬스터 중 첫 번째의 아이콘을 자동으로 사용함(dungeonIcon() 참고).
 // levelRange: 일반 등급 몬스터의 등장 레벨 = 몬스터 자체 레벨 ~ (몬스터 자체 레벨 + levelRange), 그 구간 내에서
 //   레벨별 등장 확률은 모두 동일함. 에픽(그 외 등급) 몬스터는 이 범위를 적용하지 않고 몬스터 데이터의
@@ -611,6 +607,61 @@ const DUNGEONS = [
     levelRange: 2,
   },
 ];
+
+// ============================================================
+// 던전 스테이지 시스템 (11스테이지 개편)
+// 몬스터와 전투 → 종료/탐험계속 반복이었던 기존 흐름을 대체함:
+// 던전 입장 → 스테이지 시작 → 몬스터 처치 → 행동 선택(마을 귀환/탐험 계속) → 다음 스테이지 ... → 11스테이지(숨겨진 장소)
+// 몬스터의 레벨 산출 방식(levelRange 등 기존 던전 공식)은 이 개편과 무관하게 그대로 유지됨.
+// ============================================================
+
+// 던전 내에서 출력되는 모든 팝업 메시지(스테이지 입장 안내, 몬스터 조우 안내, 몬스터 출현 토스트 등)의 공통 노출 시간
+const DUNGEON_MSG_DURATION_MS = 1000;
+
+const DUNGEON_TOTAL_STAGES = 11;     // 1~10: 전투 스테이지, 11: 숨겨진 장소(보상방)
+const DUNGEON_TREASURE_STAGE = 11;
+
+// 스테이지별 몬스터 등급 등장 확률(전역, 모든 던전 공통 적용 + 앞으로 추가되는 던전에도 자동 적용됨).
+// "어떤 레벨로 등장하는지"는 기존처럼 던전의 levelRange 공식을 그대로 쓰고, 여기서는
+// "일반/에픽 중 어느 등급으로 등장할지"만 스테이지 번호를 기준으로 결정함.
+// (몬스터 등급 등장확률은 이제 던전 전역이 아닌 이 표로 완전히 대체됨 — 기존 던전 전역 80/20 고정값은 삭제됨)
+const STAGE_GRADE_CHANCE = {
+  1:  { normal: 95, epic: 5   },
+  2:  { normal: 90, epic: 10  },
+  3:  { normal: 90, epic: 10  },
+  4:  { normal: 90, epic: 10  },
+  5:  { normal: 0,  epic: 100 },
+  6:  { normal: 85, epic: 15  },
+  7:  { normal: 85, epic: 15  },
+  8:  { normal: 85, epic: 15  },
+  9:  { normal: 85, epic: 15  },
+  10: { normal: 0,  epic: 100 },
+};
+
+// 스테이지 입장 메시지. {name}은 던전 이름으로 치환됨(1스테이지 전용).
+const STAGE_ENTER_MSG = {
+  first: '{name}에 발을 들입니다.',   // 1스테이지
+  mid: '더 깊은 곳으로 나아갑니다.',    // 2~10스테이지
+  treasure: '숨겨진 장소를 발견했습니다.', // 11스테이지(숨겨진 장소)
+};
+
+// 몬스터 조우 시 랜덤으로 출력되는 안내 문구 중 하나가 선택됨. {name}은 몬스터 이름(등급 색상 적용),
+// {josa}는 몬스터 이름의 받침 유무에 따라 자동으로 붙는 조사 — josaType이 'wagwa'면 와/과, 'iga'면 이/가.
+// (실제 조사 치환은 formulas.js의 pickEncounterMessage()에서 처리됨)
+const MONSTER_ENCOUNTER_MSGS = [
+  { text: '{name}{josa} 조우했습니다!', josaType: 'wagwa' },
+  { text: '{name}{josa} 맞닥뜨렸습니다!', josaType: 'wagwa' },
+  { text: '{name}{josa} 당신을 응시합니다...', josaType: 'iga' },
+  { text: '{name}{josa} 달려들 준비를 합니다!', josaType: 'iga' },
+];
+
+// 마을 귀환 시(스테이지 클리어 후 행동 선택에서 "마을 귀환" 선택) 출력되는 안내 문구
+const STAGE_RETURN_MSG = '지친 몸을 이끌고 마을로 귀환했습니다.';
+
+// 11스테이지(숨겨진 장소) 보물 상자 설정
+const TREASURE_SHAKE_MS = 1000;       // 상자 클릭 후 흔들림 애니메이션 시간
+const TREASURE_GOLD_MULT = 5;         // 골드 보상 = 던전 최소 레벨 몬스터의 고정 골드 × 5
+const TREASURE_GOLD_VARIANCE = 0.25;  // 골드 보상 랜덤 편차 ±25%(일반 몬스터 처치 시의 ±15%와는 다른 값)
 
 // 모든 몬스터 공통 규칙
 const MONSTER_BASE_GOLD = 100;       // 1레벨 몬스터의 기본 드랍 골드

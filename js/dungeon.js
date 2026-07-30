@@ -1,32 +1,48 @@
 // ============================================================
-// dungeon.js — 던전 전투 흐름
-// 던전 입장, 몬스터 스폰, 공격 루프(플레이어/몬스터/상태이상),
-// 처치 처리, 킬 결과 모달까지 전투와 관련된 모든 로직.
+// dungeon.js — 던전 전투 흐름 (11스테이지 시스템)
+// 던전 입장 → 스테이지 입장 메시지 → 몬스터 생성 → 조우 메시지 → 전투(자동 시작)
+// → 처치 → 행동 선택(마을 귀환/탐험 계속) → 다음 스테이지 ... → 11스테이지(숨겨진 장소, 보물 상자)
 // ============================================================
 
 function enterDungeon(id){
   const d = DUNGEONS.find(x => x.id === id);
   if(!d || !getEquipped()) return;
   hunt.dungeon = d;
+  hunt.monster = null;
   hunt.paused = true;
   hunt.started = false;
-  spawnMonster();
   showView('hunt');
+  enterStage(1);
 }
 
-// 탐험 시작 버튼: 이때부터 실제 전투(공격 루프)가 시작됨
-function startExploration(){
-  if(!hunt.dungeon || !hunt.monster || hunt.started) return;
-  hunt.started = true;
-  hunt.paused = false;
-  startHuntLoop();
+// 스테이지 진입: 입장 메시지를 DUNGEON_MSG_DURATION_MS(1초)만큼 보여준 뒤,
+// 전투 스테이지(1~10)면 몬스터를 생성하고, 11스테이지(숨겨진 장소)면 보물 상자를 연다.
+function enterStage(stageNum){
+  hunt.stage = stageNum;
+  hunt.monster = null;
+  hunt.chestOpened = false;
+  hunt.paused = true;
+  hunt.started = false;
   renderHunt();
+  const icon = el('monsterIcon');
+  if(icon){
+    icon.classList.remove('dead', 'spawn-in');
+    icon.classList.add('spawn-hidden'); // 입장 메시지가 끝나기 전에는 몬스터가 보이지 않도록 숨김
+  }
+  showDungeonMsg(stageEnterMessage(stageNum, hunt.dungeon.name));
+  hunt.stageEnterTimeout = setTimeout(() => {
+    if(stageNum === DUNGEON_TREASURE_STAGE){
+      openTreasureStage();
+    } else {
+      spawnMonster();
+    }
+  }, DUNGEON_MSG_DURATION_MS);
 }
 
 function spawnMonster(){
   const d = hunt.dungeon;
   if(!d) return;
-  const monsterId = pickSpawnMonster(d);
+  const monsterId = pickSpawnMonsterForStage(d, hunt.stage);
   const monsterDef = MONSTERS[monsterId];
   // 일반 등급: 몬스터 레벨 ~ (몬스터 레벨 + 던전 레벨범위) 구간에서 균등 추첨 / 그 외 등급: 고정 레벨
   const level = monsterDef.grade === 'normal'
@@ -37,11 +53,36 @@ function spawnMonster(){
   // 최종 공격력에만 0.5배를 곱해서 DPS를 맞춤(monsterAtkFor 공식 자체는 변경하지 않음).
   const atk = Math.round(monsterAtkFor(monsterDef, level) * 0.5);
   hunt.monster = { monsterId: monsterDef.id, level, hp: maxHp, maxHp, atk, statusEffects: [] };
-  const icon = el('monsterIcon');
-  if(icon) icon.classList.remove('dead');
   renderHunt();
   renderStatusBadges();
-  showSpawnToast(monsterDef, level);
+  const icon = el('monsterIcon');
+  if(icon){
+    icon.classList.remove('dead');
+    icon.classList.remove('spawn-hidden');
+    icon.classList.remove('spawn-in');
+    void icon.offsetWidth; // 리플로우를 강제해 애니메이션이 매번 처음부터 재생되도록 함
+    icon.classList.add('spawn-in'); // 0.5초 동안 페이드 인
+  }
+  const combatPanel = el('huntCombatPanel');
+  if(combatPanel){
+    combatPanel.classList.remove('spawn-in');
+    void combatPanel.offsetWidth;
+    combatPanel.classList.add('spawn-in'); // 몬스터 이미지와 동시에 0.5초 페이드 인
+  }
+  showEncounterToast(monsterDef);
+  // 조우 메시지 노출이 끝나면 전투를 자동으로 시작함(수동 "탐험 시작" 버튼 없음)
+  hunt.encounterTimeout = setTimeout(() => {
+    beginStageCombat();
+  }, DUNGEON_MSG_DURATION_MS);
+}
+
+// 조우 메시지 노출이 끝난 뒤 실제 전투(공격 루프)를 시작함
+function beginStageCombat(){
+  if(!hunt.dungeon || !hunt.monster || hunt.started) return;
+  hunt.started = true;
+  hunt.paused = false;
+  startHuntLoop();
+  renderHunt();
 }
 
 // ---- 전투 루프 ----
@@ -77,6 +118,9 @@ function stopHuntLoop(flaskEndMode = 'flush'){
   if(hunt.playerFirstAttackTimeout){ clearTimeout(hunt.playerFirstAttackTimeout); hunt.playerFirstAttackTimeout = null; }
   if(hunt.monsterTimerId){ clearInterval(hunt.monsterTimerId); hunt.monsterTimerId = null; }
   if(hunt.monsterFirstAttackTimeout){ clearTimeout(hunt.monsterFirstAttackTimeout); hunt.monsterFirstAttackTimeout = null; }
+  if(hunt.stageEnterTimeout){ clearTimeout(hunt.stageEnterTimeout); hunt.stageEnterTimeout = null; }
+  if(hunt.encounterTimeout){ clearTimeout(hunt.encounterTimeout); hunt.encounterTimeout = null; }
+  if(hunt.treasureShakeTimeout){ clearTimeout(hunt.treasureShakeTimeout); hunt.treasureShakeTimeout = null; }
   stopStatusTicker();
   if(flaskEndMode === 'discard') resetFlaskStateOnDeath();
   else stopFlaskHealTimers();
@@ -261,28 +305,106 @@ function openKillResultModal(monsterDef, level, result){
   }
   el('krRewards').innerHTML = rewardsHtml;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
+  // 10스테이지 이하를 클리어한 경우에만 "탐험 계속"으로 다음 스테이지를 진행할 수 있음(11=숨겨진 장소는 별도 처리)
+  el('krContinueBtn').style.display = 'inline-block';
   el('killResultModal').style.display = 'flex';
 }
 function closeKillResultModal(){
   el('killResultModal').style.display = 'none';
 }
-function killResultContinue(){
+// "탐험 계속": 다음 스테이지로 진행 (10스테이지를 클리어했으면 자동으로 11스테이지=숨겨진 장소로 이어짐)
+function advanceStage(){
   closeKillResultModal();
-  hunt.paused = false;
-  spawnMonster();
-  startHuntLoop(); // 전투 시작마다 플레이어/몬스터 첫공격 타이밍을 초기화
+  enterStage(hunt.stage + 1);
 }
-function killResultStop(){
+// "마을 귀환": 체력/마나 회복 후 메인 화면(대장간)으로 이동 (스테이지 클리어 후 행동 선택 / 숨겨진 장소 보상 이후 공통)
+function returnToVillage(){
   closeKillResultModal();
-  exitHunt();
+  state.playerHp = effectiveMaxHp(state.playerLevel);
+  state.playerMp = effectiveMaxMp(state.playerLevel);
+  saveState();
+  showView('forge');
+  showTownToast(STAGE_RETURN_MSG);
 }
 
-function exitHunt(){
-  stopHuntLoop();
-  hunt.dungeon = null;
+// ---- 던전 등장 몬스터 선택(스테이지 기준) ----
+// 스테이지 번호로 등급(일반/에픽)을 먼저 정하고, 그 등급에 해당하는 이 던전의 몬스터 중 하나를 균등 추첨.
+// 해당 등급 몬스터가 이 던전에 하나도 없으면(예: 다람쥐굴처럼 에픽 몬스터가 없는 던전에서 에픽 스테이지가 걸린 경우)
+// 등급 제한 없이 이 던전의 몬스터 전체 중에서 균등 추첨하는 것으로 폴백함.
+function pickSpawnMonsterForStage(dungeon, stageNum){
+  const grade = pickStageGrade(stageNum);
+  let candidates = dungeon.monsters.filter(id => MONSTERS[id].grade === grade);
+  if(candidates.length === 0) candidates = dungeon.monsters;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+// ---- 11스테이지: 숨겨진 장소(보물 상자) ----
+function openTreasureStage(){
   hunt.monster = null;
-  hunt.paused = false;
+  hunt.chestOpened = false;
+  hunt.paused = true;
   hunt.started = false;
-  closeKillResultModal();
-  showView('dungeonlist');
+  renderHunt();
+}
+// 보물 상자 클릭: 1초 흔들림 애니메이션 후 파괴되며 보상 지급(골드 확정 지급 + 모험가의 유해/마석은 기존 전역 드랍 공식 그대로 적용되어 드랍되지 않을 수도 있음)
+function clickTreasureChest(){
+  if(hunt.chestOpened || hunt.stage !== DUNGEON_TREASURE_STAGE) return;
+  hunt.chestOpened = true;
+  const chest = el('treasureChest');
+  const hint = el('treasureHint');
+  if(hint) hint.style.display = 'none'; // 안내 문구는 즉시 숨김(재클릭 방지 신호). 상자 자체는 흔들림 애니메이션 동안 계속 보여줌
+  if(chest) chest.classList.add('shake');
+  hunt.treasureShakeTimeout = setTimeout(() => {
+    if(chest) chest.classList.remove('shake');
+    const result = grantTreasureRewards();
+    openTreasureResultModal(result);
+  }, TREASURE_SHAKE_MS);
+}
+// 던전의 최소 레벨(가장 낮은 등장 몬스터 레벨) 기준으로 보상을 산정해 지급.
+// 골드는 확정 지급(×5, ±25%)이고, 모험가의 유해/마석은 각각의 전역 드랍 확률을 그대로 적용하므로 드랍되지 않을 수도 있음.
+function grantTreasureRewards(){
+  const minLevel = dungeonLevelRange(hunt.dungeon).min;
+  const gold = rollTreasureGold(minLevel);
+  state.gold += gold;
+
+  let weaponDrop = resolveWeaponRelicDrop(minLevel);
+  if(weaponDrop){
+    if(state.inventory.length < INV_MAX){
+      state.inventory.push({ id: state.nextItemId++, level: weaponDrop.level, type: weaponDrop.type });
+    } else {
+      weaponDrop = null; // 인벤토리가 가득 차 드랍 무산
+    }
+  }
+  const stoneDrop = rollStoneDrop(minLevel, 'normal');
+  if(stoneDrop){
+    const item = MISC_ITEMS[stoneDrop.itemId];
+    state[item.stateKey] = (state[item.stateKey] || 0) + stoneDrop.qty;
+  }
+
+  render();
+  saveState();
+  return { gold, weaponDrop, stoneDrop };
+}
+function openTreasureResultModal(result){
+  el('krIcon').textContent = '🎁';
+  el('krTitle').textContent = '숨겨진 보물을 발견했습니다!';
+  el('krTitle').style.color = 'var(--forge-gold)';
+  el('krLevel').textContent = '';
+
+  let rewardsHtml = `<div><span class="txt-gold">골드</span> +${result.gold.toLocaleString()}G</div>`;
+  if(result.weaponDrop){
+    const itemName = `${weaponName(result.weaponDrop.type)} +${result.weaponDrop.level}`;
+    rewardsHtml += `<div><span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
+  }
+  if(result.stoneDrop){
+    const item = MISC_ITEMS[result.stoneDrop.itemId];
+    rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${result.stoneDrop.qty} 획득</div>`;
+  }
+  if(state.inventory.length >= INV_MAX && !result.weaponDrop){
+    rewardsHtml += `<div class="reward-note">무기 인벤토리가 가득 찼습니다.</div>`;
+  }
+  el('krRewards').innerHTML = rewardsHtml;
+  el('krInvTooltip').innerHTML = buildInvPeekHtml();
+  el('krContinueBtn').style.display = 'none'; // 11스테이지 다음은 없으므로 "탐험 계속" 버튼은 숨김
+  el('killResultModal').style.display = 'flex';
 }

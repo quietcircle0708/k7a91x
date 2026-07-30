@@ -349,28 +349,6 @@ function dungeonIcon(d){
 function pickSpawnLevel(levelMin, levelMax){
   return levelMin + Math.floor(Math.random() * (levelMax - levelMin + 1));
 }
-// 던전 등장 몬스터 중 하나를 추첨. 등급별 등장확률은 전역 설정(MONSTER_GRADE_SPAWN_CHANCE)을 따르고,
-// 한 던전에 같은 등급 몬스터가 여럿이면 그 등급 확률을 마리 수만큼 균등하게 나눠 가짐.
-function pickSpawnMonster(dungeon){
-  const byGrade = {};
-  dungeon.monsters.forEach(id => {
-    const grade = MONSTERS[id].grade;
-    (byGrade[grade] = byGrade[grade] || []).push(id);
-  });
-  const weighted = [];
-  Object.keys(byGrade).forEach(grade => {
-    const gradeChance = MONSTER_GRADE_SPAWN_CHANCE[grade] || 0;
-    const each = gradeChance / byGrade[grade].length;
-    byGrade[grade].forEach(id => weighted.push({ id, chance: each }));
-  });
-  const total = weighted.reduce((s, w) => s + w.chance, 0);
-  let r = Math.random() * total;
-  for(const w of weighted){
-    if(r < w.chance) return w.id;
-    r -= w.chance;
-  }
-  return weighted[weighted.length - 1].id;
-}
 // 가중치 쌍 배열([값, 가중치])에서 하나를 추첨
 function pickWeighted(pairs){
   const total = pairs.reduce((s, [, w]) => s + w, 0);
@@ -482,6 +460,37 @@ function hasBatchim(word){
 }
 function josaIGa(word){ return hasBatchim(word) ? '이' : '가'; }
 function josaEulReul(word){ return hasBatchim(word) ? '을' : '를'; }
+function josaWaGwa(word){ return hasBatchim(word) ? '과' : '와'; }
+
+// ---- 던전 스테이지 시스템: 메시지 생성 ----
+// 스테이지 입장 메시지(STAGE_ENTER_MSG, data.js)를 실제 문구로 변환.
+// stageNum이 1이면 첫 입장 문구(던전 이름 치환), 2~10이면 공통 문구, 11(숨겨진 장소)이면 전용 문구.
+function stageEnterMessage(stageNum, dungeonName){
+  if(stageNum === DUNGEON_TREASURE_STAGE) return STAGE_ENTER_MSG.treasure;
+  if(stageNum === 1) return STAGE_ENTER_MSG.first.replace('{name}', dungeonName);
+  return STAGE_ENTER_MSG.mid;
+}
+// 전투 스테이지(1~10) 표시 라벨. 예) 1굴, 8굴. 숨겨진 장소는 별도 처리.
+function stageLabel(stageNum){
+  return stageNum === DUNGEON_TREASURE_STAGE ? '숨겨진 장소' : `${stageNum}굴`;
+}
+// 몬스터 조우 메시지(MONSTER_ENCOUNTER_MSGS, data.js) 중 하나를 랜덤으로 골라 조사까지 채워서 반환.
+function pickEncounterMessage(monsterName){
+  const entry = MONSTER_ENCOUNTER_MSGS[Math.floor(Math.random() * MONSTER_ENCOUNTER_MSGS.length)];
+  const josa = entry.josaType === 'wagwa' ? josaWaGwa(monsterName) : josaIGa(monsterName);
+  return entry.text.replace('{name}', monsterName).replace('{josa}', josa);
+}
+// 스테이지 번호를 기준으로 몬스터 등급(일반/에픽)을 추첨(STAGE_GRADE_CHANCE, data.js 전역 설정).
+function pickStageGrade(stageNum){
+  const chance = STAGE_GRADE_CHANCE[stageNum] || { normal: 100, epic: 0 };
+  return Math.random() * 100 < chance.epic ? 'epic' : 'normal';
+}
+// 던전의 최소 레벨(가장 낮은 등장 몬스터 레벨) 기준 골드에 배율/편차를 적용한 숨겨진 장소 보상 골드 계산.
+function rollTreasureGold(minLevel){
+  const base = monsterGoldBase(minLevel) * TREASURE_GOLD_MULT;
+  const spread = base * TREASURE_GOLD_VARIANCE;
+  return Math.round(base - spread + Math.random() * spread * 2);
+}
 
 // ---- 표시용 포맷 ----
 // "10 → 21(11↑)" 형식으로 증가폭을 함께 표시. 변동이 없으면 괄호를 생략.
