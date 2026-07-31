@@ -225,22 +225,23 @@ function requiredExp(level){
 // 스탯 보너스가 반영된 실질 최대 체력/마나
 function effectiveMaxHp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
-  return playerBaseHp(level) + (s.str || 0) * 20 + (s.agi || 0) * 10;
+  return playerBaseHp(level) + (s.str || 0) * 20 + (s.agi || 0) * 5;
 }
 function effectiveMaxMp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
-  return playerBaseMp(level) + (s.int || 0) * 10;
+  return playerBaseMp(level) + (s.int || 0) * 30;
 }
 function effectiveAtkSpeed(type, level){
   let s = atkSpeedFor(type, level);
   if(ownsArtifact('batwing')) s *= 1.05;
   const agi = (state.stats && state.stats.agi) || 0;
-  s *= 1 + agi * 0.0005; // 민첩 1당 공격속도 +0.05%
+  s *= 1 + agi * 0.001; // 민첩 1당 공격속도 +0.1%
   return s;
 }
 function effectiveAtk(type, level){
   const str = (state.stats && state.stats.str) || 0;
-  return atkFor(type, level) + str * 2; // 힘 1당 공격력 +2
+  const agi = (state.stats && state.stats.agi) || 0;
+  return atkFor(type, level) + str * 2 + agi * 1; // 힘 1당 공격력 +2, 민첩 1당 공격력 +1
 }
 
 // ---- 골드/드랍 관련 계산 ----

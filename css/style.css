@@ -387,14 +387,28 @@
   .hunter-info{ text-align:center; font-size:12.5px; color: var(--forge-cream-dim); margin-bottom:14px; font-family:'JetBrains Mono', monospace; }
   .monster-stage{ display:flex; justify-content:center; align-items:center; height:150px; position:relative; margin-bottom:10px; }
   .monster-icon{ font-size:72px; transition: transform .1s, filter .15s; position:relative; z-index:1; }
-  .monster-icon.hit{ animation: monster-hit .28s; }
+  /* .monster-icon.hit / .dead / .spawn-in 은 모두 명시도가 동일한 2-클래스 선택자였는데, 스폰 시 붙는
+     spawn-in 클래스가 이후 제거되지 않고 계속 남아있고(css 소스 순서상 아래쪽에 선언되어 있어)
+     캐스케이드에서 계속 이겨버려 히트/사망 애니메이션(keyframe)이 실제로는 전혀 재생되지 않던 버그가 있었음.
+     .monster-slot 조상 클래스를 더해 hit/dead 쪽 명시도를 의도적으로 더 높여 항상 우선 적용되도록 함. */
+  .monster-slot .monster-icon.hit{ animation: monster-hit .2s ease-in-out; }
   @keyframes monster-hit{
-    0%{ transform: scale(1); filter: brightness(1); }
-    30%{ transform: scale(.9) translateX(4px); filter: brightness(2) drop-shadow(0 0 10px #ff4444); }
-    100%{ transform: scale(1); filter: brightness(1); }
+    0%{ transform: translateX(0); filter: brightness(1); }
+    15%{ transform: translateX(-6px); filter: brightness(0) invert(1) drop-shadow(0 0 14px #fff); }
+    35%{ transform: translateX(5px); filter: brightness(0) invert(1) drop-shadow(0 0 14px #fff); }
+    55%{ transform: translateX(-3px); filter: brightness(1.4); }
+    75%{ transform: translateX(2px); filter: brightness(1); }
+    100%{ transform: translateX(0); filter: brightness(1); }
   }
-  .monster-icon.dead{ animation: monster-dead .4s forwards; }
-  @keyframes monster-dead{ to{ transform: scale(0) rotate(30deg); opacity:0; } }
+  .monster-slot .monster-icon.dead{ animation: monster-dead .4s ease-in forwards; }
+  @keyframes monster-dead{
+    0%{ transform: scale(1) translateX(0); opacity:1; }
+    20%{ transform: scale(1.05) translateX(-5px); opacity:1; }
+    40%{ transform: scale(.95) translateX(4px); opacity:1; }
+    55%{ transform: scale(1) translateX(-2px); opacity:1; }
+    75%{ transform: scale(.6) translateX(0); opacity:.7; }
+    100%{ transform: scale(0) translateX(0); opacity:0; }
+  }
   .monster-icon.spawn-hidden{ opacity:0; }
   .monster-icon.spawn-in{ animation: monster-spawn-in .5s ease-out; }
   @keyframes monster-spawn-in{
@@ -436,17 +450,30 @@
   .monster-row.count-2 .monster-slot .monster-icon{ font-size:56px; }
   .monster-row.count-3 .monster-slot .monster-icon{ font-size:44px; }
   .monster-slot.targeted .monster-icon{
-    outline: 3px solid #ff3b3b; outline-offset:5px; border-radius:14px;
-    filter: drop-shadow(0 0 8px rgba(255,59,59,.75));
+    /* 사각형 outline 대신, 여러 방향의 drop-shadow를 겹쳐 몬스터 이미지(글리프) 외곽 실루엣만 따라가는
+       붉은 테두리를 만듦(정사각형 틀이 생기지 않음). */
+    filter:
+      drop-shadow(1.5px 0 0 #ff3b3b) drop-shadow(-1.5px 0 0 #ff3b3b)
+      drop-shadow(0 1.5px 0 #ff3b3b) drop-shadow(0 -1.5px 0 #ff3b3b)
+      drop-shadow(0 0 8px rgba(255,59,59,.8));
   }
-  .monster-slot .monster-name-row{ margin-bottom:6px; font-size:12px; }
-  .monster-slot .hp-text{ margin-bottom:10px; }
+  .monster-slot .monster-name-row{ margin:8px 0 6px; font-size:12px; }
   .monster-slot .status-badge-row{ margin:-4px 0 10px; }
+  .target-marker{
+    display:none; text-align:center; color:#ff3b3b; font-size:13px; line-height:1;
+    margin-bottom:3px; text-shadow: 0 0 6px rgba(255,59,59,.85);
+  }
+  .monster-slot.targeted .target-marker{ display:block; }
   .monster-name-row{ display:flex; justify-content:center; align-items:baseline; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
   .monster-name{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:17px; }
   .monster-lv{ font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--forge-cream-dim); }
-  .hp-bar-wrap{ width:100%; height:14px; background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:999px; overflow:hidden; margin-bottom:6px; }
+  .hp-bar-wrap{ position:relative; width:100%; height:14px; background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:999px; overflow:hidden; margin-bottom:6px; }
   .hp-bar-fill{ height:100%; width:100%; background: linear-gradient(90deg, #ff6a3d, #c13c3c); transition: width .25s ease-out; }
+  .hp-bar-wrap .hp-text{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:10.5px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.85);
+    margin:0; pointer-events:none; letter-spacing:.2px;
+  }
   .hp-text{ text-align:center; font-family:'JetBrains Mono', monospace; font-size:11.5px; color: var(--forge-cream-dim); margin-bottom:16px; }
   .status-badge-row{ display:flex; justify-content:center; gap:6px; flex-wrap:wrap; margin:-10px 0 14px; }
   .status-badge{

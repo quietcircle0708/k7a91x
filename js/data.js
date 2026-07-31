@@ -60,7 +60,7 @@ const WEAPON_IMAGE_FALLBACK = 'common_shortsword';
 // atk/speed/crit: 단계별 공격력/공격속도/치명타확률 배열 / cost: 단계별 강화 비용 / sell: 단계별 판매가 / odds: 단계별 강화 확률
 const WEAPON_TYPES = {
   longsword: {
-    id: 'longsword', name: '롱소드', desc: '균형 잡힌 장검',
+    id: 'longsword', name: '견습 모험가의 낡은 장검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
@@ -71,20 +71,20 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   greatsword: {
-    id: 'greatsword', name: '그레이트 소드', desc: '강력한 일격을 위한 대검',
+    id: 'greatsword', name: '낡은 그레이트 소드', desc: '강력한 일격을 위한 대검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'rare', // 레어
-    attackPower: 34, attackSpeed: 0.6, critRate: 10,
+    attackPower: 42, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 5,
     image: 'rare_greatsword',
-    atk: [34], speed: [0.6], crit: [10], sell: [500],
+    atk: [42], speed: [0.6], crit: [10], sell: [500],
     cost: [], odds: [],
   },
   // ---- 아래 두 무기는 강화 단계별 증가 공식이 아직 없어서, 우선 +0(기본) 값만 담아둠.
   // cost/odds가 비어있으면(강화 데이터 없음) 강화 화면에서 "강화 준비 중"으로 자동 표시됨(render.js 참고).
   shortsword: {
-    id: 'shortsword', name: '숏소드', desc: '한 손으로 휘두르는 검',
+    id: 'shortsword', name: '견습 모험가의 낡은 검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
@@ -95,7 +95,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   dagger: {
-    id: 'dagger', name: '대거', desc: '짧은 두 개의 단검',
+    id: 'dagger', name: '견습 모험가의 낡은 단검', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
@@ -103,6 +103,61 @@ const WEAPON_TYPES = {
     purchasable: true, sellPrice: 100, levelReq: 1,
     image: 'common_dagger',
     atk: [18], speed: [1.2], crit: [10], sell: [100],
+    cost: [], odds: [],
+  },
+  broadsword: {
+    id: 'broadsword', name: '낡은 브로드소드', desc: '베고 찌르는 데 특화된 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'rare', // 레어
+    attackPower: 31, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 500, levelReq: 5,
+    image: 'rare_broadsword',
+    atk: [31], speed: [0.8], crit: [5], sell: [500],
+    cost: [], odds: [],
+  },
+  combatknife: {
+    id: 'combatknife', name: '낡은 컴뱃 나이프', desc: '빠르게 휘두를 수 있게 설계된 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'rare', // 레어
+    attackPower: 28, attackSpeed: 1.2, critRate: 10,
+    purchasable: true, sellPrice: 500, levelReq: 5,
+    image: 'rare_combatknife',
+    atk: [28], speed: [1.2], crit: [10], sell: [500],
+    cost: [], odds: [],
+  },
+  longsword2: {
+    id: 'longsword2', name: '초보 모험가의 장검', desc: '균형 잡힌 장검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 56, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 500, levelReq: 10,
+    image: 'common_longsword2',
+    atk: [56], speed: [0.6], crit: [10], sell: [500],
+    cost: [], odds: [],
+  },
+  shortsword2: {
+    id: 'shortsword2', name: '초보 모험가의 검', desc: '한 손으로 휘두르는 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 40, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 500, levelReq: 10,
+    image: 'common_shortsword2',
+    atk: [40], speed: [0.8], crit: [5], sell: [500],
+    cost: [], odds: [],
+  },
+  dagger2: {
+    id: 'dagger2', name: '초보 모험가의 단검', desc: '짧은 두 개의 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'normal', // 일반
+    attackPower: 36, attackSpeed: 1.2, critRate: 10,
+    purchasable: true, sellPrice: 500, levelReq: 10,
+    image: 'common_dagger2',
+    atk: [36], speed: [1.2], crit: [10], sell: [500],
     cost: [], odds: [],
   },
 };
@@ -667,6 +722,10 @@ const MONSTER_ENCOUNTER_MSGS = [
 
 // 마을 귀환 시(스테이지 클리어 후 행동 선택에서 "마을 귀환" 선택) 출력되는 안내 문구
 const STAGE_RETURN_MSG = '지친 몸을 이끌고 마을로 귀환했습니다.';
+
+// 몬스터 처치 연출
+const MONSTER_DEAD_ANIM_MS = 400;     // 몬스터 사망(scale/rotate/fade) 애니메이션 재생 시간(css .monster-icon.dead와 동일)
+const REWARD_MODAL_DELAY_MS = 500;    // 마지막 몬스터의 사망 애니메이션이 끝난 뒤 보상 창을 띄우기까지의 대기 시간
 
 // 11스테이지(숨겨진 장소) 보물 상자 설정
 const TREASURE_SHAKE_MS = 1000;       // 상자 클릭 후 흔들림 애니메이션 시간

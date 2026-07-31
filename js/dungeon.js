@@ -147,6 +147,11 @@ function stopHuntLoop(flaskEndMode = 'flush'){
   if(hunt.stageEnterTimeout){ clearTimeout(hunt.stageEnterTimeout); hunt.stageEnterTimeout = null; }
   if(hunt.encounterTimeout){ clearTimeout(hunt.encounterTimeout); hunt.encounterTimeout = null; }
   if(hunt.treasureShakeTimeout){ clearTimeout(hunt.treasureShakeTimeout); hunt.treasureShakeTimeout = null; }
+  // 던전을 도중에 나가거나(전투 중 이탈) 사망한 경우, 아직 재생 중이던 몬스터 사망 애니메이션의
+  // 후처리(슬롯 제거)와 예약된 보상 창 표시를 모두 취소해 다음 화면에 뒤늦게 끼어들지 않도록 함.
+  hunt.deathAnimTimeouts.forEach(t => clearTimeout(t));
+  hunt.deathAnimTimeouts = [];
+  if(hunt.rewardModalTimeout){ clearTimeout(hunt.rewardModalTimeout); hunt.rewardModalTimeout = null; }
   stopStatusTicker();
   if(flaskEndMode === 'discard') resetFlaskStateOnDeath();
   else stopFlaskHealTimers();
@@ -289,11 +294,20 @@ function killMonsterInstance(instanceId){
   }
 
   const icon = el('monster-icon-' + instanceId);
-  if(icon) icon.classList.add('dead');
-  setTimeout(() => {
+  if(icon){
+    // 피격(hit) 애니메이션이 아직 진행 중인 상태에서 곧바로 사망(dead) 애니메이션을 걸면
+    // 두 애니메이션이 겹쳐 사망 연출이 재생되지 않는 경우가 있었음 — hit을 먼저 확실히 제거하고
+    // 리플로우를 강제한 뒤 dead를 추가해, 사망 애니메이션이 항상 처음부터 재생되도록 함.
+    icon.classList.remove('hit');
+    void icon.offsetWidth;
+    icon.classList.add('dead');
+  }
+  const removalTimeout = setTimeout(() => {
     const slot = el('monster-slot-' + instanceId);
     if(slot) slot.remove();
-  }, 400);
+    hunt.deathAnimTimeouts = hunt.deathAnimTimeouts.filter(t => t !== removalTimeout);
+  }, MONSTER_DEAD_ANIM_MS);
+  hunt.deathAnimTimeouts.push(removalTimeout);
 
   const result = resolveDrops(monsterDef, dungeon, level);
   const curseActive = isDeathCurseActive();
@@ -342,7 +356,12 @@ function killMonsterInstance(instanceId){
     // 진행 중인 플라스크 회복이 있으면 남은 회복량을 즉시 전부 적용한 뒤 확실히 종료함.
     hunt.paused = true;
     stopFlaskHealTimers();
-    setTimeout(() => openKillResultModal(hunt.pendingRewards), 400);
+    // 보상 창은 마지막으로 죽은 몬스터의 사망 애니메이션이 완전히 끝난 뒤 0.5초 후에 표시함
+    // (죽은 몬스터의 사망 애니메이션이 화면에서 잘리지 않고 다 보이도록 보장).
+    hunt.rewardModalTimeout = setTimeout(() => {
+      hunt.rewardModalTimeout = null;
+      openKillResultModal(hunt.pendingRewards);
+    }, MONSTER_DEAD_ANIM_MS + REWARD_MODAL_DELAY_MS);
   }
 }
 

@@ -660,13 +660,16 @@ function buildMonsterSlotHtml(instance){
   const targetedClass = instance.instanceId === hunt.targetId ? ' targeted' : '';
   return `
     <div class="monster-slot${targetedClass}" id="monster-slot-${instance.instanceId}" data-instance-id="${instance.instanceId}">
+      <div class="target-marker">▼</div>
+      <div class="hp-bar-wrap">
+        <div class="hp-bar-fill" id="monster-hpfill-${instance.instanceId}" style="width:${pct}%"></div>
+        <div class="hp-text" id="monster-hptext-${instance.instanceId}">${Math.max(0, instance.hp)} / ${instance.maxHp}</div>
+      </div>
       <div class="monster-icon spawn-in" id="monster-icon-${instance.instanceId}">${monsterDef.icon}</div>
       <div class="monster-name-row">
         <span class="monster-name" style="color:${grade.color};">${monsterDef.name}</span>
         <span class="monster-lv" id="monster-lv-${instance.instanceId}">Lv.${instance.level} · 공격력 ${instance.atk}</span>
       </div>
-      <div class="hp-bar-wrap"><div class="hp-bar-fill" id="monster-hpfill-${instance.instanceId}" style="width:${pct}%"></div></div>
-      <div class="hp-text" id="monster-hptext-${instance.instanceId}">${Math.max(0, instance.hp)} / ${instance.maxHp}</div>
       <div class="status-badge-row" id="monster-status-${instance.instanceId}"></div>
     </div>`;
 }
@@ -677,6 +680,13 @@ function renderMonsterRow(){
   if(!row) return;
   row.className = 'monster-row count-' + hunt.monsters.length;
   row.innerHTML = hunt.monsters.map(buildMonsterSlotHtml).join('');
+  // spawn-in은 등장 연출(.5s) 전용 클래스라 재생이 끝나면 더는 필요 없음 — 계속 남겨두면
+  // 나중에 hit/dead 클래스가 붙어도 같은 명시도의 css 규칙끼리 소스 순서로 우선순위가 갈려
+  // 피격/사망 애니메이션이 가려질 수 있으므로, 재생이 끝나는 시점에 확실히 떼어냄.
+  hunt.monsters.forEach(instance => {
+    const icon = el('monster-icon-' + instance.instanceId);
+    if(icon) setTimeout(() => icon.classList.remove('spawn-in'), 520);
+  });
 }
 // 개체 하나의 체력바/체력텍스트만 갱신(전투 중 매 틱마다 사용 — 슬롯 전체를 다시 그리지 않아
 // 진행 중인 피격/사망 애니메이션이 끊기지 않음)
