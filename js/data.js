@@ -59,7 +59,7 @@ const WEAPON_IMAGE_FALLBACK = 'common_shortsword';
 // atk/speed/crit: 단계별 공격력/공격속도/치명타확률 배열 / cost: 단계별 강화 비용 / sell: 단계별 판매가 / odds: 단계별 강화 확률
 const WEAPON_TYPES = {
   longsword: {
-    id: 'longsword', name: '견습 모험가의 낡은 장검', desc: '균형 잡힌 장검',
+    id: 'longsword', name: '견습 모험가의 대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
@@ -83,7 +83,7 @@ const WEAPON_TYPES = {
   // ---- 아래 두 무기는 강화 단계별 증가 공식이 아직 없어서, 우선 +0(기본) 값만 담아둠.
   // cost/odds가 비어있으면(강화 데이터 없음) 강화 화면에서 "강화 준비 중"으로 자동 표시됨(render.js 참고).
   shortsword: {
-    id: 'shortsword', name: '견습 모험가의 낡은 검', desc: '한 손으로 휘두르는 검',
+    id: 'shortsword', name: '견습 모험가의 검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
@@ -94,7 +94,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   dagger: {
-    id: 'dagger', name: '견습 모험가의 낡은 단검', desc: '짧은 두 개의 단검',
+    id: 'dagger', name: '견습 모험가의 단검', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
@@ -127,7 +127,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   longsword2: {
-    id: 'longsword2', name: '초보 모험가의 장검', desc: '균형 잡힌 장검',
+    id: 'longsword2', name: '초보 모험가의 대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
@@ -437,7 +437,7 @@ const ARTIFACTS = {
     // 부여함(dungeon.js attackTick에서 판정). 중독의 지속 피해 자체는 이 발동 조건에 포함되지 않음(플레이어의
     // 직접 공격 피해만 인정 — 상태이상 틱 데미지는 startStatusTicker의 별도 경로라 자동으로 제외됨).
     effect: '몬스터에게 피해를 입힐 시, 피해를 입힌 몬스터에게 5%확률로 상태이상 "중독"을 부여한다.',
-    effectText: '공격 적중 시, 5% 확률로 <br>대상에게 중독을 부여합니다',
+    effectText: '공격 적중 시 5% 확률로 중독',
     buyPrice: null,
   },
   antlerflag: {
@@ -572,11 +572,12 @@ const RELIC_DROP_CHANCE = 10; // 몬스터 처치 시 장비 드랍 판정 확�
 const RELIC_GRADE_CHANCE = { normal: 50, rare: 35, epic: 15 }; // 드랍 판정 성공 시, 장비 등급 선택 확률
 const RELIC_LEVEL_WINDOW = 10; // 후보 아이템 레벨 하한 = max(1, 몬스터 레벨 - 이 값)
 const RELIC_LEVEL_WEIGHT_DECAY = 0.8; // 등록된 아이템 레벨이 한 단계 낮아질 때마다 가중치 ×이 값(최고 레벨 가중치는 100)
-// 드랍된 장비의 강화 단계(+N) 확률. 등급과 무관하게 동일하게 적용되며 +5가 최대.
+// 드랍된 장비의 강화 단계(+N) 확률. 등급별로 별도 표를 사용함(일반=+0~+4, 레어=+0~+3).
 // 지금은 별도 공식 없이 하드코딩된 확률표를 사용(추후 공식으로 교체 가능하도록 이 표만 바꾸면 됨).
-const RELIC_ENHANCE_LEVEL_CHANCE = [
-  [0, 20], [1, 20], [2, 20], [3, 15], [4, 15], [5, 10],
-];
+const RELIC_ENHANCE_LEVEL_CHANCE = {
+  normal: [[0, 20], [1, 30], [2, 30], [3, 10], [4, 10]],
+  rare: [[0, 65], [1, 20], [3, 15]],
+};
 
 // 마석 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
 // (예전의 던전별 드랍 확률·에픽 몬스터 확정 드랍 규칙은 삭제되고 이 전역 설정으로 대체됨)

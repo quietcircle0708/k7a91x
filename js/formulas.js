@@ -407,12 +407,14 @@ function pickWeighted(pairs){
   }
   return pairs[pairs.length - 1][0];
 }
-// 목록 중 targetLevel과 아이템 레벨 차이가 가장 작은 무기들만 남김(동률이면 전부 후보로 남음)
+// 폴백 후보 선정: 최우선 조건으로 "아이템 레벨이 targetLevel(몬스터 레벨)과 같거나 낮은" 무기만 남긴 뒤,
+// 그 중 targetLevel과 아이템 레벨 차이가 가장 작은 무기들만 남김(동률이면 전부 후보로 남음).
 function nearestLevelCandidates(list, targetLevel){
-  if(list.length === 0) return [];
+  const eligible = list.filter(w => w.levelReq <= targetLevel);
+  if(eligible.length === 0) return [];
   let minDiff = Infinity;
-  list.forEach(w => { const diff = Math.abs(w.levelReq - targetLevel); if(diff < minDiff) minDiff = diff; });
-  return list.filter(w => Math.abs(w.levelReq - targetLevel) === minDiff);
+  eligible.forEach(w => { const diff = targetLevel - w.levelReq; if(diff < minDiff) minDiff = diff; });
+  return eligible.filter(w => (targetLevel - w.levelReq) === minDiff);
 }
 // 모험가의 유해(무기) 드랍 판정.
 // 1) RELIC_DROP_CHANCE 확률로 드랍 판정 → 2) RELIC_GRADE_CHANCE로 장비 등급 선택 →
@@ -421,7 +423,9 @@ function nearestLevelCandidates(list, targetLevel){
 //     ② 그래도 없으면(해당 등급 무기가 아예 없음) 등급 상관없이 몬스터 레벨과 가장 가까운 무기로 대체) →
 // 4) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계 낮아질 때마다 ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨 →
 // 5) 그 레벨(+같은 등급, 폴백된 경우는 폴백된 등급)에 해당하는 무기 중 하나를 무작위로 선택 →
-// 6) RELIC_ENHANCE_LEVEL_CHANCE 확률표로 강화 단계(+0~+5)를 등급과 무관하게 별도로 추첨.
+// 6) RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리: 일반 +0~+4, 레어 +0~+3)로 강화 단계를 추첨.
+//    최종 선택된 무기(weaponType)의 등급을 기준으로 표를 고름(폴백 ②로 등급이 바뀌었을 수 있으므로,
+//    최초 추첨된 grade가 아니라 실제로 지급되는 weaponType.grade를 사용).
 function resolveWeaponRelicDrop(monsterLevel){
   if(Math.random() * 100 >= RELIC_DROP_CHANCE) return null;
 
@@ -433,11 +437,11 @@ function resolveWeaponRelicDrop(monsterLevel){
     w.grade === grade && w.levelReq >= minLevel && w.levelReq <= maxLevel
   );
   if(candidates.length === 0){
-    // 폴백 ①: 레벨 구간 제한을 풀고, 같은 등급 안에서 가장 가까운 레벨로 대체
+    // 폴백 ①: 레벨 구간 제한을 풀고, 같은 등급 안에서 몬스터 레벨 이하 중 가장 가까운 레벨로 대체
     candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES).filter(w => w.grade === grade), monsterLevel);
   }
   if(candidates.length === 0){
-    // 폴백 ②: 이 등급에 등록된 무기가 아예 없으면(현재 에픽처럼), 등급도 무시하고 가장 가까운 레벨로 대체
+    // 폴백 ②: 이 등급에 등록된 무기가 아예 없으면(현재 에픽처럼), 등급도 무시하고 몬스터 레벨 이하 중 가장 가까운 무기로 대체
     candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES), monsterLevel);
   }
   if(candidates.length === 0) return null; // 등록된 무기가 하나도 없는 극단적인 경우
@@ -453,7 +457,8 @@ function resolveWeaponRelicDrop(monsterLevel){
 
   const pool = candidates.filter(w => w.levelReq === chosenLevel);
   const weaponType = pool[Math.floor(Math.random() * pool.length)];
-  const enhanceLevel = pickWeighted(RELIC_ENHANCE_LEVEL_CHANCE);
+  const enhanceTable = RELIC_ENHANCE_LEVEL_CHANCE[weaponType.grade] || RELIC_ENHANCE_LEVEL_CHANCE.normal;
+  const enhanceLevel = pickWeighted(enhanceTable);
   return { type: weaponType.id, level: enhanceLevel };
 }
 // 몬스터 데이터의 drops 항목(name) 중 재료성 아이템(MISC_ITEMS)에 등록된 이름과 일치하는 것을 찾음.
