@@ -97,6 +97,41 @@ function buildWeaponTooltipHtml(type, level){
   html += `</div>`;
   return html;
 }
+// ---- 아티팩트 이름 색상 · 툴팁 ----
+// 등급 가치 시스템(WEAPON_GRADES)을 그대로 재사용. 아티팩트는 강화 단계가 없으므로 무기처럼
+// "강화 단계 색상과 비교해 더 높은 쪽" 로직 없이 등급 색상을 그대로 이름에 적용함.
+function artifactGradeLabel(id){ const g = WEAPON_GRADES[ARTIFACTS[id].grade]; return g ? g.label : ''; }
+function artifactGradeColor(id){ const g = WEAPON_GRADES[ARTIFACTS[id].grade]; return g ? g.color : '#ffffff'; }
+function artifactNameColor(id){ return artifactGradeColor(id); }
+// 아티팩트 툴팁: 레이아웃/줄바꿈/서식(라벨-값 구성 등)은 buildWeaponTooltipHtml과 동일하게 유지하고,
+// 표시 항목만 이름 / 장비 설명 / 장비 타입 / 등급 / 효과 설명(라벨은 "효과") / 상점 구매 가격으로 구성함.
+// 등급에 따른 색상 효과는 요구사항대로 "이름"에만 적용하고, 등급 행 자체는 다른 항목과 동일한 서식을 사용함.
+function buildArtifactTooltipHtml(id){
+  const a = ARTIFACTS[id];
+  if(!a) return '';
+  let html = `<div style="text-align:center;">`;
+
+  // 1. 이름 — 아티팩트 등급 색상 효과 적용
+  html += `<div style="color:${artifactNameColor(id)}; font-weight:700; margin-bottom:2px;">${a.name}</div>`;
+
+  // 2. 장비 설명
+  if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${a.desc}</div>`;
+
+  // 3. 장비 타입
+  html += wtipRow('장비 타입', EQUIPMENT_TYPES[a.equipType] || '');
+
+  // 4. 등급
+  html += wtipRow('등급', artifactGradeLabel(id));
+
+  // 5. 효과 설명 (툴팁에는 "효과"로 표시)
+  if(a.effectText) html += wtipRow('효과', a.effectText);
+
+  // 6. 상점 구매 가격 (공란이면 표시하지 않음)
+  if(a.buyPrice != null) html += wtipRow('상점 구매 가격', a.buyPrice.toLocaleString() + ' G');
+
+  html += `</div>`;
+  return html;
+}
 // ---- 마석(재료) 이름 색상 · 툴팁 ----
 // 마석은 강화 단계가 없으므로 무기처럼 이름 색상을 등급/강화 단계 중 더 높은 쪽으로 섞지 않고,
 // 무기 등급 색상 공식(WEAPON_GRADES)을 그대로 재사용해 등급 색상만 적용함.
@@ -168,9 +203,9 @@ function shopEquipmentEntries(typesTable){
 function shopConsumableEntries(){
   return Object.values(CONSUMABLES).map(c => ({ id: c.id, price: c.buyPrice, levelReq: null }));
 }
-// 아티팩트: purchasable:true(=buyPrice 있음)인 항목만 상점에 노출. 몬스터 드랍 전용은 제외됨.
+// 아티팩트: 상점 구매 가격(buyPrice)이 있는 항목만 상점에 노출. 공란(null)이면 상점 목록에서 제외됨.
 function shopArtifactEntries(){
-  return Object.values(ARTIFACTS).filter(a => a.purchasable).map(a => ({ id: a.id, price: a.buyPrice, levelReq: null }));
+  return Object.values(ARTIFACTS).filter(a => a.buyPrice != null).map(a => ({ id: a.id, price: a.buyPrice, levelReq: null }));
 }
 // 마석 탭: 판매 전용 탭. 아이템 분류(itemClass)가 'stone'이고 보유한(개수>0) 아이템만 노출, 판매가 기준 정렬.
 function shopStoneEntries(){
@@ -222,24 +257,36 @@ function requiredKills(level){
 function requiredExp(level){
   return monsterExp(level) * requiredKills(level);
 }
+// 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
+// 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
+function artifactStatBonus(stat){
+  let bonus = 0;
+  if(stat === 'str' && isArtifactEquipped('antlerflag')) bonus += 2;
+  return bonus;
+}
 // 스탯 보너스가 반영된 실질 최대 체력/마나
 function effectiveMaxHp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
-  return playerBaseHp(level) + (s.str || 0) * 20 + (s.agi || 0) * 5;
+  const str = (s.str || 0) + artifactStatBonus('str');
+  let hp = playerBaseHp(level) + str * 20 + (s.agi || 0) * 5;
+  if(isArtifactEquipped('antlerflag')) hp += 500; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
+  return hp;
 }
 function effectiveMaxMp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
-  return playerBaseMp(level) + (s.int || 0) * 30;
+  let mp = playerBaseMp(level) + (s.int || 0) * 30;
+  if(isArtifactEquipped('ring')) mp += 500;
+  return mp;
 }
 function effectiveAtkSpeed(type, level){
   let s = atkSpeedFor(type, level);
-  if(ownsArtifact('batwing')) s *= 1.05;
+  if(isArtifactEquipped('batwing')) s *= 1.05;
   const agi = (state.stats && state.stats.agi) || 0;
   s *= 1 + agi * 0.001; // 민첩 1당 공격속도 +0.1%
   return s;
 }
 function effectiveAtk(type, level){
-  const str = (state.stats && state.stats.str) || 0;
+  const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
   const agi = (state.stats && state.stats.agi) || 0;
   return atkFor(type, level) + str * 2 + agi * 1; // 힘 1당 공격력 +2, 민첩 1당 공격력 +1
 }

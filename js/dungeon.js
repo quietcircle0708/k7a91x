@@ -181,6 +181,10 @@ function attackTick(){
   const dmg = Math.max(1, Math.round(baseDmg * playerDamageMultiplier(levelDiff)));
   target.hp -= dmg;
   monsterHitEffect(target.instanceId, dmg, isCrit);
+  if(target.hp > 0 && isArtifactEquipped('poisonflask') && Math.random() * 100 < 5){
+    applyStatusEffect(target, 'poison');
+    renderStatusBadges();
+  }
   if(target.hp <= 0){
     killMonsterInstance(target.instanceId);
   } else {

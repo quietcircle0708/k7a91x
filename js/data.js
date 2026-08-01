@@ -6,10 +6,9 @@
 
 const MAX_LEVEL = 9;
 const INV_MAX = 10;
-const RING_CHANCE = 2;
 
-// 장비 타입. 지금은 '무기'만 있지만 나중에 방어구 등 다른 장비 타입이 추가될 수 있음.
-const EQUIPMENT_TYPES = { weapon: '무기' };
+// 장비 타입. 무기 / 아티팩트가 있으며, 나중에 방어구 등 다른 장비 타입이 추가될 수 있음.
+const EQUIPMENT_TYPES = { weapon: '무기', artifact: '아티팩트' };
 
 // 무기 종류(카테고리) 구분: 양손 검 / 검 / 단검 / 지팡이. 무기 "이름"과는 별개의 개념.
 const WEAPON_KINDS = { two_handed_sword: '양손 검', sword: '검', dagger: '단검', staff: '지팡이' };
@@ -406,19 +405,51 @@ const MONSTER_GRADES = {
 
 // 획득 가능한 아티팩트(장비) 도감
 const ARTIFACT_SLOT_MAX = 3;
-// purchasable:true + buyPrice가 있는 아티팩트만 상점 "아티팩트" 탭에 자동으로 등록됨(박쥐 날개처럼
-// 몬스터 드랍 전용 아티팩트는 필드를 비워두면 상점에 나타나지 않음).
+// ---- 항목 설명 ----
+// desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고, 항상 'artifact') / grade: 아티팩트 등급(WEAPON_GRADES와 동일한 키 체계 재사용) /
+// effect: 장착 효과(장착 시 실제로 적용되는 효과 — 게임 로직 설명용) / effectText: 효과 설명(아이템 툴팁에 "효과"로 표시되는 문구) /
+// buyPrice: 상점 구매 가격(비어있으면=null, 상점 구매 불가 + 상점 목록에서 제외됨) / icon: 아티팩트 아이콘
 const ARTIFACTS = {
   ring: {
     id: 'ring', name: '아주르의 강아지풀 반지', icon: '🌾',
-    desc: '마법사 아주르가 마력을 불어넣어 줄기를 꼬아 만든 반지.',
-    effectText: '강화 실패 시, 아주 낮은 확률(2%)로 강화 단계 하락을 막아준다.',
-    purchasable: true, buyPrice: 25000,
+    desc: '마법사 아주르가 마력을 불어넣어 만든 반지',
+    equipType: 'artifact',
+    grade: 'normal',
+    effect: '최대 마나 +500',
+    effectText: '최대 마나 +500',
+    buyPrice: 10000,
   },
   batwing: {
     id: 'batwing', name: '박쥐 날개', icon: '🦇',
-    desc: '흡혈 박쥐(에픽)의 단단한 날개.',
-    effectText: '공격속도 5% 증가',
+    desc: '흡혈 박쥐의 날개로 만든 견갑',
+    equipType: 'artifact',
+    grade: 'epic',
+    effect: '공격 속도 5% 증가',
+    effectText: '공격 속도 +5%',
+    buyPrice: null,
+  },
+  poisonflask: {
+    id: 'poisonflask', name: '독 플라스크', icon: '🍾',
+    desc: '방울뱀의 극독이 담긴 플라스크',
+    equipType: 'artifact',
+    grade: 'rare',
+    // 플레이어의 직접 공격으로 몬스터에게 피해를 입힐 때마다 5% 확률로 그 몬스터에게 중독(STATUS_EFFECTS.poison)을
+    // 부여함(dungeon.js attackTick에서 판정). 중독의 지속 피해 자체는 이 발동 조건에 포함되지 않음(플레이어의
+    // 직접 공격 피해만 인정 — 상태이상 틱 데미지는 startStatusTicker의 별도 경로라 자동으로 제외됨).
+    effect: '몬스터에게 피해를 입힐 시, 피해를 입힌 몬스터에게 5%확률로 상태이상 "중독"을 부여한다.',
+    effectText: '공격 적중 시, 5% 확률로 <br>대상에게 중독을 부여합니다',
+    buyPrice: null,
+  },
+  antlerflag: {
+    id: 'antlerflag', name: '사슴 뿔 깃발', icon: '🏴',
+    desc: '사슴의 뿔로 장식한 깃발',
+    equipType: 'artifact',
+    grade: 'normal',
+    // 힘 +2는 다른 힘 스탯과 동일하게 공격력/최대체력 공식에 그대로 반영되고(formulas.js의
+    // artifactStatBonus 경유), 최대 체력 +500은 그와 별개로 effectiveMaxHp에 고정값으로 더해짐.
+    effect: '힘+2<br>최대 체력 +500',
+    effectText: '힘+2<br>최대 체력 +500',
+    buyPrice: null,
   },
 };
 
@@ -599,7 +630,10 @@ const MONSTERS = {
   rattlesnake: {
     id: 'rattlesnake', name: '방울뱀', icon: '🐍', grade: 'epic', level: 9,
     hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
-    drops: [ { name: '뱀고기', chance: 50 } ],
+    drops: [
+      { name: '뱀고기', chance: 50 },
+      { name: '독 플라스크', chance: 10, artifactId: 'poisonflask' },
+    ],
   },
   blue_deer: {
     id: 'blue_deer', name: '청록수', icon: '🦌', grade: 'normal', level: 10,
@@ -614,7 +648,11 @@ const MONSTERS = {
   three_eyed_deer: {
     id: 'three_eyed_deer', name: '세개의 눈을 가진 사슴', icon: '🦌', grade: 'epic', level: 14,
     hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
-    drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
+    drops: [
+      { name: '사슴고기', chance: 50 },
+      { name: '녹용', chance: 20 },
+      { name: '사슴 뿔 깃발', chance: 10, artifactId: 'antlerflag' },
+    ],
   },
 };
 

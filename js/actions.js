@@ -51,16 +51,13 @@ function resolveEnhance(itemId, level){
   stage.classList.remove('shake','shake-hard','strike','charging');
   void stage.offsetWidth;
 
-  let blessingTriggered = false, charmTriggered = false, ringTriggered = false, popLevelDisplay = false;
+  let blessingTriggered = false, charmTriggered = false, popLevelDisplay = false;
 
   if(outcome === 'destroy' && state.blessingActive && state.blessingCount > 0){
     state.blessingCount--;
     state.blessingActive = false;
     outcome = 'down';
     blessingTriggered = true;
-  }
-  if(outcome === 'down' && ownsArtifact('ring')){
-    if(Math.random()*100 < RING_CHANCE){ outcome = 'stay'; ringTriggered = true; }
   }
   if(outcome === 'down' && state.charmActive && state.charmCount > 0){
     state.charmCount--;
@@ -210,11 +207,29 @@ function buyBlessing(btn){
 // ARTIFACTS 데이터에 purchasable:true + buyPrice만 넣으면 이 함수가 그대로 처리함.
 function buyArtifact(id, btn){
   const a = ARTIFACTS[id];
-  if(!a || !a.purchasable) return;
-  if(ownsArtifact(id) || state.artifacts.length >= ARTIFACT_SLOT_MAX || state.gold < a.buyPrice) return;
+  if(!a || a.buyPrice == null) return;
+  if(ownsArtifact(id) || state.gold < a.buyPrice) return;
   state.gold -= a.buyPrice;
   state.artifacts.push(id);
+  // 빈 장착 슬롯이 있을 때만 자동 장착(기존 장착 중인 아티팩트를 교체하지 않음).
+  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX) state.equippedArtifacts.push(id);
   purchaseEffect(btn || null);
+  render(); saveState();
+}
+// 인벤토리에서 아티팩트를 직접 장착. 빈 슬롯이 없거나 이미 장착 중이면 아무 동작도 하지 않음
+// (동일한 아티팩트를 동시에 두 번 장착할 수 없음 — 애초에 아티팩트는 종류별로 1개만 보유 가능).
+function equipArtifact(id){
+  if(!ownsArtifact(id) || isArtifactEquipped(id)) return;
+  if(state.equippedArtifacts.length >= ARTIFACT_SLOT_MAX) return;
+  state.equippedArtifacts.push(id);
+  render(); saveState();
+}
+// 인벤토리에서 장착 중인 아티팩트를 해제. 해제 즉시 해당 능력치/효과가 사라짐
+// (ownsArtifact/isArtifactEquipped를 사용하는 모든 효과 판정이 이 배열을 직접 참조하므로 별도 처리 불필요).
+function unequipArtifact(id){
+  const idx = state.equippedArtifacts.indexOf(id);
+  if(idx === -1) return;
+  state.equippedArtifacts.splice(idx, 1);
   render(); saveState();
 }
 // 상점에 등록된(purchasable) 무기를 구매. 가격은 sellPrice×2. 아이템 레벨(levelReq)은 "착용" 조건일 뿐

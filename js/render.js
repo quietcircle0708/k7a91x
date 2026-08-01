@@ -14,12 +14,12 @@ function render(){
   el('goldText').textContent = state.gold.toLocaleString();
   el('goldLedger').textContent = state.gold.toLocaleString() + ' G';
 
-  // 아티팩트 장비 슬롯 (최대 ARTIFACT_SLOT_MAX개)
+  // 아티팩트 장비 슬롯 (최대 ARTIFACT_SLOT_MAX개) — 장착 중인 아티팩트만 표시
   el('equipRow').innerHTML = Array.from({ length: ARTIFACT_SLOT_MAX }, (_, i) => {
-    const id = state.artifacts[i];
+    const id = state.equippedArtifacts[i];
     if(!id) return `<div class="equip-slot"></div>`;
     const a = ARTIFACTS[id];
-    return `<div class="equip-slot filled">${a.icon}<span class="tooltip">${a.name} — ${a.desc} (${a.effectText})</span></div>`;
+    return `<div class="equip-slot filled">${a.icon}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
   }).join('');
 
   if(!equipped){
@@ -217,7 +217,7 @@ function renderInventoryList(){
 }
 
 function renderArtifactList(){
-  el('artifactCount').textContent = state.artifacts.length + ' / ' + ARTIFACT_SLOT_MAX;
+  el('artifactCount').textContent = state.equippedArtifacts.length + ' / ' + ARTIFACT_SLOT_MAX;
   const wrap = el('artifactList');
   if(state.artifacts.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 아티팩트가 없습니다.<br>던전에서 몬스터를 처치하거나 상점에서 구매해보세요.</div>`;
@@ -225,13 +225,27 @@ function renderArtifactList(){
   }
   wrap.innerHTML = state.artifacts.map(id => {
     const a = ARTIFACTS[id];
+    const nameColor = artifactNameColor(id);
+    const equipped = isArtifactEquipped(id);
+    const slotFull = state.equippedArtifacts.length >= ARTIFACT_SLOT_MAX;
+    const equipBtnHtml = equipped
+      ? `<button class="inv-btn equip active" data-action="unequip-artifact" data-artifact-id="${id}">해제</button>`
+      : `<button class="inv-btn equip" data-action="equip-artifact" data-artifact-id="${id}" ${slotFull ? 'disabled' : ''}>장착</button>`;
+    const equipBtnFinal = (!equipped && slotFull)
+      ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">장착 슬롯이 모두 사용 중입니다. 다른 아티팩트를 먼저 해제해주세요.</span></span>`
+      : equipBtnHtml;
     return `
-      <div class="inv-card">
-        <div class="inv-icon" style="border-color: var(--forge-gold);">${a.icon}</div>
+      <div class="inv-card ${equipped?'equipped':''}">
+        <div class="inv-icon" style="border-color:${nameColor};">${a.icon}</div>
         <div class="inv-info">
-          <div class="inv-name">${a.name}</div>
-          <div class="inv-sub">${a.desc}</div>
-          <div class="inv-sub" style="color: var(--forge-gold);">${a.effectText}</div>
+          <span class="weapon-name-wrap">
+            <span class="inv-name" style="color:${nameColor};">${a.name}</span> ${equipped?'<span class="inv-badge">장착 중</span>':''}
+            <span class="tooltip">${buildArtifactTooltipHtml(id)}</span>
+          </span>
+          <div class="inv-sub">${artifactGradeLabel(id)}</div>
+        </div>
+        <div class="inv-actions">
+          ${equipBtnFinal}
         </div>
       </div>`;
   }).join('');
@@ -442,10 +456,14 @@ function hasAnyStatInvestment(){
 
 function renderStatAllocRow(key, label, value){
   const canAlloc = (draftStatPoints || 0) > 0;
+  const bonus = artifactStatBonus(key);
+  const valueHtml = bonus > 0
+    ? `${value + bonus} <span style="color:var(--forge-green);">(+${bonus})</span>`
+    : `${value}`;
   return `
     <div class="stat-alloc-row">
       <span class="stat-alloc-label">${label}</span>
-      <span class="stat-alloc-value">${value}</span>
+      <span class="stat-alloc-value">${valueHtml}</span>
       <button class="stat-alloc-btn" data-stat="${key}" ${canAlloc ? '' : 'disabled'}>+</button>
     </div>
   `;
@@ -499,7 +517,7 @@ function renderCharStats(){
   const baseSpeed = atkSpeedFor(type, level);
   const totalSpeed = effectiveAtkSpeed(type, level);
   const totalCrit = critChanceFor(type, level);
-  const hasSpeedBonus = ownsArtifact('batwing');
+  const hasSpeedBonus = isArtifactEquipped('batwing');
 
   html += `
     <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)} +${level}</span></div>
@@ -512,11 +530,11 @@ function renderCharStats(){
     html += `<div class="char-stat-note">공격속도 = 무기 기본 ${baseSpeed.toFixed(2)} + 박쥐 날개 5%</div>`;
   }
 
-  if(state.artifacts.length > 0){
+  if(state.equippedArtifacts.length > 0){
     html += `<div class="char-stat-divider"></div><div class="char-stat-sub-title">적용 중인 아티팩트 효과</div>`;
-    html += state.artifacts.map(id => {
+    html += state.equippedArtifacts.map(id => {
       const a = ARTIFACTS[id];
-      return `<div class="char-stat-artifact"><b>${a.icon} ${a.name}</b><br>${a.effectText}</div>`;
+      return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${a.icon} ${a.name}</b><br>${a.effectText}</div>`;
     }).join('');
   }
 
@@ -910,17 +928,16 @@ function buildConsumableShopCardHtml(id){
 function buildArtifactShopCardHtml(id){
   const a = ARTIFACTS[id];
   const owned = ownsArtifact(id);
-  const slotFull = state.artifacts.length >= ARTIFACT_SLOT_MAX;
-  const disabled = owned || slotFull || state.gold < a.buyPrice;
-  const btnText = owned ? '보유 중' : (slotFull ? '아티팩트 슬롯 부족' : `구매 (${a.buyPrice.toLocaleString()} G)`);
+  const disabled = owned || state.gold < a.buyPrice;
+  const btnText = owned ? '보유 중' : `구매 (${a.buyPrice.toLocaleString()} G)`;
   return `
     <div class="scroll-card artifact">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="artifact-icon-box">${a.icon}</div>
           <span class="scroll-name-wrap">
-            <span class="scroll-name artifact">${a.name}</span>
-            <span class="tooltip">${a.desc}</span>
+            <span class="scroll-name artifact" style="color:${artifactNameColor(id)};">${a.name}</span>
+            <span class="tooltip">${buildArtifactTooltipHtml(id)}</span>
           </span>
         </div>
         <span class="scroll-count">${owned ? '보유함' : ''}</span>

@@ -104,12 +104,18 @@ function gainExp(amount){
   return levelsGained;
 }
 
-// ---- 아티팩트 보유/지급 ----
+// ---- 아티팩트 보유/장착/지급 ----
+// "보유"(state.artifacts)와 "장착"(state.equippedArtifacts)은 서로 다른 개념임.
+// 보유 아티팩트 수는 제한이 없고(인벤토리에 계속 쌓임), 동시에 장착 가능한 개수만 ARTIFACT_SLOT_MAX로 제한됨.
 function ownsArtifact(id){ return state.artifacts.includes(id); }
-function canGrantArtifact(id){ return !ownsArtifact(id) && state.artifacts.length < ARTIFACT_SLOT_MAX; }
+function isArtifactEquipped(id){ return state.equippedArtifacts.includes(id); }
+function canGrantArtifact(id){ return !ownsArtifact(id); }
 function grantArtifactSafe(id){
   if(!canGrantArtifact(id)) return false;
   state.artifacts.push(id);
+  // 빈 장착 슬롯이 있을 때만 자동 장착. 슬롯이 가득 차 있으면 장착하지 않고 보유 목록에만 추가하며,
+  // 이미 장착 중인 다른 아티팩트를 교체하지 않음.
+  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX) state.equippedArtifacts.push(id);
   return true;
 }
 
@@ -156,6 +162,9 @@ function applyLoadedRaw(raw){
   if(loaded.batwingOwned && !state.artifacts.includes('batwing')) state.artifacts.push('batwing');
   delete state.ringOwned;
   delete state.batwingOwned;
+  // 장착 시스템 개편 이전 세이브 마이그레이션: 그때는 "보유 = 장착"이었으므로, 보유 중이던
+  // 아티팩트를 장착 슬롯 최대치까지 그대로 장착 상태로 옮겨 기존 효과가 끊기지 않게 함.
+  if(!Array.isArray(state.equippedArtifacts)) state.equippedArtifacts = state.artifacts.slice(0, ARTIFACT_SLOT_MAX);
   // 구버전 인벤토리(type 필드 없음) 마이그레이션: 전부 롱소드였음
   if(Array.isArray(state.inventory)){
     state.inventory.forEach(it => { if(!it.type) it.type = 'longsword'; });
@@ -239,7 +248,7 @@ function resetGame(){
     gold: 1000, inventory: [ { id: 1, level: 0, type: 'longsword' } ], equippedId: 1, nextItemId: 2,
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
-    artifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
+    artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
     acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0,
     skipEffects:false, autoRebuy:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,

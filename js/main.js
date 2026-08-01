@@ -108,6 +108,13 @@ el('inventoryList').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'equip') equipItem(id);
   else if(btn.dataset.action === 'sell') sellItem(id);
 });
+el('artifactList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn || btn.disabled) return;
+  const id = btn.dataset.artifactId;
+  if(btn.dataset.action === 'equip-artifact') equipArtifact(id);
+  else if(btn.dataset.action === 'unequip-artifact') unequipArtifact(id);
+});
 el('consumableList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action="use-flask"]');
   if(!btn) return;
