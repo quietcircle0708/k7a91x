@@ -85,12 +85,7 @@ function resolveEnhance(itemId, level){
       showMsg('강화 성공! +' + item.level, 'success');
     }
   } else if(outcome === 'stay'){
-    if(ringTriggered){
-      vortexBurst('#ffd76a');
-      burstSparks('#ffd76a', 14);
-      flashCard('rgba(255,215,106,0.5)');
-      showMsg('🌾 아주르의 강아지풀 반지 효과 발동! 하락을 막았습니다', 'artifact');
-    } else if(charmTriggered){
+    if(charmTriggered){
       vortexBurst('var(--forge-green)');
       showMsg('쇠조각의 집념이 하락을 막아냈습니다', 'stay');
     } else {
