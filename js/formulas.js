@@ -25,6 +25,24 @@ function weaponBuyPrice(type){ return (wpn(type).sellPrice || 0) * 2; }
 // 무기 이미지 경로(파일명 기준). 실제로 파일이 있는지는 <img onerror>에서 최종 확인/대체함.
 function weaponImagePath(type){ return WEAPON_IMAGE_DIR + wpn(type).image + WEAPON_IMAGE_EXT; }
 function weaponImageFallbackPath(){ return WEAPON_IMAGE_DIR + WEAPON_IMAGE_FALLBACK + WEAPON_IMAGE_EXT; }
+
+// 몬스터 아이콘 HTML 생성(무기 아이콘 출력 구조를 그대로 재사용). image 필드가 있으면 PNG를 출력하고,
+// 없으면 기존과 동일하게 icon(이모지)을 그대로 반환함(HTML 이스케이프 불필요한 순수 이모지 문자열).
+// className은 화면별 크기 클래스를 넘겨받아 CSS로만 크기를 조절함(monster-icon-img는 부모의 font-size를
+// 1em 기준으로 그대로 물려받으므로, 기존 이모지가 쓰던 font-size 기반 크기 규칙에 자동으로 맞춰짐).
+// PNG 파일이 없거나 로드에 실패하면 monsterImgError(onerror)가 img를 이모지 텍스트로 즉시 대체함 —
+// 오류 없이 항상 무언가는 표시됨. monsterDefLike는 { icon, image } 형태면 되므로 MONSTERS[id] 전체뿐 아니라
+// killedMonsters처럼 필요한 필드만 담은 객체를 넘겨도 동일하게 동작함.
+function monsterIconHtml(monsterDefLike, className){
+  if(!monsterDefLike || !monsterDefLike.image) return monsterDefLike ? monsterDefLike.icon : '';
+  const cls = 'monster-icon-img' + (className ? ' ' + className : '');
+  const path = MONSTER_IMAGE_DIR + monsterDefLike.image + MONSTER_IMAGE_EXT;
+  return `<img src="${path}" class="${cls}" alt="" data-fallback-emoji="${monsterDefLike.icon}" onerror="monsterImgError(this)">`;
+}
+// monsterIconHtml의 <img onerror>에서 호출됨: PNG 로드 실패 시 오류 없이 이모지 텍스트로 즉시 대체.
+function monsterImgError(img){
+  img.replaceWith(document.createTextNode(img.dataset.fallbackEmoji || ''));
+}
 // 무기 아이콘을 표시하는 모든 화면(강화/인벤토리/상점/보상 등)에서 공통으로 쓰는 <img> HTML 생성 함수.
 // PNG가 없거나 로드에 실패하면 onerror로 WEAPON_IMAGE_FALLBACK(common_shortsword)로 자동 대체됨.
 // 화면마다 크기가 다르므로 className만 다르게 넘겨서 CSS로 크기만 조절하고, 출력 방식 자체는 항상 동일함.
@@ -240,6 +258,40 @@ function activeEffectChance(effectId){
   return total;
 }
 function atkFor(type, level){ return wpn(type).atk[level]; }
+
+// ---- 강화 화면의 고유 옵션 표시(현재 단계 → 다음 단계 미리보기) ----
+// uniqueOption이 있는 무기라면 자동으로 이 함수가 호출되어 강화 화면에 항목이 표시됨(무기별 개별 코드 없음).
+// textTemplate 작성 규칙: "{chance}%" 형태로 붙여서 써야 함(예: '...{chance}% 확률로...') — 수치가 다음 단계에서
+// 오르는 경우 "{chance}%" 부분 전체를 formatStatDelta 결과(화살표+증가량 표시)로 치환하기 때문.
+// 반환값이 null이면 무기에 고유 옵션이 없다는 뜻 — 호출부(render.js)에서 이 값으로 표시 여부를 결정함.
+function weaponUniqueOptionForgeHtml(type, level){
+  const opt = wpn(type).uniqueOption;
+  if(!opt) return null;
+
+  const activeNow = weaponUniqueOptionActive(type, level);
+  const hasNext = level < MAX_LEVEL;
+  const activeNext = hasNext ? weaponUniqueOptionActive(type, level+1) : activeNow;
+  const chanceNow = weaponUniqueOptionChance(type, level);
+  const chanceNext = hasNext ? weaponUniqueOptionChance(type, level+1) : null;
+
+  if(activeNow){
+    // 이미 활성화된 상태 — 다음 단계에서 수치가 오르면 값 자리에 화살표+증가량만 표시하고(안내 문구 없음),
+    // 수치가 그대로면 평소 무기 툴팁과 동일하게 안내 문구 없이 고정 수치만 표시함.
+    const changed = chanceNext != null && chanceNext !== chanceNow;
+    const valueHtml = changed
+      ? formatStatDelta(chanceNow, chanceNext, 0, '%')
+      : (chanceNow + '%');
+    const text = opt.textTemplate.replace('{chance}%', valueHtml);
+    return `<div style="color:var(--forge-cream);">${text}</div>`;
+  }
+
+  // 아직 비활성화 상태 — 활성화 조건 시점의 미리보기 수치를 회색으로 보여줌(무기 툴팁과 동일한 값).
+  const text = opt.textTemplate.replace('{chance}', chanceNow);
+  const note = activeNext
+    ? '고유 옵션 활성화' // 지금 강화하면(다음 단계에서) 바로 활성화되는 경우
+    : `+${opt.activateLevel} 달성 시 활성화`; // 아직 활성화까지 강화가 더 필요한 경우
+  return `<div style="color:var(--forge-cream-dim);">${text}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${note}</div>`;
+}
 function atkSpeedFor(type, level){ return wpn(type).speed[level]; }
 function critChanceFor(type, level){ return wpn(type).crit[level]; }
 function costFor(type, level){ return wpn(type).cost[level]; }
@@ -445,9 +497,12 @@ function dungeonLevelRange(d){
   });
   return { min: Math.min(...levels), max: Math.max(...levels) };
 }
-// 던전 아이콘: 비어있으면 등장 몬스터 중 첫 번째의 아이콘을 그대로 사용
+// 던전 아이콘: 비어있으면 등장 몬스터 중 첫 번째의 아이콘을 그대로 사용(그 몬스터에 PNG가 등록돼있으면
+// monsterIconHtml을 통해 PNG로, 없으면 기존처럼 이모지로 출력됨). 던전 자체에 지정된 커스텀 아이콘(d.icon)은
+// 몬스터 데이터가 아니므로 PNG 대상이 아니라 기존처럼 문자열 그대로 사용함.
 function dungeonIcon(d){
-  return d.icon || (d.monsters.length ? MONSTERS[d.monsters[0]].icon : '');
+  if(d.icon) return d.icon;
+  return d.monsters.length ? monsterIconHtml(MONSTERS[d.monsters[0]]) : '';
 }
 // 등장 레벨 추첨: 구간 내 모든 레벨이 동일한 확률(균등 분포)
 function pickSpawnLevel(levelMin, levelMax){

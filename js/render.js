@@ -34,6 +34,7 @@ function render(){
     el('atkSpeedText').textContent = '-';
     el('atkSpeedTooltip').textContent = '장착된 무기가 없습니다';
     el('critStatWrap').style.display = 'none';
+    el('uniqueOptionWrap').style.display = 'none';
     el('oddsRow').innerHTML = '';
     stage.classList.add('empty');
     applySwordGlow(0);
@@ -80,6 +81,11 @@ function render(){
     if(showCrit){
       el('critText').innerHTML = formatStatDelta(critNow, critNext, null, '%');
     }
+
+    // 고유 옵션(에픽/유니크 전용) — 무기 데이터에 uniqueOption이 없으면 자동으로 숨겨짐
+    const uniqueOptionHtml = weaponUniqueOptionForgeHtml(type, level);
+    el('uniqueOptionWrap').style.display = uniqueOptionHtml ? '' : 'none';
+    if(uniqueOptionHtml) el('uniqueOptionText').innerHTML = uniqueOptionHtml;
 
     applySwordGlow(level);
     setBladeShape(type);
@@ -718,7 +724,7 @@ function buildMonsterSlotHtml(instance){
         <div class="hp-bar-fill" id="monster-hpfill-${instance.instanceId}" style="width:${pct}%"></div>
         <div class="hp-text" id="monster-hptext-${instance.instanceId}">${Math.max(0, instance.hp)} / ${instance.maxHp}</div>
       </div>
-      <div class="monster-icon spawn-in" id="monster-icon-${instance.instanceId}">${monsterDef.icon}</div>
+      <div class="monster-icon spawn-in" id="monster-icon-${instance.instanceId}">${monsterIconHtml(monsterDef)}</div>
       <div class="monster-name-row">
         <span class="monster-name" style="color:${grade.color};">${monsterDef.name}</span>
         <span class="monster-lv" id="monster-lv-${instance.instanceId}">Lv.${instance.level} · 공격력 ${instance.atk}</span>

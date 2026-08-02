@@ -197,6 +197,8 @@
 
   .stat-row{ display:flex; justify-content:center; gap:22px; margin-bottom:14px; font-family:'JetBrains Mono', monospace; font-size:13px; color: var(--forge-cream-dim); }
   .stat-row b{ color: var(--forge-cream); font-weight:700; }
+  /* 고유 옵션 줄은 "라벨 값" 쌍이 아니라 문장 전체이므로 가로 정렬 대신 중앙 정렬된 세로 블록으로 표시 */
+  .unique-option-row{ display:block; text-align:center; font-size:12.5px; line-height:1.5; }
 
   .odds-row{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; font-family:'JetBrains Mono', monospace; font-size:11px; }
   .odds-chip{ padding:3px 8px; border-radius:6px; background: var(--forge-panel-2); border:1px solid var(--forge-line); }
@@ -396,6 +398,10 @@
   .hunter-info{ text-align:center; font-size:12.5px; color: var(--forge-cream-dim); margin-bottom:14px; font-family:'JetBrains Mono', monospace; }
   .monster-stage{ display:flex; justify-content:center; align-items:center; height:150px; position:relative; margin-bottom:10px; }
   .monster-icon{ font-size:72px; transition: transform .1s, filter .15s; position:relative; z-index:1; }
+  /* 몬스터 PNG는 부모(.monster-icon 등)의 font-size를 1em 기준으로 그대로 물려받아 크기를 맞춤 —
+     기존 이모지가 font-size로 크기를 정하던 방식을 그대로 재사용하는 것이라, 몬스터 수(1/2/3마리)별
+     크기 변화나 던전목록/킬결과창의 서로 다른 크기에도 별도 클래스 없이 자동으로 맞춰짐. */
+  .monster-icon-img{ display:block; width:1em; height:1em; object-fit:contain; }
   /* .monster-icon.hit / .dead / .spawn-in 은 모두 명시도가 동일한 2-클래스 선택자였는데, 스폰 시 붙는
      spawn-in 클래스가 이후 제거되지 않고 계속 남아있고(css 소스 순서상 아래쪽에 선언되어 있어)
      캐스케이드에서 계속 이겨버려 히트/사망 애니메이션(keyframe)이 실제로는 전혀 재생되지 않던 버그가 있었음.

@@ -47,6 +47,12 @@ const WEAPON_IMAGE_DIR = 'assets/sword/';
 const WEAPON_IMAGE_EXT = '.png';
 const WEAPON_IMAGE_FALLBACK = 'common_shortsword';
 
+// 몬스터 이미지 파일 경로 규칙(무기와 동일한 방식). MONSTERS의 image 필드는 파일명만 가짐(확장자/경로 제외),
+// 필드 자체가 없는 몬스터는 기존처럼 icon(이모지)을 그대로 사용함. image가 있는데 실제 파일 로드에
+// 실패하는 경우엔 폴백 PNG가 아니라 이모지(icon)로 대체됨(monsterIconHtml/monsterImgError, formulas.js).
+const MONSTER_IMAGE_DIR = 'assets/monster/';
+const MONSTER_IMAGE_EXT = '.png';
+
 // 무기 종류 도감. 새로운 옵션(필드)이 필요해지면 이 객체에 항목만 추가하면 됨 — 언제든 확장 가능한 구조.
 // ---- 항목 설명 ----
 // desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고) / weaponKind: 무기 종류(WEAPON_KINDS) /
@@ -164,10 +170,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'epic', // 에픽
-    attackPower: 41, attackSpeed: 1.2, critRate: 10,
+    attackPower: 41, attackSpeed: 1.2, critRate: 15,
     purchasable: false, sellPrice: 2400, levelReq: 8,
     image: 'epic_poisonfang',
-    atk: [41], speed: [1.2], crit: [10], sell: [2400],
+    atk: [41], speed: [1.2], crit: [15], sell: [2400],
     cost: [], odds: [],
     // ---- 고유 옵션(에픽/유니크 전용) ----
     // effectId: 다른 소스(아티팩트 등)와 동일 효과일 경우 확률을 합산해 1회만 판정하기 위한 식별자
@@ -622,6 +628,8 @@ const STONE_GRADE_RULES = [
 // (여러 개를 합쳐서 100%를 나누는 방식이 아니라, 각 항목마다 따로 확률을 굴림). artifactId가 있는 항목만 실제
 // 아티팩트 지급 로직(resolveDrops)과 연결되며, artifactId가 없는 항목(도토리/쥐고기 등 재료류)은 아직 실제
 // 아이템 데이터/인벤토리 시스템이 없어 현재는 표시용 데이터로만 존재함 — 추후 재료 아이템이 추가되면 연결 예정.
+// image: 선택 필드. PNG 이미지 파일명(확장자/경로 제외, assets/monster/<image>.png)을 등록하면 icon(이모지)
+// 대신 PNG가 출력됨(monsterIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 그대로 출력됨.
 const MONSTERS = {
   squirrel: {
     id: 'squirrel', name: '다람쥐', icon: '🐿️', grade: 'normal', level: 1,

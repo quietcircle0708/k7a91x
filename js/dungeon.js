@@ -362,7 +362,7 @@ function killMonsterInstance(instanceId){
   hunt.pendingRewards.expGained += expGained;
   hunt.pendingRewards.levelsGained += levelsGained;
   hunt.pendingRewards.newPlayerLevel = state.playerLevel;
-  hunt.pendingRewards.killedMonsters.push({ name: monsterDef.name, icon: monsterDef.icon, color: MONSTER_GRADES[monsterDef.grade].color });
+  hunt.pendingRewards.killedMonsters.push({ name: monsterDef.name, icon: monsterDef.icon, image: monsterDef.image, color: MONSTER_GRADES[monsterDef.grade].color });
 
   state.totalKills = (state.totalKills || 0) + 1;
   render();
@@ -385,7 +385,7 @@ function killMonsterInstance(instanceId){
 function openKillResultModal(rewards){
   const killed = rewards.killedMonsters;
   if(killed.length === 1){
-    el('krIcon').textContent = killed[0].icon;
+    el('krIcon').innerHTML = monsterIconHtml(killed[0]);
     el('krTitle').textContent = killed[0].name + ' 처치!';
     el('krTitle').style.color = killed[0].color;
   } else {
