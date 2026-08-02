@@ -104,8 +104,10 @@ function artifactGradeLabel(id){ const g = WEAPON_GRADES[ARTIFACTS[id].grade]; r
 function artifactGradeColor(id){ const g = WEAPON_GRADES[ARTIFACTS[id].grade]; return g ? g.color : '#ffffff'; }
 function artifactNameColor(id){ return artifactGradeColor(id); }
 // 아티팩트 툴팁: 레이아웃/줄바꿈/서식(라벨-값 구성 등)은 buildWeaponTooltipHtml과 동일하게 유지하고,
-// 표시 항목만 이름 / 장비 설명 / 장비 타입 / 등급 / 효과 설명(라벨은 "효과") / 상점 구매 가격으로 구성함.
-// 등급에 따른 색상 효과는 요구사항대로 "이름"에만 적용하고, 등급 행 자체는 다른 항목과 동일한 서식을 사용함.
+// 표시 항목은 이름 / 장비 설명 / 장비 타입(값만, 라벨 없음) / 효과 설명(값만, 라벨 없음) / 상점 구매 가격으로 구성함.
+// 등급 행은 아티팩트 툴팁에서만 표시하지 않음(이름 색상에 이미 등급이 반영되어 있음). 이 규칙은 이 함수(아티팩트)에만
+// 적용되며, 무기/마석/기타 아이템 툴팁(buildWeaponTooltipHtml 등)에는 영향을 주지 않음. 새로 추가되는 아티팩트도
+// ARTIFACTS 데이터만 등록하면 이 함수를 그대로 거치므로 동일한 규칙이 자동 적용됨.
 function buildArtifactTooltipHtml(id){
   const a = ARTIFACTS[id];
   if(!a) return '';
@@ -117,16 +119,13 @@ function buildArtifactTooltipHtml(id){
   // 2. 장비 설명
   if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${a.desc}</div>`;
 
-  // 3. 장비 타입
-  html += wtipRow('장비 타입', EQUIPMENT_TYPES[a.equipType] || '');
+  // 3. 장비 타입 (라벨 없이 값만 출력)
+  html += wtipRow('', EQUIPMENT_TYPES[a.equipType] || '');
 
-  // 4. 등급
-  html += wtipRow('등급', artifactGradeLabel(id));
+  // 4. 효과 설명 (라벨 없이 값만 출력)
+  if(a.effectText) html += wtipRow('', a.effectText);
 
-  // 5. 효과 설명 (툴팁에는 "효과"로 표시)
-  if(a.effectText) html += wtipRow('효과', a.effectText);
-
-  // 6. 상점 구매 가격 (공란이면 표시하지 않음)
+  // 5. 상점 구매 가격 (공란이면 표시하지 않음)
   if(a.buyPrice != null) html += wtipRow('상점 구매 가격', a.buyPrice.toLocaleString() + ' G');
 
   html += `</div>`;
