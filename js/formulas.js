@@ -25,6 +25,14 @@ function weaponBuyPrice(type){ return (wpn(type).sellPrice || 0) * 2; }
 // 무기 이미지 경로(파일명 기준). 실제로 파일이 있는지는 <img onerror>에서 최종 확인/대체함.
 function weaponImagePath(type){ return WEAPON_IMAGE_DIR + wpn(type).image + WEAPON_IMAGE_EXT; }
 function weaponImageFallbackPath(){ return WEAPON_IMAGE_DIR + WEAPON_IMAGE_FALLBACK + WEAPON_IMAGE_EXT; }
+// 무기 아이콘을 표시하는 모든 화면(강화/인벤토리/상점/보상 등)에서 공통으로 쓰는 <img> HTML 생성 함수.
+// PNG가 없거나 로드에 실패하면 onerror로 WEAPON_IMAGE_FALLBACK(common_shortsword)로 자동 대체됨.
+// 화면마다 크기가 다르므로 className만 다르게 넘겨서 CSS로 크기만 조절하고, 출력 방식 자체는 항상 동일함.
+// 새 무기를 WEAPON_TYPES에 image 필드와 함께 등록하기만 하면 이 함수를 거치는 모든 화면에 자동 반영됨.
+function weaponIconHtml(type, className){
+  const cls = 'weapon-icon-img' + (className ? ' ' + className : '');
+  return `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${weaponImageFallbackPath()}';">`;
+}
 
 // ---- 착용 제한(레벨 + 무기 종류별 요구 스탯) ----
 // 무기 종류에 따른 요구 스탯 목록을 계산 (레벨 제한 × 배율, 소수점 반올림, 강화 단계와 무관)

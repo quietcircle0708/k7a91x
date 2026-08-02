@@ -200,7 +200,7 @@ function renderInventoryList(){
       : equipBtnHtml;
     return `
       <div class="inv-card ${isEquipped?'equipped':''}">
-        <div class="inv-icon" style="border-color:${itemColor};">🗡️</div>
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${weaponName(type)} <span class="inv-level" style="color:${itemColor};">+${item.level}</span></span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
@@ -546,64 +546,99 @@ function gradeSpan(grade){
   const g = MONSTER_GRADES[grade];
   return `<span style="color:${g.color}; font-weight:700;">${g.label}</span>`;
 }
-// 모험가의 유해는 이제 던전마다 다르지 않고 전역 설정(RELIC_*)을 그대로 사용하므로,
-// 던전 화면에는 그 전역 규칙 + 이 던전 몬스터들의 대략적인 레벨대만 안내함.
-function relicDropTooltip(d){
-  const range = dungeonLevelRange(d);
-  const rangeText = range.min === range.max ? `Lv.${range.min}` : `Lv.${range.min}~${range.max}`;
-  return `<span class="txt-relic">모험가의 유해</span><br>`
-    + `처치 시 ${RELIC_DROP_CHANCE}% 확률로 장비를 발견합니다.<br>`
-    + `등급: 일반 ${RELIC_GRADE_CHANCE.normal}% · 레어 ${RELIC_GRADE_CHANCE.rare}% · 에픽 ${RELIC_GRADE_CHANCE.epic}%<br>`
-    + `이 던전 몬스터(${rangeText})와 가까운 아이템 레벨의 장비일수록 더 잘 나옵니다.`;
+// (모험가의 유해·마석 드랍 안내는 이제 buildDungeonDropIcons에서 하드코딩 문구 또는 자동 생성 방식으로
+// 대체되어, 이 던전별 동적 문구 생성 함수들은 더 이상 쓰이지 않아 정리함)
+// 이 던전의 몬스터들이 실제로 등장 가능한 레벨(정상 등급은 레벨~레벨+levelRange 구간, 그 외 등급은 고정 레벨)을
+// 전부 모아서, 그 레벨들에서 나올 수 있는 마석 등급(pickStoneGrade, 전역 공식 재사용)을 중복없이 반환.
+function dungeonStoneGrades(d){
+  const grades = new Set();
+  d.monsters.forEach(id => {
+    const m = MONSTERS[id];
+    const levels = m.grade === 'normal'
+      ? Array.from({ length: (d.levelRange || 0) + 1 }, (_, i) => m.level + i)
+      : [m.level];
+    levels.forEach(lv => grades.add(pickStoneGrade(lv)));
+  });
+  return grades;
 }
-// 마석 드랍도 이제 던전마다 다르지 않고 전역 설정(STONE_*)을 그대로 사용하므로,
-// 던전 화면에는 그 전역 규칙 + 이 던전 몬스터들의 대략적인 레벨대만 안내함.
-function stoneDropTooltip(d){
-  const range = dungeonLevelRange(d);
-  const rangeText = range.min === range.max ? `Lv.${range.min}` : `Lv.${range.min}~${range.max}`;
-  return `<span class="txt-shard">마석</span><br>`
-    + `처치 시 ${STONE_DROP_CHANCE}% 확률로 마석을 획득합니다.<br>`
-    + `등급은 몬스터 레벨에 따라 결정되며, 에픽 등급 몬스터는 수량이 2배입니다.<br>`
-    + `이 던전 몬스터(${rangeText})의 레벨에 맞는 등급이 나옵니다.`;
-}
+// 던전 입구 카드의 "획득 가능 아이템 안내" 아이콘 목록 생성.
+// - 골드/경험치/모험가의 유해는 하드코딩된 고정 안내(요구사항)이며 던전 데이터와 무관하게 항상 표시됨.
+// - 마석/장비/기타/아티팩트는 이 던전의 몬스터 드랍 테이블(MONSTERS[id].drops)과 레벨 구간을 기준으로
+//   자동 생성됨 — 새 몬스터·드랍·던전이 추가돼도 이 함수를 손댈 필요 없이 자동으로 반영됨.
+// - 같은 아이템이 여러 몬스터의 드랍 테이블에 있어도 아이콘은 한 번만 표시(각 Set으로 중복 제거).
+// - 각 카테고리는 분류당 하나로 뭉치지 않고, 실제로 획득 가능한 아이템 각각을 개별 아이콘으로 표시함.
 function buildDungeonDropIcons(d){
   const icons = [];
 
-  // 골드 (항상 드랍)
-  icons.push({
-    icon: '🪙',
-    tooltip: `<span class="txt-gold">골드</span><br>몬스터 처치 시 골드를 획득합니다.`,
-  });
+  // 1. 골드 — 하드코딩 고정 안내
+  icons.push({ icon: '🪙', borderColor: 'var(--forge-gold)',
+    tooltip: `<span class="txt-gold">골드</span><br>몬스터 처치 시 골드를 획득합니다.` });
 
-  // 모험가의 유해 (무기 드랍) - 전역 설정값 안내
-  icons.push({
-    icon: '💀',
-    tooltip: relicDropTooltip(d),
-  });
+  // 2. 경험치 — 하드코딩 고정 안내
+  icons.push({ icon: '✨', borderColor: 'var(--forge-purple)',
+    tooltip: `<span class="txt-exp">경험치</span><br>몬스터 처치 시 경험치를 획득합니다.` });
 
-  // 마석 - 전역 설정값 안내
-  icons.push({
-    icon: '💠',
-    tooltip: stoneDropTooltip(d),
-  });
+  // 3. 모험가의 유해 — 하드코딩 고정 안내(어떤 무기가 나올지는 표시하지 않음)
+  icons.push({ icon: '💀', borderColor: 'var(--forge-green)',
+    tooltip: `<span class="txt-relic">모험가의 유해</span><br>낮은 확률로 쓰러진 모험가의 장비를 획득합니다.` });
 
-  // 몬스터별 고유 드랍(아티팩트 등)
+  // 4. 장비 아이템 — 몬스터 드랍 테이블에 직접 등록된 무기(weaponId, 모험가의 유해와는 별개의 확정 드랍)가
+  //    있다면 무기 툴팁/PNG 아이콘 공식을 그대로 사용해 표시. 현재 등록된 몬스터 중에는 이런 항목이 없어
+  //    지금은 아무 것도 표시되지 않지만, 몬스터 drops에 { weaponId, chance } 항목이 추가되는 즉시 자동 반영됨.
+  const seenWeaponIds = new Set();
   d.monsters.forEach(id => {
-    const monsterDef = MONSTERS[id];
-    (monsterDef.drops || []).forEach(drop => {
-      if(drop.artifactId){
-        const a = ARTIFACTS[drop.artifactId];
-        icons.push({
-          icon: a.icon,
-          tooltip: `${a.name}<br>${monsterDef.name} 처치 시 획득할 수 있습니다.<br>효과: ${a.effectText}`,
-        });
-      }
+    (MONSTERS[id].drops || []).forEach(drop => {
+      if(!drop.weaponId || seenWeaponIds.has(drop.weaponId)) return;
+      seenWeaponIds.add(drop.weaponId);
+      icons.push({
+        iconHtml: weaponIconHtml(drop.weaponId, 'drop-icon-img'),
+        borderColor: weaponGradeColor(drop.weaponId),
+        tooltip: buildWeaponTooltipHtml(drop.weaponId, 0),
+      });
     });
+  });
+
+  // 5. 아티팩트 — 몬스터 드랍 테이블의 artifactId 항목을 그대로 사용, 아티팩트 툴팁 공식 재사용.
+  const seenArtifactIds = new Set();
+  d.monsters.forEach(id => {
+    (MONSTERS[id].drops || []).forEach(drop => {
+      if(!drop.artifactId || seenArtifactIds.has(drop.artifactId)) return;
+      seenArtifactIds.add(drop.artifactId);
+      icons.push({
+        icon: ARTIFACTS[drop.artifactId].icon,
+        borderColor: artifactGradeColor(drop.artifactId),
+        tooltip: buildArtifactTooltipHtml(drop.artifactId),
+      });
+    });
+  });
+
+  // 6. 기타 아이템 — 몬스터 드랍 테이블 중 artifactId가 없는 항목(이름 기반, 재료류)을 MISC_ITEMS와
+  //    매칭해 기타 아이템 툴팁 공식으로 표시. 기타 아이템은 등급 개념이 없어(다른 화면과 동일하게)
+  //    var(--forge-line)을 테두리로 사용.
+  const seenMiscIds = new Set();
+  d.monsters.forEach(id => {
+    (MONSTERS[id].drops || []).forEach(drop => {
+      if(drop.artifactId || drop.weaponId) return;
+      const item = miscItemByName(drop.name);
+      if(!item || item.itemClass !== 'misc' || seenMiscIds.has(item.id)) return;
+      seenMiscIds.add(item.id);
+      icons.push({ icon: item.icon, borderColor: 'var(--forge-line)', tooltip: buildMiscTooltipHtml(item.id) });
+    });
+  });
+
+  // 7. 마석 — 이 던전 몬스터들의 레벨 구간에서 실제로 나올 수 있는 등급의 마석만 자동 선별,
+  //    마석 툴팁 공식으로 표시.
+  const seenStoneIds = new Set();
+  dungeonStoneGrades(d).forEach(grade => {
+    const item = Object.values(MISC_ITEMS).find(m => m.itemClass === 'stone' && m.grade === grade);
+    if(!item || seenStoneIds.has(item.id)) return;
+    seenStoneIds.add(item.id);
+    icons.push({ icon: item.icon, borderColor: stoneNameColor(item.id), tooltip: buildStoneTooltipHtml(item.id) });
   });
 
   return icons.map(it => `
     <span class="drop-icon-wrap">
-      <span class="drop-icon">${it.icon}</span>
+      <span class="drop-icon" style="border-color:${it.borderColor};">${it.iconHtml || it.icon}</span>
       <span class="tooltip">${it.tooltip}</span>
     </span>
   `).join('');
@@ -744,7 +779,7 @@ function buildInvPeekHtml(){
   }
   const lines = state.inventory.map(it => {
     const eq = it.id === state.equippedId ? ' <b style="color:var(--forge-gold);">(장착 중)</b>' : '';
-    return `🗡️ ${weaponName(it.type || 'longsword')} +${it.level}${eq}`;
+    return `${weaponIconHtml(it.type || 'longsword', 'inv-peek-icon-img')} ${weaponName(it.type || 'longsword')} +${it.level}${eq}`;
   }).join('<br>');
   return `인벤토리 (${state.inventory.length}/${INV_MAX})<br>${lines}`;
 }
@@ -889,7 +924,7 @@ function buildWeaponShopCardHtml(typesTable, id){
     <div class="scroll-card">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#242424; border-color:${nameColor};">🗡️</div>
+          <div class="artifact-icon-box" style="background:#242424; border-color:${nameColor};">${weaponIconHtml(id, 'shop-icon-img')}</div>
           <span class="weapon-name-wrap">
             <span class="scroll-name" style="color:${nameColor};">${w.name}</span>
             <span class="tooltip">${buildWeaponTooltipHtml(id, 0)}</span>
