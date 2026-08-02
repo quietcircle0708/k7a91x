@@ -13,8 +13,9 @@ function setBladeShape(type){
     this.src = weaponImageFallbackPath();
   };
   img.src = weaponImagePath(type);
-  // 무기 종류가 단검이면 강화 화면 이미지 크기를 40% 축소해서 출력
-  img.style.transform = wpn(type).weaponKind === 'dagger' ? 'scale(0.6)' : '';
+  // 무기 종류가 단검이면 강화 화면 이미지 크기를 30% 축소해서 출력
+  // (다른 화면의 무기 아이콘과 동일한 축소 비율 — weaponIconHtml의 kind-dagger 클래스 참고)
+  img.style.transform = wpn(type).weaponKind === 'dagger' ? 'scale(0.7)' : '';
 }
 
 // 강화 단계(level, 0~9)에 맞는 발광 효과를 무기 이미지(swordVisual)에만 적용.

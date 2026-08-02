@@ -52,7 +52,7 @@ function spawnMonsters(){
   // 이번 전투(그룹 전멸까지)에서 처치한 모든 몬스터의 보상을 합산해 담아둘 그릇
   hunt.pendingRewards = {
     gold: 0, expGained: 0, levelsGained: 0, newPlayerLevel: state.playerLevel,
-    weaponDrops: [], stoneDrops: {}, artifactDrops: [], miscDrops: {}, killedMonsters: [],
+    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, artifactDrops: [], miscDrops: {}, killedMonsters: [],
   };
 
   renderHunt();
@@ -181,9 +181,14 @@ function attackTick(){
   const dmg = Math.max(1, Math.round(baseDmg * playerDamageMultiplier(levelDiff)));
   target.hp -= dmg;
   monsterHitEffect(target.instanceId, dmg, isCrit);
-  if(target.hp > 0 && isArtifactEquipped('poisonflask') && Math.random() * 100 < 5){
-    applyStatusEffect(target, 'poison');
-    renderStatusBadges();
+  if(target.hp > 0){
+    // 독 플라스크(아티팩트)와 무기 고유 옵션 등 "중독 부여" 효과를 가진 모든 활성 소스의 확률을
+    // 합산해 1회만 판정(activeEffectChance, formulas.js). 소스가 하나도 없으면 0%로 판정 안 됨.
+    const poisonChance = activeEffectChance('poison_on_hit');
+    if(poisonChance > 0 && Math.random() * 100 < poisonChance){
+      applyStatusEffect(target, 'poison');
+      renderStatusBadges();
+    }
   }
   if(target.hp <= 0){
     killMonsterInstance(target.instanceId);
@@ -325,6 +330,14 @@ function killMonsterInstance(instanceId){
       hunt.pendingRewards.weaponDrops.push(result.weaponDrop);
     } // 인벤토리가 가득 차면 기존과 동일하게 드랍 자체가 무산됨(합산 목록에도 반영 안 함)
   }
+  if(result.weaponIdDrops && result.weaponIdDrops.length){
+    for(const drop of result.weaponIdDrops){
+      if(state.inventory.length < INV_MAX){
+        state.inventory.push({ id: state.nextItemId++, level: drop.level, type: drop.type });
+        hunt.pendingRewards.weaponIdDrops.push(drop);
+      } // 인벤토리가 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨
+    }
+  }
   if(result.stoneDrop){
     const item = MISC_ITEMS[result.stoneDrop.itemId];
     state[item.stateKey] = (state[item.stateKey] || 0) + result.stoneDrop.qty;
@@ -390,6 +403,10 @@ function openKillResultModal(rewards){
   rewards.weaponDrops.forEach(w => {
     const itemName = `${weaponName(w.type)} +${w.level}`;
     rewardsHtml += `<div><span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
+  });
+  rewards.weaponIdDrops.forEach(w => {
+    const itemName = `${weaponName(w.type)} +${w.level}`;
+    rewardsHtml += `<div><span style="color:${weaponGradeColor(w.type)}; font-weight:700;">${itemName}</span>${josaEulReul(itemName)} 획득했습니다!</div>`;
   });
   Object.keys(rewards.stoneDrops).forEach(itemId => {
     const item = MISC_ITEMS[itemId];

@@ -332,6 +332,9 @@
   }
   /* 무기 아이콘 PNG 공통 스타일. 화면마다 크기만 클래스로 다르게 줌(출력 방식은 어디서나 동일) */
   .weapon-icon-img{ display:block; object-fit:contain; }
+  /* 단검 종류 무기 아이콘은 다른 무기보다 30% 작게 출력(이미지 파일은 그대로, 출력 크기만 축소).
+     weaponIconHtml(formulas.js)이 무기 종류를 보고 자동으로 이 클래스를 붙임 — 위치/레이아웃에는 영향 없음(transform이라 박스 크기 그대로). */
+  .weapon-icon-dagger{ transform: scale(0.7); }
   .inv-icon-img{ width:30px; height:30px; }
   .shop-icon-img{ width:32px; height:32px; }
   .inv-peek-icon-img{ width:16px; height:16px; vertical-align:-3px; }

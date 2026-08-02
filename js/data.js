@@ -159,6 +159,30 @@ const WEAPON_TYPES = {
     atk: [36], speed: [1.2], crit: [10], sell: [500],
     cost: [], odds: [],
   },
+  poisonfang: {
+    id: 'poisonfang', name: '독 송곳니', desc: '맹독을 품은 송곳니를 벼려 만든 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'epic', // 에픽
+    attackPower: 41, attackSpeed: 1.2, critRate: 10,
+    purchasable: false, sellPrice: 2400, levelReq: 8,
+    image: 'epic_poisonfang',
+    atk: [41], speed: [1.2], crit: [10], sell: [2400],
+    cost: [], odds: [],
+    // ---- 고유 옵션(에픽/유니크 전용) ----
+    // effectId: 다른 소스(아티팩트 등)와 동일 효과일 경우 확률을 합산해 1회만 판정하기 위한 식별자
+    // activateLevel: 이 강화 단계(+N) 이상에서만 활성화. 강화 단계가 낮아지면 즉시 비활성화되고,
+    //   다시 조건을 만족하면 재활성화됨 — 항상 "현재 강화 단계" 기준으로 판단(별도 상태 저장 없음)
+    // chanceByLevel: 강화 단계별 발동 확률(%). activateLevel 미만 구간은 값이 없어도 됨(비활성 상태에서
+    //   툴팁에 미리보기로 표시할 때는 activateLevel 시점의 값을 사용함)
+    // textTemplate: 툴팁 표시 문구. {chance}가 현재(또는 미리보기) 수치로 자동 치환됨
+    uniqueOption: {
+      effectId: 'poison_on_hit',
+      activateLevel: 5,
+      chanceByLevel: { 5: 5, 6: 5, 7: 6, 8: 6, 9: 7 },
+      textTemplate: '공격 적중 시 {chance}% 확률로 중독',
+    },
+  },
 };
 
 // 방어구 종류 도감. 현재는 등록된 방어구가 없음(빈 객체) — 상점 "방어구" 탭은 이 표가 비어있는 동안
@@ -634,6 +658,7 @@ const MONSTERS = {
     drops: [
       { name: '뱀고기', chance: 50 },
       { name: '독 플라스크', chance: 10, artifactId: 'poisonflask' },
+      { name: '독 송곳니', chance: 10, weaponId: 'poisonfang' },
     ],
   },
   blue_deer: {

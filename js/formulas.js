@@ -29,8 +29,12 @@ function weaponImageFallbackPath(){ return WEAPON_IMAGE_DIR + WEAPON_IMAGE_FALLB
 // PNG가 없거나 로드에 실패하면 onerror로 WEAPON_IMAGE_FALLBACK(common_shortsword)로 자동 대체됨.
 // 화면마다 크기가 다르므로 className만 다르게 넘겨서 CSS로 크기만 조절하고, 출력 방식 자체는 항상 동일함.
 // 새 무기를 WEAPON_TYPES에 image 필드와 함께 등록하기만 하면 이 함수를 거치는 모든 화면에 자동 반영됨.
+// 무기 종류(weaponKind)가 단검이면 실제 이미지 파일은 그대로 두고 kind-dagger 클래스(CSS transform:scale)만
+// 추가로 붙여 다른 무기보다 30% 작게 출력함(강화 화면의 setBladeShape와 동일한 축소 비율) — 무기 데이터를
+// 개별 수정하는 방식이 아니라 무기 종류 판정만으로 자동 적용되므로, 새로 등록되는 단검에도 자동 반영됨.
 function weaponIconHtml(type, className){
-  const cls = 'weapon-icon-img' + (className ? ' ' + className : '');
+  const kindCls = wpn(type).weaponKind === 'dagger' ? ' weapon-icon-dagger' : '';
+  const cls = 'weapon-icon-img' + (className ? ' ' + className : '') + kindCls;
   return `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${weaponImageFallbackPath()}';">`;
 }
 
@@ -97,6 +101,9 @@ function buildWeaponTooltipHtml(type, level){
   // 6. 치명타 확률 (0%면 표시 안 함 — 강화 화면과 동일한 규칙)
   const crit = critChanceFor(type, lvl);
   if(crit) html += wtipRow('치명타 확률', crit + '%');
+
+  // 6-2. 고유 옵션 (에픽/유니크 전용, 활성화 단계 미만이면 회색 텍스트 + 활성화 조건 안내)
+  html += weaponUniqueOptionTooltipHtml(type, lvl);
 
   // 7. 착용 제한 (필요한 조건이 있을 때만)
   const reqText = weaponRequirementText(type);
@@ -189,6 +196,48 @@ function buildMiscTooltipHtml(id){
 
   html += `</div>`;
   return html;
+}
+// ---- 무기 고유 옵션(에픽/유니크 전용) ----
+// 활성화 조건(강화 단계)을 만족하는지는 항상 "현재 강화 단계"를 기준으로 그때그때 판단함(별도 상태 저장 없음) —
+// 강화 단계가 활성화 조건 아래로 내려가면 즉시 비활성화되고, 다시 조건을 만족하면 다시 활성화됨.
+function weaponUniqueOptionActive(type, level){
+  const opt = wpn(type).uniqueOption;
+  return !!(opt && level >= opt.activateLevel);
+}
+// 고유 옵션의 현재 발동 수치(%). 아직 활성화 조건(activateLevel) 미만이라면, 툴팁 미리보기용으로
+// 활성화 조건 시점의 수치를 대신 반환함(비활성 상태에서도 "몇 %짜리 옵션인지"는 미리 보여줘야 하므로).
+function weaponUniqueOptionChance(type, level){
+  const opt = wpn(type).uniqueOption;
+  if(!opt) return null;
+  const lookupLevel = level >= opt.activateLevel ? level : opt.activateLevel;
+  return opt.chanceByLevel[lookupLevel] != null ? opt.chanceByLevel[lookupLevel] : null;
+}
+// 무기 툴팁에 표시할 고유 옵션 줄. 고유 옵션이 없는 무기는 빈 문자열을 반환(줄 자체가 생기지 않음).
+// 활성화 상태: 기존 무기 툴팁 서식(값 노란색)을 그대로 사용하고 활성화 조건 안내는 표시하지 않음.
+// 비활성화 상태: 회색 텍스트로 표시하고, "(+N 활성화)" 조건 안내를 아래 줄에 덧붙임.
+function weaponUniqueOptionTooltipHtml(type, level){
+  const opt = wpn(type).uniqueOption;
+  if(!opt) return '';
+  const chance = weaponUniqueOptionChance(type, level);
+  if(chance == null) return '';
+  const text = opt.textTemplate.replace('{chance}', chance);
+  if(weaponUniqueOptionActive(type, level)) return wtipRow('', text);
+  return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${text}<br>(+${opt.activateLevel} 활성화)</div>`;
+}
+// 같은 효과(effectId)를 가진 모든 "현재 활성 상태인" 소스(아티팩트 + 장착 무기의 고유 옵션)의 발동 확률을 합산.
+// 동일 효과는 소스마다 따로 판정하지 않고, 이렇게 합산된 확률로 단 1회만 판정함.
+// 새 효과/소스가 추가될 때는 이 함수에 조건만 덧붙이면 됨(호출하는 쪽 로직은 그대로 유지).
+function activeEffectChance(effectId){
+  let total = 0;
+  if(effectId === 'poison_on_hit' && isArtifactEquipped('poisonflask')) total += 5;
+  const equipped = getEquipped();
+  if(equipped){
+    const opt = wpn(equipped.type).uniqueOption;
+    if(opt && opt.effectId === effectId && weaponUniqueOptionActive(equipped.type, equipped.level)){
+      total += weaponUniqueOptionChance(equipped.type, equipped.level) || 0;
+    }
+  }
+  return total;
 }
 function atkFor(type, level){ return wpn(type).atk[level]; }
 function atkSpeedFor(type, level){ return wpn(type).speed[level]; }
@@ -496,18 +545,30 @@ function resolveDrops(monsterDef, dungeon, level){
     }
   }
 
-  // drops 중 artifactId가 없는 항목(도토리/쥐고기 등 재료류)은 MISC_ITEMS에 등록된 재료 아이템으로 취급하여,
-  // 각 항목마다 독립적으로 확률을 판정함(하나의 몬스터가 여러 개를 동시에 드랍할 수도, 하나도 드랍 안 할 수도 있음).
+  // drops 중 weaponId가 있는 항목은 몬스터 드랍 테이블에 직접 등록된 확정 무기(모험가의 유해와는 별개의
+  // 지정 무기 드랍). artifactId와 동일하게 각 항목마다 독립적으로 확률을 판정하며, 지급되는 무기는
+  // 항상 +0 강화 단계로 지급됨(강화 단계 추첨은 모험가의 유해 전용 로직이라 여기선 사용하지 않음).
+  const weaponIdDrops = [];
+  for(const drop of (monsterDef.drops || [])){
+    if(!drop.weaponId) continue;
+    if(Math.random() * 100 < drop.chance){
+      weaponIdDrops.push({ type: drop.weaponId, level: 0 });
+    }
+  }
+
+  // drops 중 artifactId/weaponId가 없는 항목(도토리/쥐고기 등 재료류)은 MISC_ITEMS에 등록된 재료
+  // 아이템으로 취급하여, 각 항목마다 독립적으로 확률을 판정함(하나의 몬스터가 여러 개를 동시에
+  // 드랍할 수도, 하나도 드랍 안 할 수도 있음).
   const miscDrops = [];
   for(const drop of (monsterDef.drops || [])){
-    if(drop.artifactId) continue; // 아티팩트 드랍은 위에서 이미 별도 처리됨
+    if(drop.artifactId || drop.weaponId) continue; // 아티팩트/확정 무기 드랍은 위에서 이미 별도 처리됨
     if(Math.random() * 100 < drop.chance){
       const item = miscItemByName(drop.name);
       if(item) miscDrops.push({ itemId: item.id, name: item.name, icon: item.icon, qty: 1 });
     }
   }
 
-  return { gold, weaponDrop, stoneDrop, artifactDropId, miscDrops };
+  return { gold, weaponDrop, weaponIdDrops, stoneDrop, artifactDropId, miscDrops };
 }
 
 // ---- 한국어 조사 처리 ----
