@@ -187,11 +187,18 @@ function render(){
 
 function renderInventoryList(){
   const wrap = el('inventoryList');
+  const pagerWrap = el('invWeaponPager');
   if(state.inventory.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 무기가 없습니다.<br>상점에서 <b>검</b>을 구매해보세요 (100 G).</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
     return;
   }
-  wrap.innerHTML = state.inventory.map(item=>{
+  const pageSize = PAGE_SIZE.invWeapon;
+  const totalPageCount = pageCount(state.inventory.length, pageSize);
+  pageState.invWeapon = clampPage(pageState.invWeapon, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invWeapon', pageState.invWeapon, totalPageCount);
+  const pageItems = pageSlice(state.inventory, pageState.invWeapon, pageSize);
+  wrap.innerHTML = pageItems.map(item=>{
     const type = item.type || 'longsword';
     const tier = tierOf(item.level);
     const meta = TIER_META[tier];
@@ -522,7 +529,7 @@ function renderCharStats(){
   const totalAtk = effectiveAtk(type, level);
   const baseSpeed = atkSpeedFor(type, level);
   const totalSpeed = effectiveAtkSpeed(type, level);
-  const totalCrit = critChanceFor(type, level);
+  const totalCrit = effectiveCritChance(type, level);
   const hasSpeedBonus = isArtifactEquipped('batwing');
 
   html += `
@@ -654,7 +661,15 @@ function renderDungeonList(){
   const equipped = getEquipped();
   el('noWeaponForDungeon').style.display = equipped ? 'none' : 'block';
   const wrap = el('dungeonList');
-  wrap.innerHTML = DUNGEONS.map(d => {
+  const pagerWrap = el('dungeonListPager');
+
+  const pageSize = PAGE_SIZE.dungeonList;
+  const totalPageCount = pageCount(DUNGEONS.length, pageSize);
+  pageState.dungeonList = clampPage(pageState.dungeonList, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('dungeonList', pageState.dungeonList, totalPageCount);
+  const pageDungeons = pageSlice(DUNGEONS, pageState.dungeonList, pageSize);
+
+  wrap.innerHTML = pageDungeons.map(d => {
     const range = dungeonLevelRange(d);
     const monsterNames = d.monsters.map(id => MONSTERS[id].name).join(', ');
     return `
@@ -689,7 +704,7 @@ function renderHunt(){
     const type = equipped.type || 'longsword';
     const nameHtml = `<span class="weapon-name-wrap">${weaponName(type)} +${lv}<span class="tooltip">${buildWeaponTooltipHtml(type, lv)}</span></span>`;
     let info = `장착 무기: ${nameHtml} (공격력 ${effectiveAtk(type, lv)}, 공격속도 ${effectiveAtkSpeed(type, lv).toFixed(2)}회/초`;
-    const crit = critChanceFor(type, lv);
+    const crit = effectiveCritChance(type, lv);
     if(crit > 0) info += `, 치명타 ${crit}%`;
     info += ')';
     el('hunterInfo').innerHTML = info;
@@ -900,11 +915,28 @@ function renderShopTab(){
 
   const entries = sortShopEntries(shopEntriesForTab(shopUI.tab), shopUI.filter, shopUI.dir);
   const wrap = el('shopItemsList');
+  const pagerWrap = el('shopPager');
   if(entries.length === 0){
     wrap.innerHTML = `<div class="inv-empty">${shopUI.tab === 'armor' ? '아직 준비된 방어구가 없습니다.' : '표시할 아이템이 없습니다.'}</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
     return;
   }
-  wrap.innerHTML = entries.map(entry => buildShopCardHtml(shopUI.tab, entry.id)).join('');
+
+  // 무기/방어구/소비/아티팩트 탭만 페이지네이션 적용(SHOP_PAGE_KEY에 등록된 탭). 마석/기타 탭은
+  // 이 매핑에 키가 없으므로 예전처럼 전체 목록을 그대로 출력함(페이지 UI도 비워둠).
+  const pageKey = SHOP_PAGE_KEY[shopUI.tab];
+  let pageEntries = entries;
+  if(pageKey){
+    const pageSize = PAGE_SIZE[pageKey];
+    const totalPageCount = pageCount(entries.length, pageSize);
+    pageState[pageKey] = clampPage(pageState[pageKey], totalPageCount);
+    if(pagerWrap) pagerWrap.innerHTML = pagerHtml(pageKey, pageState[pageKey], totalPageCount);
+    pageEntries = pageSlice(entries, pageState[pageKey], pageSize);
+  } else if(pagerWrap){
+    pagerWrap.innerHTML = '';
+  }
+
+  wrap.innerHTML = pageEntries.map(entry => buildShopCardHtml(shopUI.tab, entry.id)).join('');
 }
 
 function buildShopCardHtml(tabId, id){

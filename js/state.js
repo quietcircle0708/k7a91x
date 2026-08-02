@@ -16,7 +16,7 @@ let state = {
   manaShards: 0,       // 마석 조각 보유 개수
   manaCrystals: 0,     // 마석 결정 보유 개수
   manaStones: 0,       // 마석 보유 개수
-  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, // 기타(재료) 아이템 보유 개수
+  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
   autoRebuy: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
@@ -32,6 +32,13 @@ let currentView = 'forge';
 let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null };
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
 let shopUI = { tab: 'weapon', filter: 'price', dir: 'asc' };
+// 페이지네이션: 화면(또는 탭)별 "현재 페이지" 번호(1부터 시작). PAGE_SIZE(data.js)와 키를 공유함 —
+// 새 화면을 추가할 때 여기 초기값 1과 PAGE_SIZE에 같은 키만 추가하면 동일한 페이지 시스템을 그대로 재사용함.
+let pageState = {
+  invWeapon: 1,
+  shopWeapon: 1, shopArmor: 1, shopConsumable: 1, shopArtifact: 1,
+  dungeonList: 1,
+};
 let shopFilterMenuOpen = false;
 
 const el = id => document.getElementById(id);
@@ -249,7 +256,7 @@ function resetGame(){
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
-    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0,
+    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0,
     skipEffects:false, autoRebuy:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },

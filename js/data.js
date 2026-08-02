@@ -481,6 +481,27 @@ const ARTIFACTS = {
     effectText: '힘+2<br>최대 체력 +500',
     buyPrice: null,
   },
+  oldarmguard: {
+    id: 'oldarmguard', name: '낡은 팔 보호대', icon: '🛡️',
+    desc: '빛바랜 보호구에 주인의 흔적이 남아 있다',
+    equipType: 'artifact',
+    grade: 'normal',
+    // 힘/치명타 확률 모두 다른 힘·치명타 스탯과 합산 적용(힘은 artifactStatBonus 경유, 치명타는
+    // effectiveCritChance 경유 — formulas.js)
+    effect: '힘+3<br>치명타 확률 +3%',
+    effectText: '힘 +3<br>치명타 확률 +3%',
+    buyPrice: null,
+  },
+  blackarmguard: {
+    id: 'blackarmguard', name: '흑색 팔 보호대', icon: '🛡️',
+    desc: '흑곰의 질긴 가죽으로 제작한 견고한 장비',
+    equipType: 'artifact',
+    grade: 'epic',
+    // 힘/민첩/치명타 확률 모두 합산 적용(힘·민첩은 artifactStatBonus, 치명타는 effectiveCritChance 경유)
+    effect: '힘+5<br>민첩+3<br>치명타 확률 +8%',
+    effectText: '힘 +5<br>민첩 +3<br>치명타 확률 +8%',
+    buyPrice: null,
+  },
 };
 
 // 소비 아이템(플라스크 등) 도감
@@ -562,6 +583,16 @@ const MISC_ITEMS = {
     desc: '약재로 사용되는 귀한 재료',
     sellPrice: 200, stateKey: 'deerAntlers',
   },
+  bearHide: {
+    id: 'bearHide', name: '곰 가죽', icon: '🍖', itemClass: 'misc',
+    desc: '곰의 가죽',
+    sellPrice: 50, stateKey: 'bearHides',
+  },
+  bearBile: {
+    id: 'bearBile', name: '웅담', icon: '🍖', itemClass: 'misc',
+    desc: '곰의 강인한 생명력이 깃든 귀한 약재',
+    sellPrice: 400, stateKey: 'bearBiles',
+  },
 };
 
 // ---- 상점 품목 분류 탭 ----
@@ -583,6 +614,24 @@ const SHOP_SORT_FIELDS = [
   { id: 'levelReq', label: '착용 제한 레벨' },
 ];
 
+// ---- 페이지네이션(공통 시스템) ----
+// 화면(또는 탭)마다 페이지당 최대 출력 개수를 여기서 독립적으로 관리함 — 지금은 전부 6(던전만 3)이지만,
+// 나중에 탭별로 다른 값을 쓰고 싶으면 이 숫자만 바꾸면 됨(다른 코드 수정 불필요).
+// 상점은 무기/방어구/소비/아티팩트 4개 탭에만 적용하고, 마석·기타 탭은 페이지네이션을 적용하지 않음
+// (그 두 탭은 이 객체에 키 자체가 없음 → renderShopTab에서 자동으로 페이지 UI 없이 전체 출력됨).
+const PAGE_SIZE = {
+  invWeapon: 6,        // 인벤토리 무기 탭
+  shopWeapon: 6,        // 상점 무기 탭
+  shopArmor: 6,          // 상점 방어구 탭
+  shopConsumable: 6,     // 상점 소비 탭
+  shopArtifact: 6,       // 상점 아티팩트 탭
+  dungeonList: 3,        // 던전 입구
+};
+// 상점 탭 id → PAGE_SIZE/페이지 상태 키 매핑. 페이지네이션 미적용 탭(stone/misc)은 여기 없음.
+const SHOP_PAGE_KEY = {
+  weapon: 'shopWeapon', armor: 'shopArmor', consumable: 'shopConsumable', artifact: 'shopArtifact',
+};
+
 // ---- 상태 이상(디버프) 클래스 ----
 // 앞으로 종류가 계속 추가될 예정. 새 상태 이상은 이 객체에 항목만 추가하면 됨.
 const STATUS_EFFECTS = {
@@ -599,14 +648,16 @@ const STATUS_EFFECTS = {
 
 // 모험가의 유해(무기) 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
 const RELIC_DROP_CHANCE = 10; // 몬스터 처치 시 장비 드랍 판정 확률(%)
-const RELIC_GRADE_CHANCE = { normal: 50, rare: 35, epic: 15 }; // 드랍 판정 성공 시, 장비 등급 선택 확률
+const RELIC_GRADE_CHANCE = { normal: 70, rare: 29, epic: 1 }; // 드랍 판정 성공 시, 장비 등급 선택 확률(유니크는 0%라 후보에서 제외 — pickWeighted가 가중치0 항목을 고르는 부동소수점 예외 상황까지 원천 차단)
 const RELIC_LEVEL_WINDOW = 10; // 후보 아이템 레벨 하한 = max(1, 몬스터 레벨 - 이 값)
 const RELIC_LEVEL_WEIGHT_DECAY = 0.8; // 등록된 아이템 레벨이 한 단계 낮아질 때마다 가중치 ×이 값(최고 레벨 가중치는 100)
-// 드랍된 장비의 강화 단계(+N) 확률. 등급별로 별도 표를 사용함(일반=+0~+4, 레어=+0~+3).
+// 드랍된 장비의 강화 단계(+N) 확률. 등급별로 별도 표를 사용함(일반=+0~+4, 레어=+0~+3, 에픽=+0, 유니크=+0).
 // 지금은 별도 공식 없이 하드코딩된 확률표를 사용(추후 공식으로 교체 가능하도록 이 표만 바꾸면 됨).
 const RELIC_ENHANCE_LEVEL_CHANCE = {
   normal: [[0, 20], [1, 30], [2, 30], [3, 10], [4, 10]],
-  rare: [[0, 65], [1, 20], [3, 15]],
+  rare: [[0, 40], [1, 30], [2, 20], [3, 10]],
+  epic: [[0, 100]],
+  unique: [[0, 100]],
 };
 
 // 마석 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
@@ -688,6 +739,34 @@ const MONSTERS = {
       { name: '사슴 뿔 깃발', chance: 10, artifactId: 'antlerflag' },
     ],
   },
+  red_bear: {
+    id: 'red_bear', name: '적웅', icon: '🐻', grade: 'normal', level: 16, image: 'bear',
+    hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
+    drops: [
+      { name: '곰 가죽', chance: 25 },
+      { name: '웅담', chance: 10 },
+      { name: '낡은 팔 보호대', chance: 5, artifactId: 'oldarmguard' },
+    ],
+  },
+  fierce_bear: {
+    id: 'fierce_bear', name: '사웅', icon: '🐻', grade: 'normal', level: 16, image: 'bear',
+    hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
+    drops: [
+      { name: '곰 가죽', chance: 30 },
+      { name: '웅담', chance: 5 },
+      { name: '낡은 팔 보호대', chance: 5, artifactId: 'oldarmguard' },
+    ],
+  },
+  black_bear: {
+    id: 'black_bear', name: '흑웅', icon: '🐻', grade: 'epic', level: 20, image: 'bear',
+    hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    drops: [
+      { name: '곰 가죽', chance: 50 },
+      { name: '웅담', chance: 20 },
+      { name: '낡은 팔 보호대', chance: 20, artifactId: 'oldarmguard' },
+      { name: '흑색 팔 보호대', chance: 7, artifactId: 'blackarmguard' },
+    ],
+  },
 };
 
 
@@ -732,6 +811,14 @@ const DUNGEONS = [
     desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다. 세 개의 눈을 가진 사슴은 예사롭지 않은 기운을 뿜습니다.',
     monsters: ['blue_deer', 'red_deer', 'three_eyed_deer'],
     levelRange: 2,
+  },
+  {
+    id: 'bear_den',
+    name: '곰 굴',
+    icon: '',
+    desc: '곰들의 울음소리가 끊이지 않는 어두운 굴. 용기 있는 자만이 발을 들일 수 있다.',
+    monsters: ['red_bear', 'fierce_bear', 'black_bear'],
+    levelRange: 3,
   },
 ];
 

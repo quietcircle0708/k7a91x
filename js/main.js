@@ -28,6 +28,12 @@ el('shopFilterMenu').addEventListener('click', (e)=>{
   setShopFilter(btn.dataset.filter);
 });
 el('shopSortDirBtn').addEventListener('click', toggleShopSortDir);
+el('shopPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 document.addEventListener('click', (e)=>{
   if(!shopFilterMenuOpen) return;
   if(e.target.closest('.shop-filter-wrap')) return;
@@ -96,10 +102,22 @@ el('sellConfirmYesBtn').addEventListener('click', confirmSell);
 el('sellConfirmNoBtn').addEventListener('click', cancelSell);
 el('krStopBtn').addEventListener('click', returnToVillage);
 el('krContinueBtn').addEventListener('click', advanceStage);
+el('dungeonListPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 el('dungeonList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-id]');
   if(!btn || btn.disabled) return;
   enterDungeon(btn.dataset.id);
+});
+el('invWeaponPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
 el('inventoryList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');

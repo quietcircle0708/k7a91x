@@ -325,6 +325,15 @@
   }
   .inv-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
   .inv-count{ font-size:12px; color: var(--forge-cream-dim); margin-bottom:16px; font-family:'JetBrains Mono', monospace; }
+  /* 인벤토리 무기 탭: "보유 아이템 / 최대 슬롯"과 페이지 이동 UI를 같은 줄, 우측 정렬로 배치 */
+  .inv-count-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:0; }
+  .inv-count-row .inv-count{ margin-bottom:0; }
+  /* 던전 입구: 제목과 페이지 이동 UI를 같은 줄, 우측 정렬로 배치 */
+  .dungeon-title-row{ display:flex; justify-content:space-between; align-items:center; }
+  /* 공통 페이지네이션 UI(인벤토리 무기 탭/상점 4개 탭/던전 입구가 전부 공유) */
+  .pager{ display:flex; align-items:center; gap:8px; font-size:12px; color: var(--forge-cream-dim); font-family:'JetBrains Mono', monospace; flex-shrink:0; }
+  .pager-btn{ background:#2a231f; border:1px solid var(--forge-line); color: var(--forge-cream); border-radius:6px; padding:3px 9px; font-size:12px; cursor:pointer; font-family:'JetBrains Mono', monospace; }
+  .pager-btn:hover{ border-color: var(--forge-gold); color: var(--forge-gold); }
   .inv-card{ display:flex; align-items:center; gap:12px; background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:12px; padding:12px 14px; margin-bottom:10px; }
   .inv-card.equipped{ border-color: var(--forge-gold); }
   .inv-icon{

@@ -174,7 +174,7 @@ function attackTick(){
   }
   const type = equipped.type || 'longsword';
   const atk = effectiveAtk(type, equipped.level);
-  const critChance = critChanceFor(type, equipped.level);
+  const critChance = effectiveCritChance(type, equipped.level);
   const isCrit = Math.random() * 100 < critChance;
   const baseDmg = isCrit ? Math.round(atk * 1.5) : atk;
   const levelDiff = state.playerLevel - target.level;
@@ -343,9 +343,11 @@ function killMonsterInstance(instanceId){
     state[item.stateKey] = (state[item.stateKey] || 0) + result.stoneDrop.qty;
     hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] = (hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] || 0) + result.stoneDrop.qty;
   }
-  if(result.artifactDropId){
-    grantArtifactSafe(result.artifactDropId);
-    hunt.pendingRewards.artifactDrops.push(result.artifactDropId);
+  if(result.artifactDropIds && result.artifactDropIds.length){
+    for(const id of result.artifactDropIds){
+      grantArtifactSafe(id);
+      hunt.pendingRewards.artifactDrops.push(id);
+    }
   }
   if(result.miscDrops && result.miscDrops.length){
     for(const drop of result.miscDrops){

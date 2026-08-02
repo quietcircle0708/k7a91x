@@ -138,6 +138,7 @@
             <div class="shop-filter-menu" id="shopFilterMenu" style="display:none;"></div>
           </div>
           <button class="shop-filter-btn" id="shopSortDirBtn">↑ 오름차순</button>
+          <div class="pager" id="shopPager"></div>
         </div>
       </div>
 
@@ -167,7 +168,10 @@
       </div>
 
       <div class="inv-tab-panel" id="invTabWeapon">
-        <div class="inv-count" id="invCount">0 / 10</div>
+        <div class="inv-count-row">
+          <div class="inv-count" id="invCount">0 / 10</div>
+          <div class="pager" id="invWeaponPager"></div>
+        </div>
         <div id="inventoryList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabArtifact" style="display:none;">
@@ -189,7 +193,10 @@
   <div id="dungeonListView" style="display:none;">
     <button class="back-btn back-from-dlist">← 대장간으로 돌아가기</button>
     <div class="shop-card">
-      <div class="shop-title">던전 입구</div>
+      <div class="dungeon-title-row">
+        <div class="shop-title">던전 입구</div>
+        <div class="pager" id="dungeonListPager"></div>
+      </div>
       <div class="shop-sub">사냥하여 골드와 아이템을 얻어보세요.</div>
       <div id="noWeaponForDungeon" class="empty-notice" style="display:none;">
         장착한 무기가 없어 사냥을 나갈 수 없습니다.<br>인벤토리에서 무기를 먼저 장착하세요.

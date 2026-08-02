@@ -369,14 +369,22 @@ function requiredExp(level){
 // 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
 function artifactStatBonus(stat){
   let bonus = 0;
-  if(stat === 'str' && isArtifactEquipped('antlerflag')) bonus += 2;
+  if(stat === 'str'){
+    if(isArtifactEquipped('antlerflag')) bonus += 2;
+    if(isArtifactEquipped('oldarmguard')) bonus += 3;
+    if(isArtifactEquipped('blackarmguard')) bonus += 5;
+  }
+  if(stat === 'agi'){
+    if(isArtifactEquipped('blackarmguard')) bonus += 3;
+  }
   return bonus;
 }
 // 스탯 보너스가 반영된 실질 최대 체력/마나
 function effectiveMaxHp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
   const str = (s.str || 0) + artifactStatBonus('str');
-  let hp = playerBaseHp(level) + str * 20 + (s.agi || 0) * 5;
+  const agi = (s.agi || 0) + artifactStatBonus('agi');
+  let hp = playerBaseHp(level) + str * 20 + agi * 5;
   if(isArtifactEquipped('antlerflag')) hp += 500; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   return hp;
 }
@@ -389,14 +397,23 @@ function effectiveMaxMp(level){
 function effectiveAtkSpeed(type, level){
   let s = atkSpeedFor(type, level);
   if(isArtifactEquipped('batwing')) s *= 1.05;
-  const agi = (state.stats && state.stats.agi) || 0;
+  const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
   s *= 1 + agi * 0.001; // 민첩 1당 공격속도 +0.1%
   return s;
 }
 function effectiveAtk(type, level){
   const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
-  const agi = (state.stats && state.stats.agi) || 0;
+  const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
   return atkFor(type, level) + str * 2 + agi * 1; // 힘 1당 공격력 +2, 민첩 1당 공격력 +1
+}
+// 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
+// 미리보기에서 그대로 쓰이고(무기 하나만의 값을 보여줘야 하므로), 실제 전투 판정과 캐릭터 정보창의
+// "총 치명타 확률"에는 이 함수를 사용함(effectiveAtk와 동일한 역할 분담).
+function effectiveCritChance(type, level){
+  let bonus = 0;
+  if(isArtifactEquipped('oldarmguard')) bonus += 3;
+  if(isArtifactEquipped('blackarmguard')) bonus += 8;
+  return critChanceFor(type, level) + bonus;
 }
 
 // ---- 골드/드랍 관련 계산 ----
@@ -509,6 +526,31 @@ function pickSpawnLevel(levelMin, levelMax){
   return levelMin + Math.floor(Math.random() * (levelMax - levelMin + 1));
 }
 // 가중치 쌍 배열([값, 가중치])에서 하나를 추첨
+// ---- 공통 페이지네이션 시스템 ----
+// 인벤토리 무기 탭 / 상점(무기·방어구·소비·아티팩트) / 던전 입구가 전부 이 4개 함수를 그대로 공유함.
+// 새 화면(또는 탭)에 페이지네이션을 붙이고 싶으면 PAGE_SIZE(data.js)와 pageState(state.js)에 키를
+// 하나씩 추가하고, 목록을 그릴 때 이 함수들로 페이지 계산 → 자르기 → UI 출력만 해주면 됨.
+function pageCount(itemCount, pageSize){
+  return Math.max(1, Math.ceil(itemCount / pageSize));
+}
+// 아이템 수가 줄어들어(판매 등) 현재 페이지가 범위를 벗어난 경우, [1, 전체페이지] 안으로 자동 보정.
+function clampPage(page, totalPages){
+  return Math.min(Math.max(1, page), totalPages);
+}
+// items 배열 중 현재 페이지에 해당하는 구간만 잘라서 반환(정렬/필터는 호출부에서 이미 끝낸 상태여야 함 —
+// 이 함수는 "자르기"만 담당하므로, 필터가 바뀌어도 이 함수 자체는 그대로 재사용 가능함).
+function pageSlice(items, page, pageSize){
+  const start = (page - 1) * pageSize;
+  return items.slice(start, start + pageSize);
+}
+// 페이지 이동 UI 공통 HTML: "현재 페이지 / 전체 페이지 [이전] [다음]". 첫 페이지는 [이전] 생략,
+// 마지막 페이지는 [다음] 생략. target은 어떤 화면의 페이지인지 구분하는 키(pageState의 키와 동일) —
+// 클릭 시 data-page-target으로 actions.js가 pageState의 어느 값을 바꿀지 알 수 있음.
+function pagerHtml(target, page, totalPageCount){
+  const prevBtn = page > 1 ? `<button class="pager-btn" data-action="page-prev" data-page-target="${target}">이전</button>` : '';
+  const nextBtn = page < totalPageCount ? `<button class="pager-btn" data-action="page-next" data-page-target="${target}">다음</button>` : '';
+  return `<div class="pager"><span class="pager-label">${page} / ${totalPageCount}</span>${prevBtn}${nextBtn}</div>`;
+}
 function pickWeighted(pairs){
   const total = pairs.reduce((s, [, w]) => s + w, 0);
   let r = Math.random() * total;
@@ -534,7 +576,7 @@ function nearestLevelCandidates(list, targetLevel){
 //     ② 그래도 없으면(해당 등급 무기가 아예 없음) 등급 상관없이 몬스터 레벨과 가장 가까운 무기로 대체) →
 // 4) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계 낮아질 때마다 ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨 →
 // 5) 그 레벨(+같은 등급, 폴백된 경우는 폴백된 등급)에 해당하는 무기 중 하나를 무작위로 선택 →
-// 6) RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리: 일반 +0~+4, 레어 +0~+3)로 강화 단계를 추첨.
+// 6) RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리: 일반 +0~+4, 레어 +0~+3, 에픽 +0 고정, 유니크 +0 고정)로 강화 단계를 추첨.
 //    최종 선택된 무기(weaponType)의 등급을 기준으로 표를 고름(폴백 ②로 등급이 바뀌었을 수 있으므로,
 //    최초 추첨된 grade가 아니라 실제로 지급되는 weaponType.grade를 사용).
 function resolveWeaponRelicDrop(monsterLevel){
@@ -552,7 +594,7 @@ function resolveWeaponRelicDrop(monsterLevel){
     candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES).filter(w => w.grade === grade), monsterLevel);
   }
   if(candidates.length === 0){
-    // 폴백 ②: 이 등급에 등록된 무기가 아예 없으면(현재 에픽처럼), 등급도 무시하고 몬스터 레벨 이하 중 가장 가까운 무기로 대체
+    // 폴백 ②: 이 등급에 등록된 무기가 아예 없으면(예: 유니크처럼 아직 등록된 무기가 없는 등급), 등급도 무시하고 몬스터 레벨 이하 중 가장 가까운 무기로 대체
     candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES), monsterLevel);
   }
   if(candidates.length === 0) return null; // 등록된 무기가 하나도 없는 극단적인 경우
@@ -591,12 +633,13 @@ function resolveDrops(monsterDef, dungeon, level){
 
   const stoneDrop = rollStoneDrop(level, grade); // { itemId, qty } 또는 null(전역 공식, 던전/등급별 개별 설정 없음)
 
-  // drops 중 artifactId가 있는 항목만 실제 아티팩트 지급 판정 대상.
-  let artifactDropId = null;
+  // drops 중 artifactId가 있는 항목은 각 항목마다 독립적으로 확률을 판정함(재료류 미스크 드랍과 동일한
+  // 원칙). 과거엔 몬스터마다 아티팩트 드랍 항목이 최대 1개뿐이라 첫 성공에서 멈춰도 차이가 없었지만,
+  // 이제 한 몬스터가 아티팩트 드랍을 여러 개 가질 수 있어 전부 독립 판정하도록 배열로 변경함.
+  const artifactDropIds = [];
   for(const drop of (monsterDef.drops || [])){
     if(drop.artifactId && canGrantArtifact(drop.artifactId) && Math.random() * 100 < drop.chance){
-      artifactDropId = drop.artifactId;
-      break;
+      artifactDropIds.push(drop.artifactId);
     }
   }
 
@@ -623,7 +666,7 @@ function resolveDrops(monsterDef, dungeon, level){
     }
   }
 
-  return { gold, weaponDrop, weaponIdDrops, stoneDrop, artifactDropId, miscDrops };
+  return { gold, weaponDrop, weaponIdDrops, stoneDrop, artifactDropIds, miscDrops };
 }
 
 // ---- 한국어 조사 처리 ----

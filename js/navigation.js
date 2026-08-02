@@ -79,12 +79,36 @@ function switchShopTab(tabId){
 }
 function setShopFilter(filterId){
   shopUI.filter = filterId;
+  // 정렬 기준이 바뀌면 목록 순서 자체가 바뀌므로, 지금 탭의 페이지를 1로 되돌림(범위를 벗어난 빈
+  // 페이지에 머무는 것을 방지). 페이지네이션이 적용되지 않는 탭(마석/기타)은 SHOP_PAGE_KEY에 키가
+  // 없어서 자연스럽게 아무 일도 안 일어남.
+  const pageKey = SHOP_PAGE_KEY[shopUI.tab];
+  if(pageKey) pageState[pageKey] = 1;
   closeShopFilterMenu();
   renderShopTab();
 }
 function toggleShopSortDir(){
   shopUI.dir = shopUI.dir === 'asc' ? 'desc' : 'asc';
+  const pageKey = SHOP_PAGE_KEY[shopUI.tab];
+  if(pageKey) pageState[pageKey] = 1; // setShopFilter와 동일한 이유로 페이지 초기화
   renderShopTab();
+}
+
+// ---- 페이지네이션 공통 이동 ----
+// target(pageState/PAGE_SIZE의 키)마다 "이동 후 다시 그려야 할 화면"을 매핑해둠. 새 화면을 페이지네이션에
+// 추가할 때 PAGE_SIZE·pageState에 키를 추가한 것과 동일하게, 여기에도 한 줄만 추가하면 이동 버튼이 그
+// 화면을 자동으로 다시 그려줌(다른 화면의 페이지 이동 로직에는 영향 없음).
+const PAGE_RENDER_FN = {
+  invWeapon: renderInventoryList,
+  shopWeapon: renderShopTab, shopArmor: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
+  dungeonList: renderDungeonList,
+};
+// delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
+// 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
+function goPage(target, delta){
+  pageState[target] = (pageState[target] || 1) + delta;
+  const renderFn = PAGE_RENDER_FN[target];
+  if(renderFn) renderFn();
 }
 function toggleShopFilterMenu(){
   shopFilterMenuOpen = !shopFilterMenuOpen;
