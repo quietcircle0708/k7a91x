@@ -69,21 +69,21 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
-    attackPower: 28, attackSpeed: 0.6, critRate: 10,
+    attackPower: 30, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 100, levelReq: 1,
     image: 'common_longsword',
-    atk: [28], speed: [0.6], crit: [10], sell: [100],
+    atk: [30], speed: [0.6], crit: [10], sell: [100],
     cost: [], odds: [],
   },
   greatsword: {
-    id: 'greatsword', name: '낡은 그레이트 소드', desc: '강력한 일격을 위한 대검',
+    id: 'greatsword', name: '낡은 그레이트소드', desc: '강력한 일격을 위한 대검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'rare', // 레어
-    attackPower: 42, attackSpeed: 0.6, critRate: 10,
+    attackPower: 43, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 5,
     image: 'rare_greatsword',
-    atk: [42], speed: [0.6], crit: [10], sell: [500],
+    atk: [43], speed: [0.6], crit: [10], sell: [500],
     cost: [], odds: [],
   },
   // ---- 아래 두 무기는 강화 단계별 증가 공식이 아직 없어서, 우선 +0(기본) 값만 담아둠.
@@ -104,10 +104,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
-    attackPower: 18, attackSpeed: 1.2, critRate: 10,
+    attackPower: 12, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 100, levelReq: 1,
     image: 'common_dagger',
-    atk: [18], speed: [1.2], crit: [10], sell: [100],
+    atk: [12], speed: [1.2], crit: [10], sell: [100],
     cost: [], odds: [],
   },
   broadsword: {
@@ -115,10 +115,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'rare', // 레어
-    attackPower: 31, attackSpeed: 0.8, critRate: 5,
+    attackPower: 29, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 500, levelReq: 5,
     image: 'rare_broadsword',
-    atk: [31], speed: [0.8], crit: [5], sell: [500],
+    atk: [29], speed: [0.8], crit: [5], sell: [500],
     cost: [], odds: [],
   },
   combatknife: {
@@ -126,10 +126,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'rare', // 레어
-    attackPower: 28, attackSpeed: 1.2, critRate: 10,
+    attackPower: 18, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 5,
     image: 'rare_combatknife',
-    atk: [28], speed: [1.2], crit: [10], sell: [500],
+    atk: [18], speed: [1.2], crit: [10], sell: [500],
     cost: [], odds: [],
   },
   longsword2: {
@@ -137,10 +137,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
-    attackPower: 56, attackSpeed: 0.6, critRate: 10,
+    attackPower: 47, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 10,
     image: 'common_longsword2',
-    atk: [56], speed: [0.6], crit: [10], sell: [500],
+    atk: [47], speed: [0.6], crit: [10], sell: [500],
     cost: [], odds: [],
   },
   shortsword2: {
@@ -148,10 +148,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
-    attackPower: 40, attackSpeed: 0.8, critRate: 5,
+    attackPower: 31, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 500, levelReq: 10,
     image: 'common_shortsword2',
-    atk: [40], speed: [0.8], crit: [5], sell: [500],
+    atk: [31], speed: [0.8], crit: [5], sell: [500],
     cost: [], odds: [],
   },
   dagger2: {
@@ -159,10 +159,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
-    attackPower: 36, attackSpeed: 1.2, critRate: 10,
+    attackPower: 19, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 10,
     image: 'common_dagger2',
-    atk: [36], speed: [1.2], crit: [10], sell: [500],
+    atk: [19], speed: [1.2], crit: [10], sell: [500],
     cost: [], odds: [],
   },
   poisonfang: {
@@ -170,10 +170,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'epic', // 에픽
-    attackPower: 41, attackSpeed: 1.2, critRate: 15,
+    attackPower: 26, attackSpeed: 1.2, critRate: 15,
     purchasable: false, sellPrice: 2400, levelReq: 8,
     image: 'epic_poisonfang',
-    atk: [41], speed: [1.2], crit: [15], sell: [2400],
+    atk: [26], speed: [1.2], crit: [15], sell: [2400],
     cost: [], odds: [],
     // ---- 고유 옵션(에픽/유니크 전용) ----
     // effectId: 다른 소스(아티팩트 등)와 동일 효과일 경우 확률을 합산해 1회만 판정하기 위한 식별자
@@ -189,6 +189,72 @@ const WEAPON_TYPES = {
       textTemplate: '공격 적중 시 {chance}% 확률로 중독',
     },
   },
+  greatsword2: {
+    id: 'greatsword2', name: '그레이트소드', desc: '압도적인 위력으로 적을 분쇄하는 거대한 대검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'rare', // 레어
+    attackPower: 71, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 1000, levelReq: 15,
+    image: 'rare_greatsword2',
+    atk: [71], speed: [0.6], crit: [10], sell: [1000],
+    cost: [], odds: [],
+  },
+  broadsword2: {
+    id: 'broadsword2', name: '브로드소드', desc: '공격과 방어의 균형을 갖춘 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'rare', // 레어
+    attackPower: 48, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 1000, levelReq: 15,
+    image: 'rare_broadsword2',
+    atk: [48], speed: [0.8], crit: [5], sell: [1000],
+    cost: [], odds: [],
+  },
+  combatknife2: {
+    id: 'combatknife2', name: '컴뱃 나이프', desc: '신속한 근접전을 위한 다목적 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'rare', // 레어
+    attackPower: 28, attackSpeed: 1, critRate: 10,
+    purchasable: true, sellPrice: 1000, levelReq: 15,
+    image: 'rare_combatknife2',
+    atk: [28], speed: [1], crit: [10], sell: [1000],
+    cost: [], odds: [],
+  },
+  longsword3: {
+    id: 'longsword3', name: '모험가의 대검', desc: '튼튼한 내구성을 갖춘 모험가용 대검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 51, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 1250, levelReq: 20,
+    image: 'common_longsword3',
+    atk: [51], speed: [0.6], crit: [10], sell: [1250],
+    cost: [], odds: [],
+  },
+  shortsword3: {
+    id: 'shortsword3', name: '모험가의 검', desc: '균형 잡힌 성능의 모험가용 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 76, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 1250, levelReq: 20,
+    image: 'common_shortsword3',
+    atk: [76], speed: [0.8], crit: [5], sell: [1250],
+    cost: [], odds: [],
+  },
+  dagger3: {
+    id: 'dagger3', name: '모험가의 단검', desc: '가볍고 다루기 쉬운 모험가용 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검 (표기상 "양손 검"은 오타로 확인함)
+    grade: 'normal', // 일반
+    attackPower: 30, attackSpeed: 1.0, critRate: 10,
+    purchasable: true, sellPrice: 1250, levelReq: 20,
+    image: 'common_dagger2', // 기존 dagger2와 이미지 공유(재사용) — 신규 파일 없음
+    atk: [30], speed: [1.0], crit: [10], sell: [1250],
+    cost: [], odds: [],
+  },
 };
 
 // 방어구 종류 도감. 현재는 등록된 방어구가 없음(빈 객체) — 상점 "방어구" 탭은 이 표가 비어있는 동안
@@ -202,11 +268,10 @@ const ARMOR_TYPES = {};
 // 필요한 보정값이 아직 없는 무기 종류(예: 지팡이, 구상 중)도 자동으로 제외되고 기존 값이 그대로 유지됨.
 // ============================================================
 
-// 1. 강화 단계 구간별 공격력 배율 (index = 강화단계, [0]은 사용 안 함)
-const ENHANCE_ATK_STEP_MULT = [null, 1.8, 1.5, 1.3, 1.3, 1.3, 1.3, 1.3, 1.4, 1.4];
-
-// 2. 무기 종류별 공격력 곱연산 보정 (지팡이는 구상 단계라 비워둠)
-const WEAPON_KIND_ATK_MULT = { sword: 1, two_handed_sword: 1.014, dagger: 0.96, staff: null };
+// 1. 강화 단계별 공격력 배율 (index = 강화단계, [0]은 사용 안 함)
+// 신규 공식: 무기 +N 공격력 = 기본 공격력 + (기본 공격력 × 강화 단계 × 이 배율). 재귀식이 아니라
+// 항상 +0 기본 공격력만을 기준으로 직접 계산하며, 무기 종류/등급 보정은 이 공식에서 완전히 제외됨.
+const ENHANCE_ATK_LEVEL_MULT = [null, 1.5, 1.5, 1.5, 1.5, 1.55, 1.5, 1.6, 1.6, 1.65];
 
 // 2. 무기 종류별 강화 구간(+1~+9)당 공격속도 증가량 — 합연산. index 0 = +1, ... index 8 = +9
 const WEAPON_KIND_ATKSPEED_STEP = {
@@ -224,25 +289,24 @@ const WEAPON_KIND_CRIT_STEP = {
   staff: null,
 };
 
-// 3. 무기 등급별 공격력 곱연산 보정 (+1부터 매 단계 적용). 공격력에만 적용되고 공격속도/치명타에는 영향 없음.
-const WEAPON_GRADE_ATK_MULT = { normal: 1, rare: 1.02, epic: 1.03, unique: null };
-
 // 무기 하나의 +0~+9 공격력/공격속도/치명타 배열을 공식대로 계산.
-// 필요한 보정값이 없으면(유니크 등급이거나, 아직 정의되지 않은 무기 종류) null을 반환 — 그 경우 기존 값을 그대로 둠.
+// 유니크 등급은 이 공식을 쓰지 않고 무기마다 고유 값을 직접 넣을 예정이라 대상에서 제외(공격력 계산 자체와 무관하게 유지).
+// 필요한 보정값이 없으면(아직 정의되지 않은 무기 종류) null을 반환 — 그 경우 기존 값을 그대로 둠.
 function computeWeaponLevelStats(w){
-  const kindAtkMult = WEAPON_KIND_ATK_MULT[w.weaponKind];
-  const gradeAtkMult = WEAPON_GRADE_ATK_MULT[w.grade];
+  if(w.grade === 'unique') return null;
   const atkSpeedSteps = WEAPON_KIND_ATKSPEED_STEP[w.weaponKind];
   const critSteps = WEAPON_KIND_CRIT_STEP[w.weaponKind];
-  if(kindAtkMult == null || gradeAtkMult == null || atkSpeedSteps == null || critSteps == null) return null;
+  if(atkSpeedSteps == null || critSteps == null) return null;
 
-  const atk = [w.attackPower];
+  const base = w.attackPower;
+  const atk = [base];
   const speed = [w.attackSpeed];
   const crit = [w.critRate];
   for(let lv = 1; lv <= 9; lv++){
-    const stepMult = ENHANCE_ATK_STEP_MULT[lv];
-    // +1의 공격력 = +0의 공격력 × 강화단계배율 × 무기 보정 × 무기 등급 보정 (소수 첫째자리에서 반올림), 이후 단계도 동일하게 재귀 적용
-    atk.push(Math.round(atk[lv - 1] * stepMult * kindAtkMult * gradeAtkMult));
+    const stepMult = ENHANCE_ATK_LEVEL_MULT[lv];
+    // 신규 공식: 무기 +N 공격력 = 기본 공격력 + (기본 공격력 × 강화 단계 × 단계 배율).
+    // 항상 +0 기본 공격력(base)만을 기준으로 직접 계산하며(이전 단계 값 미참조), 최종 결과만 반올림함.
+    atk.push(Math.round(base + (base * lv * stepMult)));
     speed.push(Math.round((speed[lv - 1] + (atkSpeedSteps[lv - 1] || 0)) * 100) / 100);
     crit.push(crit[lv - 1] + (critSteps[lv - 1] || 0));
   }
@@ -352,7 +416,7 @@ Object.values(WEAPON_TYPES).forEach(w => {
 // ============================================================
 
 // 강화 단계별 판매 배율. index = 강화 단계(1~9). 무기 종류/등급과 무관하게 고정값.
-const ENHANCE_SELL_STEP_MULT = [null, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.35, 1.35, 1.35];
+const ENHANCE_SELL_STEP_MULT = [null, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.20, 1.20];
 
 // 선형연립방정식 Ax=b를 가우스 소거법(부분 피벗팅)으로 푸는 범용 함수.
 // 평균 기대비용 계산 전용으로 쓰지만, 그 자체로는 강화 시스템과 무관한 독립적인 수학 유틸리티.

@@ -445,11 +445,11 @@ function rollStoneDrop(level, monsterGrade){
 }
 
 // ---- 몬스터 체력/공격력 ----
-// 일반: Lv1=150, 이후 (이전 레벨 HP + 50) x 1.12 / 에픽: 같은 레벨 일반 몬스터의 3배
+// 일반: Lv1=150, 이후 (이전 레벨 HP + 50) x 1.08 / 에픽: 같은 레벨 일반 몬스터의 3배(수정 없음)
 function normalMonsterHP(level){
   let hp = 150;
   for(let l = 2; l <= level; l++){
-    hp = (hp + 50) * 1.12;
+    hp = (hp + 50) * 1.08;
   }
   return Math.round(hp);
 }
