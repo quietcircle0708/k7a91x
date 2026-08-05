@@ -369,7 +369,7 @@ function applyFlaskHealTick(healState){
     state.playerMp = Math.min(effectiveMaxMp(state.playerLevel), (state.playerMp || 0) + healState.perTick);
   }
   renderHuntCharPanel();
-  renderCharStats();
+  refreshCharDisplays();
   saveState();
 }
 

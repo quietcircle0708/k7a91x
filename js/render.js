@@ -178,10 +178,12 @@ function render(){
     el('openShopBtn').disabled = true;
     el('openInventoryBtn').disabled = true;
     el('openDungeonBtn').disabled = true;
+    el('openCharacterBtn').disabled = true;
   } else {
     el('openShopBtn').disabled = false;
     el('openInventoryBtn').disabled = false;
     el('openDungeonBtn').disabled = false;
+    el('openCharacterBtn').disabled = false;
   }
 }
 
@@ -567,12 +569,10 @@ function renderCharStats(){
     renderCharStatsPage1();
   }
 }
-// 1페이지 — 좌: 장비창, 우: 기존 캐릭터 정보(레벨/체력/마나/경험치 → 스탯 배분 → 전투 능력치).
-// 우측 내용은 기존 renderCharStats 그대로이며(무기 미장착 시 안내 문구 포함), 기존에 그 아래 붙어있던
-// "적용 중인 아티팩트 효과" 블록만 2페이지로 옮겨짐.
-function renderCharStatsPage1(){
+// 캐릭터 정보(레벨/체력/마나/경험치 → 스탯 배분 → 전투 능력치) HTML 조립. 캐릭터 정보 모달(1페이지 우측)과
+// 캐릭터 메뉴(신규, "캐릭터 정보" 탭 1페이지)가 이 함수를 그대로 공유해서 쓰므로, 기능/데이터가 항상 동일함.
+function buildCharStatsInfoHtml(){
   const equipped = getEquipped();
-  const body = el('charStatsBody');
 
   const lv = state.playerLevel;
   const maxHp = effectiveMaxHp(lv);
@@ -628,33 +628,78 @@ function renderCharStatsPage1(){
     }
   }
 
+  return rightHtml;
+}
+// 1페이지 — 좌: 장비창, 우: 캐릭터 정보(buildCharStatsInfoHtml 공용 함수).
+function renderCharStatsPage1(){
+  const body = el('charStatsBody');
   body.innerHTML = `
     <div class="char-stats-page1">
       <div class="char-stats-left">${buildEquipPanelHtml()}</div>
-      <div class="char-stats-right">${rightHtml}</div>
+      <div class="char-stats-right">${buildCharStatsInfoHtml()}</div>
     </div>
   `;
 }
-// 2페이지 — 기존 "적용 중인 아티팩트 효과" 화면 그대로. 기존에는 무기가 장착돼 있을 때만 표시되던
-// 블록이라 그 조건은 그대로 유지하고(무기 미장착 시 동일한 안내 문구), 장착 아티팩트가 0개일 때만
-// 기존에는 아무것도 출력되지 않았던 것을 빈 페이지로 보이지 않도록 동일한 안내 문구 스타일로 보완함.
-function renderCharStatsPage2(){
+// "적용 중인 아티팩트 효과" HTML 조립. 기존에는 무기가 장착돼 있을 때만 표시되던 블록이라 그 조건은 그대로
+// 유지하고(무기 미장착 시 동일한 안내 문구), 장착 아티팩트가 0개일 때만 기존에는 아무것도 출력되지 않았던 것을
+// 빈 페이지로 보이지 않도록 동일한 안내 문구 스타일로 보완함. 캐릭터 정보 모달 2페이지와 캐릭터 메뉴 3페이지가 공유.
+function buildArtifactEffectsHtml(){
   const equipped = getEquipped();
-  const body = el('charStatsBody');
   if(!equipped){
-    body.innerHTML = `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
-    return;
+    return `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
   }
   if(state.equippedArtifacts.length === 0){
-    body.innerHTML = `<div class="char-stat-empty">적용 중인 아티팩트가 없습니다.</div>`;
-    return;
+    return `<div class="char-stat-empty">적용 중인 아티팩트가 없습니다.</div>`;
   }
   let html = `<div class="char-stat-sub-title">적용 중인 아티팩트 효과</div>`;
   html += state.equippedArtifacts.map(id => {
     const a = ARTIFACTS[id];
     return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${a.icon} ${a.name}</b><br>${a.effectText}</div>`;
   }).join('');
-  body.innerHTML = html;
+  return html;
+}
+// 2페이지 — 기존 "적용 중인 아티팩트 효과" 화면 그대로(buildArtifactEffectsHtml 공용 함수).
+function renderCharStatsPage2(){
+  el('charStatsBody').innerHTML = buildArtifactEffectsHtml();
+}
+
+// ---- 캐릭터 메뉴(좌측 상단바 "캐릭터") ----
+// CHARACTER_TABS(data.js)를 그대로 순회해 탭 버튼을 그리므로, 새 탭이 추가돼도 이 함수는 수정할 필요 없음
+// (설정 화면 renderSettings와 동일한 방식). "info"(캐릭터 정보) 탭만 실제 내용이 있고, 그 외 탭(스킬 등)은
+// 아직 구현 범위가 아니라 빈 화면만 출력함.
+function renderCharacterMenu(){
+  const tabsRow = el('charTabsRow');
+  const panelsWrap = el('charTabPanels');
+  if(!tabsRow || !panelsWrap) return;
+
+  tabsRow.innerHTML = CHARACTER_TABS.map(t =>
+    `<button class="inv-tab-btn${t.id === activeCharTab ? ' active' : ''}" data-char-tab="${t.id}">${t.label}</button>`
+  ).join('');
+
+  const tab = CHARACTER_TABS.find(t => t.id === activeCharTab) || CHARACTER_TABS[0];
+  if(!tab){ panelsWrap.innerHTML = ''; return; }
+
+  if(tab.id !== 'info'){
+    // 스킬 등 아직 콘텐츠가 없는 탭 — 탭 이름만 표시되고 화면은 비워둠.
+    panelsWrap.innerHTML = `<div class="inv-tab-panel"></div>`;
+    return;
+  }
+
+  // "캐릭터 정보" 탭 — 캐릭터 정보 모달과 동일한 데이터를 쓰되, 화면 폭이 좁아 1페이지(캐릭터 정보) /
+  // 2페이지(장비창) / 3페이지(아티팩트 효과)로 완전히 분리함(모달은 1페이지에 장비창+캐릭터 정보를 좌우 배치).
+  ensurePlayerVitals();
+  pageState.charMenuInfo = clampPage(pageState.charMenuInfo, CHAR_MENU_INFO_PAGE_COUNT);
+  const page = pageState.charMenuInfo;
+  const pageBodyHtml = page === 2 ? buildEquipPanelHtml()
+    : page === 3 ? buildArtifactEffectsHtml()
+    : buildCharStatsInfoHtml();
+
+  panelsWrap.innerHTML = `
+    <div class="inv-tab-panel">
+      <div class="char-menu-info-head">${pagerHtml('charMenuInfo', page, CHAR_MENU_INFO_PAGE_COUNT)}</div>
+      <div>${pageBodyHtml}</div>
+    </div>
+  `;
 }
 
 // ---- 던전 입구 목록 ----

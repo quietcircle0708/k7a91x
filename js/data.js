@@ -720,6 +720,19 @@ const SHOP_PAGE_KEY = {
 // 쓰지 않지만, pageState·pagerHtml·goPage·clampPage 등 페이지 이동 시스템 자체는 그대로 재사용함.
 const CHAR_STATS_PAGE_COUNT = 2;
 
+// ---- 캐릭터 메뉴(좌측 상단바 메뉴) — 탭 구성 ----
+// 데이터 기반 목록이라 새 탭을 추가하려면 이 배열에 { id, label } 항목만 추가하면 됨(renderCharacterMenu가
+// 이 목록을 그대로 순회해 탭 버튼을 자동 생성함, SETTINGS_SCHEMA→renderSettings와 동일한 방식).
+// 'info'(캐릭터 정보) id는 renderCharacterMenu에서 특별히 다뤄지는 값이라 이름을 바꾸면 안 됨.
+const CHARACTER_TABS = [
+  { id: 'info', label: '캐릭터 정보' },
+  { id: 'skill', label: '스킬' },
+];
+// 캐릭터 메뉴 "캐릭터 정보" 탭의 페이지 수. 캐릭터 정보창(모달, CHAR_STATS_PAGE_COUNT=2, 1페이지에
+// 장비창+캐릭터 정보를 좌우로 함께 배치)과 동일한 데이터를 쓰지만, 캐릭터 메뉴는 화면 폭이 좁아
+// 1페이지(캐릭터 정보) / 2페이지(장비창) / 3페이지(적용 중인 아티팩트 효과)로 완전히 분리함.
+const CHAR_MENU_INFO_PAGE_COUNT = 3;
+
 // ---- 캐릭터 정보창 — 장비창 슬롯 구성 (데이터 기반) ----
 // renderCharStats(render.js)가 이 목록을 그대로 순회해 슬롯을 그림. 새 장비 타입(방어구 등)이 실제로
 // 추가되면 이 배열에 항목만 추가하고 equippedItemForSlot(render.js)에 조회 로직 한 줄만 이어주면 되며,

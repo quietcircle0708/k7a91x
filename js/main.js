@@ -64,11 +64,13 @@ el('autoRebuyToggleBtn').addEventListener('click', toggleAutoRebuy);
 el('openShopBtn').addEventListener('click', openShop);
 el('openInventoryBtn').addEventListener('click', openInventory);
 el('openDungeonBtn').addEventListener('click', openDungeonList);
+el('openCharacterBtn').addEventListener('click', openCharacterMenu);
 el('goInventoryBtn').addEventListener('click', openInventory);
 el('quickBuySwordBtn').addEventListener('click', (e)=> buyWeapon('longsword', e.currentTarget));
 el('resetLink').addEventListener('click', resetGame);
 document.querySelector('.back-from-shop').addEventListener('click', closeToForge);
 document.querySelector('.back-from-inv').addEventListener('click', closeToForge);
+document.querySelector('.back-from-character').addEventListener('click', closeToForge);
 document.querySelector('.back-from-dlist').addEventListener('click', closeToForge);
 el('exitHuntBtn').addEventListener('click', ()=> guardedNav('dungeonlist'));
 el('treasureChest').addEventListener('click', clickTreasureChest);
@@ -109,6 +111,33 @@ el('charStatsBody').addEventListener('click', (e)=>{
   if(actionBtn.dataset.action === 'apply-stats') applyStatAlloc();
   else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
   else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
+});
+// ---- 캐릭터 메뉴 ----
+el('charTabsRow').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-char-tab]');
+  if(!btn) return;
+  switchCharTab(btn.dataset.charTab);
+});
+// "캐릭터 정보" 탭 내용(페이지 이동 버튼 + 스탯 배분 버튼)을 한 컨테이너 안에서 함께 위임 처리함
+// (charStatsBody/charStatsPager 두 곳에 나눠 걸린 모달과 달리, 캐릭터 메뉴는 페이지가 통째로 다시
+// 그려지는 하나의 컨테이너라 로직도 그대로 합쳐서 재사용함).
+el('charTabPanels').addEventListener('click', (e)=>{
+  const statBtn = e.target.closest('button[data-stat]');
+  if(statBtn && !statBtn.disabled){
+    const statKey = statBtn.dataset.stat;
+    const statAction = statBtn.dataset.statAction;
+    if(statAction === 'add-bulk') allocateStatBulk(statKey);
+    else if(statAction === 'sub') deallocateStat(statKey);
+    else allocateStat(statKey);
+    return;
+  }
+  const actionBtn = e.target.closest('button[data-action]');
+  if(!actionBtn || actionBtn.disabled) return;
+  if(actionBtn.dataset.action === 'apply-stats') applyStatAlloc();
+  else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
+  else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
+  else if(actionBtn.dataset.action === 'page-prev') goPage(actionBtn.dataset.pageTarget, -1);
+  else if(actionBtn.dataset.action === 'page-next') goPage(actionBtn.dataset.pageTarget, 1);
 });
 el('respawnBtn').addEventListener('click', respawnAtVillage);
 el('sellConfirmYesBtn').addEventListener('click', confirmSell);

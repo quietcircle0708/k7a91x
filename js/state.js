@@ -12,6 +12,10 @@ let state = {
   charmCount: 0, charmPrice: 1500, charmActive: false,
   blessingCount: 0, blessingPrice: 15000, blessingActive: false,
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
+  equippedArtifacts: [], // 장착 중인 아티팩트 id 목록(최대 ARTIFACT_SLOT_MAX) — 이전엔 저장된 데이터를
+                          // 불러올 때(applyLoadedRaw)만 채워졌는데, 저장 데이터가 아예 없는 최초 실행
+                          // 시점(신규 게임)엔 채워지지 않아 ensurePlayerVitals()가 곧바로 죽는 문제가
+                          // 있어서 기본 state 자체에도 초기값을 추가함(다른 필드들과 동일한 방식)
   manaFragments: 0,    // 마석 파편 보유 개수
   manaShards: 0,       // 마석 조각 보유 개수
   manaCrystals: 0,     // 마석 결정 보유 개수
@@ -39,6 +43,7 @@ let pageState = {
   shopWeapon: 1, shopArmor: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
   charStats: 1,
+  charMenuInfo: 1,
 };
 let shopFilterMenuOpen = false;
 

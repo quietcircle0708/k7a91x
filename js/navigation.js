@@ -16,14 +16,32 @@ function showView(name){
     hunt.paused = false;
     hunt.started = false;
   }
+  if(currentView === 'character' && name !== 'character'){
+    // 캐릭터 메뉴를 벗어날 때는 캐릭터 정보 모달을 닫을 때(closeCharStats)와 동일하게
+    // 적용하지 않은 임시 스탯 배분을 버림(둘이 draftStats를 공유하는 데이터이므로 규칙도 동일해야 함).
+    draftStats = null;
+    draftStatPoints = null;
+    statAllocActive = { str: false, agi: false, int: false };
+  }
   el('forgeView').style.display = name === 'forge' ? 'block' : 'none';
   el('shopView').style.display = name === 'shop' ? 'block' : 'none';
   el('inventoryView').style.display = name === 'inventory' ? 'block' : 'none';
   el('dungeonListView').style.display = name === 'dungeonlist' ? 'block' : 'none';
+  el('characterView').style.display = name === 'character' ? 'block' : 'none';
   el('huntView').style.display = name === 'hunt' ? 'block' : 'none';
   currentView = name;
   if(name === 'dungeonlist') renderDungeonList();
   if(name === 'hunt') renderHunt();
+  if(name === 'character'){
+    // 캐릭터 정보 모달을 열 때(openCharStats)와 동일한 초기화 규칙: 매번 진입할 때마다
+    // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·1페이지부터 보여줌.
+    draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+    draftStatPoints = state.statPoints || 0;
+    statAllocActive = { str: false, agi: false, int: false };
+    pageState.charMenuInfo = 1;
+    activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
+    renderCharacterMenu();
+  }
   render();
 }
 
@@ -55,6 +73,7 @@ function cancelLeaveBattle(){
 function openShop(){ if(isEnhancing) return; guardedNav('shop'); }
 function openInventory(){ if(isEnhancing) return; guardedNav('inventory'); }
 function openDungeonList(){ if(isEnhancing) return; guardedNav('dungeonlist'); }
+function openCharacterMenu(){ if(isEnhancing) return; guardedNav('character'); }
 function closeToForge(){ showView('forge'); }
 
 // ---- 인벤토리 탭 ----
@@ -103,6 +122,7 @@ const PAGE_RENDER_FN = {
   shopWeapon: renderShopTab, shopArmor: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
   charStats: renderCharStats,
+  charMenuInfo: renderCharacterMenu,
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
@@ -151,6 +171,14 @@ function pendingStatPoints(key){
   if(!draftStats) return 0;
   return (draftStats[key] || 0) - (state.stats[key] || 0);
 }
+// 캐릭터 정보 모달(charStatsModal)과 캐릭터 메뉴("캐릭터" 탭)는 draftStats 등 동일한 데이터를 공유하며,
+// 항상 둘 중 하나만 화면에 보이지만("모달은 대장간 화면에서만, 캐릭터 메뉴는 그 화면을 벗어나야 열림")
+// 요구사항대로 "한쪽에서 바뀌면 다른 쪽도 즉시 반영"되도록 스탯이 바뀌는 모든 지점에서 항상 둘 다 다시 그림
+// (둘 다 숨겨진 화면을 다시 그리는 건 비용이 거의 없음 — render()가 매번 상점/인벤토리를 다시 그리는 것과 동일한 방식).
+function refreshCharDisplays(){
+  renderCharStats();
+  renderCharacterMenu();
+}
 function allocateStat(key){
   if(!draftStats) return;
   if((draftStatPoints || 0) <= 0) return;
@@ -158,7 +186,7 @@ function allocateStat(key){
   draftStats[key]++;
   draftStatPoints--;
   statAllocActive[key] = true;
-  renderCharStats();
+  refreshCharDisplays();
 }
 // +N(레벨업당 지급 포인트, STAT_POINTS_PER_LEVEL) 버튼 — 분배 모드가 활성화된 스탯에서
 // 사용 가능 포인트가 STAT_POINTS_PER_LEVEL 이상일 때만 동작. 이 상수가 바뀌면 한 번에 분배되는
@@ -170,7 +198,7 @@ function allocateStatBulk(key){
   if(!(key in draftStats)) return;
   draftStats[key] += STAT_POINTS_PER_LEVEL;
   draftStatPoints -= STAT_POINTS_PER_LEVEL;
-  renderCharStats();
+  refreshCharDisplays();
 }
 // - 버튼 — 아직 적용되지 않은 해당 스탯의 임시 분배 포인트만 1 차감하고, 그만큼 사용 가능 포인트로 되돌림.
 function deallocateStat(key){
@@ -179,7 +207,7 @@ function deallocateStat(key){
   if(pendingStatPoints(key) <= 0) return;
   draftStats[key]--;
   draftStatPoints++;
-  renderCharStats();
+  refreshCharDisplays();
 }
 // 적용: draft 값을 실제 state에 반영하고 저장
 function applyStatAlloc(){
@@ -193,14 +221,14 @@ function applyStatAlloc(){
   saveState();
   draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
   draftStatPoints = state.statPoints;
-  renderCharStats();
+  refreshCharDisplays();
 }
 // 초기화: 이번에 임시로 찍었던 포인트를 되돌려 마지막으로 적용된 상태에서 다시 찍을 수 있게 함
 function resetStatAlloc(){
   if(!draftStats) return;
   draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
   draftStatPoints = state.statPoints || 0;
-  renderCharStats();
+  refreshCharDisplays();
 }
 // 전체 초기화: 마지막으로 '적용'되어 실제 저장된 스탯까지 포함해 지금까지 찍은 모든 포인트를 되돌림.
 // draft만 바뀌므로 실제로 확정되려면 여전히 '적용'을 눌러야 함.
@@ -209,14 +237,14 @@ function resetStatAllocFull(){
   const totalPoints = (state.statPoints || 0) + (state.stats.str || 0) + (state.stats.agi || 0) + (state.stats.int || 0);
   draftStats = { str: 0, agi: 0, int: 0 };
   draftStatPoints = totalPoints;
-  renderCharStats();
+  refreshCharDisplays();
 }
 function openCharStats(){
   draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
   draftStatPoints = state.statPoints || 0;
   statAllocActive = { str: false, agi: false, int: false };
   pageState.charStats = 1; // 모달을 열 때는 항상 1페이지(장비창+캐릭터 정보)부터 보여줌
-  renderCharStats();
+  refreshCharDisplays();
   el('charStatsModal').style.display = 'flex';
 }
 function closeCharStats(){
@@ -225,6 +253,15 @@ function closeCharStats(){
   draftStatPoints = null;
   statAllocActive = { str: false, agi: false, int: false };
   el('charStatsModal').style.display = 'none';
+}
+
+// ---- 캐릭터 메뉴(좌측 상단바 "캐릭터") ----
+// 탭 전환은 CHARACTER_TABS(data.js)를 그대로 따르므로, 새 탭이 추가돼도 이 함수는 수정할 필요 없음
+// (설정 화면의 activeSettingsCategory/switchSettingsCategory와 동일한 패턴).
+let activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
+function switchCharTab(tabId){
+  activeCharTab = tabId;
+  renderCharacterMenu();
 }
 
 // ---- 설정 모달 ----

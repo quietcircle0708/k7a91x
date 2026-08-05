@@ -26,10 +26,12 @@
   }
   .wrap{ width:100%; max-width: 480px; }
 
-  .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; gap:8px; flex-wrap:wrap; }
+  .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap; }
   .brand{ font-family:'Cinzel', 'Noto Serif KR', serif; font-weight:900; font-size:19px; letter-spacing:1.5px; }
   .brand span{ color: var(--forge-ember); }
   .topbar-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  /* 메인 메뉴(캐릭터/던전/인벤토리/상점) — 항상 좌측 정렬로 고정, 가로 배치는 기존 topbar-right와 동일 */
+  .main-nav{ display:flex; justify-content:flex-start; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
   .gold-badge{
     display:flex; align-items:center; gap:6px;
     background: var(--forge-panel); border:1px solid var(--forge-line);
@@ -557,6 +559,9 @@
     display:flex; align-items:center; justify-content:center;
   }
   .stat-peek-btn:hover{ border-color: var(--forge-gold); }
+
+  /* 캐릭터 메뉴 "캐릭터 정보" 탭 — 화면 폭이 좁아 페이지 이동 버튼만 우측 정렬로 표시 */
+  .char-menu-info-head{ display:flex; justify-content:flex-end; margin-bottom:10px; }
 
   .char-stats-modal{ max-width:680px; text-align:left; }
   .char-stats-title-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
