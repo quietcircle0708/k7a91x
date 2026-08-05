@@ -102,6 +102,7 @@ const PAGE_RENDER_FN = {
   invWeapon: renderInventoryList,
   shopWeapon: renderShopTab, shopArmor: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
+  charStats: renderCharStats,
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
@@ -141,12 +142,43 @@ function closeQuickSlotPicker(){
 // '적용'을 누르기 전까지는 draftStats/draftStatPoints(임시 값)만 바뀌고 실제 state는 그대로 유지됨.
 let draftStats = null;
 let draftStatPoints = null;
+// 스탯별 "분배 모드" 활성화 여부. 해당 스탯의 +(또는 +N) 버튼을 한 번이라도 누르면 true가 되며,
+// 이때부터 +N/- 버튼이 함께 표시됨(캐릭터 정보 모달을 열고 닫을 때마다 초기화됨).
+let statAllocActive = { str: false, agi: false, int: false };
+// 해당 스탯의 "아직 적용되지 않은 임시 분배 포인트" 수 — 마지막으로 적용(state.stats)된 값 대비
+// draftStats가 얼마나 더 찍혀있는지로 계산함. -(마이너스) 버튼의 표시/차감 기준으로 쓰임.
+function pendingStatPoints(key){
+  if(!draftStats) return 0;
+  return (draftStats[key] || 0) - (state.stats[key] || 0);
+}
 function allocateStat(key){
   if(!draftStats) return;
   if((draftStatPoints || 0) <= 0) return;
   if(!(key in draftStats)) return;
   draftStats[key]++;
   draftStatPoints--;
+  statAllocActive[key] = true;
+  renderCharStats();
+}
+// +N(레벨업당 지급 포인트, STAT_POINTS_PER_LEVEL) 버튼 — 분배 모드가 활성화된 스탯에서
+// 사용 가능 포인트가 STAT_POINTS_PER_LEVEL 이상일 때만 동작. 이 상수가 바뀌면 한 번에 분배되는
+// 양과 버튼 문자(render.js renderStatAllocRow)가 코드 수정 없이 함께 바뀜.
+function allocateStatBulk(key){
+  if(!draftStats) return;
+  if(!statAllocActive[key]) return;
+  if((draftStatPoints || 0) < STAT_POINTS_PER_LEVEL) return;
+  if(!(key in draftStats)) return;
+  draftStats[key] += STAT_POINTS_PER_LEVEL;
+  draftStatPoints -= STAT_POINTS_PER_LEVEL;
+  renderCharStats();
+}
+// - 버튼 — 아직 적용되지 않은 해당 스탯의 임시 분배 포인트만 1 차감하고, 그만큼 사용 가능 포인트로 되돌림.
+function deallocateStat(key){
+  if(!draftStats) return;
+  if(!(key in draftStats)) return;
+  if(pendingStatPoints(key) <= 0) return;
+  draftStats[key]--;
+  draftStatPoints++;
   renderCharStats();
 }
 // 적용: draft 값을 실제 state에 반영하고 저장
@@ -182,6 +214,8 @@ function resetStatAllocFull(){
 function openCharStats(){
   draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
   draftStatPoints = state.statPoints || 0;
+  statAllocActive = { str: false, agi: false, int: false };
+  pageState.charStats = 1; // 모달을 열 때는 항상 1페이지(장비창+캐릭터 정보)부터 보여줌
   renderCharStats();
   el('charStatsModal').style.display = 'flex';
 }
@@ -189,6 +223,7 @@ function closeCharStats(){
   // 적용하지 않은 임시 배분은 버림
   draftStats = null;
   draftStatPoints = null;
+  statAllocActive = { str: false, agi: false, int: false };
   el('charStatsModal').style.display = 'none';
 }
 

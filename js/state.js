@@ -38,6 +38,7 @@ let pageState = {
   invWeapon: 1,
   shopWeapon: 1, shopArmor: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
+  charStats: 1,
 };
 let shopFilterMenuOpen = false;
 

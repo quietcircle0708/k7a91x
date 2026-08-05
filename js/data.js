@@ -255,6 +255,26 @@ const WEAPON_TYPES = {
     atk: [30], speed: [1.0], crit: [10], sell: [1250],
     cost: [], odds: [],
   },
+  blacksword: {
+    id: 'blacksword', name: '흑색 검', desc: '검은빛을 머금은 날은 적의 숨결마저 끊어낸다.',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'epic', // 에픽
+    attackPower: 69, attackSpeed: 0.8, critRate: 5,
+    purchasable: false, sellPrice: 4560, levelReq: 18,
+    image: 'epic_blacksword',
+    atk: [69], speed: [0.8], crit: [5], sell: [4560],
+    cost: [], odds: [],
+    // 고유 옵션: 치명타 확률 자체를 올려주는 "스탯 보너스" 계열 효과(effectId: crit_chance_bonus).
+    // 독 송곳니의 poison_on_hit(적중 시 확률 발동형)와 달리, 이 효과는 활성화 조건을 만족하는 동안
+    // 항상 적용되는 고정 보너스 — effectiveCritChance(formulas.js)에서 effectId로 인식해 합산함.
+    uniqueOption: {
+      effectId: 'crit_chance_bonus',
+      activateLevel: 5,
+      chanceByLevel: { 5: 4, 6: 5, 7: 6, 8: 7, 9: 10 },
+      textTemplate: '치명타 확률 {chance}% 증가',
+    },
+  },
 };
 
 // 방어구 종류 도감. 현재는 등록된 방어구가 없음(빈 객체) — 상점 "방어구" 탭은 이 표가 비어있는 동안
@@ -695,6 +715,22 @@ const PAGE_SIZE = {
 const SHOP_PAGE_KEY = {
   weapon: 'shopWeapon', armor: 'shopArmor', consumable: 'shopConsumable', artifact: 'shopArtifact',
 };
+// 캐릭터 정보창 페이지 수. 이 화면은 아이템 목록을 잘라서 보여주는 게 아니라 "1페이지(장비창+캐릭터 정보) /
+// 2페이지(적용 중인 아티팩트 효과)"처럼 완전히 다른 내용을 페이지로 나눈 것이라 PAGE_SIZE(개수 기반 분할)는
+// 쓰지 않지만, pageState·pagerHtml·goPage·clampPage 등 페이지 이동 시스템 자체는 그대로 재사용함.
+const CHAR_STATS_PAGE_COUNT = 2;
+
+// ---- 캐릭터 정보창 — 장비창 슬롯 구성 (데이터 기반) ----
+// renderCharStats(render.js)가 이 목록을 그대로 순회해 슬롯을 그림. 새 장비 타입(방어구 등)이 실제로
+// 추가되면 이 배열에 항목만 추가하고 equippedItemForSlot(render.js)에 조회 로직 한 줄만 이어주면 되며,
+// 나머지 렌더링 코드는 수정할 필요가 없음. cellClass는 장비창 그리드에서 이 슬롯이 위치할 CSS 그리드 영역.
+const EQUIPMENT_SLOTS = [
+  { key: 'weapon', label: '무기', cellClass: 'area-weapon' },
+  { key: 'helmet', label: '투구', cellClass: 'area-helmet' },
+  { key: 'armor', label: '갑옷', cellClass: 'area-armor' },
+  { key: 'accessory1', label: '장신구1', cellClass: '' },
+  { key: 'accessory2', label: '장신구2', cellClass: '' },
+];
 
 // ---- 상태 이상(디버프) 클래스 ----
 // 앞으로 종류가 계속 추가될 예정. 새 상태 이상은 이 객체에 항목만 추가하면 됨.
@@ -829,6 +865,7 @@ const MONSTERS = {
       { name: '웅담', chance: 20 },
       { name: '낡은 팔 보호대', chance: 20, artifactId: 'oldarmguard' },
       { name: '흑색 팔 보호대', chance: 7, artifactId: 'blackarmguard' },
+      { name: '흑색 검', chance: 8, weaponId: 'blacksword' },
     ],
   },
 };

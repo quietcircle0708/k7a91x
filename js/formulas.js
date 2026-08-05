@@ -413,6 +413,12 @@ function effectiveCritChance(type, level){
   let bonus = 0;
   if(isArtifactEquipped('oldarmguard')) bonus += 3;
   if(isArtifactEquipped('blackarmguard')) bonus += 8;
+  // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
+  // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
+  const opt = wpn(type).uniqueOption;
+  if(opt && opt.effectId === 'crit_chance_bonus' && weaponUniqueOptionActive(type, level)){
+    bonus += weaponUniqueOptionChance(type, level) || 0;
+  }
   return critChanceFor(type, level) + bonus;
 }
 

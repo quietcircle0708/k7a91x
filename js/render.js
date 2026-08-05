@@ -469,6 +469,8 @@ function hasAnyStatInvestment(){
 
 function renderStatAllocRow(key, label, value){
   const canAlloc = (draftStatPoints || 0) > 0;
+  const bulkVisible = statAllocActive[key] && (draftStatPoints || 0) >= STAT_POINTS_PER_LEVEL;
+  const subVisible = pendingStatPoints(key) >= 1;
   const bonus = artifactStatBonus(key);
   const valueHtml = bonus > 0
     ? `${value + bonus} <span style="color:var(--forge-green);">(+${bonus})</span>`
@@ -477,13 +479,98 @@ function renderStatAllocRow(key, label, value){
     <div class="stat-alloc-row">
       <span class="stat-alloc-label">${label}</span>
       <span class="stat-alloc-value">${valueHtml}</span>
-      <button class="stat-alloc-btn" data-stat="${key}" ${canAlloc ? '' : 'disabled'}>+</button>
+      <div class="stat-alloc-btn-group">
+        <button class="stat-alloc-btn" data-stat="${key}" data-stat-action="add" ${canAlloc ? '' : 'disabled'}>+</button>
+        ${bulkVisible ? `<button class="stat-alloc-btn wide" data-stat="${key}" data-stat-action="add-bulk">+${STAT_POINTS_PER_LEVEL}</button>` : ''}
+        ${subVisible ? `<button class="stat-alloc-btn" data-stat="${key}" data-stat-action="sub">-</button>` : ''}
+      </div>
     </div>
   `;
 }
 
+// 슬롯 키 → 현재 장착 중인 아이템 표시 정보(이름/강화단계/색상/아이콘/툴팁) 조회.
+// 무기는 기존 장착 시스템(getEquipped)을 그대로 사용해 조회하고, 아직 실제 장비 데이터가 없는 슬롯
+// (투구/갑옷/장신구1/장신구2)은 항상 null을 반환해 빈 슬롯으로 표시됨 — 해당 장비 타입이 실제로 추가되면
+// 이 함수에 조회 분기 하나만 추가하면 되고, 장비창을 그리는 나머지 코드는 수정할 필요가 없음.
+function equippedItemForSlot(slotKey){
+  if(slotKey === 'weapon'){
+    const equipped = getEquipped();
+    if(!equipped) return null;
+    const type = equipped.type || 'longsword';
+    const level = equipped.level;
+    return {
+      name: weaponName(type), level,
+      color: weaponNameColor(type, level),
+      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img'),
+      tooltipHtml: buildWeaponTooltipHtml(type, level),
+    };
+  }
+  return null; // 투구 / 갑옷 / 장신구1 / 장신구2 — 아직 등록된 장비 데이터 없음
+}
+function equipSlotHtml(slot){
+  const item = equippedItemForSlot(slot.key);
+  if(!item){
+    return `<div class="eq-slot ${slot.cellClass}"><span class="eq-slot-empty-label">${slot.label}</span></div>`;
+  }
+  return `<div class="eq-slot filled ${slot.cellClass}">${item.iconHtml}<span class="tooltip">${item.tooltipHtml}</span></div>`;
+}
+// 아티팩트 슬롯 — 현재 최대 슬롯 수(ARTIFACT_SLOT_MAX)만큼 자동 생성되므로, 이 숫자가 바뀌면
+// 장비창의 아티팩트 칸 개수도 코드 수정 없이 그대로 함께 바뀜.
+function equipArtifactSlotsHtml(){
+  return Array.from({ length: ARTIFACT_SLOT_MAX }, (_, i) => {
+    const id = state.equippedArtifacts[i];
+    if(!id) return `<div class="eq-slot eq-slot-artifact"><span class="eq-slot-empty-label">아티팩트</span></div>`;
+    const a = ARTIFACTS[id];
+    return `<div class="eq-slot eq-slot-artifact filled">${a.icon}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
+  }).join('');
+}
+// 장비창 아래 "장착 아이템 정보" — 현재 장착 중인 장비만 한 줄씩 출력(EQUIPMENT_SLOTS 기반이라
+// 새 장비 타입이 추가돼도 자동으로 반영됨). 무기(및 향후 강화 가능한 장비)는 이름+강화 단계를,
+// 아티팩트는 강화 개념이 없으므로 이름만 출력함.
+function equippedItemInfoLinesHtml(){
+  const lines = [];
+  EQUIPMENT_SLOTS.forEach(slot => {
+    const item = equippedItemForSlot(slot.key);
+    if(item) lines.push(`<div class="char-equip-info-line" style="color:${item.color};">${item.name} +${item.level}</div>`);
+  });
+  state.equippedArtifacts.forEach(id => {
+    const a = ARTIFACTS[id];
+    lines.push(`<div class="char-equip-info-line" style="color:${artifactNameColor(id)};">${a.icon} ${a.name}</div>`);
+  });
+  return lines.length > 0 ? lines.join('') : `<div class="char-stat-empty">장착 중인 장비가 없습니다.</div>`;
+}
+// 좌측 "장비창" 전체(슬롯 그리드 + 아티팩트 칸 + 장착 아이템 정보 목록) HTML 조립.
+function buildEquipPanelHtml(){
+  const byKey = key => EQUIPMENT_SLOTS.find(s => s.key === key);
+  const gridHtml = equipSlotHtml(byKey('weapon')) + equipSlotHtml(byKey('helmet')) + equipSlotHtml(byKey('armor'))
+    + `<div class="eq-slot-accessories area-accessories">${equipSlotHtml(byKey('accessory1'))}${equipSlotHtml(byKey('accessory2'))}</div>`;
+  return `
+    <div class="equip-panel">
+      <div class="equip-slots-grid">${gridHtml}</div>
+      <div class="equip-artifact-col">${equipArtifactSlotsHtml()}</div>
+    </div>
+    <div class="char-stat-divider"></div>
+    <div class="char-stat-sub-title">장착 아이템 정보</div>
+    <div class="equipped-item-info">${equippedItemInfoLinesHtml()}</div>
+  `;
+}
+// 캐릭터 정보 모달 — 인벤토리와 동일한 페이지네이션 시스템(pageState/pagerHtml/goPage)을 그대로 재사용해
+// 1페이지(장비창+캐릭터 정보) / 2페이지(적용 중인 아티팩트 효과)를 전환함.
 function renderCharStats(){
   ensurePlayerVitals();
+  pageState.charStats = clampPage(pageState.charStats, CHAR_STATS_PAGE_COUNT);
+  const pagerWrap = el('charStatsPager');
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('charStats', pageState.charStats, CHAR_STATS_PAGE_COUNT);
+  if(pageState.charStats === 2){
+    renderCharStatsPage2();
+  } else {
+    renderCharStatsPage1();
+  }
+}
+// 1페이지 — 좌: 장비창, 우: 기존 캐릭터 정보(레벨/체력/마나/경험치 → 스탯 배분 → 전투 능력치).
+// 우측 내용은 기존 renderCharStats 그대로이며(무기 미장착 시 안내 문구 포함), 기존에 그 아래 붙어있던
+// "적용 중인 아티팩트 효과" 블록만 2페이지로 옮겨짐.
+function renderCharStatsPage1(){
   const equipped = getEquipped();
   const body = el('charStatsBody');
 
@@ -495,7 +582,7 @@ function renderCharStats(){
   const expReq = lv >= PLAYER_MAX_LEVEL ? 0 : requiredExp(lv);
   const expPct = lv >= PLAYER_MAX_LEVEL ? 100 : Math.min(100, Math.round(state.playerExp / expReq * 1000) / 10);
 
-  let html = `
+  let rightHtml = `
     <div class="char-stat-row big"><span>캐릭터 레벨</span><span class="v">Lv.${lv}</span></div>
     <div class="player-bar-label">체력 <span>${hp.toLocaleString()} / ${maxHp.toLocaleString()}</span></div>
     <div class="player-bar-wrap"><div class="player-bar-fill hp" style="width:${(hp/maxHp*100)}%;"></div></div>
@@ -519,38 +606,54 @@ function renderCharStats(){
   `;
 
   if(!equipped){
-    html += `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
-    body.innerHTML = html;
+    rightHtml += `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
+  } else {
+    const type = equipped.type || 'longsword';
+    const level = equipped.level;
+    const totalAtk = effectiveAtk(type, level);
+    const baseSpeed = atkSpeedFor(type, level);
+    const totalSpeed = effectiveAtkSpeed(type, level);
+    const totalCrit = effectiveCritChance(type, level);
+    const hasSpeedBonus = isArtifactEquipped('batwing');
+
+    rightHtml += `
+      <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)} +${level}</span></div>
+      <div class="char-stat-divider"></div>
+      <div class="char-stat-row big"><span>총 공격력</span><span class="v">${totalAtk}</span></div>
+      <div class="char-stat-row big"><span>공격속도</span><span class="v">${totalSpeed.toFixed(2)}회/초</span></div>
+      <div class="char-stat-row big"><span>치명타 확률</span><span class="v">${totalCrit}%</span></div>
+    `;
+    if(hasSpeedBonus){
+      rightHtml += `<div class="char-stat-note">공격속도 = 무기 기본 ${baseSpeed.toFixed(2)} + 박쥐 날개 5%</div>`;
+    }
+  }
+
+  body.innerHTML = `
+    <div class="char-stats-page1">
+      <div class="char-stats-left">${buildEquipPanelHtml()}</div>
+      <div class="char-stats-right">${rightHtml}</div>
+    </div>
+  `;
+}
+// 2페이지 — 기존 "적용 중인 아티팩트 효과" 화면 그대로. 기존에는 무기가 장착돼 있을 때만 표시되던
+// 블록이라 그 조건은 그대로 유지하고(무기 미장착 시 동일한 안내 문구), 장착 아티팩트가 0개일 때만
+// 기존에는 아무것도 출력되지 않았던 것을 빈 페이지로 보이지 않도록 동일한 안내 문구 스타일로 보완함.
+function renderCharStatsPage2(){
+  const equipped = getEquipped();
+  const body = el('charStatsBody');
+  if(!equipped){
+    body.innerHTML = `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
     return;
   }
-
-  const type = equipped.type || 'longsword';
-  const level = equipped.level;
-  const totalAtk = effectiveAtk(type, level);
-  const baseSpeed = atkSpeedFor(type, level);
-  const totalSpeed = effectiveAtkSpeed(type, level);
-  const totalCrit = effectiveCritChance(type, level);
-  const hasSpeedBonus = isArtifactEquipped('batwing');
-
-  html += `
-    <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)} +${level}</span></div>
-    <div class="char-stat-divider"></div>
-    <div class="char-stat-row big"><span>총 공격력</span><span class="v">${totalAtk}</span></div>
-    <div class="char-stat-row big"><span>공격속도</span><span class="v">${totalSpeed.toFixed(2)}회/초</span></div>
-    <div class="char-stat-row big"><span>치명타 확률</span><span class="v">${totalCrit}%</span></div>
-  `;
-  if(hasSpeedBonus){
-    html += `<div class="char-stat-note">공격속도 = 무기 기본 ${baseSpeed.toFixed(2)} + 박쥐 날개 5%</div>`;
+  if(state.equippedArtifacts.length === 0){
+    body.innerHTML = `<div class="char-stat-empty">적용 중인 아티팩트가 없습니다.</div>`;
+    return;
   }
-
-  if(state.equippedArtifacts.length > 0){
-    html += `<div class="char-stat-divider"></div><div class="char-stat-sub-title">적용 중인 아티팩트 효과</div>`;
-    html += state.equippedArtifacts.map(id => {
-      const a = ARTIFACTS[id];
-      return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${a.icon} ${a.name}</b><br>${a.effectText}</div>`;
-    }).join('');
-  }
-
+  let html = `<div class="char-stat-sub-title">적용 중인 아티팩트 효과</div>`;
+  html += state.equippedArtifacts.map(id => {
+    const a = ARTIFACTS[id];
+    return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${a.icon} ${a.name}</b><br>${a.effectText}</div>`;
+  }).join('');
   body.innerHTML = html;
 }
 

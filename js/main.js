@@ -34,6 +34,12 @@ el('shopPager').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
+el('charStatsPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 document.addEventListener('click', (e)=>{
   if(!shopFilterMenuOpen) return;
   if(e.target.closest('.shop-filter-wrap')) return;
@@ -90,7 +96,14 @@ el('settingsBody').addEventListener('click', (e)=>{
 });
 el('charStatsBody').addEventListener('click', (e)=>{
   const statBtn = e.target.closest('button[data-stat]');
-  if(statBtn && !statBtn.disabled){ allocateStat(statBtn.dataset.stat); return; }
+  if(statBtn && !statBtn.disabled){
+    const statKey = statBtn.dataset.stat;
+    const statAction = statBtn.dataset.statAction;
+    if(statAction === 'add-bulk') allocateStatBulk(statKey);
+    else if(statAction === 'sub') deallocateStat(statKey);
+    else allocateStat(statKey);
+    return;
+  }
   const actionBtn = e.target.closest('button[data-action]');
   if(!actionBtn || actionBtn.disabled) return;
   if(actionBtn.dataset.action === 'apply-stats') applyStatAlloc();
