@@ -397,14 +397,16 @@ function renderHuntCharPanel(){
   el('huntExpBar').style.width = expPct + '%';
 }
 
+// 플라스크 퀵슬롯이 표시되는 모든 위치. 사냥 화면(quickSlotRow)에 있던 기존 UI를 그대로 재사용해
+// 캐릭터 메뉴 스킬 탭(skillTabFlaskRow, "오른쪽: 기존 플라스크 퀵슬롯 그대로 사용")에도 동일하게 출력함 —
+// 같은 state.quickSlots를 보여주는 것뿐이라 여기 목록에 id만 추가하면 다른 코드 수정 없이 그대로 반영됨.
+const QUICK_SLOT_ROW_IDS = ['quickSlotRow', 'skillTabFlaskRow'];
 function renderQuickSlots(){
-  const row = el('quickSlotRow');
-  if(!row) return;
   if(!Array.isArray(state.quickSlots) || state.quickSlots.length !== QUICK_SLOT_COUNT){
     const prev = Array.isArray(state.quickSlots) ? state.quickSlots : [];
     state.quickSlots = Array.from({ length: QUICK_SLOT_COUNT }, (_, i) => prev[i] || null);
   }
-  row.innerHTML = state.quickSlots.map((itemId, idx) => {
+  const html = state.quickSlots.map((itemId, idx) => {
     if(!itemId){
       return `<div class="quickslot-wrap"><button class="quickslot-btn empty" data-action="assign" data-slot="${idx}">+</button></div>`;
     }
@@ -425,34 +427,37 @@ function renderQuickSlots(){
         <button class="quickslot-clear" data-action="clear" data-slot="${idx}" title="슬롯 비우기">×</button>
       </div>`;
   }).join('');
+  QUICK_SLOT_ROW_IDS.forEach(id => { const row = el(id); if(row) row.innerHTML = html; });
 }
 
 // renderQuickSlots()는 전체 innerHTML을 다시 그리므로 매 프레임 부르기엔 무겁다.
 // 쿨타임 초 단위 실시간 표시(2.0→1.9→…→0.1)를 위해, 이미 그려진 버튼의 쿨타임 표시 영역만
 // 가볍게 갱신하는 전용 함수. main.js에서 짧은 주기로 반복 호출됨.
 function updateQuickSlotCooldowns(){
-  const row = el('quickSlotRow');
-  if(!row) return;
-  row.querySelectorAll('.quickslot-btn.filled').forEach(btn => {
-    const itemId = btn.dataset.item;
-    const remain = flaskCooldownRemainingSec(itemId);
-    const cooldownEl = btn.querySelector('.quickslot-cooldown');
-    const iconEl = btn.querySelector('.quickslot-icon');
-    const countEl = btn.querySelector('.quickslot-count');
-    if(!cooldownEl) return;
-    if(remain > 0){
-      cooldownEl.textContent = remain.toFixed(1);
-      cooldownEl.style.display = 'flex';
-      if(iconEl) iconEl.style.visibility = 'hidden';
-      if(countEl) countEl.style.visibility = 'hidden';
-      btn.disabled = true;
-    } else {
-      cooldownEl.style.display = 'none';
-      if(iconEl) iconEl.style.visibility = '';
-      if(countEl) countEl.style.visibility = '';
-      const count = (state.consumables && state.consumables[itemId]) || 0;
-      btn.disabled = count <= 0;
-    }
+  QUICK_SLOT_ROW_IDS.forEach(id => {
+    const row = el(id);
+    if(!row) return;
+    row.querySelectorAll('.quickslot-btn.filled').forEach(btn => {
+      const itemId = btn.dataset.item;
+      const remain = flaskCooldownRemainingSec(itemId);
+      const cooldownEl = btn.querySelector('.quickslot-cooldown');
+      const iconEl = btn.querySelector('.quickslot-icon');
+      const countEl = btn.querySelector('.quickslot-count');
+      if(!cooldownEl) return;
+      if(remain > 0){
+        cooldownEl.textContent = remain.toFixed(1);
+        cooldownEl.style.display = 'flex';
+        if(iconEl) iconEl.style.visibility = 'hidden';
+        if(countEl) countEl.style.visibility = 'hidden';
+        btn.disabled = true;
+      } else {
+        cooldownEl.style.display = 'none';
+        if(iconEl) iconEl.style.visibility = '';
+        if(countEl) countEl.style.visibility = '';
+        const count = (state.consumables && state.consumables[itemId]) || 0;
+        btn.disabled = count <= 0;
+      }
+    });
   });
 }
 
@@ -665,8 +670,8 @@ function renderCharStatsPage2(){
 
 // ---- 캐릭터 메뉴(좌측 상단바 "캐릭터") ----
 // CHARACTER_TABS(data.js)를 그대로 순회해 탭 버튼을 그리므로, 새 탭이 추가돼도 이 함수는 수정할 필요 없음
-// (설정 화면 renderSettings와 동일한 방식). "info"(캐릭터 정보) 탭만 실제 내용이 있고, 그 외 탭(스킬 등)은
-// 아직 구현 범위가 아니라 빈 화면만 출력함.
+// (설정 화면 renderSettings와 동일한 방식). "info"(캐릭터 정보)와 "skill"(스킬)만 실제 내용이 있고,
+// 그 외 탭이 추가되면 기본적으로 빈 화면만 출력함.
 function renderCharacterMenu(){
   const tabsRow = el('charTabsRow');
   const panelsWrap = el('charTabPanels');
@@ -679,8 +684,15 @@ function renderCharacterMenu(){
   const tab = CHARACTER_TABS.find(t => t.id === activeCharTab) || CHARACTER_TABS[0];
   if(!tab){ panelsWrap.innerHTML = ''; return; }
 
+  if(tab.id === 'skill'){
+    panelsWrap.innerHTML = buildSkillTabHtml();
+    renderSkillQuickSlots();
+    renderQuickSlots(); // 스킬 탭에 새로 생긴 skillTabFlaskRow도 함께 채움
+    return;
+  }
+
   if(tab.id !== 'info'){
-    // 스킬 등 아직 콘텐츠가 없는 탭 — 탭 이름만 표시되고 화면은 비워둠.
+    // 아직 콘텐츠가 없는 탭 — 탭 이름만 표시되고 화면은 비워둠.
     panelsWrap.innerHTML = `<div class="inv-tab-panel"></div>`;
     return;
   }
@@ -700,6 +712,126 @@ function renderCharacterMenu(){
       <div>${pageBodyHtml}</div>
     </div>
   `;
+}
+
+// ---- 스킬 탭 ----
+// 상단: 스킬 퀵슬롯(5칸) + 기존 플라스크 퀵슬롯 + 초기화 버튼 → 하위 탭(공용/특화/기연, SKILL_CATEGORIES
+// 기반) → 페이지 이동 → 하위 탭별 본문(buildSkillCategoryBodyHtml). 하위 탭 버튼도 인벤토리와 동일한
+// inv-tabs 클래스를 그대로 사용함(요구사항: "탭 UI는 현재 인벤토리에서 사용하는 탭 구조를 그대로 사용").
+function buildSkillTabHtml(){
+  const catTabsHtml = SKILL_CATEGORIES.map(c =>
+    `<button class="inv-tab-btn${c.id === activeSkillCategory ? ' active' : ''}" data-skill-cat="${c.id}">${c.label}</button>`
+  ).join('');
+  const page = clampPage(pageState.skillPage, SKILL_PAGES.length);
+  pageState.skillPage = page;
+  return `
+    <div class="inv-tab-panel">
+      <div class="skill-quickslot-row">
+        <div class="quickslot-row" id="skillTabQuickSlotRow"></div>
+        <div class="quickslot-row" id="skillTabFlaskRow"></div>
+        <button class="nav-btn" data-action="reset-skill-quickslots">초기화</button>
+      </div>
+      <div class="inv-tabs">${catTabsHtml}</div>
+      <div class="char-menu-info-head">${pagerHtml('skillPage', page, SKILL_PAGES.length)}</div>
+      ${buildSkillCategoryBodyHtml(activeSkillCategory)}
+    </div>
+  `;
+}
+// 스킬 퀵슬롯(왼쪽 5칸) HTML. showRemove가 false면 X(제거) 버튼을 숨김(요구사항: "던전에서는 X 버튼을
+// 표시하지 않습니다"). 아이콘 아래에 등급 색상으로 스킬 이름을 표시하고(요구사항 6번 "퀵슬롯 UI"), 사용
+// 가능 여부(canUseSkillNow: 사냥 중 + 쿨타임 아님 + 자원 충분)에 따라 버튼을 비활성화함.
+function buildSkillQuickSlotsHtml(showRemove){
+  return state.skillQuickSlots.map((skillId, idx) => {
+    const s = skillId ? SKILLS[skillId] : null;
+    if(!s){
+      return `<div class="quickslot-wrap skill-quickslot-wrap"><button class="quickslot-btn empty" data-action="assign-skill" data-slot="${idx}">+</button></div>`;
+    }
+    const grade = WEAPON_GRADES[s.grade];
+    const remain = skillCooldownRemainingSec(skillId);
+    const onCooldown = remain > 0;
+    const usable = canUseSkillNow(skillId);
+    return `
+      <div class="quickslot-wrap skill-quickslot-wrap">
+        <button class="quickslot-btn filled" data-action="use-skill" data-item="${skillId}" ${usable ? '' : 'disabled'} title="${s.name}">
+          <span class="quickslot-icon" style="${onCooldown ? 'visibility:hidden;' : ''}">${skillIconHtml(s)}</span>
+          <span class="quickslot-cooldown" style="display:${onCooldown ? 'flex' : 'none'};">${remain.toFixed(1)}</span>
+        </button>
+        <div class="skill-quickslot-name" style="color:${grade ? grade.color : '#fff'};">${s.name}</div>
+        ${showRemove ? `<button class="quickslot-clear" data-action="clear-skill" data-slot="${idx}" title="슬롯 비우기">×</button>` : ''}
+      </div>`;
+  }).join('');
+}
+// 스킬 퀵슬롯이 표시되는 두 위치(캐릭터 메뉴 스킬 탭 / 던전 사냥 화면)를 한 번에 갱신.
+function renderSkillQuickSlots(){
+  if(!Array.isArray(state.skillQuickSlots) || state.skillQuickSlots.length !== SKILL_QUICK_SLOT_COUNT){
+    const prev = Array.isArray(state.skillQuickSlots) ? state.skillQuickSlots : [];
+    state.skillQuickSlots = Array.from({ length: SKILL_QUICK_SLOT_COUNT }, (_, i) => prev[i] || null);
+  }
+  const skillTabRow = el('skillTabQuickSlotRow');
+  if(skillTabRow) skillTabRow.innerHTML = buildSkillQuickSlotsHtml(true);
+  const huntRow = el('huntSkillQuickSlotRow');
+  if(huntRow) huntRow.innerHTML = buildSkillQuickSlotsHtml(false);
+}
+// 스킬 퀵슬롯이 표시되는 모든 위치 — 쿨타임 실시간 표시를 가볍게 갱신할 때 순회 대상(플라스크의
+// QUICK_SLOT_ROW_IDS와 동일한 패턴).
+const SKILL_QUICK_SLOT_ROW_IDS = ['skillTabQuickSlotRow', 'huntSkillQuickSlotRow'];
+// updateQuickSlotCooldowns(플라스크용)와 동일한 목적의 가벼운 갱신 — 매번 전체를 다시 그리지 않고
+// 쿨타임 표시/비활성화 상태만 갱신함. main.js에서 짧은 주기로 반복 호출됨.
+function updateSkillQuickSlotCooldowns(){
+  SKILL_QUICK_SLOT_ROW_IDS.forEach(id => {
+    const row = el(id);
+    if(!row) return;
+    row.querySelectorAll('.quickslot-btn.filled').forEach(btn => {
+      const skillId = btn.dataset.item;
+      const remain = skillCooldownRemainingSec(skillId);
+      const cooldownEl = btn.querySelector('.quickslot-cooldown');
+      const iconEl = btn.querySelector('.quickslot-icon');
+      if(!cooldownEl) return;
+      if(remain > 0){
+        cooldownEl.textContent = remain.toFixed(1);
+        cooldownEl.style.display = 'flex';
+        if(iconEl) iconEl.style.visibility = 'hidden';
+        btn.disabled = true;
+      } else {
+        cooldownEl.style.display = 'none';
+        if(iconEl) iconEl.style.visibility = '';
+        btn.disabled = !canUseSkillNow(skillId);
+      }
+    });
+  });
+}
+// 하위 탭(공용/특화/기연) 한 개의 본문: 미사용 포인트 표시 + 레벨별 스킬 목록(현재 페이지 구간).
+function buildSkillCategoryBodyHtml(categoryId){
+  const isAwakening = categoryId === 'awakening';
+  const pointsLabel = isAwakening ? '미사용 깨달음' : '미사용 스킬 포인트';
+  const pointsValue = isAwakening ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
+  const levels = levelsForSkillPage(categoryId, pageState.skillPage);
+  const rowsHtml = levels.map(lv => buildSkillLevelRowHtml(categoryId, lv)).join('');
+  return `
+    <div class="skill-points-row"><span>${pointsLabel}</span><span class="v">${pointsValue}</span></div>
+    <div class="skill-level-grid">${rowsHtml || `<div class="char-stat-empty">표시할 레벨이 없습니다.</div>`}</div>
+  `;
+}
+// 레벨 한 줄: 좌측에 레벨 라벨(고정 폭, 좌측 정렬), 우측에 그 레벨에 등록된 스킬 아이콘들(중앙 정렬 유지는
+// CSS에서 처리). SKILLS를 순회해 이 레벨·분류에 해당하는 항목만 자동으로 모으므로, 나중에 스킬을 추가해도
+// 이 함수는 손댈 필요가 없음(요구사항: "앞으로 스킬을 추가하면 자동으로 해당 레벨에 표시").
+function buildSkillLevelRowHtml(categoryId, level){
+  const ids = Object.keys(SKILLS).filter(id => SKILLS[id].category === categoryId && SKILLS[id].levelReq === level);
+  const iconsHtml = ids.map(id => buildSkillIconBtnHtml(id)).join('');
+  return `<div class="skill-level-row"><span class="skill-level-label">LV${level}</span><span class="skill-level-icons">${iconsHtml}</span></div>`;
+}
+// 스킬 한 칸: 습득 전이면 흑백(50% 밝기), 습득했으면 원본 그대로. 클릭하면 학습을 시도함(learnSkill).
+// 습득 불가(등급 미구현/포인트 부족/공용·특화 습득 제한 충돌)면 버튼 자체를 비활성화함(요구사항 4번:
+// "이미 하나를 습득한 경우 나머지 스킬은 습득 버튼을 비활성화합니다").
+function buildSkillIconBtnHtml(id){
+  const s = SKILLS[id];
+  const learned = isSkillLearned(id);
+  const grade = WEAPON_GRADES[s.grade];
+  return `
+    <button class="skill-icon-btn${learned ? '' : ' locked'}" data-learn-skill="${id}" ${(!learned && !canLearnSkill(id)) ? 'disabled' : ''} style="border-color:${grade ? grade.color : '#fff'};">
+      <span class="skill-icon">${skillIconHtml(s)}</span>
+      <span class="tooltip">${buildSkillTooltipHtml(id)}</span>
+    </button>`;
 }
 
 // ---- 던전 입구 목록 ----

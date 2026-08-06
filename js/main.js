@@ -118,10 +118,35 @@ el('charTabsRow').addEventListener('click', (e)=>{
   if(!btn) return;
   switchCharTab(btn.dataset.charTab);
 });
-// "캐릭터 정보" 탭 내용(페이지 이동 버튼 + 스탯 배분 버튼)을 한 컨테이너 안에서 함께 위임 처리함
-// (charStatsBody/charStatsPager 두 곳에 나눠 걸린 모달과 달리, 캐릭터 메뉴는 페이지가 통째로 다시
-// 그려지는 하나의 컨테이너라 로직도 그대로 합쳐서 재사용함).
+// 캐릭터 메뉴 안(정보 탭 + 스킬 탭)에서 일어나는 클릭을 전부 한 컨테이너에서 위임 처리함(둘 다 페이지
+// 전체가 매번 다시 그려지는 구조라 charStatsBody/charStatsPager처럼 따로 나눌 필요가 없음).
+// - 캐릭터 정보 탭: 스탯 배분 버튼 + 페이지 이동
+// - 스킬 탭: 하위 탭 전환 + 스킬 습득 + 스킬 퀵슬롯(배정/사용/제거) + 플라스크 퀵슬롯(기존 로직 그대로,
+//   skillTabFlaskRow가 quickSlotRow와 동일한 data-action 이름을 그대로 씀) + 퀵슬롯 초기화 + 페이지 이동
 el('charTabPanels').addEventListener('click', (e)=>{
+  const skillCatBtn = e.target.closest('button[data-skill-cat]');
+  if(skillCatBtn){ switchSkillCategory(skillCatBtn.dataset.skillCat); return; }
+
+  const learnBtn = e.target.closest('button[data-learn-skill]');
+  if(learnBtn){ learnSkill(learnBtn.dataset.learnSkill); return; }
+
+  const skillUseBtn = e.target.closest('button[data-action="use-skill"]');
+  const skillAssignBtn = e.target.closest('button[data-action="assign-skill"]');
+  const skillClearBtn = e.target.closest('button[data-action="clear-skill"]');
+  if(skillUseBtn || skillAssignBtn || skillClearBtn){
+    handleSkillQuickSlotClick(skillUseBtn, skillAssignBtn, skillClearBtn);
+    return;
+  }
+
+  // 스킬 탭의 플라스크 퀵슬롯(skillTabFlaskRow) — 사냥 화면 퀵슬롯과 완전히 동일한 로직 재사용
+  const flaskUseBtn = e.target.closest('button[data-action="use"]');
+  const flaskAssignBtn = e.target.closest('button[data-action="assign"]');
+  const flaskClearBtn = e.target.closest('button[data-action="clear"]');
+  if(flaskUseBtn || flaskAssignBtn || flaskClearBtn){
+    handleFlaskQuickSlotClick(flaskUseBtn, flaskAssignBtn, flaskClearBtn);
+    return;
+  }
+
   const statBtn = e.target.closest('button[data-stat]');
   if(statBtn && !statBtn.disabled){
     const statKey = statBtn.dataset.stat;
@@ -136,6 +161,7 @@ el('charTabPanels').addEventListener('click', (e)=>{
   if(actionBtn.dataset.action === 'apply-stats') applyStatAlloc();
   else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
   else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
+  else if(actionBtn.dataset.action === 'reset-skill-quickslots') resetSkillQuickSlots();
   else if(actionBtn.dataset.action === 'page-prev') goPage(actionBtn.dataset.pageTarget, -1);
   else if(actionBtn.dataset.action === 'page-next') goPage(actionBtn.dataset.pageTarget, 1);
 });
@@ -184,6 +210,11 @@ el('quickSlotRow').addEventListener('click', (e)=>{
   const useBtn = e.target.closest('button[data-action="use"]');
   const assignBtn = e.target.closest('button[data-action="assign"]');
   const clearBtn = e.target.closest('button[data-action="clear"]');
+  handleFlaskQuickSlotClick(useBtn, assignBtn, clearBtn);
+});
+// 플라스크 퀵슬롯 사용/배정/제거 — 사냥 화면(quickSlotRow)과 캐릭터 메뉴 스킬 탭(skillTabFlaskRow) 두
+// 곳에서 동일하게 재사용(요구사항: "오른쪽: 기존 플라스크 퀵슬롯 그대로 사용").
+function handleFlaskQuickSlotClick(useBtn, assignBtn, clearBtn){
   if(useBtn && !useBtn.disabled){
     useFlask(useBtn.dataset.item);
     return;
@@ -197,10 +228,41 @@ el('quickSlotRow').addEventListener('click', (e)=>{
     renderQuickSlots();
     saveState();
   }
+}
+// 스킬 퀵슬롯 사용/배정/제거 — 캐릭터 메뉴 스킬 탭(skillTabQuickSlotRow)과 던전 사냥 화면
+// (huntSkillQuickSlotRow) 두 곳에서 동일하게 재사용(요구사항: "던전과 스킬 탭은 동일한 데이터를 공유").
+// 사냥 화면 쪽 마크업에는 제거(×) 버튼이 없어 clearBtn 분기에 도달할 일이 없을 뿐, 나머지는 동일함.
+function handleSkillQuickSlotClick(useBtn, assignBtn, clearBtn){
+  if(useBtn && !useBtn.disabled){
+    useSkill(useBtn.dataset.item);
+    return;
+  }
+  if(assignBtn){
+    openSkillQuickSlotPicker(Number(assignBtn.dataset.slot));
+    return;
+  }
+  if(clearBtn){
+    state.skillQuickSlots[Number(clearBtn.dataset.slot)] = null;
+    renderSkillQuickSlots();
+    saveState();
+  }
+}
+el('huntSkillQuickSlotRow').addEventListener('click', (e)=>{
+  const useBtn = e.target.closest('button[data-action="use-skill"]');
+  const assignBtn = e.target.closest('button[data-action="assign-skill"]');
+  const clearBtn = e.target.closest('button[data-action="clear-skill"]');
+  handleSkillQuickSlotClick(useBtn, assignBtn, clearBtn);
 });
 el('quickSlotPickerList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-item]');
   if(!btn || pendingQuickSlotIndex === null) return;
+  if(pendingQuickSlotKind === 'skill'){
+    state.skillQuickSlots[pendingQuickSlotIndex] = btn.dataset.item;
+    closeQuickSlotPicker();
+    renderSkillQuickSlots();
+    saveState();
+    return;
+  }
   state.quickSlots[pendingQuickSlotIndex] = btn.dataset.item;
   closeQuickSlotPicker();
   renderQuickSlots();
@@ -211,5 +273,6 @@ el('closeQuickSlotPickerBtn').addEventListener('click', closeQuickSlotPicker);
 // 플라스크 쿨타임 표시(2.0→1.9→…→0.1)를 위한 실시간 갱신. 퀵슬롯이 없는 화면에서는
 // updateQuickSlotCooldowns() 내부에서 el('quickSlotRow')가 조용히 무시하므로 항상 켜둬도 무방함.
 setInterval(updateQuickSlotCooldowns, 100);
+setInterval(updateSkillQuickSlotCooldowns, 100);
 
 loadState();

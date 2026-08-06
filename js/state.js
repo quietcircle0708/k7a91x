@@ -25,6 +25,9 @@ let state = {
   autoRebuy: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
+  skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
+  learnedSkills: [], learnedAwakeningSkills: [], // 습득한 스킬 id 목록(공용·특화 공용 / 기연 별도)
+  skillQuickSlots: [null, null, null, null, null], // 스킬 퀵슬롯(왼쪽 5칸)에 등록된 스킬 id
   consumables: { hpFlask: 0, mpFlask: 0 }, // 보유 플라스크 개수
   quickSlots: [null, null], // 사냥 화면 퀵슬롯에 등록된 소비 아이템 id
   settings: {}, // 설정값 저장 (키: SETTINGS_SCHEMA의 항목 id). ensureSettingsDefaults()가 누락된 키를 기본값으로 채움
@@ -44,6 +47,7 @@ let pageState = {
   dungeonList: 1,
   charStats: 1,
   charMenuInfo: 1,
+  skillPage: 1,
 };
 let shopFilterMenuOpen = false;
 
@@ -109,6 +113,10 @@ function gainExp(amount){
     state.playerHp = effectiveMaxHp(state.playerLevel); // 레벨업 시 완전 회복
     state.playerMp = effectiveMaxMp(state.playerLevel);
     state.statPoints = (state.statPoints || 0) + STAT_POINTS_PER_LEVEL;
+    // 스킬/깨달음 포인트는 스탯 포인트처럼 매 레벨 고정 지급이 아니라 특정 레벨(마일스톤)에서만 지급되므로,
+    // "이 레벨까지 누적 지급량 - 직전 레벨까지 누적 지급량"만큼만 더해줌(공식이 바뀌어도 이 코드는 그대로 동작함).
+    state.skillPoints = (state.skillPoints || 0) + skillPointsGrantedAtLevel(state.playerLevel);
+    state.awakeningPoints = (state.awakeningPoints || 0) + awakeningPointsGrantedAtLevel(state.playerLevel);
   }
   if(state.playerLevel >= PLAYER_MAX_LEVEL){
     state.playerLevel = PLAYER_MAX_LEVEL;
@@ -186,6 +194,16 @@ function applyLoadedRaw(raw){
   if(loaded.statPoints === undefined){
     state.statPoints = 4 * (state.playerLevel || 1);
     state.stats = { str: 0, agi: 0, int: 0 };
+  }
+  // 구버전(스킬 시스템 이전) 마이그레이션: 스탯 포인트와 동일한 방식으로, 이미 도달한 레벨 기준
+  // 공식(totalSkillPointsForLevel/totalAwakeningPointsForLevel)으로 포인트를 소급 지급함.
+  if(loaded.skillPoints === undefined) state.skillPoints = totalSkillPointsForLevel(state.playerLevel);
+  if(loaded.awakeningPoints === undefined) state.awakeningPoints = totalAwakeningPointsForLevel(state.playerLevel);
+  if(!Array.isArray(state.learnedSkills)) state.learnedSkills = [];
+  if(!Array.isArray(state.learnedAwakeningSkills)) state.learnedAwakeningSkills = [];
+  if(!Array.isArray(state.skillQuickSlots) || state.skillQuickSlots.length !== SKILL_QUICK_SLOT_COUNT){
+    const prevSkillSlots = Array.isArray(state.skillQuickSlots) ? state.skillQuickSlots : [];
+    state.skillQuickSlots = Array.from({ length: SKILL_QUICK_SLOT_COUNT }, (_, i) => prevSkillSlots[i] || null);
   }
   if(!state.consumables) state.consumables = { hpFlask: 0, mpFlask: 0 };
   if(!Array.isArray(state.quickSlots) || state.quickSlots.length !== QUICK_SLOT_COUNT){
@@ -266,6 +284,8 @@ function resetGame(){
     skipEffects:false, autoRebuy:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
+    skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [],
+    skillQuickSlots: [null, null, null, null, null],
     consumables: { hpFlask: 0, mpFlask: 0 },
     quickSlots: [null, null],
     settings: {},

@@ -40,6 +40,9 @@ function showView(name){
     statAllocActive = { str: false, agi: false, int: false };
     pageState.charMenuInfo = 1;
     activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
+    // 스킬 탭 상태도 캐릭터 정보 탭과 동일하게 진입할 때마다 첫 하위탭·1페이지로 초기화
+    activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
+    pageState.skillPage = 1;
     renderCharacterMenu();
   }
   render();
@@ -123,6 +126,7 @@ const PAGE_RENDER_FN = {
   dungeonList: renderDungeonList,
   charStats: renderCharStats,
   charMenuInfo: renderCharacterMenu,
+  skillPage: renderCharacterMenu,
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
@@ -141,8 +145,12 @@ function closeShopFilterMenu(){
 }
 
 // ---- 퀵슬롯 등록 모달 ----
+// 플라스크(state.quickSlots)와 스킬(state.skillQuickSlots) 두 종류의 퀵슬롯이 같은 선택 모달을 공유함 —
+// pendingQuickSlotKind로 지금 어느 배열에 등록할지 구분(둘 다 배열 인덱스=슬롯 번호라는 점은 동일).
 let pendingQuickSlotIndex = null;
+let pendingQuickSlotKind = 'flask'; // 'flask' | 'skill'
 function openQuickSlotPicker(idx){
+  pendingQuickSlotKind = 'flask';
   pendingQuickSlotIndex = idx;
   const list = el('quickSlotPickerList');
   list.innerHTML = Object.values(CONSUMABLES).map(item => `
@@ -151,6 +159,32 @@ function openQuickSlotPicker(idx){
       <span>${item.name} <span style="color:var(--forge-cream-dim);">×${(state.consumables && state.consumables[item.id]) || 0}</span></span>
     </button>
   `).join('');
+  el('quickSlotPickerModal').style.display = 'flex';
+}
+// 스킬 퀵슬롯 선택 목록 — 습득한 스킬(공용/특화 + 기연 전부)만 후보로 나열함. 실제 스킬 데이터가
+// 없는 지금은 항상 빈 목록으로 표시되며, SKILLS에 항목이 등록되고 습득되는 즉시 자동으로 채워짐.
+// 스킬 퀵슬롯 선택 목록 — 습득한 스킬(공용/특화 + 기연) 중 패시브를 제외하고 후보로 나열함(요구사항:
+// "패시브 스킬은 퀵슬롯에 등록할 수 없습니다" — 패시브는 습득만 하면 항상 자동 적용되므로 등록 대상이 아님).
+function openSkillQuickSlotPicker(idx){
+  pendingQuickSlotKind = 'skill';
+  pendingQuickSlotIndex = idx;
+  const list = el('quickSlotPickerList');
+  const learnedIds = [...(state.learnedSkills || []), ...(state.learnedAwakeningSkills || [])]
+    .filter(id => SKILLS[id] && skillKindOf(SKILLS[id]) !== 'passive');
+  if(learnedIds.length === 0){
+    list.innerHTML = `<div class="inv-empty">등록 가능한 스킬이 없습니다.</div>`;
+  } else {
+    list.innerHTML = learnedIds.map(id => {
+      const s = SKILLS[id];
+      if(!s) return '';
+      const grade = WEAPON_GRADES[s.grade];
+      return `
+        <button class="quickslot-pick-item" data-item="${id}">
+          <span style="font-size:20px;">${skillIconHtml(s, 'quickslot-pick-icon')}</span>
+          <span style="color:${grade ? grade.color : '#fff'};">${s.name}</span>
+        </button>`;
+    }).join('');
+  }
   el('quickSlotPickerModal').style.display = 'flex';
 }
 function closeQuickSlotPicker(){
@@ -262,6 +296,37 @@ let activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
 function switchCharTab(tabId){
   activeCharTab = tabId;
   renderCharacterMenu();
+}
+
+// ---- 스킬 탭(캐릭터 메뉴 하위) ----
+// 하위 탭 전환은 SKILL_CATEGORIES(data.js)를 그대로 따르므로, 새 분류가 추가돼도 이 함수는 수정할 필요 없음.
+let activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
+function switchSkillCategory(catId){
+  activeSkillCategory = catId;
+  renderCharacterMenu();
+}
+// 스킬 습득: 포인트를 소비하고 해당 분류의 습득 목록(learnedSkills/learnedAwakeningSkills)에 추가함.
+// 에픽/유니크는 아직 해금 방식이 구현되지 않아(비급/깨달음 소비 예정) canLearnSkill이 항상 false를 반환하므로
+// 이 함수까지 도달해도 아무 일도 일어나지 않음 — 실제 해금 로직이 추가되면 이 함수만 손보면 됨.
+function learnSkill(id){
+  if(!canLearnSkill(id)) return;
+  const s = SKILLS[id];
+  const cost = s.cost || 1;
+  if(s.category === 'awakening'){
+    state.awakeningPoints -= cost;
+    state.learnedAwakeningSkills.push(id);
+  } else {
+    state.skillPoints -= cost;
+    state.learnedSkills.push(id);
+  }
+  renderCharacterMenu();
+  saveState();
+}
+// 스킬 퀵슬롯 초기화 — 등록된 스킬을 전부 제거함(캐릭터 메뉴 스킬 탭에서만 노출되는 버튼).
+function resetSkillQuickSlots(){
+  state.skillQuickSlots = Array.from({ length: SKILL_QUICK_SLOT_COUNT }, () => null);
+  renderSkillQuickSlots();
+  saveState();
 }
 
 // ---- 설정 모달 ----

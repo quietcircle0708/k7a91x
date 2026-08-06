@@ -733,6 +733,75 @@ const CHARACTER_TABS = [
 // 1페이지(캐릭터 정보) / 2페이지(장비창) / 3페이지(적용 중인 아티팩트 효과)로 완전히 분리함.
 const CHAR_MENU_INFO_PAGE_COUNT = 3;
 
+// ---- 스킬 시스템 — 기반 구조 ----
+// 스킬 데이터 형식(SKILLS의 각 항목). 실제 스킬은 아직 등록하지 않음(이번 작업은 기반 구조만 구현) —
+// 이후 이 객체에 항목을 추가하기만 하면 캐릭터 메뉴 스킬 탭(레벨별 목록/툴팁/습득/퀵슬롯)과 전투(쿨타임/자원
+// 소모/시전시간/데미지)까지 코드 수정 없이 자동으로 반영됨.
+// {
+//   name: '스킬 이름', desc: '스킬 설명',
+//   grade: 'normal' | 'rare' | 'epic' | 'unique',           // WEAPON_GRADES와 동일한 등급 색상 체계 재사용
+//   category: 'common' | 'specialized' | 'awakening',        // SKILL_CATEGORIES의 id와 일치해야 함
+//   target: 'single' | 'aoe' | 'buff' | 'passive',           // 단일/광역/버프/패시브 — skillKindOf 분류에 사용
+//   cooldown: 재사용 대기시간(초), resourceType: 'hp' | 'mp'(생략하면 패시브로 간주), resourceAmount: 소모량,
+//   castTime: 시전 시간(초, 0=즉시), damagePercent: 총 공격력 기준 데미지 배율(%), hits: 타수,
+//   icon: '아이콘 파일명(SKILL_IMAGE_DIR 기준, 확장자 제외)'. 생략 시 종류별 기본 아이콘(SKILL_DEFAULT_ICON)을 자동 적용.
+//   levelReq: 습득 가능한 최소 레벨, cost: 습득에 필요한 포인트(생략 시 1),
+//   passiveEffect: { hpFlat: N, ... } — 패시브 스킬을 습득만 하면 항상 적용되는 고정 보너스(학습 즉시 반영,
+//     learnedPassiveSkillBonus가 이 키들을 합산함. 새 보너스 종류를 추가하려면 이 객체에 키만 추가하고
+//     그 키를 참조하는 effective 공식 쪽에 더해주면 됨 — 지금은 hpFlat만 사용).
+//   buffEffect: { atkFlat: N, durationMs: N } — 버프 스킬 사용 시 그 시간 동안 적용되는 보너스(activeSkillBuffs에
+//     등록되고 activeBuffBonus가 합산함. hpFlat과 동일하게 키 기반이라 확장 가능).
+// }
+const SKILLS = {
+  adventurer_will: {
+    name: '모험가의 의지', desc: '[패시브] 체력 +100',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 1,
+    passiveEffect: { hpFlat: 100 },
+  },
+  slash: {
+    name: '슬래시', desc: '무기를 휘둘러 120%의 데미지로 적을 공격한다.',
+    grade: 'normal', category: 'common', target: 'single', levelReq: 5,
+    cooldown: 6, resourceType: 'mp', resourceAmount: 30, castTime: 0,
+    damagePercent: 120, hits: 1,
+  },
+  rage: {
+    name: '분노', desc: '[버프] 5초 동안 자신의 공격력을 30 증가시킨다.',
+    grade: 'normal', category: 'common', target: 'buff', levelReq: 5,
+    cooldown: 10, resourceType: 'mp', resourceAmount: 50, castTime: 0.1,
+    buffEffect: { atkFlat: 30, durationMs: 5000 },
+  },
+};
+// 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
+// (일반/레어/에픽/유니크 라벨·색상이 이미 동일하므로 SKILLS[id].grade를 WEAPON_GRADES에 그대로 대입해 조회).
+
+// 스킬 아이콘 이미지 — weaponImagePath/monsterIconHtml과 동일한 방식(디렉토리+확장자 상수, <img> 태그로 출력).
+const SKILL_IMAGE_DIR = 'assets/skill/';
+const SKILL_IMAGE_EXT = '.svg';
+// SKILLS[id].icon이 없을 때 종류별로 자동 적용되는 기본 아이콘 파일명(요구사항 5번 표 그대로).
+const SKILL_DEFAULT_ICON = { attack: 'BSatk', buff: 'BSbuff', passive: 'BSpassive' };
+
+// 캐릭터 > 스킬 탭의 하위 탭(분류) 목록. 데이터 기반이라 새 분류가 추가되면 이 배열에 항목만 추가하면 됨
+// (renderCharacterMenu의 스킬 탭 렌더링이 이 목록을 그대로 순회해 하위 탭 버튼을 자동 생성함).
+const SKILL_CATEGORIES = [
+  { id: 'common', label: '공용' },
+  { id: 'specialized', label: '특화' },
+  { id: 'awakening', label: '기연' },
+];
+// 스킬 탭 페이지 구성(레벨 구간). "8. 페이지" 요구사항 표를 그대로 데이터화한 것으로, 페이지네이션은
+// 기존 공용 시스템(pageState/pagerHtml/goPage/clampPage)을 그대로 재사용함(개수 기반 분할이 아니라
+// 레벨 구간 기준 분할이라는 점은 CHAR_STATS_PAGE_COUNT와 동일한 방식).
+const SKILL_PAGES = [
+
+  { min: 1, max: 20 },
+  { min: 25, max: 45 },
+  { min: 50, max: 70 },
+  { min: 75, max: 95 },
+  { min: 99, max: 99 },
+];
+// 스킬 퀵슬롯 칸 수(왼쪽 5칸). 오른쪽에는 기존 플라스크 퀵슬롯(QUICK_SLOT_COUNT)을 그대로 이어붙여 사용함.
+const SKILL_QUICK_SLOT_COUNT = 5;
+
+
 // ---- 캐릭터 정보창 — 장비창 슬롯 구성 (데이터 기반) ----
 // renderCharStats(render.js)가 이 목록을 그대로 순회해 슬롯을 그림. 새 장비 타입(방어구 등)이 실제로
 // 추가되면 이 배열에 항목만 추가하고 equippedItemForSlot(render.js)에 조회 로직 한 줄만 이어주면 되며,

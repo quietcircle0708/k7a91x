@@ -323,6 +323,97 @@ function startFlaskCooldown(id){
   flaskCooldownUntil[id] = Date.now() + FLASK_COOLDOWN_MS;
 }
 
+// ---- 스킬 쿨타임/버프 (기존 플라스크 쿨타임 방식을 그대로 재사용) ----
+// 스킬 id별로 독립 관리하며, 플라스크와 마찬가지로 저장 대상이 아닌 런타임 전용 값. 요구사항: "전투 종료
+// 및 마을 귀환 시에도 초기화하지 않는다" — resetFlaskStateOnDeath 등 어디에서도 이 값을 지우지 않으므로
+// 새로고침 전까지는 자연히 만료될 때까지(시간 경과) 유지됨.
+let skillCooldownUntil = {};
+function isSkillOnCooldown(id){
+  return (skillCooldownUntil[id] || 0) > Date.now();
+}
+function skillCooldownRemainingSec(id){
+  const remainMs = (skillCooldownUntil[id] || 0) - Date.now();
+  return remainMs > 0 ? remainMs / 1000 : 0;
+}
+function startSkillCooldown(id){
+  const s = SKILLS[id];
+  if(!s || !s.cooldown) return;
+  skillCooldownUntil[id] = Date.now() + s.cooldown * 1000;
+}
+// 지금 활성화된 버프 스킬 효과들. { [skillId]: { ...buffEffect, until } } — activeBuffBonus(formulas.js)가
+// 읽어서 합산함. 스킬 쿨타임과 마찬가지로 런타임 전용(저장 대상 아님).
+let activeSkillBuffs = {};
+function applySkillBuff(id){
+  const s = SKILLS[id];
+  if(!s || !s.buffEffect) return;
+  activeSkillBuffs[id] = { ...s.buffEffect, until: Date.now() + s.buffEffect.durationMs };
+}
+
+// ---- 스킬 사용 (요구사항: "전투에서의 스킬 사용") ----
+// 지금 이 스킬을 사용할 수 있는지 — 퀵슬롯 버튼 disabled 판정과 실제 사용(useSkill) 양쪽에서 공유해서 씀.
+function canUseSkillNow(id){
+  const s = SKILLS[id];
+  if(!s) return false;
+  if(skillKindOf(s) === 'passive') return false; // 패시브는 항상 자동 적용이라 "사용" 개념이 없음
+  if(currentView !== 'hunt' || !hunt.started || hunt.paused || hunt.monsters.length === 0) return false;
+  if(isSkillOnCooldown(id)) return false;
+  const pool = s.resourceType === 'hp' ? (state.playerHp || 0) : (state.playerMp || 0);
+  return pool >= (s.resourceAmount || 0);
+}
+// 퀵슬롯의 스킬 아이콘을 클릭했을 때 실제로 발동시키는 함수. 자원 소모/쿨타임 시작은 시전 시간과 무관하게
+// 사용한 순간 바로 적용하고, 실제 효과(데미지/버프)는 시전 시간이 지난 뒤에 적용함(요구사항 1번).
+function useSkill(id){
+  if(!canUseSkillNow(id)) return;
+  const s = SKILLS[id];
+  if(s.resourceType === 'hp') state.playerHp = Math.max(0, (state.playerHp || 0) - s.resourceAmount);
+  else state.playerMp = Math.max(0, (state.playerMp || 0) - s.resourceAmount);
+  startSkillCooldown(id);
+  renderHuntCharPanel();
+  renderSkillQuickSlots();
+  skillUseFlash(id);
+  saveState();
+  if(s.castTime && s.castTime > 0){
+    setTimeout(() => resolveSkillEffect(id), Math.round(s.castTime * 1000));
+  } else {
+    resolveSkillEffect(id);
+  }
+}
+// 시전 시간이 끝난 뒤 실제 효과를 적용. 시전 중에 전투가 끝나버렸을 수 있으므로(사망/던전 이탈 등) 그 사이
+// 상태를 다시 확인함 — 이미 전투가 아니면 조용히 무시(자원 소모와 쿨타임은 사용 시점에 이미 적용됐으므로 유지).
+function resolveSkillEffect(id){
+  const s = SKILLS[id];
+  if(!s) return;
+  if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return;
+  if(skillKindOf(s) === 'buff'){
+    applySkillBuff(id);
+    refreshCharDisplays();
+    renderHuntCharPanel();
+    return;
+  }
+  // 공격 스킬 데미지 공식(요구사항 3번): 플레이어의 총 공격력 x 데미지%
+  const equipped = getEquipped();
+  if(!equipped) return;
+  const type = equipped.type || 'longsword';
+  const atk = effectiveAtk(type, equipped.level);
+  const perHit = Math.max(1, Math.round(atk * (s.damagePercent || 0) / 100));
+  const hits = s.hits || 1;
+  const targets = s.target === 'aoe'
+    ? hunt.monsters.slice()
+    : [hunt.monsters.find(m => m.instanceId === hunt.targetId) || hunt.monsters[0]];
+  targets.forEach(t => {
+    if(!t) return;
+    for(let i = 0; i < hits; i++){
+      if(t.hp <= 0) break;
+      const levelDiff = state.playerLevel - t.level;
+      const dmg = Math.max(1, Math.round(perHit * playerDamageMultiplier(levelDiff)));
+      t.hp -= dmg;
+      monsterHitEffect(t.instanceId, dmg, false);
+    }
+    if(t.hp <= 0) killMonsterInstance(t.instanceId);
+    else updateMonsterSlot(t);
+  });
+}
+
 // ---- 소비 아이템 사용 ----
 // 플라스크 사용: 1초 간격 여러 틱으로 나눠 최대치의 일부를 서서히 회복.
 // hp/mp 각각 진행 중인 회복 상태(healState)를 추적 — 겹침 방지 및 전투 종료 시 잔여 회복량 즉시 지급에 사용.

@@ -154,6 +154,18 @@ function shatterBurst(count=16){
   }
 }
 
+// 스킬 사용 시 퀵슬롯 버튼에 적용하는 빛나는 효과 — 요구사항: "구매 버튼에서 사용하는 빛나는 효과를
+// 적용합니다". 코인 파티클 없이 purchaseEffect와 동일한 시각 효과(.purchase-flash)만 재사용함.
+// 실제 사용(useSkill)은 사냥 화면(hunt)에서만 가능하므로 huntSkillQuickSlotRow 안에서만 찾음 —
+// 캐릭터 메뉴 스킬 탭 쪽에 같은 스킬이 배정돼 있어도(숨겨진 화면일 수 있음) 그쪽을 잘못 반짝이지 않게 함.
+function skillUseFlash(skillId){
+  const row = document.getElementById('huntSkillQuickSlotRow');
+  const btn = row && row.querySelector(`.quickslot-btn[data-item="${skillId}"]`);
+  if(!btn) return;
+  btn.classList.remove('purchase-flash'); void btn.offsetWidth;
+  btn.classList.add('purchase-flash');
+  setTimeout(() => btn.classList.remove('purchase-flash'), 600);
+}
 function purchaseEffect(target){
   if(!target) return;
   target.classList.remove('purchase-flash'); void target.offsetWidth;

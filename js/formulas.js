@@ -365,6 +365,135 @@ function requiredKills(level){
 function requiredExp(level){
   return monsterExp(level) * requiredKills(level);
 }
+
+// ---- 스킬 시스템 — 포인트 공식 ----
+// 공용/특화가 공유하는 스킬 포인트의 "레벨까지 누적 지급량"(레벨1 + 5레벨 단위마다 1개: LV1,5,10,15...).
+function totalSkillPointsForLevel(lv){
+  if(lv < 1) return 0;
+  return 1 + Math.floor(lv / 5);
+}
+// 기연(깨달음)의 "레벨까지 누적 지급량"(10레벨 단위 LV10~90마다 1개 + LV99 도달 시 예외적으로 2개 추가).
+function totalAwakeningPointsForLevel(lv){
+  if(lv < 1) return 0;
+  return Math.floor(Math.min(lv, 90) / 10) + (lv >= 99 ? 2 : 0);
+}
+// 레벨업 시 이번 레벨에서 실제로 지급되는 증가분(마일스톤이 아닌 레벨이면 0).
+function skillPointsGrantedAtLevel(lv){
+  return totalSkillPointsForLevel(lv) - totalSkillPointsForLevel(lv - 1);
+}
+function awakeningPointsGrantedAtLevel(lv){
+  return totalAwakeningPointsForLevel(lv) - totalAwakeningPointsForLevel(lv - 1);
+}
+// 분류(공용/특화/기연)별 스킬 포인트 마일스톤 레벨 목록. 공용/특화는 위 공식과 동일하게 LV1,5,10,...,95,99
+// 이고, 기연은 LV10,20,...,90,99. 캐릭터 메뉴 스킬 탭의 "레벨별 스킬 목록" 행이 이 레벨들을 그대로 사용함.
+function skillMilestoneLevels(categoryId){
+  const levels = [];
+  if(categoryId === 'awakening'){
+    for(let lv = 10; lv <= 90; lv += 10) levels.push(lv);
+  } else {
+    levels.push(1);
+    for(let lv = 5; lv <= 95; lv += 5) levels.push(lv);
+  }
+  levels.push(PLAYER_MAX_LEVEL); // 99는 항상 예외적으로 마지막에 단독 포함
+  return levels;
+}
+// 스킬 탭의 한 페이지(SKILL_PAGES[pageIdx-1])에 표시할 레벨 목록(해당 분류의 마일스톤 레벨 중 그 구간에
+// 속하는 것만). 페이지가 늘어나거나 마일스톤 공식이 바뀌어도 이 함수는 그대로 동작함.
+function levelsForSkillPage(categoryId, pageIdx){
+  const range = SKILL_PAGES[pageIdx - 1];
+  if(!range) return [];
+  return skillMilestoneLevels(categoryId).filter(lv => lv >= range.min && lv <= range.max);
+}
+// 습득 여부 조회 — 공용/특화는 learnedSkills, 기연은 learnedAwakeningSkills를 봄(분류별로 완전히 별도 목록).
+function isSkillLearned(id){
+  const s = SKILLS[id];
+  if(!s) return false;
+  const list = s.category === 'awakening' ? state.learnedAwakeningSkills : state.learnedSkills;
+  return Array.isArray(list) && list.includes(id);
+}
+// 스킬 종류(공격/버프/패시브) 자동 판정 — 요구사항 3번 규칙을 그대로 코드화:
+// 1) 소모 자원이 없으면 패시브, 2) target이 'buff'면 버프, 3) 그 외는 전부 공격.
+// 이 순서를 그대로 지켜야 하며(패시브 판정이 우선), 새 스킬을 추가해도 이 함수는 손댈 필요가 없음.
+function skillKindOf(skill){
+  if(!skill) return 'attack';
+  if(!skill.resourceType) return 'passive';
+  if(skill.target === 'buff') return 'buff';
+  return 'attack';
+}
+// 공용/특화가 스킬 포인트를 공유하기 때문에 생기는 습득 제한(요구사항 4번): 같은 레벨 제한 + 같은 종류
+// (공격/버프/패시브)의 스킬은 하나만 습득 가능. 기연(awakening)은 별도 포인트를 쓰므로 이 제한을 적용하지 않음.
+function hasConflictingLearnedSkill(id){
+  const s = SKILLS[id];
+  if(!s || s.category === 'awakening') return false;
+  const kind = skillKindOf(s);
+  return (state.learnedSkills || []).some(otherId => {
+    if(otherId === id) return false;
+    const other = SKILLS[otherId];
+    return other && other.levelReq === s.levelReq && skillKindOf(other) === kind;
+  });
+}
+// ---- 스킬 툴팁 ----
+// 레이아웃/서식은 buildWeaponTooltipHtml·buildArtifactTooltipHtml과 동일한 규칙(wtipRow, 라벨 없는 값은
+// wtipRow('', 값))을 그대로 따름. 이름/설명/소모 자원/레벨 제한은 항목명을 생략하고 값만 출력하고,
+// 쿨타임만 라벨을 함께 표시함(요구사항 표기 예시와 동일).
+function buildSkillTooltipHtml(id){
+  const s = SKILLS[id];
+  if(!s) return '';
+  const grade = WEAPON_GRADES[s.grade];
+  let html = `<div style="text-align:center;">`;
+  html += `<div style="color:${grade ? grade.color : '#ffffff'}; font-weight:700; margin-bottom:2px;">${s.name}</div>`;
+  if(s.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${s.desc}</div>`;
+  if(s.cooldown != null) html += wtipRow('쿨타임', s.cooldown + '초');
+  if(s.resourceType != null){
+    const resourceLabel = s.resourceType === 'hp' ? '체력' : '마나';
+    html += wtipRow('', `${resourceLabel} ${s.resourceAmount}`);
+  }
+  if(s.levelReq != null) html += wtipRow('', 'LV' + s.levelReq);
+  html += `</div>`;
+  return html;
+}
+// 스킬 아이콘 <img> HTML — weaponIconHtml/monsterIconHtml과 동일한 방식. icon 필드가 없으면
+// 종류(공격/버프/패시브)에 따른 기본 아이콘(SKILL_DEFAULT_ICON)을 자동으로 적용함(요구사항 5번).
+function skillIconHtml(skill, className){
+  if(!skill) return '';
+  const kind = skillKindOf(skill);
+  const file = skill.icon || SKILL_DEFAULT_ICON[kind] || SKILL_DEFAULT_ICON.attack;
+  const cls = 'skill-icon-img' + (className ? ' ' + className : '');
+  return `<img src="${SKILL_IMAGE_DIR}${file}${SKILL_IMAGE_EXT}" class="${cls}" alt="">`;
+}
+// 습득한 패시브 스킬의 고정 보너스 합산(요구사항: "별도 사용 없이 항상 적용"). 공용/특화/기연 습득 목록을
+// 모두 뒤져 passiveEffect[key]가 있는 스킬을 전부 더함 — 새 패시브 스킬을 추가해도 자동으로 합산됨.
+function learnedPassiveSkillBonus(key){
+  const allLearned = [...(state.learnedSkills || []), ...(state.learnedAwakeningSkills || [])];
+  let total = 0;
+  allLearned.forEach(id => {
+    const s = SKILLS[id];
+    if(s && s.passiveEffect && typeof s.passiveEffect[key] === 'number') total += s.passiveEffect[key];
+  });
+  return total;
+}
+// 지금 활성화된 버프 스킬 효과의 합산(요구사항: 분노 등 시간제한 버프). activeSkillBuffs(actions.js, 스킬
+// id별로 { ...buffEffect, until }를 담는 런타임 전용 저장소, 저장 대상 아님)를 읽어 만료되지 않은 것만 합산.
+function activeBuffBonus(key){
+  if(typeof activeSkillBuffs !== 'object' || !activeSkillBuffs) return 0;
+  const now = Date.now();
+  let total = 0;
+  Object.values(activeSkillBuffs).forEach(b => {
+    if(b && b.until > now && typeof b[key] === 'number') total += b[key];
+  });
+  return total;
+}
+// 지금 습득할 수 있는지(포인트 충분 + 아직 미습득 + 습득 제한에 걸리지 않음). 에픽/유니크는 해금 방식이
+// 아직 구현되지 않아(비급/깨달음 소비 예정) 항상 불가로 처리 — SKILLS에 실제 항목이 등록되고 해금 로직이
+// 추가되면 이 부분만 손보면 됨.
+function canLearnSkill(id){
+  const s = SKILLS[id];
+  if(!s || isSkillLearned(id)) return false;
+  if(s.grade === 'epic' || s.grade === 'unique') return false;
+  if(hasConflictingLearnedSkill(id)) return false;
+  const pool = s.category === 'awakening' ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
+  return pool >= (s.cost || 1);
+}
 // 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
 // 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
 function artifactStatBonus(stat){
@@ -386,6 +515,7 @@ function effectiveMaxHp(level){
   const agi = (s.agi || 0) + artifactStatBonus('agi');
   let hp = playerBaseHp(level) + str * 20 + agi * 5;
   if(isArtifactEquipped('antlerflag')) hp += 500; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
+  hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
   return hp;
 }
 function effectiveMaxMp(level){
@@ -404,7 +534,8 @@ function effectiveAtkSpeed(type, level){
 function effectiveAtk(type, level){
   const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  return atkFor(type, level) + str * 2 + agi * 1; // 힘 1당 공격력 +2, 민첩 1당 공격력 +1
+  // 힘 1당 공격력 +2, 민첩 1당 공격력 +1, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함
+  return atkFor(type, level) + str * 2 + agi * 1 + activeBuffBonus('atkFlat');
 }
 // 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
 // 미리보기에서 그대로 쓰이고(무기 하나만의 값을 보여줘야 하므로), 실제 전투 판정과 캐릭터 정보창의

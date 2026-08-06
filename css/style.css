@@ -520,6 +520,7 @@
   .quickslot-btn.filled:hover:not(:disabled){ border-color: var(--forge-gold); }
   .quickslot-btn.filled:disabled{ opacity:.4; cursor:not-allowed; }
   .quickslot-icon{ font-size:18px; line-height:1; }
+  .quickslot-icon img.skill-icon-img{ width:20px; height:20px; object-fit:contain; display:block; }
   .quickslot-count{ font-size:10px; font-family:'JetBrains Mono', monospace; color: var(--forge-cream-dim); margin-top:2px; }
   .quickslot-cooldown{
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -531,6 +532,35 @@
     background: var(--forge-blood); border:1px solid #7a1f1f; color:#fff; font-size:10px; line-height:1;
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
   }
+  /* 스킬 퀵슬롯 줄(왼쪽 5칸) + 기존 플라스크 퀵슬롯 + 초기화 버튼을 한 줄에 담되, 좁은 화면에서는
+     자연스럽게 줄바꿈되도록 함(요구사항: 스킬 탭 상단 배치, 던전 화면에도 동일하게 출력). */
+  .skill-quickslot-row{ display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+  .skill-quickslot-row .quickslot-row{ margin-bottom:0; }
+  /* 스킬 퀵슬롯은 아이콘 버튼 아래에 스킬 이름(등급 색상)을 함께 표시함(요구사항 6번) */
+  .skill-quickslot-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .skill-quickslot-name{
+    font-size:9.5px; font-weight:700; text-align:center; max-width:50px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  /* 스킬 탭 하위 내용 — 미사용 포인트(우측 정렬) + 레벨별 스킬 목록 */
+  .skill-points-row{ display:flex; justify-content:flex-end; align-items:center; gap:6px; font-size:12.5px; color: var(--forge-cream-dim); margin-bottom:10px; }
+  .skill-points-row .v{ color: var(--forge-gold); font-family:'JetBrains Mono', monospace; font-weight:700; }
+  .skill-level-row{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .skill-level-label{ flex:0 0 40px; font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--forge-cream-dim); text-align:left; }
+  .skill-level-icons{ flex:1; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; min-height:34px; }
+  .skill-icon-btn{
+    position:relative; width:34px; height:34px; border-radius:8px; cursor:pointer; padding:0;
+    display:flex; align-items:center; justify-content:center; font-size:17px; border-width:1px; border-style:solid;
+    background: var(--forge-panel-2);
+  }
+  .skill-icon-btn .skill-icon img.skill-icon-img{ width:22px; height:22px; object-fit:contain; display:block; }
+  /* 미습득 스킬: 흑백(약 50% 밝기)으로 출력, 습득하면 원본 그대로 */
+  .skill-icon-btn.locked{ filter: grayscale(1) brightness(.5); }
+  /* 습득 불가(에픽·유니크 미구현/포인트 부족/공용·특화 습득 제한 충돌) — 요구사항 4번: 습득 버튼 비활성화 */
+  .skill-icon-btn:disabled{ cursor:not-allowed; opacity:.6; }
+  .skill-icon-btn .tooltip{ width:200px; left:50%; transform:translateX(-50%); bottom:120%; text-align:center; }
+  .skill-icon-btn:hover .tooltip{ visibility:visible; opacity:1; }
+
   .quickslot-picker-list{ display:flex; flex-direction:column; gap:8px; margin:14px 0; }
   .quickslot-pick-item{
     display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px;
