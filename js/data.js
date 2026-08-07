@@ -7,8 +7,9 @@
 const MAX_LEVEL = 9;
 const INV_MAX = 10;
 
-// 장비 타입. 무기 / 아티팩트가 있으며, 나중에 방어구 등 다른 장비 타입이 추가될 수 있음.
-const EQUIPMENT_TYPES = { weapon: '무기', artifact: '아티팩트' };
+// 장비 타입. 무기 / 방어구 / 장신구 / 아티팩트가 있으며, 방어구·장신구는 아직 실제 데이터가 없음(장비 탭
+// 구조만 먼저 준비된 상태 — 20번째 작업 "장비 탭 추가" 참고).
+const EQUIPMENT_TYPES = { weapon: '무기', armor: '방어구', accessory: '장신구', artifact: '아티팩트' };
 
 // 무기 종류(카테고리) 구분: 양손 검 / 검 / 단검 / 지팡이. 무기 "이름"과는 별개의 개념.
 const WEAPON_KINDS = { two_handed_sword: '양손 검', sword: '검', dagger: '단검', staff: '지팡이' };
@@ -227,10 +228,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
-    attackPower: 51, attackSpeed: 0.6, critRate: 10,
+    attackPower: 76, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 1250, levelReq: 20,
     image: 'common_longsword3',
-    atk: [51], speed: [0.6], crit: [10], sell: [1250],
+    atk: [76], speed: [0.6], crit: [10], sell: [1250],
     cost: [], odds: [],
   },
   shortsword3: {
@@ -238,10 +239,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
-    attackPower: 76, attackSpeed: 0.8, critRate: 5,
+    attackPower: 51, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 1250, levelReq: 20,
     image: 'common_shortsword3',
-    atk: [76], speed: [0.8], crit: [5], sell: [1250],
+    atk: [51], speed: [0.8], crit: [5], sell: [1250],
     cost: [], odds: [],
   },
   dagger3: {
@@ -281,6 +282,27 @@ const WEAPON_TYPES = {
 // 자동으로 빈 탭이 됨. WEAPON_TYPES와 동일한 필드 구조(equipType:'armor', purchasable 등)로 항목을
 // 추가하면 상점 코드를 건드리지 않고도 자동으로 목록에 표시됨.
 const ARMOR_TYPES = {};
+
+// 장신구 종류 도감. ARMOR_TYPES와 동일한 이유·동일한 방식으로 아직 빈 객체(등록된 장신구 없음) —
+// WEAPON_TYPES/ARMOR_TYPES와 같은 필드 구조(equipType:'accessory')로 항목을 추가하면 자동으로
+// 상점 "장비 > 장신구" 탭에 표시됨.
+const ACCESSORY_TYPES = {};
+
+// ---- 대장간 "강화 장비 선택" 팝업이 훑는 장비 보유 풀 목록 ----
+// 각 항목은 { kind, items(): 보유 아이템 배열을 반환하는 함수, typesTable: 도감(공격력/등급 등 정의),
+// meetsReq(type): 착용 가능 여부 판정 함수 }. formulas.js의 forgeSelectableItems()가 이 배열을 순회해서
+// "소유 + 착용 가능 + 강화 가능(typesTable에 강화단계 atk 배열이 있음)" 세 조건을 모두 만족하는 장비만
+// 추려 하나의 목록으로 합침. 방어구/장신구는 아직 실제 인벤토리 배열이 없어(state.armorInventory 등
+// 미정의) items()가 항상 빈 배열을 반환하지만, 나중에 그 배열과 도감 데이터가 채워지면 이 표에 항목만
+// 추가하면 대장간 팝업에도 자동으로 합류됨(다른 코드 수정 불필요).
+const EQUIP_INVENTORY_POOLS = [
+  {
+    kind: 'weapon',
+    items: () => state.inventory,
+    typesTable: WEAPON_TYPES,
+    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
+  },
+];
 
 // ============================================================
 // 강화 단계별 공격력/공격속도/치명타 계산 공식
@@ -679,15 +701,36 @@ const MISC_ITEMS = {
   },
 };
 
-// ---- 상점 품목 분류 탭 ----
-// 새 탭이 필요해지면 이 배열에 항목만 추가하면 됨. 실제로 어떤 아이템이 어느 탭에 뜨는지는
-// formulas.js의 shopEntriesForTab()이 각 도감(WEAPON_TYPES/ARMOR_TYPES/CONSUMABLES/ARTIFACTS/MISC_ITEMS)의
-// purchasable 여부(또는 판매 전용 규칙)를 보고 자동으로 결정함 — 아이템 이름/ID로 분기하지 않음.
-const SHOP_TABS = [
+// ---- 상점/인벤토리 "장비" 탭 공용 하위 분류 ----
+// 무기/방어구/장신구/아티팩트 4종. 인벤토리·상점 양쪽의 "장비" 최상위 탭이 이 배열을 그대로 공유해서
+// 하위탭을 만듦 — 새 장비 소분류가 필요해지면 여기에 항목만 추가하면 양쪽 화면에 자동으로 반영됨.
+const EQUIP_SUB_TABS = [
   { id: 'weapon', label: '무기' },
   { id: 'armor', label: '방어구' },
-  { id: 'consumable', label: '소비' },
+  { id: 'accessory', label: '장신구' },
   { id: 'artifact', label: '아티팩트' },
+];
+
+// ---- 상점 품목 분류 탭 ----
+// 새 탭이 필요해지면 이 배열에 항목만 추가하면 됨. 실제로 어떤 아이템이 어느 탭에 뜨는지는
+// formulas.js의 shopEntriesForTab()이 각 도감(WEAPON_TYPES/ARMOR_TYPES/ACCESSORY_TYPES/CONSUMABLES/
+// ARTIFACTS/MISC_ITEMS)의 purchasable 여부(또는 판매 전용 규칙)를 보고 자동으로 결정함 — 아이템
+// 이름/ID로 분기하지 않음.
+// "장비" 탭은 subTabs(EQUIP_SUB_TABS)를 갖는 최상위 탭이며, 실제 표시 대상은 항상 subTabs 중 하나
+// (leaf id: weapon/armor/accessory/artifact)임. 최상위 탭 자체는 내용을 직접 표시하지 않음.
+const SHOP_TABS = [
+  { id: 'equipment', label: '장비', subTabs: EQUIP_SUB_TABS },
+  { id: 'consumable', label: '소비' },
+  { id: 'stone', label: '마석' },
+  { id: 'misc', label: '기타' },
+];
+
+// ---- 인벤토리 탭 분류 ----
+// 상점(SHOP_TABS)과 동일한 구조(최상위 탭 + "장비" 탭만 EQUIP_SUB_TABS를 하위탭으로 가짐)를 그대로
+// 재사용. 실제 각 하위탭의 목록을 어디서 가져오는지는 render.js의 각 renderXxxList 함수가 담당.
+const INVENTORY_TABS = [
+  { id: 'equipment', label: '장비', subTabs: EQUIP_SUB_TABS },
+  { id: 'consumable', label: '소비' },
   { id: 'stone', label: '마석' },
   { id: 'misc', label: '기타' },
 ];
@@ -705,15 +748,17 @@ const SHOP_SORT_FIELDS = [
 // (그 두 탭은 이 객체에 키 자체가 없음 → renderShopTab에서 자동으로 페이지 UI 없이 전체 출력됨).
 const PAGE_SIZE = {
   invWeapon: 6,        // 인벤토리 무기 탭
+  forgeSelect: 6,       // 대장간 "강화 장비 선택" 팝업
   shopWeapon: 6,        // 상점 무기 탭
   shopArmor: 6,          // 상점 방어구 탭
+  shopAccessory: 6,      // 상점 장신구 탭
   shopConsumable: 6,     // 상점 소비 탭
   shopArtifact: 6,       // 상점 아티팩트 탭
   dungeonList: 3,        // 던전 입구
 };
 // 상점 탭 id → PAGE_SIZE/페이지 상태 키 매핑. 페이지네이션 미적용 탭(stone/misc)은 여기 없음.
 const SHOP_PAGE_KEY = {
-  weapon: 'shopWeapon', armor: 'shopArmor', consumable: 'shopConsumable', artifact: 'shopArtifact',
+  weapon: 'shopWeapon', armor: 'shopArmor', accessory: 'shopAccessory', consumable: 'shopConsumable', artifact: 'shopArtifact',
 };
 // 캐릭터 정보창 페이지 수. 이 화면은 아이템 목록을 잘라서 보여주는 게 아니라 "1페이지(장비창+캐릭터 정보) /
 // 2페이지(적용 중인 아티팩트 효과)"처럼 완전히 다른 내용을 페이지로 나눈 것이라 PAGE_SIZE(개수 기반 분할)는
@@ -749,8 +794,9 @@ const CHAR_MENU_INFO_PAGE_COUNT = 3;
 //   passiveEffect: { hpFlat: N, ... } — 패시브 스킬을 습득만 하면 항상 적용되는 고정 보너스(학습 즉시 반영,
 //     learnedPassiveSkillBonus가 이 키들을 합산함. 새 보너스 종류를 추가하려면 이 객체에 키만 추가하고
 //     그 키를 참조하는 effective 공식 쪽에 더해주면 됨 — 지금은 hpFlat만 사용).
-//   buffEffect: { atkFlat: N, durationMs: N } — 버프 스킬 사용 시 그 시간 동안 적용되는 보너스(activeSkillBuffs에
-//     등록되고 activeBuffBonus가 합산함. hpFlat과 동일하게 키 기반이라 확장 가능).
+//   buffEffect: { atkFlat: N, atkSpeedPercent: N, durationMs: N } — 버프 스킬 사용 시 그 시간 동안 적용되는
+//     보너스(activeSkillBuffs에 등록되고 activeBuffBonus가 합산함. hpFlat과 동일하게 키 기반이라 확장 가능 —
+//     atkFlat은 effectiveAtk, atkSpeedPercent는 effectiveAtkSpeed 쪽에서 각각 더해줌).
 // }
 const SKILLS = {
   adventurer_will: {
@@ -769,6 +815,29 @@ const SKILLS = {
     grade: 'normal', category: 'common', target: 'buff', levelReq: 5,
     cooldown: 10, resourceType: 'mp', resourceAmount: 50, castTime: 0.1,
     buffEffect: { atkFlat: 30, durationMs: 5000 },
+  },
+  fluent_attack: {
+    name: '플루언트 어택', desc: '빠르게 무기를 휘둘러 70%의 데미지로 적을 2번 공격한다.',
+    grade: 'normal', category: 'common', target: 'single', levelReq: 10,
+    cooldown: 5.5, resourceType: 'mp', resourceAmount: 50, castTime: 0,
+    damagePercent: 70, hits: 2, icon: 'lv10atk',
+  },
+  preemptive_strike: {
+    name: '선공', desc: '[버프] 8초 동안 자신의 공격 속도를 20% 증가시킨다.',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 10,
+    cooldown: 15, resourceType: 'mp', resourceAmount: 70, castTime: 0.1,
+    buffEffect: { atkSpeedPercent: 20, durationMs: 8000 }, icon: 'lv10buff',
+  },
+  guardian_will: {
+    name: '수호자의 의지', desc: '[패시브] 체력 +500',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 10,
+    passiveEffect: { hpFlat: 500 }, icon: 'lv10passive',
+  },
+  sword_nova: {
+    name: '소드 노바', desc: '115%의 데미지로 모든 적을 공격한다.',
+    grade: 'rare', category: 'common', target: 'aoe', levelReq: 15,
+    cooldown: 8, resourceType: 'mp', resourceAmount: 110, castTime: 0.1,
+    damagePercent: 115, hits: 1,
   },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
@@ -1076,7 +1145,7 @@ const TREASURE_GOLD_VARIANCE = 0.25;  // 골드 보상 랜덤 편차 ±25%(일�
 
 // 모든 몬스터 공통 규칙
 const MONSTER_BASE_GOLD = 100;       // 1레벨 몬스터의 기본 드랍 골드
-const MONSTER_GOLD_GROWTH = 0.12;    // 레벨당 골드 가중치 (+12%)
+const MONSTER_GOLD_GROWTH = 0.06;    // 레벨당 골드 가중치 (+6%)
 const MONSTER_GOLD_VARIANCE = 0.15;  // 최종 드랍 골드 랜덤 편차 (±15%)
 const MONSTER_ATTACK_SPEED = 1.0;    // 몬스터 공격속도(초당 공격 횟수) = 1초에 1번
 

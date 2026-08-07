@@ -6,9 +6,13 @@
 
 let state = {
   gold: 1000,
-  inventory: [ { id: 1, level: 0, type: 'longsword' } ],
-  equippedId: 1,
-  nextItemId: 2,
+  // (강화 장비 선택 기능 추가 시 제거) 예전엔 새 게임 시작 시 견습 모험가의 대검(양손검, 착용 요구
+  // 힘 3)을 무조건 지급하고 자동으로 장착했지만, 착용 요구 스탯을 만족 못한 채로 장착되는 모순이
+  // 있었음. 이제는 인벤토리를 비운 채로 시작하고, 시작 골드(1000G)로 상점에서 직접 무기를 사고
+  // 대장간 버튼(또는 인벤토리)에서 직접 강화 대상으로 선택하도록 함.
+  inventory: [],
+  equippedId: null,
+  nextItemId: 1,
   charmCount: 0, charmPrice: 1500, charmActive: false,
   blessingCount: 0, blessingPrice: 15000, blessingActive: false,
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
@@ -38,12 +42,17 @@ let isEnhancing = false;
 let currentView = 'forge';
 let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null };
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
-let shopUI = { tab: 'weapon', filter: 'price', dir: 'asc' };
+// equipTab: "장비" 최상위 탭 안에서 마지막으로 보고 있던 하위탭(weapon/armor/accessory/artifact)을
+// 기억해뒀다가, "장비" 최상위 버튼을 다시 눌렀을 때 그 탭으로 돌아가기 위한 값.
+let shopUI = { tab: 'weapon', equipTab: 'weapon', filter: 'price', dir: 'asc' };
+// 인벤토리 탭 UI 상태. shopUI와 동일한 이유로 equipTab을 따로 기억함(저장 대상 아님).
+let invUI = { tab: 'weapon', equipTab: 'weapon' };
 // 페이지네이션: 화면(또는 탭)별 "현재 페이지" 번호(1부터 시작). PAGE_SIZE(data.js)와 키를 공유함 —
 // 새 화면을 추가할 때 여기 초기값 1과 PAGE_SIZE에 같은 키만 추가하면 동일한 페이지 시스템을 그대로 재사용함.
 let pageState = {
   invWeapon: 1,
-  shopWeapon: 1, shopArmor: 1, shopConsumable: 1, shopArtifact: 1,
+  forgeSelect: 1,
+  shopWeapon: 1, shopArmor: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
   charStats: 1,
   charMenuInfo: 1,
@@ -276,7 +285,7 @@ function resetGame(){
   hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null };
 
   state = {
-    gold: 1000, inventory: [ { id: 1, level: 0, type: 'longsword' } ], equippedId: 1, nextItemId: 2,
+    gold: 1000, inventory: [], equippedId: null, nextItemId: 1,
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,

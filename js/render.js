@@ -160,7 +160,10 @@ function render(){
 
   // 인벤토리
   el('invCount').textContent = state.inventory.length + ' / ' + INV_MAX;
+  renderInvTabs();
   renderInventoryList();
+  renderArmorInventoryList();
+  renderAccessoryInventoryList();
   renderArtifactList();
   renderConsumableList();
   renderStoneList();
@@ -185,6 +188,39 @@ function render(){
     el('openDungeonBtn').disabled = false;
     el('openCharacterBtn').disabled = false;
   }
+}
+
+// ---- 대장간 "강화 장비 선택" 팝업 ----
+// forgeSelectableItems()(formulas.js)가 "소유+착용가능+강화가능" 조건으로 이미 걸러준 목록을 그대로
+// 인벤토리 무기 탭과 동일한 페이지 시스템(PAGE_SIZE.forgeSelect=6)으로 잘라서 보여줌. 클릭하면
+// selectForgeTarget(id)(actions.js)가 기존 equipItem과 동일한 로직으로 강화 대상을 설정함.
+function renderForgeSelectList(){
+  const wrap = el('forgeSelectList');
+  if(!wrap) return;
+  const pagerWrap = el('forgeSelectPager');
+  const entries = forgeSelectableItems();
+  if(entries.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">강화 가능한 장비가 없습니다.<br>상점에서 장비를 구매해보세요.</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
+    return;
+  }
+  const pageSize = PAGE_SIZE.forgeSelect;
+  const totalPageCount = pageCount(entries.length, pageSize);
+  pageState.forgeSelect = clampPage(pageState.forgeSelect, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('forgeSelect', pageState.forgeSelect, totalPageCount);
+  const pageEntries = pageSlice(entries, pageState.forgeSelect, pageSize);
+  wrap.innerHTML = `<div class="forge-select-list">${pageEntries.map(entry => {
+    const isCurrent = entry.id === state.equippedId;
+    const itemColor = weaponNameColor(entry.type, entry.level);
+    return `
+      <button class="forge-select-item ${isCurrent ? 'active' : ''}" data-action="select-forge-target" data-id="${entry.id}">
+        <span class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img')}</span>
+        <span class="forge-select-info">
+          <span class="forge-select-name" style="color:${itemColor};">${weaponName(entry.type)} +${entry.level}</span>
+          ${isCurrent ? '<span class="inv-badge">선택됨</span>' : ''}
+        </span>
+      </button>`;
+  }).join('')}</div>`;
 }
 
 function renderInventoryList(){
@@ -229,6 +265,57 @@ function renderInventoryList(){
         </div>
       </div>`;
   }).join('');
+}
+
+// 방어구/장신구 인벤토리 목록 — 이번 작업(장비 탭 추가)에서는 UI/탭 구조만 만들고 실제 방어구·장신구
+// 아이템 데이터는 아직 추가하지 않으므로 항상 빈 상태로 표시됨. state.armorInventory / state.
+// accessoryInventory는 아직 정의되지 않은 값이라 항상 빈 배열로 취급되며(다음 작업에서 실제 인벤토리
+// 배열과 카드 템플릿이 추가되면, renderInventoryList와 동일한 방식으로 이 함수만 확장하면 자동 반영됨),
+// 지금 당장은 데이터 구조나 임시 데이터를 새로 만들지 않는다는 이번 작업 범위를 그대로 지킴.
+function renderArmorInventoryList(){
+  const wrap = el('armorInventoryList');
+  if(!wrap) return;
+  const items = state.armorInventory || [];
+  if(items.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">아직 준비된 방어구가 없습니다.</div>`;
+  }
+}
+function renderAccessoryInventoryList(){
+  const wrap = el('accessoryInventoryList');
+  if(!wrap) return;
+  const items = state.accessoryInventory || [];
+  if(items.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">아직 준비된 장신구가 없습니다.</div>`;
+  }
+}
+
+// ---- 인벤토리: 탭(장비 최상위+하위탭 / 소비 / 마석 / 기타) 표시 상태 갱신 ----
+// 상점의 renderShopTab() 앞부분(탭 active 표시 + 하위탭 행 노출)과 동일한 구조. invUI.tab이 실제 보여줄
+// leaf 탭(weapon/armor/accessory/artifact/consumable/stone/misc)이고, invUI.equipTab은 장비 그룹 안에서
+// 마지막으로 선택했던 하위탭을 기억해뒀다가 "장비" 최상위 버튼을 다시 눌렀을 때 그 탭으로 복귀시키는 데 씀.
+function renderInvTabs(){
+  if(!el('invTabWeapon')) return; // 인벤토리 화면 DOM이 아직 없는 초기 타이밍 방어
+  const topId = topTabIdFor(INVENTORY_TABS, invUI.tab);
+  INVENTORY_TABS.forEach(t => {
+    const btn = document.querySelector(`.inv-tab-btn[data-tab="${t.id}"]`);
+    if(btn) btn.classList.toggle('active', topId === t.id);
+  });
+  const equipTop = INVENTORY_TABS.find(t => t.id === 'equipment');
+  const subWrap = el('invEquipSubTabs');
+  if(subWrap) subWrap.style.display = topId === 'equipment' ? 'flex' : 'none';
+  if(equipTop && equipTop.subTabs){
+    equipTop.subTabs.forEach(st => {
+      const btn = document.querySelector(`.inv-subtab-btn[data-tab="${st.id}"]`);
+      if(btn) btn.classList.toggle('active', invUI.tab === st.id);
+    });
+  }
+  el('invTabWeapon').style.display = invUI.tab === 'weapon' ? 'block' : 'none';
+  el('invTabArmor').style.display = invUI.tab === 'armor' ? 'block' : 'none';
+  el('invTabAccessory').style.display = invUI.tab === 'accessory' ? 'block' : 'none';
+  el('invTabArtifact').style.display = invUI.tab === 'artifact' ? 'block' : 'none';
+  el('invTabConsumable').style.display = invUI.tab === 'consumable' ? 'block' : 'none';
+  el('invTabStone').style.display = invUI.tab === 'stone' ? 'block' : 'none';
+  el('invTabMisc').style.display = invUI.tab === 'misc' ? 'block' : 'none';
 }
 
 function renderArtifactList(){
@@ -1179,13 +1266,30 @@ function renderDeathCurseBadge(){
 // formulas.js의 shopEntriesForTab()이 데이터 기반으로 뽑아줌.
 // ============================================================
 
+// "아직 데이터가 없어 항상 빈 상태로 표시되는" 장비 소분류(방어구/장신구)의 안내 문구. 새 소분류가
+// 생겨도 이 표에 항목만 추가하면 자동으로 적용됨(그 소분류에 실제 데이터가 등록되면 entries.length가
+// 0이 아니게 되어 이 안내 문구 자체가 더 이상 쓰이지 않게 됨).
+const SHOP_EMPTY_EQUIP_LABEL = { armor: '방어구', accessory: '장신구' };
+
 function renderShopTab(){
   if(!el('shopItemsList')) return; // 상점 화면 DOM이 아직 없는 초기 타이밍 방어
 
+  const topId = topTabIdFor(SHOP_TABS, shopUI.tab);
   SHOP_TABS.forEach(t => {
     const btn = document.querySelector(`.shop-tab-btn[data-tab="${t.id}"]`);
-    if(btn) btn.classList.toggle('active', shopUI.tab === t.id);
+    if(btn) btn.classList.toggle('active', topId === t.id);
   });
+  // "장비" 최상위 탭일 때만 하위탭(무기/방어구/장신구/아티팩트) 행을 보여주고, 그 안에서 지금 보고
+  // 있는 탭(shopUI.tab)을 active로 표시함. 다른 최상위 탭(소비/마석/기타)은 하위탭이 없으므로 숨김.
+  const equipTop = SHOP_TABS.find(t => t.id === 'equipment');
+  const subWrap = el('shopEquipSubTabs');
+  if(subWrap) subWrap.style.display = topId === 'equipment' ? 'flex' : 'none';
+  if(equipTop && equipTop.subTabs){
+    equipTop.subTabs.forEach(st => {
+      const btn = document.querySelector(`.shop-subtab-btn[data-tab="${st.id}"]`);
+      if(btn) btn.classList.toggle('active', shopUI.tab === st.id);
+    });
+  }
   const filterDef = SHOP_SORT_FIELDS.find(f => f.id === shopUI.filter) || SHOP_SORT_FIELDS[0];
   el('shopFilterLabel').textContent = filterDef.label;
   el('shopSortDirBtn').textContent = shopUI.dir === 'asc' ? '↑ 오름차순' : '↓ 내림차순';
@@ -1197,7 +1301,8 @@ function renderShopTab(){
   const wrap = el('shopItemsList');
   const pagerWrap = el('shopPager');
   if(entries.length === 0){
-    wrap.innerHTML = `<div class="inv-empty">${shopUI.tab === 'armor' ? '아직 준비된 방어구가 없습니다.' : '표시할 아이템이 없습니다.'}</div>`;
+    const emptyLabel = SHOP_EMPTY_EQUIP_LABEL[shopUI.tab];
+    wrap.innerHTML = `<div class="inv-empty">${emptyLabel ? `아직 준비된 ${emptyLabel}가 없습니다.` : '표시할 아이템이 없습니다.'}</div>`;
     if(pagerWrap) pagerWrap.innerHTML = '';
     return;
   }
@@ -1222,6 +1327,7 @@ function renderShopTab(){
 function buildShopCardHtml(tabId, id){
   if(tabId === 'weapon') return buildWeaponShopCardHtml(WEAPON_TYPES, id);
   if(tabId === 'armor') return buildWeaponShopCardHtml(ARMOR_TYPES, id);
+  if(tabId === 'accessory') return buildWeaponShopCardHtml(ACCESSORY_TYPES, id);
   if(tabId === 'consumable') return buildConsumableShopCardHtml(id);
   if(tabId === 'artifact') return buildArtifactShopCardHtml(id);
   if(tabId === 'stone') return buildStoneShopCardHtml(id);

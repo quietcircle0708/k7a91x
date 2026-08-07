@@ -10,13 +10,23 @@ el('toggleCharmBtn').addEventListener('click', toggleCharm);
 el('toggleBlessingBtn').addEventListener('click', toggleBlessing);
 el('buyCharmBtn').addEventListener('click', (e)=> buyCharm(e.currentTarget));
 el('buyBlessingBtn').addEventListener('click', (e)=> buyBlessing(e.currentTarget));
-el('invTabBtnWeapon').addEventListener('click', ()=> switchInvTab('weapon'));
-el('invTabBtnArtifact').addEventListener('click', ()=> switchInvTab('artifact'));
-el('invTabBtnConsumable').addEventListener('click', ()=> switchInvTab('consumable'));
-el('invTabBtnStone').addEventListener('click', ()=> switchInvTab('stone'));
-el('invTabBtnMisc').addEventListener('click', ()=> switchInvTab('misc'));
+el('invTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  switchInvTab(btn.dataset.tab);
+});
+el('invEquipSubTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  switchInvTab(btn.dataset.tab);
+});
 // ---- 상점 탭 / 정렬 ----
 el('shopTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  switchShopTab(btn.dataset.tab);
+});
+el('shopEquipSubTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-tab]');
   if(!btn) return;
   switchShopTab(btn.dataset.tab);
@@ -83,6 +93,19 @@ el('leaveConfirmStopBtn').addEventListener('click', confirmLeaveBattle);
 el('leaveConfirmContinueBtn').addEventListener('click', cancelLeaveBattle);
 el('openStatsBtn').addEventListener('click', openCharStats);
 el('closeStatsBtn').addEventListener('click', closeCharStats);
+el('openBlacksmithBtn').addEventListener('click', openForgeSelect);
+el('closeForgeSelectBtn').addEventListener('click', closeForgeSelect);
+el('forgeSelectList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="select-forge-target"]');
+  if(!btn) return;
+  selectForgeTarget(Number(btn.dataset.id));
+});
+el('forgeSelectPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 el('openSettingsBtn').addEventListener('click', openSettings);
 el('closeSettingsBtn').addEventListener('click', closeSettings);
 el('settingsCategoryList').addEventListener('click', (e)=>{

@@ -318,6 +318,14 @@
     border-radius:8px; padding:8px 4px; font-size:12px; font-weight:700; cursor:pointer;
   }
   .shop-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+  /* "장비" 최상위 탭 전용 하위탭 행(무기/방어구/장신구/아티팩트). 상위 탭보다 한 단계 옅게 표시해서
+     계층 관계를 시각적으로 드러냄. 장비 탭이 아닐 때는 JS(renderShopTab)가 display:none 처리. */
+  .shop-subtabs{ display:flex; gap:6px; margin:-6px 0 14px; flex-wrap:wrap; }
+  .shop-subtab-btn{
+    flex:1; min-width:50px; background:transparent; border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+    border-radius:6px; padding:5px 4px; font-size:11px; font-weight:600; cursor:pointer;
+  }
+  .shop-subtab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
 
   /* ---- inventory ---- */
   .inv-tabs{ display:flex; gap:8px; margin-bottom:14px; }
@@ -326,6 +334,14 @@
     border-radius:8px; padding:8px 4px; font-size:12px; font-weight:700; cursor:pointer;
   }
   .inv-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+  /* 인벤토리 쪽 "장비" 하위탭 행. shop-subtabs와 동일한 스타일을 그대로 대응시켜 상점/인벤토리가
+     같은 계층 구조로 보이게 함. */
+  .inv-subtabs{ display:flex; gap:6px; margin:-6px 0 14px; flex-wrap:wrap; }
+  .inv-subtab-btn{
+    flex:1; background:transparent; border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+    border-radius:6px; padding:5px 4px; font-size:11px; font-weight:600; cursor:pointer;
+  }
+  .inv-subtab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
   .inv-count{ font-size:12px; color: var(--forge-cream-dim); margin-bottom:16px; font-family:'JetBrains Mono', monospace; }
   /* 인벤토리 무기 탭: "보유 아이템 / 최대 슬롯"과 페이지 이동 UI를 같은 줄, 우측 정렬로 배치 */
   .inv-count-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:0; }
@@ -569,6 +585,18 @@
   }
   .quickslot-pick-item:hover{ border-color: var(--forge-gold); }
 
+  /* ---- 강화 장비 선택 팝업(대장간 버튼) ---- */
+  .forge-select-modal{ max-width:400px; }
+  .forge-select-list{ display:flex; flex-direction:column; gap:8px; margin:14px 0; max-height:60vh; overflow-y:auto; }
+  .forge-select-item{
+    display:flex; align-items:center; gap:12px; width:100%; padding:10px 12px; border-radius:10px;
+    background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream);
+    font-size:13px; cursor:pointer; text-align:left;
+  }
+  .forge-select-item:hover{ border-color: var(--forge-gold); }
+  .forge-select-item.active{ border-color: var(--forge-gold); background:#2c2415; }
+  .forge-select-name{ font-weight:700; }
+
   /* ---- modal ---- */
   .modal-overlay{
     position:fixed; inset:0; background: rgba(10,7,5,0.72); display:flex; align-items:center; justify-content:center;
@@ -589,6 +617,10 @@
     display:flex; align-items:center; justify-content:center;
   }
   .stat-peek-btn:hover{ border-color: var(--forge-gold); }
+  /* 대장간(강화 장비 선택) 버튼: 캐릭터 정보 버튼(openStatsBtn, top:16px) 바로 아래에 같은 크기로 배치 */
+  .blacksmith-peek-btn{ top:60px; right:16px; }
+  .blacksmith-icon-fallback{ font-size:16px; line-height:1; }
+  .blacksmith-icon-img{ width:20px; height:20px; object-fit:contain; }
 
   /* 캐릭터 메뉴 "캐릭터 정보" 탭 — 화면 폭이 좁아 페이지 이동 버튼만 우측 정렬로 표시 */
   .char-menu-info-head{ display:flex; justify-content:flex-end; margin-bottom:10px; }

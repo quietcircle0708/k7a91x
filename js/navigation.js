@@ -80,22 +80,32 @@ function openCharacterMenu(){ if(isEnhancing) return; guardedNav('character'); }
 function closeToForge(){ showView('forge'); }
 
 // ---- 인벤토리 탭 ----
-function switchInvTab(tab){
-  el('invTabWeapon').style.display = tab === 'weapon' ? 'block' : 'none';
-  el('invTabArtifact').style.display = tab === 'artifact' ? 'block' : 'none';
-  el('invTabConsumable').style.display = tab === 'consumable' ? 'block' : 'none';
-  el('invTabStone').style.display = tab === 'stone' ? 'block' : 'none';
-  el('invTabMisc').style.display = tab === 'misc' ? 'block' : 'none';
-  el('invTabBtnWeapon').classList.toggle('active', tab === 'weapon');
-  el('invTabBtnArtifact').classList.toggle('active', tab === 'artifact');
-  el('invTabBtnConsumable').classList.toggle('active', tab === 'consumable');
-  el('invTabBtnStone').classList.toggle('active', tab === 'stone');
-  el('invTabBtnMisc').classList.toggle('active', tab === 'misc');
+// 상점(switchShopTab)과 동일한 규칙: "장비" 최상위 탭(subTabs를 가진 탭)을 클릭하면 마지막으로 보던
+// 하위탭(invUI.equipTab, 없으면 첫 하위탭)으로 이동하고, 하위탭(무기/방어구/장신구/아티팩트)이나
+// 다른 최상위 탭(소비/마석/기타)을 클릭하면 그 탭을 그대로 보여줌. 실제 화면 갱신은 renderInvTabs()가
+// 담당(render() 매 사이클마다도 호출되므로 여기서 직접 DOM을 건드리지 않아도 항상 최신 상태로 반영됨).
+function switchInvTab(tabId){
+  const top = INVENTORY_TABS.find(t => t.id === tabId);
+  if(top && top.subTabs){
+    invUI.tab = invUI.equipTab || top.subTabs[0].id;
+  } else {
+    invUI.tab = tabId;
+    const equipTop = INVENTORY_TABS.find(t => t.id === 'equipment');
+    if(equipTop && equipTop.subTabs.some(st => st.id === tabId)) invUI.equipTab = tabId;
+  }
+  renderInvTabs();
 }
 
 // ---- 상점 탭/정렬 ----
 function switchShopTab(tabId){
-  shopUI.tab = tabId;
+  const top = SHOP_TABS.find(t => t.id === tabId);
+  if(top && top.subTabs){
+    shopUI.tab = shopUI.equipTab || top.subTabs[0].id;
+  } else {
+    shopUI.tab = tabId;
+    const equipTop = SHOP_TABS.find(t => t.id === 'equipment');
+    if(equipTop && equipTop.subTabs.some(st => st.id === tabId)) shopUI.equipTab = tabId;
+  }
   closeShopFilterMenu();
   renderShopTab();
 }
@@ -122,7 +132,8 @@ function toggleShopSortDir(){
 // 화면을 자동으로 다시 그려줌(다른 화면의 페이지 이동 로직에는 영향 없음).
 const PAGE_RENDER_FN = {
   invWeapon: renderInventoryList,
-  shopWeapon: renderShopTab, shopArmor: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
+  forgeSelect: renderForgeSelectList,
+  shopWeapon: renderShopTab, shopArmor: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
   charStats: renderCharStats,
   charMenuInfo: renderCharacterMenu,
@@ -287,6 +298,17 @@ function closeCharStats(){
   draftStatPoints = null;
   statAllocActive = { str: false, agi: false, int: false };
   el('charStatsModal').style.display = 'none';
+}
+
+// ---- 대장간 "강화 장비 선택" 팝업 ----
+function openForgeSelect(){
+  if(isEnhancing) return;
+  pageState.forgeSelect = 1; // 열 때마다 항상 1페이지부터
+  renderForgeSelectList();
+  el('forgeSelectModal').style.display = 'flex';
+}
+function closeForgeSelect(){
+  el('forgeSelectModal').style.display = 'none';
 }
 
 // ---- 캐릭터 메뉴(좌측 상단바 "캐릭터") ----

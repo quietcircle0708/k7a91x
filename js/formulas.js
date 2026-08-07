@@ -327,15 +327,28 @@ function shopMiscEntries(){
     .filter(m => m.itemClass === 'misc' && (state[m.stateKey] || 0) > 0)
     .map(m => ({ id: m.id, price: m.sellPrice, levelReq: null }));
 }
-// 탭 id로 해당 탭에 표시할 정규화된 아이템 목록을 조회. 새 탭이 SHOP_TABS에 추가되면 이 분기도 함께 추가.
+// 탭 id로 해당 탭에 표시할 정규화된 아이템 목록을 조회. 새 탭이 SHOP_TABS(의 subTabs 포함)에
+// 추가되면 이 분기도 함께 추가.
 function shopEntriesForTab(tabId){
   if(tabId === 'weapon') return shopEquipmentEntries(WEAPON_TYPES);
   if(tabId === 'armor') return shopEquipmentEntries(ARMOR_TYPES);
+  if(tabId === 'accessory') return shopEquipmentEntries(ACCESSORY_TYPES);
   if(tabId === 'consumable') return shopConsumableEntries();
   if(tabId === 'artifact') return shopArtifactEntries();
   if(tabId === 'stone') return shopStoneEntries();
   if(tabId === 'misc') return shopMiscEntries();
   return [];
+}
+// 상점/인벤토리 공용: leafId(실제 표시 중인 탭, 예: 'weapon')가 속한 최상위 탭 id를 반환(예: 'equipment').
+// leafId 자체가 이미 최상위 탭(subTabs가 없는 탭, 예: 'consumable')이면 그대로 반환. 최상위 탭 버튼의
+// active 표시와 하위탭 행 노출 여부를 결정하는 데 공용으로 사용됨(SHOP_TABS/INVENTORY_TABS 둘 다 동일한
+// { id, label, subTabs? } 구조를 쓰므로 같은 함수로 처리 가능).
+function topTabIdFor(topTabsList, leafId){
+  for(const t of topTabsList){
+    if(t.id === leafId) return t.id;
+    if(t.subTabs && t.subTabs.some(st => st.id === leafId)) return t.id;
+  }
+  return leafId;
 }
 // 필터(price/levelReq) + 방향(asc/desc)에 따라 엔트리 목록을 정렬해서 새 배열로 반환.
 // levelReq가 없는 아이템(소비/아티팩트/기타)에 레벨 필터를 적용해도 에러 없이 동작하도록 null은 맨 뒤로 취급.
@@ -529,6 +542,7 @@ function effectiveAtkSpeed(type, level){
   if(isArtifactEquipped('batwing')) s *= 1.05;
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
   s *= 1 + agi * 0.001; // 민첩 1당 공격속도 +0.1%
+  s *= 1 + activeBuffBonus('atkSpeedPercent') / 100; // 활성화된 버프 스킬(예: 선공)의 공격속도% 보너스
   return s;
 }
 function effectiveAtk(type, level){
@@ -551,6 +565,30 @@ function effectiveCritChance(type, level){
     bonus += weaponUniqueOptionChance(type, level) || 0;
   }
   return critChanceFor(type, level) + bonus;
+}
+
+// ---- 대장간 "강화 장비 선택" 팝업: 후보 목록 조회 ----
+// EQUIP_INVENTORY_POOLS(data.js)를 순회하며 "소유 + 착용 가능 + 강화 가능" 세 조건을 모두 만족하는
+// 장비만 모아 하나의 배열로 반환. 장비 종류(무기/방어구/장신구)를 구분하지 않고 섞어서 반환하며,
+// 정렬 기준은 없음(원래 인벤토리 등록 순서 그대로) — 요구사항에 정렬 규칙이 없으므로 임의 정렬을
+// 추가하지 않음.
+// "착용 가능" 조건은 현재 강화 대상으로 지정된 아이템(state.equippedId)에는 적용하지 않음 — 인벤토리
+// 목록(render.js의 equipDisabled = isEquipped || !reqOk)과 동일한 안전장치로, 레벨업/스탯초기화 등으로
+// 요구 스탯에 일시적으로 못 미치게 되어도 "이미 선택되어 있던" 장비가 목록에서 갑자기 사라지지 않게 함.
+function forgeSelectableItems(){
+  const list = [];
+  EQUIP_INVENTORY_POOLS.forEach(pool => {
+    const items = (typeof pool.items === 'function' ? pool.items() : pool.items) || [];
+    items.forEach(item => {
+      const type = item.type;
+      const typeDef = pool.typesTable[type];
+      if(!typeDef) return;                          // 도감에 없는 타입은 제외
+      if(item.id !== state.equippedId && !pool.meetsReq(type)) return; // 착용 가능 조건
+      if(!typeDef.atk || typeDef.atk.length === 0) return; // 강화 가능 조건(강화단계 데이터가 있어야 함)
+      list.push({ kind: pool.kind, id: item.id, type, level: item.level });
+    });
+  });
+  return list;
 }
 
 // ---- 골드/드랍 관련 계산 ----

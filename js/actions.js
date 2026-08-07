@@ -144,11 +144,14 @@ function performSellItem(id){
   state.inventory.splice(idx, 1);
   if(state.equippedId === id){
     state.equippedId = null;
+    // "판매 후 자동 구매"는 인벤토리에 새 검을 채워주는 기능이지 강화 대상을 대신 골라주는 기능이
+    // 아님(구조 변경 5번: 강화 화면은 항상 플레이어가 직접 선택한 장비만 표시) — 그래서 구매까지는
+    // 자동으로 하되, 강화 대상으로 자동 지정(equippedId 대입)하지는 않음. 이후 대장간 버튼이나
+    // 인벤토리에서 직접 "강화 선택"해야 강화 화면에 표시됨.
     if(state.autoRebuy && state.gold >= weaponBuyPrice('longsword') && state.inventory.length < INV_MAX){
       state.gold -= weaponBuyPrice('longsword');
       const newItem = { id: state.nextItemId++, level: 0, type: 'longsword' };
       state.inventory.push(newItem);
-      state.equippedId = newItem.id;
     }
   }
   render();
@@ -169,6 +172,13 @@ function equipItem(id){
   showMsg('', '');
   render();
   saveState();
+}
+// 대장간 "강화 장비 선택" 팝업에서 아이템을 클릭했을 때 호출됨. 기존 equipItem(인벤토리의 "강화 선택"
+// 버튼과 동일 로직)을 그대로 재사용해서 강화 대상을 설정하고, 선택 즉시 팝업만 닫음 — 강화 공식/비용
+// 등 기존 강화 로직은 전혀 건드리지 않음.
+function selectForgeTarget(id){
+  equipItem(id);
+  closeForgeSelect();
 }
 
 // ---- 보호 장치(쇠조각/보석) ----
@@ -237,10 +247,9 @@ function buyWeapon(typeId, btn){
   state.gold -= price;
   const newItem = { id: state.nextItemId++, level: 0, type: typeId };
   state.inventory.push(newItem);
-  // 장착 중인 무기가 없을 때만 자동 장착하되, 착용 조건(레벨/요구 스탯)을 만족할 때만 실제로 장착함.
-  if(state.equippedId === null && meetsWeaponEquipRequirements(typeId, state.playerLevel, state.stats)){
-    state.equippedId = newItem.id;
-  }
+  // (구조 변경 5번) 예전에는 장착 중인 무기가 없으면 방금 구매한 무기를 자동으로 강화 대상으로
+  // 지정했지만, 이제는 대장간 버튼/인벤토리에서 플레이어가 직접 "강화 선택"해야만 강화 화면에
+  // 표시되도록 자동 지정을 제거함. 구매 자체(인벤토리에 추가)는 그대로 동작함.
   purchaseEffect(btn || null);
   render(); saveState();
 }
