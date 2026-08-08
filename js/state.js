@@ -11,8 +11,15 @@ let state = {
   // 있었음. 이제는 인벤토리를 비운 채로 시작하고, 시작 골드(1000G)로 상점에서 직접 무기를 사고
   // 대장간 버튼(또는 인벤토리)에서 직접 강화 대상으로 선택하도록 함.
   inventory: [],
-  equippedId: null,
+  equippedId: null,   // 실제 전투에 사용되는 착용 무기(대장간 화면과 무관하게 항상 무기만 가리킴)
+  // 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기든 방어구든 상관없이 여기에 지정된 아이템이
+  // 표시됨. 무기를 강화 선택하면 equipItem()이 이 값과 equippedId를 함께 갱신(=강화 선택이 곧 착용)하지만,
+  // 방어구를 강화 선택할 때는 equippedId(착용 무기)는 건드리지 않고 이 값만 바뀜 — 방어구의 실제 능력치
+  // 적용은 이 값과 무관하게 별도의 equippedArmor(착용) 상태를 따름.
+  forgeTargetId: null,
   nextItemId: 1,
+  armorInventory: [],                          // 보유 방어구 목록({id,type,level}, 무기 인벤토리와 동일한 형태)
+  equippedArmor: { helmet: null, armor: null }, // 착용 중인 방어구(종류당 1개) — 강화 대상(equippedId)과는 별개 개념
   charmCount: 0, charmPrice: 1500, charmActive: false,
   blessingCount: 0, blessingPrice: 15000, blessingActive: false,
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
@@ -61,7 +68,17 @@ let pageState = {
 let shopFilterMenuOpen = false;
 
 const el = id => document.getElementById(id);
-function getEquipped(){ return state.inventory.find(i => i.id === state.equippedId) || null; }
+// 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기든 방어구든 상관없이 state.forgeTargetId가
+// 가리키는 아이템을 반환함(사용자 요청: 강화 화면에서 강화 가능한 모든 장비를 선택해서 쓸 수 있어야 함).
+function getEquipped(){
+  return state.inventory.find(i => i.id === state.forgeTargetId)
+    || (state.armorInventory || []).find(i => i.id === state.forgeTargetId)
+    || null;
+}
+// 공격력 등 "실제 전투에 쓰이는 착용 무기"가 필요한 곳 전용(스킬 데미지 계산, 던전 입장 조건, 전투 자동
+// 공격, 캐릭터 정보창의 "장착 무기" 패널 등) — 대장간 화면에 방어구가 선택되어 있어도 이 함수는 항상
+// state.equippedId(착용 무기)만 반환함. 방어구 시스템 추가 이전의 원래 getEquipped()와 동일한 동작.
+function getEquippedWeapon(){ return state.inventory.find(i => i.id === state.equippedId) || null; }
 
 // SETTINGS_SCHEMA를 순회하며 state.settings에 없는 키를 기본값으로 채움.
 // 새 설정 메뉴가 추가돼도 기존 저장 데이터를 불러올 때 자동으로 기본값이 채워짐.
@@ -108,6 +125,16 @@ function stopDeathCurseTicker(){
 function ensurePlayerVitals(){
   if(state.playerHp == null) state.playerHp = effectiveMaxHp(state.playerLevel);
   if(state.playerMp == null) state.playerMp = effectiveMaxMp(state.playerLevel);
+}
+// 방어구 착용/해제/강화처럼 최대 체력·마나(effectiveMaxHp/Mp)가 즉시 바뀔 수 있는 동작 이후 호출.
+// 현재 체력/마나가 새 최대치를 넘지 않도록 잘라줌(레벨업 때처럼 꽉 채우지는 않음 — 착용 해제로 체력이
+// 줄어드는 경우를 자연스럽게 처리하기 위함).
+function clampPlayerVitals(){
+  ensurePlayerVitals();
+  const maxHp = effectiveMaxHp(state.playerLevel);
+  const maxMp = effectiveMaxMp(state.playerLevel);
+  if(state.playerHp > maxHp) state.playerHp = maxHp;
+  if(state.playerMp > maxMp) state.playerMp = maxMp;
 }
 // 경험치 획득 처리. 레벨업하면 몇 레벨이 올랐는지 반환(안 올랐으면 0)
 function gainExp(amount){
@@ -199,6 +226,14 @@ function applyLoadedRaw(raw){
   if(Array.isArray(state.inventory)){
     state.inventory.forEach(it => { if(!it.type) it.type = 'longsword'; });
   }
+  // 방어구 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
+  if(!Array.isArray(state.armorInventory)) state.armorInventory = [];
+  if(!state.equippedArmor || typeof state.equippedArmor !== 'object') state.equippedArmor = { helmet: null, armor: null };
+  if(state.equippedArmor.helmet === undefined) state.equippedArmor.helmet = null;
+  if(state.equippedArmor.armor === undefined) state.equippedArmor.armor = null;
+  // 대장간 강화 대상(forgeTargetId) 추가 이전 세이브 마이그레이션: 예전엔 equippedId 하나가 "착용
+  // 무기"와 "대장간 표시 대상"을 겸했으므로, 없으면 기존 equippedId 값을 그대로 이어받음.
+  if(state.forgeTargetId === undefined) state.forgeTargetId = state.equippedId != null ? state.equippedId : null;
   // 구버전(스탯 시스템 이전) 마이그레이션: 이미 얻은 레벨만큼 포인트 소급 지급
   if(loaded.statPoints === undefined){
     state.statPoints = 4 * (state.playerLevel || 1);
@@ -285,7 +320,8 @@ function resetGame(){
   hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null };
 
   state = {
-    gold: 1000, inventory: [], equippedId: null, nextItemId: 1,
+    gold: 1000, inventory: [], equippedId: null, forgeTargetId: null, nextItemId: 1,
+    armorInventory: [], equippedArmor: { helmet: null, armor: null },
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,

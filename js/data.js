@@ -278,10 +278,76 @@ const WEAPON_TYPES = {
   },
 };
 
-// 방어구 종류 도감. 현재는 등록된 방어구가 없음(빈 객체) — 상점 "방어구" 탭은 이 표가 비어있는 동안
-// 자동으로 빈 탭이 됨. WEAPON_TYPES와 동일한 필드 구조(equipType:'armor', purchasable 등)로 항목을
-// 추가하면 상점 코드를 건드리지 않고도 자동으로 목록에 표시됨.
-const ARMOR_TYPES = {};
+// ---- 방어구 종류(투구/갑옷) ----
+const ARMOR_KINDS = { helmet: '투구', armor: '갑옷' };
+// 방어구 이미지 파일 경로 규칙(무기와 동일한 onerror 방식). image 필드가 비어 있으면 방어구 종류별
+// 기본 이미지(투구→helmetbase, 갑옷→armorbase)를 자동 적용함(방어구 아이템 데이터 스키마 규칙).
+const ARMOR_IMAGE_DIR = 'assets/armor/';
+const ARMOR_IMAGE_EXT = '.png';
+const ARMOR_DEFAULT_IMAGE = { helmet: 'helmetbase', armor: 'armorbase' };
+
+// 방어구 종류 도감. 무기 데이터 스키마와 동일한 구조를 기본으로 사용함(이름/장비 설명/아이템 등급/
+// 고유 옵션/상점 구매 여부/판매 가격/이미지는 무기와 동일한 규칙). 레벨 제한은 레벨만 검사하고(힘/민첩 등
+// 추가 조건 없음), 각 방어구 종류(투구/갑옷)당 하나의 아이템만 동시 착용 가능함.
+// ---- 항목 설명 ----
+// armorKind: 방어구 종류('helmet'|'armor') / defense: 기본 방어도(음수 값만 사용) / hp: 기본 체력 보너스 /
+// mana: 기본 마나 보너스 — defense/hp/mana는 공란(값 없음=undefined)이면 해당 옵션이 없는 것으로 간주됨.
+// defArr/hpArr/manaArr: 강화 단계별(+0~+9) 값 배열 — 아래 forEach가 자동으로 계산해서 채움(직접 적을 필요 없음).
+const ARMOR_TYPES = {
+  oldarmor: {
+    id: 'oldarmor', name: '낡은 갑옷', desc: '낡았지만 아직 입을 만한 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'normal', // 일반
+    defense: -1,
+    purchasable: true, sellPrice: 100, levelReq: 1,
+    image: '',
+  },
+  oldhelmet: {
+    id: 'oldhelmet', name: '낡은 투구', desc: '기본적인 방호력은 유지하고 있다',
+    equipType: 'armor',
+    armorKind: 'helmet', // 투구
+    grade: 'normal', // 일반
+    defense: -1,
+    purchasable: true, sellPrice: 100, levelReq: 1,
+    image: '',
+  },
+};
+
+// ---- 방어구 강화 단계별 체력/마나 증가 공식 ----
+// +N 체력(또는 마나) = 기본값 + (기본값 × 강화 단계 × 이 배율). 항상 +0(기본) 값을 기준으로 직접 계산하며
+// (재귀 아님, 이전 강화 단계는 참조하지 않음), 계산 과정에서는 반올림하지 않고 최종 결과만 반올림함.
+// index = 강화 단계(1~9)
+const ARMOR_VITAL_STEP_MULT = [null, 0.05, 0.05, 0.05, 0.05, 0.10, 0.05, 0.15, 0.15, 0.20];
+function computeArmorVitalArray(base){
+  if(base == null) return null;
+  const arr = [base];
+  for(let lv = 1; lv <= 9; lv++){
+    arr.push(Math.round(base + (base * lv * ARMOR_VITAL_STEP_MULT[lv])));
+  }
+  return arr;
+}
+
+// ---- 방어구 강화 단계별 방어도 증가 공식 ----
+// 재귀 방식: +N 방어도 = +(N-1) 방어도 + 해당 강화 단계 증가치. index = 강화 단계(1~9)
+const ARMOR_DEFENSE_STEP_DELTA = [null, 0, -1, 0, -1, 0, -1, -1, -1, -2];
+function computeArmorDefenseArray(baseDefense){
+  if(baseDefense == null) return null;
+  const arr = [baseDefense];
+  for(let lv = 1; lv <= 9; lv++){
+    arr.push(arr[lv - 1] + (ARMOR_DEFENSE_STEP_DELTA[lv] || 0));
+  }
+  return arr;
+}
+
+// 방어도/체력/마나 강화 배열은 여기서 바로 채움(다른 데이터 테이블에 의존하지 않는 자체 계산).
+// 강화 비용/확률/판매가("장비 전역 설정")는 computeGradeCost 등 관련 함수/상수가 이 파일 아래쪽에
+// 정의되므로, 그 정의 이후(무기 판매가 공식 연결부 바로 다음)에서 이어서 연결함 — 3단계 참고.
+Object.values(ARMOR_TYPES).forEach(a => {
+  if(a.defense != null) a.defArr = computeArmorDefenseArray(a.defense);
+  if(a.hp != null) a.hpArr = computeArmorVitalArray(a.hp);
+  if(a.mana != null) a.manaArr = computeArmorVitalArray(a.mana);
+});
 
 // 장신구 종류 도감. ARMOR_TYPES와 동일한 이유·동일한 방식으로 아직 빈 객체(등록된 장신구 없음) —
 // WEAPON_TYPES/ARMOR_TYPES와 같은 필드 구조(equipType:'accessory')로 항목을 추가하면 자동으로
@@ -291,15 +357,22 @@ const ACCESSORY_TYPES = {};
 // ---- 대장간 "강화 장비 선택" 팝업이 훑는 장비 보유 풀 목록 ----
 // 각 항목은 { kind, items(): 보유 아이템 배열을 반환하는 함수, typesTable: 도감(공격력/등급 등 정의),
 // meetsReq(type): 착용 가능 여부 판정 함수 }. formulas.js의 forgeSelectableItems()가 이 배열을 순회해서
-// "소유 + 착용 가능 + 강화 가능(typesTable에 강화단계 atk 배열이 있음)" 세 조건을 모두 만족하는 장비만
-// 추려 하나의 목록으로 합침. 방어구/장신구는 아직 실제 인벤토리 배열이 없어(state.armorInventory 등
-// 미정의) items()가 항상 빈 배열을 반환하지만, 나중에 그 배열과 도감 데이터가 채워지면 이 표에 항목만
-// 추가하면 대장간 팝업에도 자동으로 합류됨(다른 코드 수정 불필요).
+// "소유 + 착용 가능 + 강화 가능" 세 조건을 모두 만족하는 장비만 추려 하나의 목록으로 합침.
+// 무기/방어구 모두 이 풀에 포함됨(사용자 요청: 강화 화면에서 강화 가능한 모든 장비를 선택해서 사용) —
+// 강화 화면(render() 상단)은 buildForgeStatRowsHtml로 데이터에 있는 옵션만 동적으로 표시하므로 장비
+// 종류를 가리지 않음. 단, 방어구를 여기서 "선택"(state.forgeTargetId)해도 실제 착용 무기(state.
+// equippedId)나 방어구 착용 상태(state.equippedArmor)는 바뀌지 않음 — 그건 별도의 착용 시스템이 담당.
 const EQUIP_INVENTORY_POOLS = [
   {
     kind: 'weapon',
     items: () => state.inventory,
     typesTable: WEAPON_TYPES,
+    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
+  },
+  {
+    kind: 'armor',
+    items: () => state.armorInventory || [],
+    typesTable: ARMOR_TYPES,
     meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
   },
 ];
@@ -526,6 +599,22 @@ function computeWeaponSellPrices(w){
 Object.values(WEAPON_TYPES).forEach(w => {
   const sell = computeWeaponSellPrices(w);
   if(sell) w.sell = sell;
+});
+
+// ============================================================
+// ARMOR_TYPES에 "장비 전역 설정"(강화 비용/확률/판매가) 연결. 무기와 완전히 동일한 등급 기반 공식을
+// 그대로 재사용함 — computeGradeCost/resolveGradeOdds/computeWeaponSellPrices는 원래부터 무기 전용
+// 필드를 참조하지 않는 범용 함수(등급/아이템 레벨/cost·odds·sellPrice만 사용)라 그대로 호출 가능함.
+// ============================================================
+Object.values(ARMOR_TYPES).forEach(a => {
+  const gradeOdds = resolveGradeOdds(a.grade);
+  const gradeCost = computeGradeCost(a.levelReq || 1, a.grade);
+  if(gradeOdds) a.odds = gradeOdds;
+  if(gradeCost) a.cost = gradeCost;
+});
+Object.values(ARMOR_TYPES).forEach(a => {
+  const sell = computeWeaponSellPrices(a);
+  if(sell) a.sell = sell;
 });
 
 // ---- 캐릭터 레벨 시스템 ----

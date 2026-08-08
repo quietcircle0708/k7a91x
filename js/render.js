@@ -26,14 +26,11 @@ function render(){
     el('emptyNotice').style.display = 'block';
     el('quickBuySwordBtn').textContent = `🗡️ 검 구매 (${weaponBuyPrice('longsword').toLocaleString()} G)`;
     el('quickBuySwordBtn').disabled = state.gold < weaponBuyPrice('longsword') || state.inventory.length >= INV_MAX;
-    el('tierLabel').textContent = '장착된 무기 없음';
+    el('tierLabel').textContent = '장착된 장비 없음';
     el('levelDisplay').textContent = '-';
     el('levelDisplay').style.color = 'var(--forge-cream-dim)';
     el('itemName').textContent = '';
-    el('atkText').textContent = '-';
-    el('atkSpeedText').textContent = '-';
-    el('atkSpeedTooltip').textContent = '장착된 무기가 없습니다';
-    el('critStatWrap').style.display = 'none';
+    el('statRowsWrap').innerHTML = '';
     el('uniqueOptionWrap').style.display = 'none';
     el('oddsRow').innerHTML = '';
     stage.classList.add('empty');
@@ -42,7 +39,7 @@ function render(){
     updateAuraSmoke(false);
     el('enhanceBtn').disabled = true;
     el('enhanceBtn').textContent = '강화하기';
-    el('costLine').innerHTML = '장착된 무기가 없습니다';
+    el('costLine').innerHTML = '장착된 장비가 없습니다';
     el('sellBtn').disabled = true;
     el('charmCount').textContent = state.charmCount;
     el('charmPrice').textContent = state.charmPrice.toLocaleString();
@@ -66,23 +63,12 @@ function render(){
     el('tierLabel').textContent = meta.label;
     el('itemName').textContent = weaponName(type) + ' +' + level;
     el('itemName').style.color = weaponNameColor(type, level);
-    const atkNext = level < MAX_LEVEL ? atkFor(type, level+1) : null;
-    el('atkText').innerHTML = formatStatDelta(atkFor(type, level), atkNext, null, '');
 
-    const speedNow = atkSpeedFor(type, level);
-    const speedNext = level < MAX_LEVEL ? atkSpeedFor(type, level+1) : null;
-    el('atkSpeedText').innerHTML = formatStatDelta(speedNow, speedNext, 2, '');
-    el('atkSpeedTooltip').textContent = `1초에 ${speedNow.toFixed(2)}만큼 공격`;
+    // 강화 화면 스탯: 무기/방어구 구분 없이 데이터에 실제로 존재하는 옵션(공격력/공격속도/치명타 확률/
+    // 방어도/체력/마나)만 자동으로 표시(하드코딩 없음, buildForgeStatRowsHtml 참고).
+    el('statRowsWrap').innerHTML = buildForgeStatRowsHtml(type, level);
 
-    const critNow = critChanceFor(type, level);
-    const critNext = level < MAX_LEVEL ? critChanceFor(type, level+1) : null;
-    const showCrit = critNow > 0 || (critNext !== null && critNext > 0);
-    el('critStatWrap').style.display = showCrit ? '' : 'none';
-    if(showCrit){
-      el('critText').innerHTML = formatStatDelta(critNow, critNext, null, '%');
-    }
-
-    // 고유 옵션(에픽/유니크 전용) — 무기 데이터에 uniqueOption이 없으면 자동으로 숨겨짐
+    // 고유 옵션(에픽/유니크 전용) — 무기 데이터에 uniqueOption이 없으면 자동으로 숨겨짐. 기존 로직 그대로 재사용.
     const uniqueOptionHtml = weaponUniqueOptionForgeHtml(type, level);
     el('uniqueOptionWrap').style.display = uniqueOptionHtml ? '' : 'none';
     if(uniqueOptionHtml) el('uniqueOptionText').innerHTML = uniqueOptionHtml;
@@ -97,7 +83,7 @@ function render(){
     el('blessingCount').textContent = state.blessingCount;
     el('blessingPrice').textContent = state.blessingPrice.toLocaleString();
 
-    const noEnhanceData = !wpn(type).cost || wpn(type).cost.length === 0; // 아직 강화 단계별 데이터가 없는 무기(숏소드/대거 등)
+    const noEnhanceData = !wpn(type).cost || wpn(type).cost.length === 0; // 아직 강화 단계별 데이터가 없는 장비(숏소드/대거 등)
     const atMax = noEnhanceData || level >= MAX_LEVEL;
     const odds = atMax ? null : oddsFor(type, level);
     const downPossible = odds && odds[2] > 0;
@@ -125,12 +111,12 @@ function render(){
       oddsRow.innerHTML = '';
       el('enhanceBtn').disabled = true;
       el('enhanceBtn').textContent = '강화 준비 중';
-      el('costLine').innerHTML = '이 무기는 아직 강화 데이터가 준비되지 않았습니다';
+      el('costLine').innerHTML = '이 장비는 아직 강화 데이터가 준비되지 않았습니다';
     } else if(atMax){
       oddsRow.innerHTML = '';
       el('enhanceBtn').disabled = true;
       el('enhanceBtn').textContent = '최대 강화 완료';
-      el('costLine').innerHTML = '판매하여 새 무기를 시작하세요';
+      el('costLine').innerHTML = '판매하여 새 장비를 시작하세요';
     } else {
       let chips = `<span class="odds-chip success">성공 ${odds[0]}%</span><span class="odds-chip stay">유지 ${odds[1]}%</span>`;
       if(odds[2] > 0) chips += `<span class="odds-chip down">하락 ${odds[2]}%</span>`;
@@ -210,7 +196,7 @@ function renderForgeSelectList(){
   if(pagerWrap) pagerWrap.innerHTML = pagerHtml('forgeSelect', pageState.forgeSelect, totalPageCount);
   const pageEntries = pageSlice(entries, pageState.forgeSelect, pageSize);
   wrap.innerHTML = `<div class="forge-select-list">${pageEntries.map(entry => {
-    const isCurrent = entry.id === state.equippedId;
+    const isCurrent = entry.id === state.forgeTargetId;
     const itemColor = weaponNameColor(entry.type, entry.level);
     return `
       <button class="forge-select-item ${isCurrent ? 'active' : ''}" data-action="select-forge-target" data-id="${entry.id}">
@@ -267,18 +253,57 @@ function renderInventoryList(){
   }).join('');
 }
 
-// 방어구/장신구 인벤토리 목록 — 이번 작업(장비 탭 추가)에서는 UI/탭 구조만 만들고 실제 방어구·장신구
-// 아이템 데이터는 아직 추가하지 않으므로 항상 빈 상태로 표시됨. state.armorInventory / state.
-// accessoryInventory는 아직 정의되지 않은 값이라 항상 빈 배열로 취급되며(다음 작업에서 실제 인벤토리
-// 배열과 카드 템플릿이 추가되면, renderInventoryList와 동일한 방식으로 이 함수만 확장하면 자동 반영됨),
-// 지금 당장은 데이터 구조나 임시 데이터를 새로 만들지 않는다는 이번 작업 범위를 그대로 지킴.
+// 방어구 인벤토리 목록. 무기 인벤토리 카드(renderInventoryList)와 동일한 레이아웃/공용 함수
+// (weaponNameColor/weaponIconHtml/meetsWeaponEquipRequirements/sellValueFor — 전부 "장비 전역 설정"에
+// 해당하는 범용 함수라 방어구에도 그대로 재사용됨)를 쓰되, 버튼 구성은 다름:
+// - "착용/착용 해제": 무기의 "강화 선택"(=대장간 표시 대상 지정)과는 별개 개념. 방어구는 투구+갑옷을
+//   동시에 착용할 수 있어서(state.equippedArmor.helmet / .armor), 착용 여부가 실제 능력치(방어도/체력/
+//   마나)에 곧바로 반영됨(equipArmorPiece/unequipArmorPiece, actions.js).
+// - "강화": 대장간 swordStage 화면을 거치지 않고 카드에서 바로 강화(startEnhanceArmor, actions.js) —
+//   swordStage는 공격력/공격속도 등 무기 전용 필드 기반이라 방어구를 그 화면으로 보내지 않음.
 function renderArmorInventoryList(){
   const wrap = el('armorInventoryList');
   if(!wrap) return;
   const items = state.armorInventory || [];
   if(items.length === 0){
-    wrap.innerHTML = `<div class="inv-empty">아직 준비된 방어구가 없습니다.</div>`;
+    wrap.innerHTML = `<div class="inv-empty">보유한 방어구가 없습니다.<br>상점에서 <b>방어구</b>를 구매해보세요.</div>`;
+    return;
   }
+  wrap.innerHTML = items.map(item => {
+    const type = item.type;
+    const def = ARMOR_TYPES[type];
+    if(!def) return '';
+    const itemColor = weaponNameColor(type, item.level);
+    const isWorn = !!(state.equippedArmor && state.equippedArmor[def.armorKind] === item.id);
+    const sellVal = sellValueFor(type, item.level);
+    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, state.stats);
+    const wearBtnHtml = isWorn
+      ? `<button class="inv-btn equip active" data-action="unwear-armor" data-id="${item.id}">착용 해제</button>`
+      : `<button class="inv-btn equip" data-action="wear-armor" data-id="${item.id}" ${reqOk ? '' : 'disabled'}>착용</button>`;
+    const wearBtnFinal = (!isWorn && !reqOk)
+      ? `<span class="equip-req-wrap">${wearBtnHtml}<span class="tooltip">착용 조건을 만족해야 장착할 수 있습니다.${weaponRequirementText(type) ? `<br>(${weaponRequirementText(type)})` : ''}</span></span>`
+      : wearBtnHtml;
+    // "강화 선택" — 대장간 화면(swordStage)에 이 방어구를 강화 대상으로 올림(무기 인벤토리 카드의
+    // "강화 선택" 버튼과 동일한 equipItem() 재사용). 실제 강화는 대장간 화면의 "강화하기" 버튼에서 진행.
+    const isForgeTarget = item.id === state.forgeTargetId;
+    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk) ? 'disabled' : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
+    return `
+      <div class="inv-card ${isWorn ? 'equipped' : ''}">
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
+        <div class="inv-info">
+          <span class="weapon-name-wrap">
+            <span class="inv-name" style="color:${itemColor};">${def.name} <span class="inv-level" style="color:${itemColor};">+${item.level}</span></span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="tooltip">${buildArmorTooltipHtml(type, item.level)}</span>
+          </span>
+          <div class="inv-sub">${ARMOR_KINDS[def.armorKind] || ''}</div>
+        </div>
+        <div class="inv-actions">
+          ${wearBtnFinal}
+          ${forgeBtnHtml}
+          <button class="inv-btn sell" data-action="sell-armor" data-id="${item.id}">판매 (${sellVal.toLocaleString()}G)</button>
+        </div>
+      </div>`;
+  }).join('');
 }
 function renderAccessoryInventoryList(){
   const wrap = el('accessoryInventoryList');
@@ -586,9 +611,13 @@ function renderStatAllocRow(key, label, value){
 // 무기는 기존 장착 시스템(getEquipped)을 그대로 사용해 조회하고, 아직 실제 장비 데이터가 없는 슬롯
 // (투구/갑옷/장신구1/장신구2)은 항상 null을 반환해 빈 슬롯으로 표시됨 — 해당 장비 타입이 실제로 추가되면
 // 이 함수에 조회 분기 하나만 추가하면 되고, 장비창을 그리는 나머지 코드는 수정할 필요가 없음.
+// 장비창의 각 슬롯(무기/투구/갑옷/장신구1/장신구2)에 대해, 현재 그 슬롯에 장착된 아이템의 표시 정보를
+// { name, level, color, iconHtml, tooltipHtml } 형태로 통일해서 반환. 무기는 실제 착용 무기(getEquippedWeapon,
+// state.equippedId) 기준, 투구/갑옷은 착용 방어구(state.equippedArmor, state.armorInventory) 기준 —
+// 대장간 화면에 무엇이 선택되어 있는지(state.forgeTargetId)와는 무관함.
 function equippedItemForSlot(slotKey){
   if(slotKey === 'weapon'){
-    const equipped = getEquipped();
+    const equipped = getEquippedWeapon();
     if(!equipped) return null;
     const type = equipped.type || 'longsword';
     const level = equipped.level;
@@ -599,7 +628,21 @@ function equippedItemForSlot(slotKey){
       tooltipHtml: buildWeaponTooltipHtml(type, level),
     };
   }
-  return null; // 투구 / 갑옷 / 장신구1 / 장신구2 — 아직 등록된 장비 데이터 없음
+  if(slotKey === 'helmet' || slotKey === 'armor'){
+    const id = state.equippedArmor && state.equippedArmor[slotKey];
+    if(!id) return null;
+    const item = (state.armorInventory || []).find(i => i.id === id);
+    if(!item) return null;
+    const type = item.type;
+    const level = item.level;
+    return {
+      name: weaponName(type), level,
+      color: weaponNameColor(type, level),
+      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img'),
+      tooltipHtml: buildArmorTooltipHtml(type, level),
+    };
+  }
+  return null; // 장신구1 / 장신구2 — 아직 등록된 장비 데이터 없음
 }
 function equipSlotHtml(slot){
   const item = equippedItemForSlot(slot.key);
@@ -664,7 +707,7 @@ function renderCharStats(){
 // 캐릭터 정보(레벨/체력/마나/경험치 → 스탯 배분 → 전투 능력치) HTML 조립. 캐릭터 정보 모달(1페이지 우측)과
 // 캐릭터 메뉴(신규, "캐릭터 정보" 탭 1페이지)가 이 함수를 그대로 공유해서 쓰므로, 기능/데이터가 항상 동일함.
 function buildCharStatsInfoHtml(){
-  const equipped = getEquipped();
+  const equipped = getEquippedWeapon();
 
   const lv = state.playerLevel;
   const maxHp = effectiveMaxHp(lv);
@@ -720,6 +763,18 @@ function buildCharStatsInfoHtml(){
     }
   }
 
+  // 착용 중인 방어구(투구/갑옷) 요약 — 착용한 방어구가 하나도 없으면 이 블록 자체를 표시하지 않음.
+  const wornHelmet = state.equippedArmor && state.equippedArmor.helmet
+    ? (state.armorInventory || []).find(i => i.id === state.equippedArmor.helmet) : null;
+  const wornBody = state.equippedArmor && state.equippedArmor.armor
+    ? (state.armorInventory || []).find(i => i.id === state.equippedArmor.armor) : null;
+  if(wornHelmet || wornBody){
+    rightHtml += `<div class="char-stat-divider"></div>`;
+    rightHtml += `<div class="char-stat-row big"><span>총 방어도</span><span class="v">${playerTotalDefense()}</span></div>`;
+    if(wornHelmet) rightHtml += `<div class="char-stat-row"><span>투구</span><span class="v">${ARMOR_TYPES[wornHelmet.type].name} +${wornHelmet.level}</span></div>`;
+    if(wornBody) rightHtml += `<div class="char-stat-row"><span>갑옷</span><span class="v">${ARMOR_TYPES[wornBody.type].name} +${wornBody.level}</span></div>`;
+  }
+
   return rightHtml;
 }
 // 1페이지 — 좌: 장비창, 우: 캐릭터 정보(buildCharStatsInfoHtml 공용 함수).
@@ -736,7 +791,7 @@ function renderCharStatsPage1(){
 // 유지하고(무기 미장착 시 동일한 안내 문구), 장착 아티팩트가 0개일 때만 기존에는 아무것도 출력되지 않았던 것을
 // 빈 페이지로 보이지 않도록 동일한 안내 문구 스타일로 보완함. 캐릭터 정보 모달 2페이지와 캐릭터 메뉴 3페이지가 공유.
 function buildArtifactEffectsHtml(){
-  const equipped = getEquipped();
+  const equipped = getEquippedWeapon();
   if(!equipped){
     return `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
   }
@@ -1025,7 +1080,7 @@ function buildDungeonDropIcons(d){
 }
 
 function renderDungeonList(){
-  const equipped = getEquipped();
+  const equipped = getEquippedWeapon();
   el('noWeaponForDungeon').style.display = equipped ? 'none' : 'block';
   const wrap = el('dungeonList');
   const pagerWrap = el('dungeonListPager');
@@ -1065,7 +1120,7 @@ function renderHunt(){
   if(!d) return;
   el('huntDungeonName').textContent = d.name + ' - ' + stageLabel(hunt.stage);
 
-  const equipped = getEquipped();
+  const equipped = getEquippedWeapon();
   if(equipped){
     const lv = equipped.level;
     const type = equipped.type || 'longsword';
@@ -1339,11 +1394,18 @@ function buildShopCardHtml(tabId, id){
 function buildWeaponShopCardHtml(typesTable, id){
   const w = typesTable[id];
   const buyPrice = (w.sellPrice || 0) * 2;
-  const capOk = state.inventory.length < INV_MAX;
+  // 구매 시 실제로 담기는 인벤토리 배열이 장비 종류마다 다르므로(무기→state.inventory, 방어구→
+  // state.armorInventory), 용량 확인도 그에 맞춰 분기함.
+  const capOk = w.equipType === 'armor'
+    ? (state.armorInventory || []).length < INV_MAX
+    : state.inventory.length < INV_MAX;
   // 아이템 레벨(levelReq)은 "착용" 조건일 뿐이라 구매를 막지 않음 — 인벤토리 공간/골드만 확인.
   const disabled = !capOk || state.gold < buyPrice;
   const tag = !capOk ? '인벤토리 가득참' : (w.levelReq && w.levelReq > 1 ? `아이템 Lv.${w.levelReq}` : '');
   const nameColor = weaponNameColor(id, 0);
+  // 방어구 탭은 무기와 동일한 카드를 공유하지만, 툴팁 내용은 방어구 전용 구성(buildArmorTooltipHtml)을 써야 함
+  // (무기 툴팁은 공격력/공격속도 등 방어구에 없는 필드를 참조하므로).
+  const tooltipHtml = w.equipType === 'armor' ? buildArmorTooltipHtml(id, 0) : buildWeaponTooltipHtml(id, 0);
   return `
     <div class="scroll-card">
       <div class="scroll-head">
@@ -1351,7 +1413,7 @@ function buildWeaponShopCardHtml(typesTable, id){
           <div class="artifact-icon-box" style="background:#242424; border-color:${nameColor};">${weaponIconHtml(id, 'shop-icon-img')}</div>
           <span class="weapon-name-wrap">
             <span class="scroll-name" style="color:${nameColor};">${w.name}</span>
-            <span class="tooltip">${buildWeaponTooltipHtml(id, 0)}</span>
+            <span class="tooltip">${tooltipHtml}</span>
           </span>
         </div>
         <span class="scroll-count">${tag}</span>

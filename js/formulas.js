@@ -6,7 +6,12 @@
 // ============================================================
 
 // ---- 무기 스탯 조회 ----
-function wpn(type){ return WEAPON_TYPES[type] || WEAPON_TYPES.longsword; }
+// 방어구 시스템 추가 이후: WEAPON_TYPES에 없으면 ARMOR_TYPES(→ACCESSORY_TYPES)도 찾아봄. 아이템 id는
+// 도감 간에 겹치지 않으므로 기존 무기 id 조회 동작은 완전히 그대로 유지됨(항상 WEAPON_TYPES가 먼저
+// 검사됨). 이렇게 하면 이름/등급색상/아이콘/툴팁 등 "장비 전역 설정"에 해당하는 함수들을 방어구에도
+// 그대로 재사용할 수 있음 — 단, atk/speed/crit 등 무기 전용 필드를 쓰는 함수(atkFor 등)는 방어구
+// id로 호출하면 안 됨(호출부에서 equipType으로 구분해서 사용).
+function wpn(type){ return WEAPON_TYPES[type] || ARMOR_TYPES[type] || ACCESSORY_TYPES[type] || WEAPON_TYPES.longsword; }
 function weaponKindLabel(type){ return WEAPON_KINDS[wpn(type).weaponKind] || ''; }
 function weaponGradeLabel(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.label : ''; }
 function weaponGradeColor(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.color : '#ffffff'; }
@@ -23,7 +28,16 @@ function weaponName(type){ return wpn(type).name; }
 // 상점 구매가 = 판매가(sellPrice) × 2
 function weaponBuyPrice(type){ return (wpn(type).sellPrice || 0) * 2; }
 // 무기 이미지 경로(파일명 기준). 실제로 파일이 있는지는 <img onerror>에서 최종 확인/대체함.
-function weaponImagePath(type){ return WEAPON_IMAGE_DIR + wpn(type).image + WEAPON_IMAGE_EXT; }
+// 방어구(equipType:'armor')는 별도 디렉토리(ARMOR_IMAGE_DIR)를 쓰고, image 필드가 비어 있으면
+// 방어구 종류별 기본 이미지(ARMOR_DEFAULT_IMAGE)를 자동 적용함(방어구 데이터 스키마 규칙).
+function weaponImagePath(type){
+  const w = wpn(type);
+  if(w.equipType === 'armor'){
+    const file = w.image || ARMOR_DEFAULT_IMAGE[w.armorKind] || 'armorbase';
+    return ARMOR_IMAGE_DIR + file + ARMOR_IMAGE_EXT;
+  }
+  return WEAPON_IMAGE_DIR + w.image + WEAPON_IMAGE_EXT;
+}
 function weaponImageFallbackPath(){ return WEAPON_IMAGE_DIR + WEAPON_IMAGE_FALLBACK + WEAPON_IMAGE_EXT; }
 
 // 몬스터 아이콘 HTML 생성(무기 아이콘 출력 구조를 그대로 재사용). image 필드가 있으면 PNG를 출력하고,
@@ -51,9 +65,13 @@ function monsterImgError(img){
 // 추가로 붙여 다른 무기보다 30% 작게 출력함(강화 화면의 setBladeShape와 동일한 축소 비율) — 무기 데이터를
 // 개별 수정하는 방식이 아니라 무기 종류 판정만으로 자동 적용되므로, 새로 등록되는 단검에도 자동 반영됨.
 function weaponIconHtml(type, className){
-  const kindCls = wpn(type).weaponKind === 'dagger' ? ' weapon-icon-dagger' : '';
+  const w = wpn(type);
+  const kindCls = w.weaponKind === 'dagger' ? ' weapon-icon-dagger' : '';
   const cls = 'weapon-icon-img' + (className ? ' ' + className : '') + kindCls;
-  return `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${weaponImageFallbackPath()}';">`;
+  // 방어구는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
+  // 자기 경로를 유지함(이미지가 없으면 빈 아이콘으로 보임 — 방어구 PNG 에셋 추가 시 자동 해결됨).
+  const fallback = w.equipType === 'armor' ? weaponImagePath(type) : weaponImageFallbackPath();
+  return `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${fallback}';">`;
 }
 
 // ---- 착용 제한(레벨 + 무기 종류별 요구 스탯) ----
@@ -129,6 +147,77 @@ function buildWeaponTooltipHtml(type, level){
 
   html += `</div>`;
   return html;
+}
+// ---- 방어구 스탯 조회 · 툴팁 ----
+function armorKindLabel(type){ return ARMOR_KINDS[wpn(type).armorKind] || ''; }
+function defenseFor(type, level){ const w = wpn(type); return w.defArr ? w.defArr[level] : null; }
+function armorHpFor(type, level){ const w = wpn(type); return w.hpArr ? w.hpArr[level] : null; }
+function armorManaFor(type, level){ const w = wpn(type); return w.manaArr ? w.manaArr[level] : null; }
+// 방어구 툴팁: 무기 툴팁(buildWeaponTooltipHtml)과 동일한 레이아웃/서식(이름·등급 색상 효과, wtipRow
+// 구조)을 그대로 재사용하되("장비 전역 설정" — 등급 색상/이름 색상/중앙 정렬 서식 공용), 표시 항목만
+// 방어구 데이터 스키마에 맞게 구성함: 이름/등급/장비 설명/방어구 종류/방어도/체력/마나/(고유 옵션)/레벨 제한.
+function buildArmorTooltipHtml(type, level){
+  const a = wpn(type);
+  const grade = WEAPON_GRADES[a.grade];
+  const lvl = level != null ? level : 0;
+  let html = `<div style="text-align:center;">`;
+
+  const nameLine = a.name + ' +' + lvl;
+  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
+
+  const kindLabel = armorKindLabel(type);
+  if(kindLabel) html += wtipRow('', kindLabel);
+
+  const def = defenseFor(type, lvl);
+  if(def != null) html += wtipRow('방어도', def);
+  const hp = armorHpFor(type, lvl);
+  if(hp != null) html += wtipRow('체력', hp);
+  const mana = armorManaFor(type, lvl);
+  if(mana != null) html += wtipRow('마나', mana);
+
+  // 고유 옵션(있으면) — weaponUniqueOptionTooltipHtml은 wpn(type).uniqueOption만 참조하는 범용 함수라
+  // 방어구에도 그대로 재사용 가능함(무기 전용 필드 미참조).
+  html += weaponUniqueOptionTooltipHtml(type, lvl);
+
+  if(a.levelReq && a.levelReq > 1) html += wtipRow('레벨 제한 :', `레벨 ${a.levelReq} 이상`);
+
+  html += `</div>`;
+  return html;
+}
+// ---- 방어구 방어력 → 피해 감소 공식 ----
+// 최종 데미지 비율 = {(200 + 방어도) / 20}² × 0.01. 방어도는 음수 값(0 이하)만 사용됨.
+// 결과는 퍼센트 기준 소수 둘째 자리에서 반올림(비율로는 소수 넷째 자리). 플레이어/몬스터 공용 공식으로
+// 설계됨 — 현재는 플레이어(착용 방어구 합산)에만 적용되고, 몬스터 쪽은 이후 별도로 연결될 예정.
+// ※ 기획 문서의 예시(방어도 -12 → 72.25%)는 이 식을 그대로 계산하면 88.36%가 나와 문서 예시와
+// 어긋남 — 식 자체는 문서에 적힌 그대로 구현했고, 예시 쪽 오탈자로 보여 별도로 알려드림.
+function defenseDamageMultiplier(defense){
+  const raw = Math.pow((200 + (defense || 0)) / 20, 2) * 0.01;
+  return Math.round(raw * 10000) / 10000;
+}
+// 현재 착용 중인 방어구 아이템(투구/갑옷) 목록을 반환.
+function wornArmorItems(){
+  const list = [];
+  if(!state.equippedArmor) return list;
+  ['helmet', 'armor'].forEach(kind => {
+    const id = state.equippedArmor[kind];
+    if(!id) return;
+    const item = (state.armorInventory || []).find(i => i.id === id);
+    if(item) list.push(item);
+  });
+  return list;
+}
+// 착용 중인 방어구 전체의 방어도 합산.
+function playerTotalDefense(){
+  return wornArmorItems().reduce((sum, item) => sum + (defenseFor(item.type, item.level) || 0), 0);
+}
+// 착용 중인 방어구 전체의 체력/마나 보너스 합산. key: 'hp' | 'mana'
+function armorStatBonus(key){
+  return wornArmorItems().reduce((sum, item) => {
+    const val = key === 'hp' ? armorHpFor(item.type, item.level) : armorManaFor(item.type, item.level);
+    return sum + (val || 0);
+  }, 0);
 }
 // ---- 아티팩트 이름 색상 · 툴팁 ----
 // 등급 가치 시스템(WEAPON_GRADES)을 그대로 재사용. 아티팩트는 강화 단계가 없으므로 무기처럼
@@ -248,7 +337,7 @@ function weaponUniqueOptionTooltipHtml(type, level){
 function activeEffectChance(effectId){
   let total = 0;
   if(effectId === 'poison_on_hit' && isArtifactEquipped('poisonflask')) total += 5;
-  const equipped = getEquipped();
+  const equipped = getEquippedWeapon(); // 전투 중 발동하는 무기 고유 옵션이므로 실제 착용 무기 기준
   if(equipped){
     const opt = wpn(equipped.type).uniqueOption;
     if(opt && opt.effectId === effectId && weaponUniqueOptionActive(equipped.type, equipped.level)){
@@ -297,6 +386,33 @@ function critChanceFor(type, level){ return wpn(type).crit[level]; }
 function costFor(type, level){ return wpn(type).cost[level]; }
 function sellValueFor(type, level){ return wpn(type).sell[level]; }
 function oddsFor(type, level){ return wpn(type).odds[level]; }
+
+// ---- 강화 화면 스탯 표시(데이터 기반, 하드코딩 없음) ----
+// 강화 화면에서 선택된 장비가 무기든 방어구든 상관없이, 도감 데이터에 해당 강화단계별 배열이 있는
+// 옵션만 자동으로 표시함. arrKey는 wpn(type) 위의 실제 배열 필드명(atkFor 등 기존 접근자와 동일한
+// 필드를 그대로 참조 — 새 필드를 만들지 않음). 순서 = 공격력→공격속도→치명타 확률→방어도→체력→마나.
+const FORGE_STAT_FIELDS = [
+  { arrKey: 'atk',     label: '공격력',      decimals: null, suffix: '' },
+  { arrKey: 'speed',   label: '공격속도',    decimals: 2,    suffix: '' },
+  { arrKey: 'crit',    label: '치명타 확률', decimals: null, suffix: '%' },
+  { arrKey: 'defArr',  label: '방어도',      decimals: null, suffix: '' },
+  { arrKey: 'hpArr',   label: '체력',        decimals: null, suffix: '' },
+  { arrKey: 'manaArr', label: '마나',        decimals: null, suffix: '' },
+];
+// 현재 선택된 장비(type, level)에 대해, 데이터에 실제로 존재하는 옵션만 "현재 수치 → 다음 단계 수치"
+// 행으로 조립해서 반환. 증가량 색상/기호는 기존 formatStatDelta를 그대로 재사용(요청사항: 그대로 사용).
+function buildForgeStatRowsHtml(type, level){
+  const w = wpn(type);
+  let html = '';
+  FORGE_STAT_FIELDS.forEach(f => {
+    const arr = w[f.arrKey];
+    if(!arr || arr[level] == null) return; // 이 장비 데이터에 해당 옵션이 없으면 행 자체를 생략
+    const now = arr[level];
+    const next = level < MAX_LEVEL ? (arr[level + 1] != null ? arr[level + 1] : null) : null;
+    html += `<div class="stat-row"><span>${f.label} <b>${formatStatDelta(now, next, f.decimals, f.suffix)}</b></span></div>`;
+  });
+  return html;
+}
 
 // ---- 상점 품목 목록 (탭별) ----
 // 각 아이템을 정렬에 필요한 최소 정보 { id, price, levelReq }로 정규화해서 반환.
@@ -529,12 +645,14 @@ function effectiveMaxHp(level){
   let hp = playerBaseHp(level) + str * 20 + agi * 5;
   if(isArtifactEquipped('antlerflag')) hp += 500; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
+  hp += armorStatBonus('hp'); // 착용 중인 방어구의 체력 보너스 합산
   return hp;
 }
 function effectiveMaxMp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
   let mp = playerBaseMp(level) + (s.int || 0) * 30;
   if(isArtifactEquipped('ring')) mp += 500;
+  mp += armorStatBonus('mana'); // 착용 중인 방어구의 마나 보너스 합산
   return mp;
 }
 function effectiveAtkSpeed(type, level){
@@ -583,8 +701,8 @@ function forgeSelectableItems(){
       const type = item.type;
       const typeDef = pool.typesTable[type];
       if(!typeDef) return;                          // 도감에 없는 타입은 제외
-      if(item.id !== state.equippedId && !pool.meetsReq(type)) return; // 착용 가능 조건
-      if(!typeDef.atk || typeDef.atk.length === 0) return; // 강화 가능 조건(강화단계 데이터가 있어야 함)
+      if(item.id !== state.forgeTargetId && !pool.meetsReq(type)) return; // 착용 가능 조건
+      if(!typeDef.cost || typeDef.cost.length === 0) return; // 강화 가능 조건(강화단계 비용 데이터가 있어야 함) — 무기/방어구 공용
       list.push({ kind: pool.kind, id: item.id, type, level: item.level });
     });
   });

@@ -39,9 +39,13 @@ function startEnhance(){
 
 function resolveEnhance(itemId, level){
   isEnhancing = false;
-  const item = state.inventory.find(i => i.id === itemId);
+  // 대장간 화면에 지금 표시된 대상은 무기(state.inventory) 또는 방어구(state.armorInventory) 둘 중
+  // 하나이므로 둘 다 검색함(getEquipped()와 동일한 검색 범위).
+  let item = state.inventory.find(i => i.id === itemId);
+  if(!item) item = (state.armorInventory || []).find(i => i.id === itemId);
   if(!item){ render(); saveState(); return; }
   const type = item.type || 'longsword';
+  const isArmorItem = wpn(type).equipType === 'armor';
 
   const odds = oddsFor(type, level);
   let outcome = weightedOutcome(odds);
@@ -80,7 +84,7 @@ function resolveEnhance(itemId, level){
       state.legendCount++;
       successRing('#e0b13c');
       burstRays('#ffffff', 14);
-      showMsg('✨ 전설의 검 완성! 판매하여 다음 검을 만드세요', 'legend');
+      showMsg(isArmorItem ? '✨ 전설의 방어구 완성! 판매하여 다음 방어구를 준비하세요' : '✨ 전설의 검 완성! 판매하여 다음 검을 만드세요', 'legend');
     } else {
       showMsg('강화 성공! +' + item.level, 'success');
     }
@@ -112,6 +116,7 @@ function resolveEnhance(itemId, level){
     showMsg('💥 아이템이 파괴되었습니다...', 'destroy');
   }
 
+  clampPlayerVitals(); // 방어구 강화로 체력/마나 보너스가 바뀌었을 수 있으므로 현재값을 새 최대치에 맞춰 정리
   render();
   saveState();
   if(popLevelDisplay){
@@ -142,11 +147,12 @@ function performSellItem(id){
   state.totalSold += value;
   showMsg(('+' + item.level) + ' ' + weaponName(type) + '를 ' + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.inventory.splice(idx, 1);
+  if(state.forgeTargetId === id) state.forgeTargetId = null; // 대장간에 표시 중이었다면 함께 정리
   if(state.equippedId === id){
     state.equippedId = null;
     // "판매 후 자동 구매"는 인벤토리에 새 검을 채워주는 기능이지 강화 대상을 대신 골라주는 기능이
     // 아님(구조 변경 5번: 강화 화면은 항상 플레이어가 직접 선택한 장비만 표시) — 그래서 구매까지는
-    // 자동으로 하되, 강화 대상으로 자동 지정(equippedId 대입)하지는 않음. 이후 대장간 버튼이나
+    // 자동으로 하되, 강화 대상으로 자동 지정(forgeTargetId 대입)하지는 않음. 이후 대장간 버튼이나
     // 인벤토리에서 직접 "강화 선택"해야 강화 화면에 표시됨.
     if(state.autoRebuy && state.gold >= weaponBuyPrice('longsword') && state.inventory.length < INV_MAX){
       state.gold -= weaponBuyPrice('longsword');
@@ -157,21 +163,37 @@ function performSellItem(id){
   render();
   saveState();
 }
+// 대장간 화면 하단 "판매" 버튼 — 지금 대장간에 표시된 대상(getEquipped(), 무기 또는 방어구)을 판매함.
 function doSell(){
   const equipped = getEquipped();
   if(!equipped) return;
-  sellItem(equipped.id);
+  if(state.inventory.some(i => i.id === equipped.id)) sellItem(equipped.id);
+  else sellArmorItem(equipped.id);
 }
+// 강화 대상 선택. 무기를 선택하면 "착용 무기"(equippedId, 전투에 실제 사용)와 "대장간 표시 대상"
+// (forgeTargetId)을 함께 갱신함(기존 동작과 동일 — 무기는 강화 선택이 곧 착용). 방어구를 선택하면
+// forgeTargetId만 바뀌고 equippedId(착용 무기)는 그대로 유지됨 — 방어구는 별도의 "착용"(equipArmorPiece)
+// 상태가 실제 능력치를 결정하므로, 대장간에 올려놓는 것만으로 전투 중인 무기가 바뀌면 안 됨.
 function equipItem(id){
   if(isEnhancing) return;
-  const item = state.inventory.find(i => i.id === id);
-  if(!item) return;
-  const type = item.type || 'longsword';
-  if(!meetsWeaponEquipRequirements(type, state.playerLevel, state.stats)) return;
-  state.equippedId = id;
-  showMsg('', '');
-  render();
-  saveState();
+  const weaponItem = state.inventory.find(i => i.id === id);
+  if(weaponItem){
+    if(!meetsWeaponEquipRequirements(weaponItem.type, state.playerLevel, state.stats)) return;
+    state.equippedId = id;
+    state.forgeTargetId = id;
+    showMsg('', '');
+    render();
+    saveState();
+    return;
+  }
+  const armorItem = (state.armorInventory || []).find(i => i.id === id);
+  if(armorItem){
+    if(!meetsWeaponEquipRequirements(armorItem.type, state.playerLevel, state.stats)) return;
+    state.forgeTargetId = id;
+    showMsg('', '');
+    render();
+    saveState();
+  }
 }
 // 대장간 "강화 장비 선택" 팝업에서 아이템을 클릭했을 때 호출됨. 기존 equipItem(인벤토리의 "강화 선택"
 // 버튼과 동일 로직)을 그대로 재사용해서 강화 대상을 설정하고, 선택 즉시 팝업만 닫음 — 강화 공식/비용
@@ -241,18 +263,86 @@ function unequipArtifact(id){
 // 구매/강화와는 무관하므로, 레벨이 낮아도 구매해서 인벤토리에 넣고 강화할 수 있음.
 function buyWeapon(typeId, btn){
   const w = WEAPON_TYPES[typeId];
-  if(!w || !w.purchasable) return;
-  const price = weaponBuyPrice(typeId);
-  if(state.gold < price || state.inventory.length >= INV_MAX) return;
+  if(w){
+    if(!w.purchasable) return;
+    const price = weaponBuyPrice(typeId);
+    if(state.gold < price || state.inventory.length >= INV_MAX) return;
+    state.gold -= price;
+    const newItem = { id: state.nextItemId++, level: 0, type: typeId };
+    state.inventory.push(newItem);
+    // (구조 변경 5번) 예전에는 장착 중인 무기가 없으면 방금 구매한 무기를 자동으로 강화 대상으로
+    // 지정했지만, 이제는 대장간 버튼/인벤토리에서 플레이어가 직접 "강화 선택"해야만 강화 화면에
+    // 표시되도록 자동 지정을 제거함. 구매 자체(인벤토리에 추가)는 그대로 동작함.
+    purchaseEffect(btn || null);
+    render(); saveState();
+    return;
+  }
+  // 상점 "장비 > 방어구" 탭 카드도 동일한 data-action="buy-weapon"을 공유해서 호출하므로(buildWeaponShopCardHtml
+  // 참고) 여기서 분기해서 처리함. 방어구는 별도 인벤토리 배열(state.armorInventory)에 담김.
+  const a = ARMOR_TYPES[typeId];
+  if(!a || !a.purchasable) return;
+  const price = (a.sellPrice || 0) * 2;
+  if(!state.armorInventory) state.armorInventory = [];
+  if(state.gold < price || state.armorInventory.length >= INV_MAX) return;
   state.gold -= price;
-  const newItem = { id: state.nextItemId++, level: 0, type: typeId };
-  state.inventory.push(newItem);
-  // (구조 변경 5번) 예전에는 장착 중인 무기가 없으면 방금 구매한 무기를 자동으로 강화 대상으로
-  // 지정했지만, 이제는 대장간 버튼/인벤토리에서 플레이어가 직접 "강화 선택"해야만 강화 화면에
-  // 표시되도록 자동 지정을 제거함. 구매 자체(인벤토리에 추가)는 그대로 동작함.
+  state.armorInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
   purchaseEffect(btn || null);
   render(); saveState();
 }
+
+// ---- 방어구: 판매/착용/강화 ----
+function sellArmorItem(id){
+  if(isEnhancing) return;
+  const item = (state.armorInventory || []).find(i => i.id === id);
+  if(!item) return;
+  const value = sellValueFor(item.type, item.level);
+  const label = `${ARMOR_TYPES[item.type].name} +${item.level}`;
+  openSellConfirm(label, value, () => performSellArmorItem(id));
+}
+function performSellArmorItem(id){
+  const idx = (state.armorInventory || []).findIndex(i => i.id === id);
+  if(idx === -1) return;
+  const item = state.armorInventory[idx];
+  const def = ARMOR_TYPES[item.type];
+  const value = sellValueFor(item.type, item.level);
+  state.gold += value;
+  state.totalSold += value;
+  showMsg(('+' + item.level) + ' ' + def.name + '를 ' + value.toLocaleString() + ' G에 판매했습니다', 'success');
+  state.armorInventory.splice(idx, 1);
+  if(def && state.equippedArmor && state.equippedArmor[def.armorKind] === id){
+    state.equippedArmor[def.armorKind] = null;
+  }
+  if(state.forgeTargetId === id) state.forgeTargetId = null; // 대장간에 표시 중이었다면 함께 정리
+  clampPlayerVitals();
+  render(); saveState();
+}
+// 방어구 착용 — 종류(투구/갑옷)당 한 개만 착용 가능하므로, 같은 종류를 착용 중이면 자동 교체됨.
+// "강화 선택"(state.forgeTargetId, equipItem)과는 완전히 별개 개념 — 착용은 실제 능력치(방어도/체력/
+// 마나)에 곧바로 반영되고, 대장간 화면에 무엇이 표시되는지와는 무관함.
+function equipArmorPiece(id){
+  const item = (state.armorInventory || []).find(i => i.id === id);
+  if(!item) return;
+  const def = ARMOR_TYPES[item.type];
+  if(!def) return;
+  if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, state.stats)) return;
+  if(!state.equippedArmor) state.equippedArmor = { helmet: null, armor: null };
+  state.equippedArmor[def.armorKind] = id;
+  clampPlayerVitals();
+  render(); saveState();
+}
+function unequipArmorPiece(id){
+  const item = (state.armorInventory || []).find(i => i.id === id);
+  if(!item || !state.equippedArmor) return;
+  const def = ARMOR_TYPES[item.type];
+  if(!def) return;
+  if(state.equippedArmor[def.armorKind] === id) state.equippedArmor[def.armorKind] = null;
+  clampPlayerVitals();
+  render(); saveState();
+}
+// 방어구 강화는 대장간 화면(startEnhance/resolveEnhance)을 무기와 완전히 동일하게 재사용함(사용자
+// 요청: 강화 화면에서 강화 가능한 모든 장비를 선택해서 사용). 인벤토리 카드의 "강화 선택" 버튼은
+// equipItem(id)을 그대로 호출해 forgeTargetId만 지정하고, 실제 강화는 대장간 화면의 "강화하기" 버튼으로
+// 진행됨 — 별도의 즉시 강화 함수를 두지 않음.
 function buyFlask(id, btn){
   const item = CONSUMABLES[id];
   if(!item || state.gold < item.buyPrice) return;
@@ -399,8 +489,9 @@ function resolveSkillEffect(id){
     renderHuntCharPanel();
     return;
   }
-  // 공격 스킬 데미지 공식(요구사항 3번): 플레이어의 총 공격력 x 데미지%
-  const equipped = getEquipped();
+  // 공격 스킬 데미지 공식(요구사항 3번): 플레이어의 총 공격력 x 데미지% — 대장간 화면에 방어구가
+  // 선택되어 있어도 스킬 데미지는 항상 실제 착용 무기 기준이어야 하므로 getEquippedWeapon() 사용.
+  const equipped = getEquippedWeapon();
   if(!equipped) return;
   const type = equipped.type || 'longsword';
   const atk = effectiveAtk(type, equipped.level);

@@ -7,7 +7,7 @@
 
 function enterDungeon(id){
   const d = DUNGEONS.find(x => x.id === id);
-  if(!d || !getEquipped()) return;
+  if(!d || !getEquippedWeapon()) return; // 던전 입장은 실제 착용 무기 기준(대장간 화면 선택 대상과 무관)
   hunt.dungeon = d;
   hunt.monsters = [];
   hunt.targetId = null;
@@ -111,7 +111,7 @@ function beginStageCombat(){
 // 몬스터는 개체마다 자신의 공격속도로 독립된 타이머를 가진다(startMonsterAttackTimer).
 function startHuntLoop(){
   stopHuntLoop();
-  const equipped = getEquipped();
+  const equipped = getEquippedWeapon(); // 공격속도는 실제 착용 무기 기준(대장간 선택 대상과 무관)
   const speed = equipped ? effectiveAtkSpeed(equipped.type || 'longsword', equipped.level) : 0.5;
   const intervalMs = Math.round(1000 / speed);
 
@@ -160,7 +160,7 @@ function stopHuntLoop(flaskEndMode = 'flush'){
 // 플레이어의 자동 공격: 현재 지정된 대상(hunt.targetId)을 우선 공격하고, 대상이 없으면(사망 등) 살아있는 첫 몬스터를 공격
 function attackTick(){
   if(hunt.paused || hunt.monsters.length === 0) return;
-  const equipped = getEquipped();
+  const equipped = getEquippedWeapon(); // 실제 공격에 사용되는 착용 무기(대장간 선택 대상과 무관)
   if(!equipped){
     showHuntMsg('장착한 무기가 없어 사냥을 중단합니다.');
     stopHuntLoop();
@@ -213,7 +213,9 @@ function monsterAttackTick(instanceId){
   ensurePlayerVitals();
   if(state.playerHp <= 0) return; // 이미 쓰러진 상태면 추가 피해 없음
   const levelDiff = state.playerLevel - instance.level;
-  const dmg = Math.max(1, Math.round((instance.atk || 0) * monsterDamageMultiplier(levelDiff)));
+  let dmg = Math.max(1, Math.round((instance.atk || 0) * monsterDamageMultiplier(levelDiff)));
+  // 착용 중인 방어구(투구+갑옷)의 방어도 합산치를 최종 피해 감소 공식에 적용(방어구 시스템 추가).
+  dmg = Math.max(1, Math.round(dmg * defenseDamageMultiplier(playerTotalDefense())));
   state.playerHp = Math.max(0, state.playerHp - dmg);
   playerHitEffect(dmg);
   renderHuntCharPanel();

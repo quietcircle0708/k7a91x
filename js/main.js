@@ -217,6 +217,15 @@ el('inventoryList').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'equip') equipItem(id);
   else if(btn.dataset.action === 'sell') sellItem(id);
 });
+el('armorInventoryList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn || btn.disabled) return;
+  const id = Number(btn.dataset.id);
+  if(btn.dataset.action === 'wear-armor') equipArmorPiece(id);
+  else if(btn.dataset.action === 'unwear-armor') unequipArmorPiece(id);
+  else if(btn.dataset.action === 'equip') equipItem(id); // 강화 선택(대장간 화면에 표시) — 무기 인벤토리와 동일한 함수 재사용
+  else if(btn.dataset.action === 'sell-armor') sellArmorItem(id);
+});
 el('artifactList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn || btn.disabled) return;
