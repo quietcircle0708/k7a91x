@@ -138,7 +138,7 @@ function sellItem(id){
   if(!item) return;
   const type = item.type || 'longsword';
   const value = sellValueFor(type, item.level);
-  const label = `${weaponName(type)} +${item.level}`;
+  const label = `${weaponName(type)}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellItem(id));
 }
 function performSellItem(id){
@@ -149,7 +149,7 @@ function performSellItem(id){
   const value = sellValueFor(type, item.level);
   state.gold += value;
   state.totalSold += value;
-  showMsg(('+' + item.level) + ' ' + weaponName(type) + '를 ' + value.toLocaleString() + ' G에 판매했습니다', 'success');
+  showMsg(`${weaponName(type)}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.inventory.splice(idx, 1);
   if(state.forgeTargetId === id) state.forgeTargetId = null; // 대장간에 표시 중이었다면 함께 정리
   if(state.equippedId === id){
@@ -323,7 +323,7 @@ function sellAccessoryItem(id){
   const item = (state.accessoryInventory || []).find(i => i.id === id);
   if(!item) return;
   const value = sellValueFor(item.type, item.level);
-  const label = `${ACCESSORY_TYPES[item.type].name} +${item.level}`;
+  const label = `${ACCESSORY_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellAccessoryItem(id));
 }
 function performSellAccessoryItem(id){
@@ -334,7 +334,7 @@ function performSellAccessoryItem(id){
   const value = sellValueFor(item.type, item.level);
   state.gold += value;
   state.totalSold += value;
-  showMsg(('+' + item.level) + ' ' + def.name + '를 ' + value.toLocaleString() + ' G에 판매했습니다', 'success');
+  showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.accessoryInventory.splice(idx, 1);
   if(Array.isArray(state.equippedAccessories)){
     const slotIdx = state.equippedAccessories.indexOf(id);
@@ -374,7 +374,7 @@ function sellArmorItem(id){
   const item = (state.armorInventory || []).find(i => i.id === id);
   if(!item) return;
   const value = sellValueFor(item.type, item.level);
-  const label = `${ARMOR_TYPES[item.type].name} +${item.level}`;
+  const label = `${ARMOR_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellArmorItem(id));
 }
 function performSellArmorItem(id){
@@ -385,7 +385,7 @@ function performSellArmorItem(id){
   const value = sellValueFor(item.type, item.level);
   state.gold += value;
   state.totalSold += value;
-  showMsg(('+' + item.level) + ' ' + def.name + '를 ' + value.toLocaleString() + ' G에 판매했습니다', 'success');
+  showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.armorInventory.splice(idx, 1);
   if(def && state.equippedArmor && state.equippedArmor[def.armorKind] === id){
     state.equippedArmor[def.armorKind] = null;

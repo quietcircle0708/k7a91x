@@ -202,7 +202,7 @@ function renderForgeSelectList(){
       <button class="forge-select-item ${isCurrent ? 'active' : ''}" data-action="select-forge-target" data-id="${entry.id}">
         <span class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img')}</span>
         <span class="forge-select-info">
-          <span class="forge-select-name" style="color:${itemColor};">${weaponName(entry.type)} +${entry.level}</span>
+          <span class="forge-select-name" style="color:${itemColor};">${weaponName(entry.type)}${levelSuffix(entry.level)}</span>
           ${isCurrent ? '<span class="inv-badge">선택됨</span>' : ''}
         </span>
       </button>`;
@@ -240,7 +240,7 @@ function renderInventoryList(){
         <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${weaponName(type)} <span class="inv-level" style="color:${itemColor};">+${item.level}</span></span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
+            <span class="inv-name" style="color:${itemColor};">${weaponName(type)}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
             <span class="tooltip">${buildWeaponTooltipHtml(type, item.level)}</span>
           </span>
           <div class="inv-sub">${meta.label}</div>
@@ -292,7 +292,7 @@ function renderArmorInventoryList(){
         <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${def.name} <span class="inv-level" style="color:${itemColor};">+${item.level}</span></span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="inv-name" style="color:${itemColor};">${def.name}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
             <span class="tooltip">${buildArmorTooltipHtml(type, item.level)}</span>
           </span>
           <div class="inv-sub">${ARMOR_KINDS[def.armorKind] || ''}</div>
@@ -342,7 +342,7 @@ function renderAccessoryInventoryList(){
         <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${def.name} <span class="inv-level" style="color:${itemColor};">+${item.level}</span></span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="inv-name" style="color:${itemColor};">${def.name}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
             <span class="tooltip">${buildAccessoryTooltipHtml(type, item.level)}</span>
           </span>
           <div class="inv-sub">${ACCESSORY_KINDS[def.accessoryKind] || ''}</div>
@@ -725,7 +725,7 @@ function equippedItemInfoLinesHtml(){
   const lines = [];
   EQUIPMENT_SLOTS.forEach(slot => {
     const item = equippedItemForSlot(slot.key);
-    if(item) lines.push(`<div class="char-equip-info-line" style="color:${item.color};">${item.name} +${item.level}</div>`);
+    if(item) lines.push(`<div class="char-equip-info-line" style="color:${item.color};">${item.name}${levelSuffix(item.level)}</div>`);
   });
   state.equippedArtifacts.forEach(id => {
     const a = ARTIFACTS[id];
@@ -809,7 +809,7 @@ function buildCharStatsInfoHtml(){
     const hasSpeedBonus = isArtifactEquipped('batwing');
 
     rightHtml += `
-      <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)} +${level}</span></div>
+      <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)}${levelSuffix(level)}</span></div>
       <div class="char-stat-divider"></div>
       <div class="char-stat-row big"><span>총 공격력</span><span class="v">${totalAtk}</span></div>
       <div class="char-stat-row big"><span>공격속도</span><span class="v">${totalSpeed.toFixed(2)}회/초</span></div>
@@ -829,11 +829,11 @@ function buildCharStatsInfoHtml(){
   if(wornHelmet || wornBody || wornAccessories.length > 0){
     rightHtml += `<div class="char-stat-divider"></div>`;
     rightHtml += `<div class="char-stat-row big"><span>총 방어도</span><span class="v">${playerTotalDefense()}</span></div>`;
-    if(wornHelmet) rightHtml += `<div class="char-stat-row"><span>투구</span><span class="v">${ARMOR_TYPES[wornHelmet.type].name} +${wornHelmet.level}</span></div>`;
-    if(wornBody) rightHtml += `<div class="char-stat-row"><span>갑옷</span><span class="v">${ARMOR_TYPES[wornBody.type].name} +${wornBody.level}</span></div>`;
+    if(wornHelmet) rightHtml += `<div class="char-stat-row"><span>투구</span><span class="v">${ARMOR_TYPES[wornHelmet.type].name}${levelSuffix(wornHelmet.level)}</span></div>`;
+    if(wornBody) rightHtml += `<div class="char-stat-row"><span>갑옷</span><span class="v">${ARMOR_TYPES[wornBody.type].name}${levelSuffix(wornBody.level)}</span></div>`;
     wornAccessories.forEach(acc => {
       const accDef = ACCESSORY_TYPES[acc.type];
-      rightHtml += `<div class="char-stat-row"><span>${accDef ? ACCESSORY_KINDS[accDef.accessoryKind] || '장신구' : '장신구'}</span><span class="v">${accDef ? accDef.name : acc.type} +${acc.level}</span></div>`;
+      rightHtml += `<div class="char-stat-row"><span>${accDef ? ACCESSORY_KINDS[accDef.accessoryKind] || '장신구' : '장신구'}</span><span class="v">${accDef ? accDef.name : acc.type}${levelSuffix(acc.level)}</span></div>`;
     });
   }
 
@@ -1186,7 +1186,7 @@ function renderHunt(){
   if(equipped){
     const lv = equipped.level;
     const type = equipped.type || 'longsword';
-    const nameHtml = `<span class="weapon-name-wrap">${weaponName(type)} +${lv}<span class="tooltip">${buildWeaponTooltipHtml(type, lv)}</span></span>`;
+    const nameHtml = `<span class="weapon-name-wrap">${weaponName(type)}${levelSuffix(lv)}<span class="tooltip">${buildWeaponTooltipHtml(type, lv)}</span></span>`;
     let info = `장착 무기: ${nameHtml} (공격력 ${effectiveAtk(type, lv)}, 공격속도 ${effectiveAtkSpeed(type, lv).toFixed(2)}회/초`;
     const crit = effectiveCritChance(type, lv);
     if(crit > 0) info += `, 치명타 ${crit}%`;
@@ -1284,7 +1284,7 @@ function buildInvPeekHtml(){
   }
   const lines = state.inventory.map(it => {
     const eq = it.id === state.equippedId ? ' <b style="color:var(--forge-gold);">(장착 중)</b>' : '';
-    return `${weaponIconHtml(it.type || 'longsword', 'inv-peek-icon-img')} ${weaponName(it.type || 'longsword')} +${it.level}${eq}`;
+    return `${weaponIconHtml(it.type || 'longsword', 'inv-peek-icon-img')} ${weaponName(it.type || 'longsword')}${levelSuffix(it.level)}${eq}`;
   }).join('<br>');
   return `인벤토리 (${state.inventory.length}/${INV_MAX})<br>${lines}`;
 }

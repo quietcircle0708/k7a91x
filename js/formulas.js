@@ -25,6 +25,11 @@ function weaponNameColor(type, level){
   return NAME_COLOR_HEX[finalKey];
 }
 function weaponName(type){ return wpn(type).name; }
+// 강화 단계 표시 문구: +0이면 빈 문자열(문구 자체를 숨김), +1 이상이면 기존과 동일하게 " +N"으로 표시.
+// 강화 수치(level) 자체는 전혀 건드리지 않고, 화면에 붙이는 접미사 문구만 여기서 통일해서 관리함 —
+// 이름 옆에 강화 단계를 표시하는 모든 화면(인벤토리/강화선택/툴팁/장착정보/판매문구/드랍알림 등)이
+// 전부 이 함수를 거치므로, 표시 규칙을 바꿀 일이 생기면 여기 한 곳만 고치면 됨.
+function levelSuffix(level){ return (level > 0) ? ' +' + level : ''; }
 // 상점 구매가 = 판매가(sellPrice) × 2
 function weaponBuyPrice(type){ return (wpn(type).sellPrice || 0) * 2; }
 // 무기 이미지 경로(파일명 기준). 실제로 파일이 있는지는 <img onerror>에서 최종 확인/대체함.
@@ -68,10 +73,14 @@ function monsterImgError(img){
 // 무기 종류(weaponKind)가 단검이면 실제 이미지 파일은 그대로 두고 kind-dagger 클래스(CSS transform:scale)만
 // 추가로 붙여 다른 무기보다 30% 작게 출력함(강화 화면의 setBladeShape와 동일한 축소 비율) — 무기 데이터를
 // 개별 수정하는 방식이 아니라 무기 종류 판정만으로 자동 적용되므로, 새로 등록되는 단검에도 자동 반영됨.
+// 방어구/장신구(equipType이 armor 또는 accessory)는 종류 구분 없이 전부 20% 작게 출력함(weapon-icon-equip-small,
+// dagger와 동일한 CSS transform:scale 패턴) — equipType 판정만으로 자동 적용되므로 새로 추가되는 방어구/장신구
+// 종류(투구/갑옷/반지 외 새 종류 포함)에도 데이터 등록만으로 자동 반영됨.
 function weaponIconHtml(type, className){
   const w = wpn(type);
   const kindCls = w.weaponKind === 'dagger' ? ' weapon-icon-dagger' : '';
-  const cls = 'weapon-icon-img' + (className ? ' ' + className : '') + kindCls;
+  const equipSmallCls = (w.equipType === 'armor' || w.equipType === 'accessory') ? ' weapon-icon-equip-small' : '';
+  const cls = 'weapon-icon-img' + (className ? ' ' + className : '') + kindCls + equipSmallCls;
   // 방어구/장신구는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
   // 자기 경로를 유지함(이미지가 없으면 빈 아이콘으로 보임 — 해당 종류 PNG 에셋 추가 시 자동 해결됨).
   const fallback = (w.equipType === 'armor' || w.equipType === 'accessory') ? weaponImagePath(type) : weaponImageFallbackPath();
@@ -116,8 +125,8 @@ function buildWeaponTooltipHtml(type, level){
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  // 1. 이름 (+강화단계) — 무기 이름 색상 효과 적용
-  const nameLine = w.name + ' +' + lvl;
+  // 1. 이름 (+강화단계, +0이면 숨김) — 무기 이름 색상 효과 적용
+  const nameLine = w.name + levelSuffix(lvl);
   html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
 
   // 1-2. 등급 — 이름과 별도 줄, 등급 색상 효과 적용
@@ -166,7 +175,7 @@ function buildArmorTooltipHtml(type, level){
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  const nameLine = a.name + ' +' + lvl;
+  const nameLine = a.name + levelSuffix(lvl);
   html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
   if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
   if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
@@ -249,7 +258,7 @@ function buildAccessoryTooltipHtml(type, level){
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  const nameLine = a.name + ' +' + lvl;
+  const nameLine = a.name + levelSuffix(lvl);
   html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
   if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
   if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
@@ -969,6 +978,32 @@ function miscItemByName(name){
   return Object.values(MISC_ITEMS).find(it => it.name === name) || null;
 }
 
+// ---- 장비 드랍 우선순위 판정 ----
+// "장비" 드랍(모험가의 유해 + drops의 weaponId 확정 드랍 — 무기뿐 아니라 방어구/장신구 id를 weaponId에
+// 등록해도 동일하게 취급됨)이 한 몬스터에게서 동시에 여러 개 당첨된 경우, 최종적으로 1개만 지급하기
+// 위한 우선순위만 담당함. 개별 드랍 확률 판정 로직/드랍 테이블은 전혀 건드리지 않고, 이미 각자의 확률
+// 판정을 통과한 후보들 중에서 고르기만 함. 아티팩트/재료/마석 드랍에는 관여하지 않음.
+// 등급 우선순위는 WEAPON_GRADES에 등록된 키 순서(normal < rare < epic < unique)를 그대로 사용 — 새
+// 등급을 WEAPON_GRADES 뒤쪽에 추가하면 그 등급이 자동으로 더 높은 우선순위가 됨(하드코딩 없음).
+const WEAPON_GRADE_RANK = Object.keys(WEAPON_GRADES).reduce((m, k, i) => { m[k] = i; return m; }, {});
+// candidates: [{ type, level, chance, _source }]. 1순위 등급 높은 쪽, 2순위(등급 동률) 드랍확률(chance)이
+// 더 낮은(더 희귀한) 쪽, 그래도 동률이면 무작위 선택.
+function pickPriorityEquipDrop(candidates){
+  if(candidates.length <= 1) return candidates[0] || null;
+  let best = candidates[0];
+  for(let i = 1; i < candidates.length; i++){
+    const c = candidates[i];
+    const bestRank = WEAPON_GRADE_RANK[wpn(best.type).grade] ?? -1;
+    const cRank = WEAPON_GRADE_RANK[wpn(c.type).grade] ?? -1;
+    if(cRank > bestRank){ best = c; continue; }
+    if(cRank < bestRank) continue;
+    if(c.chance < best.chance){ best = c; continue; }
+    if(c.chance > best.chance) continue;
+    if(Math.random() < 0.5) best = c;
+  }
+  return best;
+}
+
 // 몬스터 처치 시 모든 드랍(골드/모험가의 유해/마석/몬스터 고유 드랍/재료 아이템)을 판정
 function resolveDrops(monsterDef, dungeon, level){
   const grade = monsterDef.grade;
@@ -977,7 +1012,7 @@ function resolveDrops(monsterDef, dungeon, level){
   const goldMultiplier = 1 + gradeInfo.goldBonus + (monsterDef.extraGoldBonus || 0);
   const gold = rollGoldDrop(level, goldMultiplier);
 
-  const weaponDrop = resolveWeaponRelicDrop(level); // { type, level } 또는 null
+  let weaponDrop = resolveWeaponRelicDrop(level); // { type, level } 또는 null
 
   const stoneDrop = rollStoneDrop(level, grade); // { itemId, qty } 또는 null(전역 공식, 던전/등급별 개별 설정 없음)
 
@@ -994,12 +1029,33 @@ function resolveDrops(monsterDef, dungeon, level){
   // drops 중 weaponId가 있는 항목은 몬스터 드랍 테이블에 직접 등록된 확정 무기(모험가의 유해와는 별개의
   // 지정 무기 드랍). artifactId와 동일하게 각 항목마다 독립적으로 확률을 판정하며, 지급되는 무기는
   // 항상 +0 강화 단계로 지급됨(강화 단계 추첨은 모험가의 유해 전용 로직이라 여기선 사용하지 않음).
-  const weaponIdDrops = [];
+  let weaponIdDrops = [];
   for(const drop of (monsterDef.drops || [])){
     if(!drop.weaponId) continue;
     if(Math.random() * 100 < drop.chance){
-      weaponIdDrops.push({ type: drop.weaponId, level: 0 });
+      weaponIdDrops.push({ type: drop.weaponId, level: 0, chance: drop.chance });
     }
+  }
+
+  // 장비 드랍 우선순위 판정: 모험가의 유해(weaponDrop)와 확정 장비 드랍(weaponIdDrops)이 동시에
+  // 당첨된 경우 이 몬스터에서는 최종적으로 1개만 지급되도록 정리함(1마리당 장비 드랍 1개 제한).
+  // weaponDrop의 비교용 확률은 "이 등급의 모험가의 유해가 나올 실제 확률"(RELIC_DROP_CHANCE ×
+  // RELIC_GRADE_CHANCE[등급])로 환산함 — 폴백으로 등급이 바뀌었을 수 있으므로 최종 지급 등급
+  // (wpn(weaponDrop.type).grade) 기준으로 계산(다른 곳의 폴백 등급 처리 규칙과 동일).
+  const equipCandidates = [];
+  if(weaponDrop){
+    const relicGrade = wpn(weaponDrop.type).grade;
+    const relicChance = RELIC_DROP_CHANCE * (RELIC_GRADE_CHANCE[relicGrade] || 0) / 100;
+    equipCandidates.push({ type: weaponDrop.type, level: weaponDrop.level, chance: relicChance, _source: 'relic' });
+  }
+  weaponIdDrops.forEach(d => equipCandidates.push({ type: d.type, level: d.level, chance: d.chance, _source: 'weaponId' }));
+
+  if(equipCandidates.length > 1){
+    const winner = pickPriorityEquipDrop(equipCandidates);
+    weaponDrop = winner._source === 'relic' ? { type: winner.type, level: winner.level } : null;
+    weaponIdDrops = winner._source === 'weaponId' ? [{ type: winner.type, level: winner.level }] : [];
+  } else {
+    weaponIdDrops = weaponIdDrops.map(d => ({ type: d.type, level: d.level }));
   }
 
   // drops 중 artifactId/weaponId가 없는 항목(도토리/쥐고기 등 재료류)은 MISC_ITEMS에 등록된 재료

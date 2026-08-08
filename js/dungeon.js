@@ -405,11 +405,11 @@ function openKillResultModal(rewards){
     rewardsHtml += `<div class="reward-levelup">🎉 레벨업! Lv.${rewards.newPlayerLevel - rewards.levelsGained} → Lv.${rewards.newPlayerLevel}</div>`;
   }
   rewards.weaponDrops.forEach(w => {
-    const itemName = `${weaponName(w.type)} +${w.level}`;
+    const itemName = `${weaponName(w.type)}${levelSuffix(w.level)}`;
     rewardsHtml += `<div><span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
   });
   rewards.weaponIdDrops.forEach(w => {
-    const itemName = `${weaponName(w.type)} +${w.level}`;
+    const itemName = `${weaponName(w.type)}${levelSuffix(w.level)}`;
     rewardsHtml += `<div><span style="color:${weaponGradeColor(w.type)}; font-weight:700;">${itemName}</span>${josaEulReul(itemName)} 획득했습니다!</div>`;
   });
   Object.keys(rewards.stoneDrops).forEach(itemId => {
@@ -507,7 +507,7 @@ function openTreasureResultModal(result){
 
   let rewardsHtml = `<div><span class="txt-gold">골드</span> +${result.gold.toLocaleString()}G</div>`;
   if(result.weaponDrop){
-    const itemName = `${weaponName(result.weaponDrop.type)} +${result.weaponDrop.level}`;
+    const itemName = `${weaponName(result.weaponDrop.type)}${levelSuffix(result.weaponDrop.level)}`;
     rewardsHtml += `<div><span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
   }
   if(result.stoneDrop){
