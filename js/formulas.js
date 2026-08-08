@@ -36,6 +36,10 @@ function weaponImagePath(type){
     const file = w.image || ARMOR_DEFAULT_IMAGE[w.armorKind] || 'armorbase';
     return ARMOR_IMAGE_DIR + file + ARMOR_IMAGE_EXT;
   }
+  if(w.equipType === 'accessory'){
+    const file = w.image || ACCESSORY_DEFAULT_IMAGE[w.accessoryKind] || 'ringbase';
+    return ACCESSORY_IMAGE_DIR + file + ACCESSORY_IMAGE_EXT;
+  }
   return WEAPON_IMAGE_DIR + w.image + WEAPON_IMAGE_EXT;
 }
 function weaponImageFallbackPath(){ return WEAPON_IMAGE_DIR + WEAPON_IMAGE_FALLBACK + WEAPON_IMAGE_EXT; }
@@ -68,9 +72,9 @@ function weaponIconHtml(type, className){
   const w = wpn(type);
   const kindCls = w.weaponKind === 'dagger' ? ' weapon-icon-dagger' : '';
   const cls = 'weapon-icon-img' + (className ? ' ' + className : '') + kindCls;
-  // 방어구는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
-  // 자기 경로를 유지함(이미지가 없으면 빈 아이콘으로 보임 — 방어구 PNG 에셋 추가 시 자동 해결됨).
-  const fallback = w.equipType === 'armor' ? weaponImagePath(type) : weaponImageFallbackPath();
+  // 방어구/장신구는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
+  // 자기 경로를 유지함(이미지가 없으면 빈 아이콘으로 보임 — 해당 종류 PNG 에셋 추가 시 자동 해결됨).
+  const fallback = (w.equipType === 'armor' || w.equipType === 'accessory') ? weaponImagePath(type) : weaponImageFallbackPath();
   return `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${fallback}';">`;
 }
 
@@ -196,7 +200,7 @@ function defenseDamageMultiplier(defense){
   const raw = Math.pow((200 + (defense || 0)) / 20, 2) * 0.01;
   return Math.round(raw * 10000) / 10000;
 }
-// 현재 착용 중인 방어구 아이템(투구/갑옷) 목록을 반환.
+// 현재 착용 중인 방어구(투구/갑옷) 아이템 목록을 반환.
 function wornArmorItems(){
   const list = [];
   if(!state.equippedArmor) return list;
@@ -208,16 +212,66 @@ function wornArmorItems(){
   });
   return list;
 }
-// 착용 중인 방어구 전체의 방어도 합산.
-function playerTotalDefense(){
-  return wornArmorItems().reduce((sum, item) => sum + (defenseFor(item.type, item.level) || 0), 0);
+// 현재 착용 중인 장신구(반지 등, 최대 2개) 아이템 목록을 반환.
+function wornAccessoryItems(){
+  if(!Array.isArray(state.equippedAccessories)) return [];
+  return state.equippedAccessories
+    .filter(id => id != null)
+    .map(id => (state.accessoryInventory || []).find(i => i.id === id))
+    .filter(Boolean);
 }
-// 착용 중인 방어구 전체의 체력/마나 보너스 합산. key: 'hp' | 'mana'
+// 방어도/체력/마나/치명타 보너스에 실제로 기여하는 "착용 중인 모든 방어형 장비"(방어구+장신구) 목록.
+// 무기는 포함하지 않음(무기는 별도의 effectiveAtk 등으로 처리됨).
+function wornEquipmentItems(){ return wornArmorItems().concat(wornAccessoryItems()); }
+// 착용 중인 방어구+장신구 전체의 방어도 합산.
+function playerTotalDefense(){
+  return wornEquipmentItems().reduce((sum, item) => sum + (defenseFor(item.type, item.level) || 0), 0);
+}
+// 착용 중인 방어구+장신구 전체의 체력/마나/치명타 보너스 합산. key: 'hp' | 'mana' | 'crit'
 function armorStatBonus(key){
-  return wornArmorItems().reduce((sum, item) => {
-    const val = key === 'hp' ? armorHpFor(item.type, item.level) : armorManaFor(item.type, item.level);
+  return wornEquipmentItems().reduce((sum, item) => {
+    let val;
+    if(key === 'hp') val = armorHpFor(item.type, item.level);
+    else if(key === 'mana') val = armorManaFor(item.type, item.level);
+    else if(key === 'crit') val = wpn(item.type).crit ? critChanceFor(item.type, item.level) : null;
     return sum + (val || 0);
   }, 0);
+}
+
+// ---- 장신구 이름/종류 · 툴팁 ----
+function accessoryKindLabel(type){ return ACCESSORY_KINDS[wpn(type).accessoryKind] || ''; }
+// 장신구 툴팁: 방어구 툴팁(buildArmorTooltipHtml)과 서식은 동일("장비 전역 설정" 공용)하되, 표시
+// 항목만 장신구 데이터 스키마에 맞게 구성함: 이름/등급/장비 설명/장신구 종류/방어도/체력/마나/치명타
+// 확률/(고유 옵션)/착용 제한(문서에 명시된 그대로 "착용 제한 : 레벨 N 이상" 형식 사용).
+function buildAccessoryTooltipHtml(type, level){
+  const a = wpn(type);
+  const grade = WEAPON_GRADES[a.grade];
+  const lvl = level != null ? level : 0;
+  let html = `<div style="text-align:center;">`;
+
+  const nameLine = a.name + ' +' + lvl;
+  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
+
+  const kindLabel = accessoryKindLabel(type);
+  if(kindLabel) html += wtipRow('', kindLabel);
+
+  const def = defenseFor(type, lvl);
+  if(def != null) html += wtipRow('방어도', def);
+  const hp = armorHpFor(type, lvl);
+  if(hp != null) html += wtipRow('체력', hp);
+  const mana = armorManaFor(type, lvl);
+  if(mana != null) html += wtipRow('마나', mana);
+  const crit = wpn(type).crit ? critChanceFor(type, lvl) : null; // crit 배열이 없는 장신구(예: 무색 반지)는 건너뜀
+  if(crit != null) html += wtipRow('치명타 확률', crit + '%');
+
+  html += weaponUniqueOptionTooltipHtml(type, lvl); // wpn(type).uniqueOption만 참조하는 범용 함수라 그대로 재사용
+
+  if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
+
+  html += `</div>`;
+  return html;
 }
 // ---- 아티팩트 이름 색상 · 툴팁 ----
 // 등급 가치 시스템(WEAPON_GRADES)을 그대로 재사용. 아티팩트는 강화 단계가 없으므로 무기처럼
@@ -676,6 +730,7 @@ function effectiveCritChance(type, level){
   let bonus = 0;
   if(isArtifactEquipped('oldarmguard')) bonus += 3;
   if(isArtifactEquipped('blackarmguard')) bonus += 8;
+  bonus += armorStatBonus('crit'); // 착용 중인 방어구/장신구의 치명타 확률 보너스 합산
   // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
   // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
   const opt = wpn(type).uniqueOption;

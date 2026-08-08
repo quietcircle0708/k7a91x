@@ -19,7 +19,9 @@ let state = {
   forgeTargetId: null,
   nextItemId: 1,
   armorInventory: [],                          // 보유 방어구 목록({id,type,level}, 무기 인벤토리와 동일한 형태)
-  equippedArmor: { helmet: null, armor: null }, // 착용 중인 방어구(종류당 1개) — 강화 대상(equippedId)과는 별개 개념
+  equippedArmor: { helmet: null, armor: null }, // 착용 중인 방어구(종류당 1개) — 강화 대상(forgeTargetId)과는 별개 개념
+  accessoryInventory: [],                       // 보유 장신구 목록({id,type,level})
+  equippedAccessories: [null, null],            // 착용 중인 장신구(장신구1/장신구2 슬롯, 최대 ACCESSORY_SLOT_MAX개) — 같은 아이템 2개 착용 가능
   charmCount: 0, charmPrice: 1500, charmActive: false,
   blessingCount: 0, blessingPrice: 15000, blessingActive: false,
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
@@ -73,6 +75,7 @@ const el = id => document.getElementById(id);
 function getEquipped(){
   return state.inventory.find(i => i.id === state.forgeTargetId)
     || (state.armorInventory || []).find(i => i.id === state.forgeTargetId)
+    || (state.accessoryInventory || []).find(i => i.id === state.forgeTargetId)
     || null;
 }
 // 공격력 등 "실제 전투에 쓰이는 착용 무기"가 필요한 곳 전용(스킬 데미지 계산, 던전 입장 조건, 전투 자동
@@ -231,6 +234,10 @@ function applyLoadedRaw(raw){
   if(!state.equippedArmor || typeof state.equippedArmor !== 'object') state.equippedArmor = { helmet: null, armor: null };
   if(state.equippedArmor.helmet === undefined) state.equippedArmor.helmet = null;
   if(state.equippedArmor.armor === undefined) state.equippedArmor.armor = null;
+  // 장신구 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
+  if(!Array.isArray(state.accessoryInventory)) state.accessoryInventory = [];
+  if(!Array.isArray(state.equippedAccessories)) state.equippedAccessories = [null, null];
+  while(state.equippedAccessories.length < ACCESSORY_SLOT_MAX) state.equippedAccessories.push(null);
   // 대장간 강화 대상(forgeTargetId) 추가 이전 세이브 마이그레이션: 예전엔 equippedId 하나가 "착용
   // 무기"와 "대장간 표시 대상"을 겸했으므로, 없으면 기존 equippedId 값을 그대로 이어받음.
   if(state.forgeTargetId === undefined) state.forgeTargetId = state.equippedId != null ? state.equippedId : null;
@@ -322,6 +329,7 @@ function resetGame(){
   state = {
     gold: 1000, inventory: [], equippedId: null, forgeTargetId: null, nextItemId: 1,
     armorInventory: [], equippedArmor: { helmet: null, armor: null },
+    accessoryInventory: [], equippedAccessories: [null, null],
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,

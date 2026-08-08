@@ -318,7 +318,7 @@ const ARMOR_TYPES = {
 // +N 체력(또는 마나) = 기본값 + (기본값 × 강화 단계 × 이 배율). 항상 +0(기본) 값을 기준으로 직접 계산하며
 // (재귀 아님, 이전 강화 단계는 참조하지 않음), 계산 과정에서는 반올림하지 않고 최종 결과만 반올림함.
 // index = 강화 단계(1~9)
-const ARMOR_VITAL_STEP_MULT = [null, 0.05, 0.05, 0.05, 0.05, 0.10, 0.05, 0.15, 0.15, 0.20];
+const ARMOR_VITAL_STEP_MULT = [null, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.15, 0.15, 0.20]; // 장신구도 동일 공식을 재사용(computeArmorVitalArray)
 function computeArmorVitalArray(base){
   if(base == null) return null;
   const arr = [base];
@@ -349,16 +349,64 @@ Object.values(ARMOR_TYPES).forEach(a => {
   if(a.mana != null) a.manaArr = computeArmorVitalArray(a.mana);
 });
 
-// 장신구 종류 도감. ARMOR_TYPES와 동일한 이유·동일한 방식으로 아직 빈 객체(등록된 장신구 없음) —
-// WEAPON_TYPES/ARMOR_TYPES와 같은 필드 구조(equipType:'accessory')로 항목을 추가하면 자동으로
-// 상점 "장비 > 장신구" 탭에 표시됨.
-const ACCESSORY_TYPES = {};
+// ---- 장신구 종류(현재는 반지만 사용) ----
+const ACCESSORY_KINDS = { ring: '반지' };
+// 장신구 이미지 경로 규칙(무기/방어구와 동일한 onerror 방식). image 필드가 비어 있으면 장신구 종류별
+// 기본 이미지(반지→ringbase)를 자동 적용함(장신구 데이터 스키마 규칙). 종류가 늘어나도(목걸이 등)
+// 이 표에 항목만 추가하면 자동 적용됨.
+const ACCESSORY_IMAGE_DIR = 'assets/accessory/';
+const ACCESSORY_IMAGE_EXT = '.png';
+const ACCESSORY_DEFAULT_IMAGE = { ring: 'ringbase' };
+
+// 장신구 도감. 무기/방어구와 동일한 데이터 구조를 그대로 사용함. 레벨 제한은 레벨만 검사(힘/민첩 등
+// 추가 조건 없음). 반지는 같은 아이템이라도 2개까지 동시 착용 가능(장신구1/장신구2 슬롯) — 방어구처럼
+// 종류당 1개로 제한하지 않음(state.equippedAccessories, actions.js 참고).
+// ---- 항목 설명 ----
+// accessoryKind: 장신구 종류('ring') / defense: 기본 방어도(강화되지 않고 항상 이 값 그대로 유지 —
+// "장신구 강화 대상 옵션"에서 방어도 제외) / hp,mana: 방어구와 동일한 공식으로 강화 / crit: 기본
+// 치명타 확률(강화 시 합연산으로 증가) — defense/hp/mana/crit는 공란(undefined)이면 옵션 없음으로 간주.
+const ACCESSORY_TYPES = {
+  colorlessring: {
+    id: 'colorlessring', name: '무색 반지', desc: '희미한 마나가 서려있는 반지',
+    equipType: 'accessory',
+    accessoryKind: 'ring',
+    grade: 'normal', // 일반
+    defense: -1,
+    mana: 50,
+    purchasable: true, sellPrice: 500, levelReq: 5,
+    image: '',
+  },
+};
+
+// ---- 장신구 강화 단계별 치명타 확률 증가 공식 ----
+// 합연산 방식: 각 단계의 증가값을 그때그때 누적해서 더함(방어도처럼 이전 단계를 그대로 이어받는 재귀와
+// 결과적으로 같은 누적 형태지만, 의미상 "합연산"임을 명확히 하기 위해 별도 표로 관리). index = 강화 단계(1~9)
+const ACCESSORY_CRIT_STEP_DELTA = [null, 0, 0, 2, 0, 2, 0, 2, 1, 2];
+function computeAccessoryCritArray(baseCrit){
+  if(baseCrit == null) return null;
+  const arr = [baseCrit];
+  for(let lv = 1; lv <= 9; lv++){
+    arr.push(arr[lv - 1] + (ACCESSORY_CRIT_STEP_DELTA[lv] || 0));
+  }
+  return arr;
+}
+
+// 방어도/체력/마나/치명타 강화 배열 계산. 방어도는 "강화 대상에서 제외"되므로 배열 전체를 기본값으로
+// 채워(defenseFor(type, level)이 어떤 강화 단계를 물어봐도 항상 기본값을 반환하게) 강화되지 않게 함 —
+// defenseFor 등 기존 접근자 함수(formulas.js)를 그대로 재사용하기 위한 방식(별도 함수를 만들지 않음).
+// 체력/마나는 방어구와 완전히 동일한 공식(computeArmorVitalArray)을 그대로 재사용함.
+Object.values(ACCESSORY_TYPES).forEach(a => {
+  if(a.defense != null) a.defArr = new Array(10).fill(a.defense);
+  if(a.hp != null) a.hpArr = computeArmorVitalArray(a.hp);
+  if(a.mana != null) a.manaArr = computeArmorVitalArray(a.mana);
+  if(a.crit != null) a.crit = computeAccessoryCritArray(a.crit); // crit 필드를 배열로 덮어씀(critChanceFor가 wpn(type).crit[level]로 읽음)
+});
 
 // ---- 대장간 "강화 장비 선택" 팝업이 훑는 장비 보유 풀 목록 ----
 // 각 항목은 { kind, items(): 보유 아이템 배열을 반환하는 함수, typesTable: 도감(공격력/등급 등 정의),
 // meetsReq(type): 착용 가능 여부 판정 함수 }. formulas.js의 forgeSelectableItems()가 이 배열을 순회해서
 // "소유 + 착용 가능 + 강화 가능" 세 조건을 모두 만족하는 장비만 추려 하나의 목록으로 합침.
-// 무기/방어구 모두 이 풀에 포함됨(사용자 요청: 강화 화면에서 강화 가능한 모든 장비를 선택해서 사용) —
+// 무기/방어구/장신구 모두 이 풀에 포함됨(사용자 요청: 강화 화면에서 강화 가능한 모든 장비를 선택해서 사용) —
 // 강화 화면(render() 상단)은 buildForgeStatRowsHtml로 데이터에 있는 옵션만 동적으로 표시하므로 장비
 // 종류를 가리지 않음. 단, 방어구를 여기서 "선택"(state.forgeTargetId)해도 실제 착용 무기(state.
 // equippedId)나 방어구 착용 상태(state.equippedArmor)는 바뀌지 않음 — 그건 별도의 착용 시스템이 담당.
@@ -373,6 +421,12 @@ const EQUIP_INVENTORY_POOLS = [
     kind: 'armor',
     items: () => state.armorInventory || [],
     typesTable: ARMOR_TYPES,
+    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
+  },
+  {
+    kind: 'accessory',
+    items: () => state.accessoryInventory || [],
+    typesTable: ACCESSORY_TYPES,
     meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
   },
 ];
@@ -617,6 +671,25 @@ Object.values(ARMOR_TYPES).forEach(a => {
   if(sell) a.sell = sell;
 });
 
+// ============================================================
+// ACCESSORY_TYPES에 "장비 전역 설정" 연결 — 무기/방어구와 동일한 등급 기반 공식을 그대로 재사용하되,
+// "장신구 강화 비용 보정"(문서 7번) 요구사항에 따라 계산된 강화 비용 배열에 최종적으로 1.3배를 적용함.
+// 이 보정은 각 단계의 비용에 독립적으로(이전 단계의 보정된 값을 다시 사용하지 않고) 적용되므로,
+// computeGradeCost가 반환한 원래 배열을 그대로 각 원소별로 1.3배 해서 덮어쓰는 방식으로 구현함.
+// 기대비용(computeAverageExpectedCosts)과 판매가(computeWeaponSellPrices)는 이 보정된 cost 배열을
+// 그대로 입력받아 계산하는 기존 범용 함수라, 별도 처리 없이 "보정된 강화 비용 기준"이 자동으로 적용됨.
+// ============================================================
+Object.values(ACCESSORY_TYPES).forEach(a => {
+  const gradeOdds = resolveGradeOdds(a.grade);
+  const gradeCost = computeGradeCost(a.levelReq || 1, a.grade);
+  if(gradeOdds) a.odds = gradeOdds;
+  if(gradeCost) a.cost = gradeCost.map(c => Math.round(c * 1.3)); // 장신구 강화 비용 보정(×1.3, 단계별 독립 적용)
+});
+Object.values(ACCESSORY_TYPES).forEach(a => {
+  const sell = computeWeaponSellPrices(a);
+  if(sell) a.sell = sell;
+});
+
 // ---- 캐릭터 레벨 시스템 ----
 const PLAYER_MAX_LEVEL = 99;
 const STAT_POINTS_PER_LEVEL = 4;
@@ -630,6 +703,7 @@ const MONSTER_GRADES = {
 
 // 획득 가능한 아티팩트(장비) 도감
 const ARTIFACT_SLOT_MAX = 3;
+const ACCESSORY_SLOT_MAX = 2; // 장신구1/장신구2 — 반지는 같은 아이템을 2개까지 동시 착용 가능(장신구 데이터 스키마 규칙)
 // ---- 항목 설명 ----
 // desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고, 항상 'artifact') / grade: 아티팩트 등급(WEAPON_GRADES와 동일한 키 체계 재사용) /
 // effect: 장착 효과(장착 시 실제로 적용되는 효과 — 게임 로직 설명용) / effectText: 효과 설명(아이템 툴팁에 "효과"로 표시되는 문구) /

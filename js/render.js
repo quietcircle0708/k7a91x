@@ -305,13 +305,55 @@ function renderArmorInventoryList(){
       </div>`;
   }).join('');
 }
+// 장신구 인벤토리 목록. 방어구 인벤토리 카드(renderArmorInventoryList)와 거의 동일한 구조를 재사용하되,
+// "착용"은 단일 슬롯이 아니라 장신구1/장신구2 두 슬롯 중 빈 곳에 들어감(반지는 같은 종류를 2개까지
+// 동시 착용 가능 — 문서 1번 규칙). isWorn 판정도 armorKind 매칭이 아니라 state.equippedAccessories
+// 배열에 이 아이템 id가 포함되어 있는지로 확인함.
 function renderAccessoryInventoryList(){
   const wrap = el('accessoryInventoryList');
   if(!wrap) return;
   const items = state.accessoryInventory || [];
   if(items.length === 0){
-    wrap.innerHTML = `<div class="inv-empty">아직 준비된 장신구가 없습니다.</div>`;
+    wrap.innerHTML = `<div class="inv-empty">보유한 장신구가 없습니다.<br>상점에서 <b>장신구</b>를 구매해보세요.</div>`;
+    return;
   }
+  const wornList = Array.isArray(state.equippedAccessories) ? state.equippedAccessories : [];
+  const slotsFull = wornList.filter(id => id != null).length >= ACCESSORY_SLOT_MAX;
+  wrap.innerHTML = items.map(item => {
+    const type = item.type;
+    const def = ACCESSORY_TYPES[type];
+    if(!def) return '';
+    const itemColor = weaponNameColor(type, item.level);
+    const isWorn = wornList.includes(item.id);
+    const sellVal = sellValueFor(type, item.level);
+    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, state.stats);
+    const canWear = !isWorn && reqOk && !slotsFull;
+    const wearBtnHtml = isWorn
+      ? `<button class="inv-btn equip active" data-action="unwear-accessory" data-id="${item.id}">착용 해제</button>`
+      : `<button class="inv-btn equip" data-action="wear-accessory" data-id="${item.id}" ${canWear ? '' : 'disabled'}>${slotsFull && reqOk ? '슬롯 가득참' : '착용'}</button>`;
+    const wearBtnFinal = (!isWorn && !reqOk)
+      ? `<span class="equip-req-wrap">${wearBtnHtml}<span class="tooltip">착용 조건을 만족해야 장착할 수 있습니다.${weaponRequirementText(type) ? `<br>(${weaponRequirementText(type)})` : ''}</span></span>`
+      : wearBtnHtml;
+    // "강화 선택" — 무기/방어구 인벤토리 카드와 동일하게 equipItem()을 재사용해 대장간 화면(forgeTargetId)에 올림.
+    const isForgeTarget = item.id === state.forgeTargetId;
+    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk) ? 'disabled' : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
+    return `
+      <div class="inv-card ${isWorn ? 'equipped' : ''}">
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
+        <div class="inv-info">
+          <span class="weapon-name-wrap">
+            <span class="inv-name" style="color:${itemColor};">${def.name} <span class="inv-level" style="color:${itemColor};">+${item.level}</span></span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="tooltip">${buildAccessoryTooltipHtml(type, item.level)}</span>
+          </span>
+          <div class="inv-sub">${ACCESSORY_KINDS[def.accessoryKind] || ''}</div>
+        </div>
+        <div class="inv-actions">
+          ${wearBtnFinal}
+          ${forgeBtnHtml}
+          <button class="inv-btn sell" data-action="sell-accessory" data-id="${item.id}">판매 (${sellVal.toLocaleString()}G)</button>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ---- 인벤토리: 탭(장비 최상위+하위탭 / 소비 / 마석 / 기타) 표시 상태 갱신 ----
@@ -642,7 +684,22 @@ function equippedItemForSlot(slotKey){
       tooltipHtml: buildArmorTooltipHtml(type, level),
     };
   }
-  return null; // 장신구1 / 장신구2 — 아직 등록된 장비 데이터 없음
+  if(slotKey === 'accessory1' || slotKey === 'accessory2'){
+    const slotIdx = slotKey === 'accessory1' ? 0 : 1;
+    const id = Array.isArray(state.equippedAccessories) ? state.equippedAccessories[slotIdx] : null;
+    if(!id) return null;
+    const item = (state.accessoryInventory || []).find(i => i.id === id);
+    if(!item) return null;
+    const type = item.type;
+    const level = item.level;
+    return {
+      name: weaponName(type), level,
+      color: weaponNameColor(type, level),
+      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img'),
+      tooltipHtml: buildAccessoryTooltipHtml(type, level),
+    };
+  }
+  return null;
 }
 function equipSlotHtml(slot){
   const item = equippedItemForSlot(slot.key);
@@ -763,16 +820,21 @@ function buildCharStatsInfoHtml(){
     }
   }
 
-  // 착용 중인 방어구(투구/갑옷) 요약 — 착용한 방어구가 하나도 없으면 이 블록 자체를 표시하지 않음.
+  // 착용 중인 방어구(투구/갑옷)+장신구(반지 등) 요약 — 아무것도 착용하지 않았으면 이 블록 자체를 표시하지 않음.
   const wornHelmet = state.equippedArmor && state.equippedArmor.helmet
     ? (state.armorInventory || []).find(i => i.id === state.equippedArmor.helmet) : null;
   const wornBody = state.equippedArmor && state.equippedArmor.armor
     ? (state.armorInventory || []).find(i => i.id === state.equippedArmor.armor) : null;
-  if(wornHelmet || wornBody){
+  const wornAccessories = wornAccessoryItems();
+  if(wornHelmet || wornBody || wornAccessories.length > 0){
     rightHtml += `<div class="char-stat-divider"></div>`;
     rightHtml += `<div class="char-stat-row big"><span>총 방어도</span><span class="v">${playerTotalDefense()}</span></div>`;
     if(wornHelmet) rightHtml += `<div class="char-stat-row"><span>투구</span><span class="v">${ARMOR_TYPES[wornHelmet.type].name} +${wornHelmet.level}</span></div>`;
     if(wornBody) rightHtml += `<div class="char-stat-row"><span>갑옷</span><span class="v">${ARMOR_TYPES[wornBody.type].name} +${wornBody.level}</span></div>`;
+    wornAccessories.forEach(acc => {
+      const accDef = ACCESSORY_TYPES[acc.type];
+      rightHtml += `<div class="char-stat-row"><span>${accDef ? ACCESSORY_KINDS[accDef.accessoryKind] || '장신구' : '장신구'}</span><span class="v">${accDef ? accDef.name : acc.type} +${acc.level}</span></div>`;
+    });
   }
 
   return rightHtml;
@@ -1395,17 +1457,21 @@ function buildWeaponShopCardHtml(typesTable, id){
   const w = typesTable[id];
   const buyPrice = (w.sellPrice || 0) * 2;
   // 구매 시 실제로 담기는 인벤토리 배열이 장비 종류마다 다르므로(무기→state.inventory, 방어구→
-  // state.armorInventory), 용량 확인도 그에 맞춰 분기함.
+  // state.armorInventory, 장신구→state.accessoryInventory), 용량 확인도 그에 맞춰 분기함.
   const capOk = w.equipType === 'armor'
     ? (state.armorInventory || []).length < INV_MAX
-    : state.inventory.length < INV_MAX;
+    : w.equipType === 'accessory'
+      ? (state.accessoryInventory || []).length < INV_MAX
+      : state.inventory.length < INV_MAX;
   // 아이템 레벨(levelReq)은 "착용" 조건일 뿐이라 구매를 막지 않음 — 인벤토리 공간/골드만 확인.
   const disabled = !capOk || state.gold < buyPrice;
   const tag = !capOk ? '인벤토리 가득참' : (w.levelReq && w.levelReq > 1 ? `아이템 Lv.${w.levelReq}` : '');
   const nameColor = weaponNameColor(id, 0);
-  // 방어구 탭은 무기와 동일한 카드를 공유하지만, 툴팁 내용은 방어구 전용 구성(buildArmorTooltipHtml)을 써야 함
-  // (무기 툴팁은 공격력/공격속도 등 방어구에 없는 필드를 참조하므로).
-  const tooltipHtml = w.equipType === 'armor' ? buildArmorTooltipHtml(id, 0) : buildWeaponTooltipHtml(id, 0);
+  // 방어구/장신구 탭은 무기와 동일한 카드를 공유하지만, 툴팁 내용은 장비 종류별 전용 구성을 써야 함
+  // (무기 툴팁은 공격력/공격속도 등 방어구·장신구에 없는 필드를 참조하므로).
+  const tooltipHtml = w.equipType === 'armor' ? buildArmorTooltipHtml(id, 0)
+    : w.equipType === 'accessory' ? buildAccessoryTooltipHtml(id, 0)
+    : buildWeaponTooltipHtml(id, 0);
   return `
     <div class="scroll-card">
       <div class="scroll-head">

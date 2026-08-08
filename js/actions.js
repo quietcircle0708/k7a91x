@@ -39,13 +39,15 @@ function startEnhance(){
 
 function resolveEnhance(itemId, level){
   isEnhancing = false;
-  // 대장간 화면에 지금 표시된 대상은 무기(state.inventory) 또는 방어구(state.armorInventory) 둘 중
-  // 하나이므로 둘 다 검색함(getEquipped()와 동일한 검색 범위).
+  // 대장간 화면에 지금 표시된 대상은 무기/방어구/장신구 인벤토리 중 하나이므로 전부 검색함(getEquipped()와 동일한 검색 범위).
   let item = state.inventory.find(i => i.id === itemId);
   if(!item) item = (state.armorInventory || []).find(i => i.id === itemId);
+  if(!item) item = (state.accessoryInventory || []).find(i => i.id === itemId);
   if(!item){ render(); saveState(); return; }
   const type = item.type || 'longsword';
-  const isArmorItem = wpn(type).equipType === 'armor';
+  const equipTypeNow = wpn(type).equipType;
+  const isArmorItem = equipTypeNow === 'armor';
+  const isAccessoryItem = equipTypeNow === 'accessory';
 
   const odds = oddsFor(type, level);
   let outcome = weightedOutcome(odds);
@@ -84,7 +86,9 @@ function resolveEnhance(itemId, level){
       state.legendCount++;
       successRing('#e0b13c');
       burstRays('#ffffff', 14);
-      showMsg(isArmorItem ? '✨ 전설의 방어구 완성! 판매하여 다음 방어구를 준비하세요' : '✨ 전설의 검 완성! 판매하여 다음 검을 만드세요', 'legend');
+      showMsg(isArmorItem ? '✨ 전설의 방어구 완성! 판매하여 다음 방어구를 준비하세요'
+        : isAccessoryItem ? '✨ 전설의 장신구 완성! 판매하여 다음 장신구를 준비하세요'
+        : '✨ 전설의 검 완성! 판매하여 다음 검을 만드세요', 'legend');
     } else {
       showMsg('강화 성공! +' + item.level, 'success');
     }
@@ -163,12 +167,13 @@ function performSellItem(id){
   render();
   saveState();
 }
-// 대장간 화면 하단 "판매" 버튼 — 지금 대장간에 표시된 대상(getEquipped(), 무기 또는 방어구)을 판매함.
+// 대장간 화면 하단 "판매" 버튼 — 지금 대장간에 표시된 대상(getEquipped(), 무기/방어구/장신구)을 판매함.
 function doSell(){
   const equipped = getEquipped();
   if(!equipped) return;
   if(state.inventory.some(i => i.id === equipped.id)) sellItem(equipped.id);
-  else sellArmorItem(equipped.id);
+  else if((state.armorInventory || []).some(i => i.id === equipped.id)) sellArmorItem(equipped.id);
+  else sellAccessoryItem(equipped.id);
 }
 // 강화 대상 선택. 무기를 선택하면 "착용 무기"(equippedId, 전투에 실제 사용)와 "대장간 표시 대상"
 // (forgeTargetId)을 함께 갱신함(기존 동작과 동일 — 무기는 강화 선택이 곧 착용). 방어구를 선택하면
@@ -189,6 +194,15 @@ function equipItem(id){
   const armorItem = (state.armorInventory || []).find(i => i.id === id);
   if(armorItem){
     if(!meetsWeaponEquipRequirements(armorItem.type, state.playerLevel, state.stats)) return;
+    state.forgeTargetId = id;
+    showMsg('', '');
+    render();
+    saveState();
+    return;
+  }
+  const accessoryItem = (state.accessoryInventory || []).find(i => i.id === id);
+  if(accessoryItem){
+    if(!meetsWeaponEquipRequirements(accessoryItem.type, state.playerLevel, state.stats)) return;
     state.forgeTargetId = id;
     showMsg('', '');
     render();
@@ -277,16 +291,80 @@ function buyWeapon(typeId, btn){
     render(); saveState();
     return;
   }
-  // 상점 "장비 > 방어구" 탭 카드도 동일한 data-action="buy-weapon"을 공유해서 호출하므로(buildWeaponShopCardHtml
-  // 참고) 여기서 분기해서 처리함. 방어구는 별도 인벤토리 배열(state.armorInventory)에 담김.
+  // 상점 "장비 > 방어구/장신구" 탭 카드도 동일한 data-action="buy-weapon"을 공유해서 호출하므로(buildWeaponShopCardHtml
+  // 참고) 여기서 분기해서 처리함. 방어구/장신구는 각각 별도 인벤토리 배열에 담김.
   const a = ARMOR_TYPES[typeId];
-  if(!a || !a.purchasable) return;
-  const price = (a.sellPrice || 0) * 2;
-  if(!state.armorInventory) state.armorInventory = [];
-  if(state.gold < price || state.armorInventory.length >= INV_MAX) return;
-  state.gold -= price;
-  state.armorInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
+  if(a){
+    if(!a.purchasable) return;
+    const price = (a.sellPrice || 0) * 2;
+    if(!state.armorInventory) state.armorInventory = [];
+    if(state.gold < price || state.armorInventory.length >= INV_MAX) return;
+    state.gold -= price;
+    state.armorInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
+    purchaseEffect(btn || null);
+    render(); saveState();
+    return;
+  }
+  const acc = ACCESSORY_TYPES[typeId];
+  if(!acc || !acc.purchasable) return;
+  const accPrice = (acc.sellPrice || 0) * 2;
+  if(!state.accessoryInventory) state.accessoryInventory = [];
+  if(state.gold < accPrice || state.accessoryInventory.length >= INV_MAX) return;
+  state.gold -= accPrice;
+  state.accessoryInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
   purchaseEffect(btn || null);
+  render(); saveState();
+}
+
+// ---- 장신구: 판매/착용/강화 ----
+// 강화는 방어구와 마찬가지로 대장간 화면(startEnhance/resolveEnhance)을 그대로 재사용함 — 별도 함수 없음.
+function sellAccessoryItem(id){
+  if(isEnhancing) return;
+  const item = (state.accessoryInventory || []).find(i => i.id === id);
+  if(!item) return;
+  const value = sellValueFor(item.type, item.level);
+  const label = `${ACCESSORY_TYPES[item.type].name} +${item.level}`;
+  openSellConfirm(label, value, () => performSellAccessoryItem(id));
+}
+function performSellAccessoryItem(id){
+  const idx = (state.accessoryInventory || []).findIndex(i => i.id === id);
+  if(idx === -1) return;
+  const item = state.accessoryInventory[idx];
+  const def = ACCESSORY_TYPES[item.type];
+  const value = sellValueFor(item.type, item.level);
+  state.gold += value;
+  state.totalSold += value;
+  showMsg(('+' + item.level) + ' ' + def.name + '를 ' + value.toLocaleString() + ' G에 판매했습니다', 'success');
+  state.accessoryInventory.splice(idx, 1);
+  if(Array.isArray(state.equippedAccessories)){
+    const slotIdx = state.equippedAccessories.indexOf(id);
+    if(slotIdx !== -1) state.equippedAccessories[slotIdx] = null;
+  }
+  if(state.forgeTargetId === id) state.forgeTargetId = null; // 대장간에 표시 중이었다면 함께 정리
+  clampPlayerVitals();
+  render(); saveState();
+}
+// 장신구 착용 — 장신구1/장신구2 두 슬롯 중 빈 곳에 들어감(반지는 같은 아이템을 2개까지 동시 착용
+// 가능하므로 방어구처럼 종류로 슬롯을 구분하지 않음). 두 슬롯이 모두 차 있으면 아무 동작도 하지 않음
+// (렌더링 쪽에서 이 경우 버튼을 비활성화해서 "슬롯 가득참"으로 안내함).
+function equipAccessoryPiece(id){
+  const item = (state.accessoryInventory || []).find(i => i.id === id);
+  if(!item) return;
+  if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, state.stats)) return;
+  if(!Array.isArray(state.equippedAccessories)) state.equippedAccessories = [null, null];
+  if(state.equippedAccessories.includes(id)) return; // 이미 착용 중
+  const emptyIdx = state.equippedAccessories.indexOf(null);
+  if(emptyIdx === -1) return; // 슬롯 가득참
+  state.equippedAccessories[emptyIdx] = id;
+  clampPlayerVitals();
+  render(); saveState();
+}
+function unequipAccessoryPiece(id){
+  if(!Array.isArray(state.equippedAccessories)) return;
+  const idx = state.equippedAccessories.indexOf(id);
+  if(idx === -1) return;
+  state.equippedAccessories[idx] = null;
+  clampPlayerVitals();
   render(); saveState();
 }
 

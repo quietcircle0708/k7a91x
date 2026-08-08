@@ -487,7 +487,11 @@
     30%{ transform: translate(-50%,-8px) scale(1.5); }
     100%{ opacity:0; transform: translate(-50%,-50px) scale(1.1); }
   }
-  .monster-row{ display:flex; justify-content:center; align-items:flex-start; gap:8px; margin-bottom:6px; }
+  /* 몬스터 UI 그룹(아이콘/이름/레벨/체력바)을 통째로 위로 이동 — 던전 입장 팝업(#spawnToast, top:2px,
+     .monster-stage 기준)의 아래쪽 끝(약 31px)에서 20px 아래(약 51px)에 그룹 상단이 오도록, 원래 위치
+     (.monster-stage 150px + margin-bottom 10px = 160px)에서 그만큼만 끌어올림. 내부 배치/간격은 그대로
+     유지되고 그룹 전체가 한 덩어리로 이동하며, 몬스터 수와 무관하게 항상 동일하게 적용됨. */
+  .monster-row{ display:flex; justify-content:center; align-items:flex-start; gap:8px; margin-bottom:6px; margin-top:-109px; }
   .monster-slot{ display:flex; flex-direction:column; align-items:center; flex:1 1 0; min-width:0; max-width:170px; cursor:pointer; position:relative; }
   .monster-row.count-2 .monster-slot .monster-icon{ font-size:56px; }
   .monster-row.count-3 .monster-slot .monster-icon{ font-size:44px; }
