@@ -409,3 +409,50 @@ function confirmSell(){
 function cancelSell(){
   closeSellConfirm();
 }
+
+// ---- 상점 "개수 지정 구매" 팝업 ----
+// 상점의 buy-weapon(무기/방어구/장신구 공용)/buy-consumable/buy-artifact 세 구매 버튼을 클릭하면
+// 즉시 구매하는 대신 이 팝업을 먼저 띄움. 실제 구매(골드 차감/인벤토리 지급)는 기존 구매 함수
+// (actions.js의 buyWeapon/buyFlask/buyArtifact)를 그대로 재사용함 — 여기서는 개수만 정하고 확정 시
+// 그 함수를 개수만큼 반복 호출함(shopBuyMaxQty로 이미 상한을 계산해두므로 반복 중 실패할 일은 없음).
+let buyQtyState = null; // { action, typeId, qty, unitPrice, maxQty }
+function openBuyQtyModal(action, typeId){
+  const unitPrice = shopBuyUnitPrice(action, typeId);
+  const maxQty = shopBuyMaxQty(action, typeId);
+  if(maxQty <= 0) return; // 방어적 처리(정상적으로는 버튼 자체가 비활성화되어 있어 여기 도달하지 않음)
+  buyQtyState = { action, typeId, qty: 1, unitPrice, maxQty };
+  renderBuyQtyModal();
+  el('buyQtyModal').style.display = 'flex';
+}
+function closeBuyQtyModal(){
+  el('buyQtyModal').style.display = 'none';
+  buyQtyState = null;
+}
+// 구매 개수를 1~maxQty 범위로 정규화해서 반영(직접 입력/▲▼ 버튼 공용 진입점).
+function setBuyQty(n){
+  if(!buyQtyState) return;
+  const num = Math.floor(Number(n));
+  const clamped = Number.isFinite(num) ? Math.max(1, Math.min(buyQtyState.maxQty, num)) : 1;
+  buyQtyState.qty = clamped;
+  renderBuyQtyModal();
+}
+function adjustBuyQty(dir){
+  if(!buyQtyState) return;
+  setBuyQty(buyQtyState.qty + (dir === 'up' ? 1 : -1));
+}
+function renderBuyQtyModal(){
+  if(!buyQtyState) return;
+  const { action, typeId, qty, unitPrice, maxQty } = buyQtyState;
+  const display = shopBuyItemDisplay(action, typeId);
+  const iconBox = el('buyQtyIconBox');
+  iconBox.style.background = display.borderColor ? '#242424' : '';
+  iconBox.style.borderColor = display.borderColor || '';
+  iconBox.innerHTML = display.iconHtml + `<span class="tooltip" id="buyQtyTooltip">${display.tooltipHtml}</span>`;
+  el('buyQtyInput').value = qty;
+  el('buyQtyInput').max = maxQty;
+  el('buyQtyCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
+  el('buyQtyTotalGold').textContent = '🪙 ' + (unitPrice * qty).toLocaleString();
+  el('buyQtyUpBtn').disabled = qty >= maxQty;
+  el('buyQtyDownBtn').disabled = qty <= 1;
+}
+

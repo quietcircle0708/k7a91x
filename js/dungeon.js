@@ -327,17 +327,16 @@ function killMonsterInstance(instanceId){
   hunt.pendingRewards.gold += result.gold;
 
   if(result.weaponDrop){
-    if(state.inventory.length < INV_MAX){
-      state.inventory.push({ id: state.nextItemId++, level: result.weaponDrop.level, type: result.weaponDrop.type });
+    if(grantRelicEquipDrop(result.weaponDrop)){
       hunt.pendingRewards.weaponDrops.push(result.weaponDrop);
-    } // 인벤토리가 가득 차면 기존과 동일하게 드랍 자체가 무산됨(합산 목록에도 반영 안 함)
+    } // 해당 장비 타입의 인벤토리가 가득 차면 기존과 동일하게 드랍 자체가 무산됨(합산 목록에도 반영 안 함)
   }
   if(result.weaponIdDrops && result.weaponIdDrops.length){
     for(const drop of result.weaponIdDrops){
-      if(state.inventory.length < INV_MAX){
+      if(!equipInventoryFull()){
         state.inventory.push({ id: state.nextItemId++, level: drop.level, type: drop.type });
         hunt.pendingRewards.weaponIdDrops.push(drop);
-      } // 인벤토리가 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨
+      } // 공용 장비 슬롯이 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨
     }
   }
   if(result.stoneDrop){
@@ -424,8 +423,8 @@ function openKillResultModal(rewards){
     const drop = rewards.miscDrops[itemId];
     rewardsHtml += `<div><span class="txt-shard">${drop.icon} ${drop.name}</span> +${drop.qty} 획득</div>`;
   });
-  if(state.inventory.length >= INV_MAX){
-    rewardsHtml += `<div class="reward-note">무기 인벤토리가 가득 찼습니다.</div>`;
+  if(anyEquipInventoryFull()){
+    rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;
   }
   el('krRewards').innerHTML = rewardsHtml;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
@@ -474,6 +473,24 @@ function clickTreasureChest(){
     openTreasureResultModal(result);
   }, TREASURE_SHAKE_MS);
 }
+// 모험가의 유해로 지급받은 장비를 장비 타입(무기/방어구/장신구)에 맞는 인벤토리에 추가.
+// 대상 인벤토리는 EQUIP_INVENTORY_POOLS(data.js)의 items()를 그대로 재사용하므로, 새 장비 타입이
+// 추가돼도 이 함수 수정 없이 자동으로 대응됨. 세 인벤토리가 INV_MAX(50)를 공용으로 나눠 쓰므로,
+// 용량 판단은 대상 배열 자신의 길이가 아니라 totalEquipInventoryCount()(formulas.js)로 함 — 가득
+// 차 있으면 지급하지 않고 false 반환(기존처럼 드랍 자체가 무산됨).
+function grantRelicEquipDrop(drop){
+  const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === (drop.equipType || 'weapon'));
+  const arr = pool ? pool.items() : state.inventory;
+  if(equipInventoryFull()) return false;
+  arr.push({ id: state.nextItemId++, level: drop.level, type: drop.type });
+  return true;
+}
+// 장비(무기/방어구/장신구) 공용 인벤토리 슬롯이 가득 찼는지 — 결과 화면의 "인벤토리가 가득 찼습니다"
+// 안내에 사용함. equipInventoryFull()(formulas.js)을 그대로 재사용.
+function anyEquipInventoryFull(){
+  return equipInventoryFull();
+}
+
 // 던전의 최소 레벨(가장 낮은 등장 몬스터 레벨) 기준으로 보상을 산정해 지급.
 // 골드는 확정 지급(×5, ±25%)이고, 모험가의 유해/마석은 각각의 전역 드랍 확률을 그대로 적용하므로 드랍되지 않을 수도 있음.
 function grantTreasureRewards(){
@@ -482,12 +499,8 @@ function grantTreasureRewards(){
   state.gold += gold;
 
   let weaponDrop = resolveWeaponRelicDrop(minLevel);
-  if(weaponDrop){
-    if(state.inventory.length < INV_MAX){
-      state.inventory.push({ id: state.nextItemId++, level: weaponDrop.level, type: weaponDrop.type });
-    } else {
-      weaponDrop = null; // 인벤토리가 가득 차 드랍 무산
-    }
+  if(weaponDrop && !grantRelicEquipDrop(weaponDrop)){
+    weaponDrop = null; // 해당 장비 타입의 인벤토리가 가득 차 드랍 무산
   }
   const stoneDrop = rollStoneDrop(minLevel, 'normal');
   if(stoneDrop){
@@ -514,8 +527,8 @@ function openTreasureResultModal(result){
     const item = MISC_ITEMS[result.stoneDrop.itemId];
     rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${result.stoneDrop.qty} 획득</div>`;
   }
-  if(state.inventory.length >= INV_MAX && !result.weaponDrop){
-    rewardsHtml += `<div class="reward-note">무기 인벤토리가 가득 찼습니다.</div>`;
+  if(anyEquipInventoryFull() && !result.weaponDrop){
+    rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;
   }
   el('krRewards').innerHTML = rewardsHtml;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();

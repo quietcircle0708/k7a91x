@@ -57,15 +57,17 @@ document.addEventListener('click', (e)=>{
 });
 // 상점 품목 목록: 탭에 관계없이 data-action으로 구매/판매를 한 번에 위임 처리
 // (새 탭/아이템이 추가돼도 render.js가 알맞은 data-action을 붙여주므로 여기는 수정할 필요 없음)
+// 구매(buy-*) 세 종류는 즉시 구매하지 않고 개수 지정 구매 팝업(openBuyQtyModal)을 먼저 띄움 — 실제
+// 구매는 팝업의 "구매" 버튼(confirmBuyQty)에서 이뤄짐.
 el('shopItemsList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn || btn.disabled) return;
   const type = btn.dataset.type;
   switch(btn.dataset.action){
-    case 'buy-weapon': buyWeapon(type, btn); break;
-    case 'buy-consumable': buyFlask(type, btn); break;
+    case 'buy-weapon': openBuyQtyModal('buy-weapon', type); break;
+    case 'buy-consumable': openBuyQtyModal('buy-consumable', type); break;
     case 'sell-consumable': sellAllFlask(type, btn); break;
-    case 'buy-artifact': buyArtifact(type, btn); break;
+    case 'buy-artifact': openBuyQtyModal('buy-artifact', type); break;
     case 'sell-misc': sellAllMisc(type, btn); break;
   }
 });
@@ -191,6 +193,11 @@ el('charTabPanels').addEventListener('click', (e)=>{
 el('respawnBtn').addEventListener('click', respawnAtVillage);
 el('sellConfirmYesBtn').addEventListener('click', confirmSell);
 el('sellConfirmNoBtn').addEventListener('click', cancelSell);
+el('buyQtyCancelBtn').addEventListener('click', closeBuyQtyModal);
+el('buyQtyConfirmBtn').addEventListener('click', confirmBuyQty);
+el('buyQtyUpBtn').addEventListener('click', ()=> adjustBuyQty('up'));
+el('buyQtyDownBtn').addEventListener('click', ()=> adjustBuyQty('down'));
+el('buyQtyInput').addEventListener('input', (e)=> setBuyQty(e.target.value));
 el('krStopBtn').addEventListener('click', returnToVillage);
 el('krContinueBtn').addEventListener('click', advanceStage);
 el('dungeonListPager').addEventListener('click', (e)=>{

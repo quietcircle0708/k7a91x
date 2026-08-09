@@ -4,6 +4,29 @@
 // dungeon.js, 화면 전환/모달은 navigation.js를 참고.
 // ============================================================
 
+// ---- 상점 "개수 지정 구매" 팝업: 확정 구매 ----
+// 팝업(navigation.js의 buyQtyState)에 설정된 개수만큼 기존 단건 구매 함수를 그대로 반복 호출함
+// (골드 차감/인벤토리 지급 로직은 100% 재사용, 여기서는 반복 횟수만 담당). silent=true로 호출해
+// 매번 render/saveState/구매 이펙트를 띄우지 않다가, 전부 끝난 뒤 한 번만 갱신·저장하고 팝업을 닫음.
+function confirmBuyQty(){
+  if(!buyQtyState) return;
+  const { action, typeId, qty } = buyQtyState;
+  let bought = 0;
+  for(let i = 0; i < qty; i++){
+    let ok = false;
+    if(action === 'buy-weapon') ok = buyWeapon(typeId, null, true);
+    else if(action === 'buy-consumable') ok = buyFlask(typeId, null, true);
+    else if(action === 'buy-artifact') ok = buyArtifact(typeId, null, true);
+    if(!ok) break; // 방어적 처리(정상 흐름에서는 maxQty 계산 덕분에 도중에 실패하지 않음)
+    bought++;
+  }
+  closeBuyQtyModal();
+  if(bought > 0){
+    render();
+    saveState();
+  }
+}
+
 // ---- 강화 ----
 function startEnhance(){
   if(isEnhancing) return;
@@ -158,7 +181,7 @@ function performSellItem(id){
     // 아님(구조 변경 5번: 강화 화면은 항상 플레이어가 직접 선택한 장비만 표시) — 그래서 구매까지는
     // 자동으로 하되, 강화 대상으로 자동 지정(forgeTargetId 대입)하지는 않음. 이후 대장간 버튼이나
     // 인벤토리에서 직접 "강화 선택"해야 강화 화면에 표시됨.
-    if(state.autoRebuy && state.gold >= weaponBuyPrice('longsword') && state.inventory.length < INV_MAX){
+    if(state.autoRebuy && state.gold >= weaponBuyPrice('longsword') && !equipInventoryFull()){
       state.gold -= weaponBuyPrice('longsword');
       const newItem = { id: state.nextItemId++, level: 0, type: 'longsword' };
       state.inventory.push(newItem);
@@ -246,16 +269,17 @@ function buyBlessing(btn){
 // ---- 상점 구매/판매 ----
 // 상점에서 구매 가능한(purchasable:true) 아티팩트를 구매. 특정 아티팩트 이름/ID에 의존하지 않음 —
 // ARTIFACTS 데이터에 purchasable:true + buyPrice만 넣으면 이 함수가 그대로 처리함.
-function buyArtifact(id, btn){
+// silent 파라미터는 buyWeapon과 동일한 역할(개수 지정 구매 팝업에서 반복 호출용).
+function buyArtifact(id, btn, silent){
   const a = ARTIFACTS[id];
-  if(!a || a.buyPrice == null) return;
-  if(ownsArtifact(id) || state.gold < a.buyPrice) return;
+  if(!a || a.buyPrice == null) return false;
+  if(ownsArtifact(id) || state.gold < a.buyPrice) return false;
   state.gold -= a.buyPrice;
   state.artifacts.push(id);
   // 빈 장착 슬롯이 있을 때만 자동 장착(기존 장착 중인 아티팩트를 교체하지 않음).
   if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX) state.equippedArtifacts.push(id);
-  purchaseEffect(btn || null);
-  render(); saveState();
+  if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
+  return true;
 }
 // 인벤토리에서 아티팩트를 직접 장착. 빈 슬롯이 없거나 이미 장착 중이면 아무 동작도 하지 않음
 // (동일한 아티팩트를 동시에 두 번 장착할 수 없음 — 애초에 아티팩트는 종류별로 1개만 보유 가능).
@@ -275,45 +299,46 @@ function unequipArtifact(id){
 }
 // 상점에 등록된(purchasable) 무기를 구매. 가격은 sellPrice×2. 아이템 레벨(levelReq)은 "착용" 조건일 뿐
 // 구매/강화와는 무관하므로, 레벨이 낮아도 구매해서 인벤토리에 넣고 강화할 수 있음.
-function buyWeapon(typeId, btn){
+// silent가 true면 이펙트 연출/화면 갱신/저장을 생략하고 성공 여부(boolean)만 반환함 — 개수 지정 구매
+// 팝업(confirmBuyQty)이 이 함수를 N번 반복 호출한 뒤 마지막에 한 번만 render/saveState 하기 위함.
+// 기존 방식대로 단건 구매(버튼 클릭 → 즉시 1개 구매)로 호출할 때는 silent를 생략하면 기존과 동일하게 동작함.
+function buyWeapon(typeId, btn, silent){
   const w = WEAPON_TYPES[typeId];
   if(w){
-    if(!w.purchasable) return;
+    if(!w.purchasable) return false;
     const price = weaponBuyPrice(typeId);
-    if(state.gold < price || state.inventory.length >= INV_MAX) return;
+    if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
     const newItem = { id: state.nextItemId++, level: 0, type: typeId };
     state.inventory.push(newItem);
     // (구조 변경 5번) 예전에는 장착 중인 무기가 없으면 방금 구매한 무기를 자동으로 강화 대상으로
     // 지정했지만, 이제는 대장간 버튼/인벤토리에서 플레이어가 직접 "강화 선택"해야만 강화 화면에
     // 표시되도록 자동 지정을 제거함. 구매 자체(인벤토리에 추가)는 그대로 동작함.
-    purchaseEffect(btn || null);
-    render(); saveState();
-    return;
+    if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
+    return true;
   }
   // 상점 "장비 > 방어구/장신구" 탭 카드도 동일한 data-action="buy-weapon"을 공유해서 호출하므로(buildWeaponShopCardHtml
   // 참고) 여기서 분기해서 처리함. 방어구/장신구는 각각 별도 인벤토리 배열에 담김.
   const a = ARMOR_TYPES[typeId];
   if(a){
-    if(!a.purchasable) return;
+    if(!a.purchasable) return false;
     const price = (a.sellPrice || 0) * 2;
     if(!state.armorInventory) state.armorInventory = [];
-    if(state.gold < price || state.armorInventory.length >= INV_MAX) return;
+    if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
     state.armorInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
-    purchaseEffect(btn || null);
-    render(); saveState();
-    return;
+    if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
+    return true;
   }
   const acc = ACCESSORY_TYPES[typeId];
-  if(!acc || !acc.purchasable) return;
+  if(!acc || !acc.purchasable) return false;
   const accPrice = (acc.sellPrice || 0) * 2;
   if(!state.accessoryInventory) state.accessoryInventory = [];
-  if(state.gold < accPrice || state.accessoryInventory.length >= INV_MAX) return;
+  if(state.gold < accPrice || equipInventoryFull()) return false;
   state.gold -= accPrice;
   state.accessoryInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
-  purchaseEffect(btn || null);
-  render(); saveState();
+  if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
+  return true;
 }
 
 // ---- 장신구: 판매/착용/강화 ----
@@ -421,14 +446,18 @@ function unequipArmorPiece(id){
 // 요청: 강화 화면에서 강화 가능한 모든 장비를 선택해서 사용). 인벤토리 카드의 "강화 선택" 버튼은
 // equipItem(id)을 그대로 호출해 forgeTargetId만 지정하고, 실제 강화는 대장간 화면의 "강화하기" 버튼으로
 // 진행됨 — 별도의 즉시 강화 함수를 두지 않음.
-function buyFlask(id, btn){
+// silent 파라미터는 buyWeapon과 동일한 역할(개수 지정 구매 팝업에서 반복 호출용).
+function buyFlask(id, btn, silent){
   const item = CONSUMABLES[id];
-  if(!item || state.gold < item.buyPrice) return;
+  if(!item || state.gold < item.buyPrice) return false;
   if(!state.consumables) state.consumables = { hpFlask: 0, mpFlask: 0 };
   state.gold -= item.buyPrice;
   state.consumables[id] = (state.consumables[id] || 0) + 1;
-  purchaseEffect(btn ? (btn.closest('.scroll-card') || btn) : null);
-  render(); saveState();
+  if(!silent){
+    purchaseEffect(btn ? (btn.closest('.scroll-card') || btn) : null);
+    render(); saveState();
+  }
+  return true;
 }
 function sellAllFlask(id, btn){
   const item = CONSUMABLES[id];

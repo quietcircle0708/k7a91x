@@ -11,6 +11,12 @@ function render(){
 
   renderHuntCharPanel();
   renderQuickSlots();
+  // 플라스크 퀵슬롯(renderQuickSlots)과 동일한 이유로 여기서 항상 호출함 — 예전에는 캐릭터 메뉴의
+  // 스킬 탭을 열거나 스킬을 실제로 사용할 때만 renderSkillQuickSlots()가 불려서, 게임 시작 후 스킬
+  // 탭을 한 번도 안 연 채로 곧장 던전에 들어가면 huntSkillQuickSlotRow가 비어있는 채로 남는 버그가
+  // 있었음(캐릭터 메뉴를 한 번 열면 그 뒤로는 정상 출력됐던 것도 이 때문). render()에서 항상 채워주면
+  // 화면 전환과 무관하게 처음부터 정상 출력됨.
+  renderSkillQuickSlots();
   el('goldText').textContent = state.gold.toLocaleString();
   el('goldLedger').textContent = state.gold.toLocaleString() + ' G';
 
@@ -25,7 +31,7 @@ function render(){
   if(!equipped){
     el('emptyNotice').style.display = 'block';
     el('quickBuySwordBtn').textContent = `🗡️ 검 구매 (${weaponBuyPrice('longsword').toLocaleString()} G)`;
-    el('quickBuySwordBtn').disabled = state.gold < weaponBuyPrice('longsword') || state.inventory.length >= INV_MAX;
+    el('quickBuySwordBtn').disabled = state.gold < weaponBuyPrice('longsword') || equipInventoryFull();
     el('tierLabel').textContent = '장착된 장비 없음';
     el('levelDisplay').textContent = '-';
     el('levelDisplay').style.color = 'var(--forge-cream-dim)';
@@ -61,7 +67,7 @@ function render(){
     el('levelDisplay').textContent = '+' + level;
     el('levelDisplay').style.color = weaponNameColor(type, level);
     el('tierLabel').textContent = meta.label;
-    el('itemName').textContent = weaponName(type) + ' +' + level;
+    el('itemName').textContent = weaponName(type) + levelSuffix(level);
     el('itemName').style.color = weaponNameColor(type, level);
 
     // 강화 화면 스탯: 무기/방어구 구분 없이 데이터에 실제로 존재하는 옵션(공격력/공격속도/치명타 확률/
@@ -145,7 +151,10 @@ function render(){
   renderShopTab();
 
   // 인벤토리
-  el('invCount').textContent = state.inventory.length + ' / ' + INV_MAX;
+  // 무기/방어구/장신구가 INV_MAX(50)를 공용으로 나눠 쓰므로, 이 카운트도 무기 탭에 있지만
+  // totalEquipInventoryCount()로 세 종류를 합산해 표시함(무기 개수만 보여주면 실제 남은 공용 슬롯과
+  // 어긋나 보일 수 있음).
+  el('invCount').textContent = totalEquipInventoryCount() + ' / ' + INV_MAX;
   renderInvTabs();
   renderInventoryList();
   renderArmorInventoryList();
@@ -1277,16 +1286,18 @@ function renderStatusBadges(){
   });
 }
 
-// 킬 결과 모달에 보여줄 인벤토리 미리보기 HTML
+// 킬 결과 모달에 보여줄 인벤토리 미리보기 HTML(목록 자체는 기존처럼 무기만 나열함 — 이번 작업은
+// 슬롯 최대 개수만 다루므로 목록 범위는 건드리지 않음). 다만 슬롯 수 표시는 무기/방어구/장신구가
+// INV_MAX(50)를 공용으로 나눠 쓰는 새 모델에 맞춰 totalEquipInventoryCount()로 합산해서 보여줌.
 function buildInvPeekHtml(){
   if(state.inventory.length === 0){
-    return `인벤토리 (0/${INV_MAX})<br>비어있음`;
+    return `인벤토리 (${totalEquipInventoryCount()}/${INV_MAX})<br>비어있음`;
   }
   const lines = state.inventory.map(it => {
     const eq = it.id === state.equippedId ? ' <b style="color:var(--forge-gold);">(장착 중)</b>' : '';
     return `${weaponIconHtml(it.type || 'longsword', 'inv-peek-icon-img')} ${weaponName(it.type || 'longsword')}${levelSuffix(it.level)}${eq}`;
   }).join('<br>');
-  return `인벤토리 (${state.inventory.length}/${INV_MAX})<br>${lines}`;
+  return `인벤토리 (${totalEquipInventoryCount()}/${INV_MAX})<br>${lines}`;
 }
 
 // ---- 설정 화면 ----
@@ -1456,13 +1467,10 @@ function buildShopCardHtml(tabId, id){
 function buildWeaponShopCardHtml(typesTable, id){
   const w = typesTable[id];
   const buyPrice = (w.sellPrice || 0) * 2;
-  // 구매 시 실제로 담기는 인벤토리 배열이 장비 종류마다 다르므로(무기→state.inventory, 방어구→
-  // state.armorInventory, 장신구→state.accessoryInventory), 용량 확인도 그에 맞춰 분기함.
-  const capOk = w.equipType === 'armor'
-    ? (state.armorInventory || []).length < INV_MAX
-    : w.equipType === 'accessory'
-      ? (state.accessoryInventory || []).length < INV_MAX
-      : state.inventory.length < INV_MAX;
+  // 무기/방어구/장신구가 INV_MAX(50)를 공용으로 나눠 쓰므로(구매 시 실제로 담기는 배열은 여전히
+  // 종류별로 다름 — 무기→state.inventory, 방어구→state.armorInventory, 장신구→state.accessoryInventory),
+  // 용량 확인은 개별 배열이 아니라 세 배열의 합계(equipInventoryFull)로 판단함.
+  const capOk = !equipInventoryFull();
   // 아이템 레벨(levelReq)은 "착용" 조건일 뿐이라 구매를 막지 않음 — 인벤토리 공간/골드만 확인.
   const disabled = !capOk || state.gold < buyPrice;
   const tag = !capOk ? '인벤토리 가득참' : (w.levelReq && w.levelReq > 1 ? `아이템 Lv.${w.levelReq}` : '');

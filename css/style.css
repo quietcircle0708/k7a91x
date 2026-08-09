@@ -790,6 +790,20 @@
   .stat-alloc-actions-right{ display:flex; gap:8px; }
   .stat-alloc-actions .nav-btn:disabled, .stat-alloc-actions .btn:disabled{ opacity:.35; cursor:not-allowed; }
 
+  /* ---- 상점 개수 지정 구매 팝업 ---- */
+  .buy-qty-icon-row{ display:flex; justify-content:center; margin-bottom:14px; }
+  .buy-qty-icon-box{ width:56px; height:56px; font-size:26px; }
+  .buy-qty-field-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; }
+  .buy-qty-input{
+    width:56px; text-align:center; padding:6px 4px;
+    border:1px solid var(--forge-line); background: var(--forge-panel-2); color: var(--forge-cream);
+    border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700;
+  }
+  .buy-qty-input::-webkit-outer-spin-button, .buy-qty-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .buy-qty-gold-row{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color: var(--forge-cream-dim); padding:3px 0; }
+  .buy-qty-gold-row.total{ color: var(--forge-gold); font-weight:700; font-size:13.5px; }
+  .buy-qty-divider{ border-top:1px dashed var(--forge-line); margin:6px 0; }
+
   /* ---- 마을(대장간) 상단 팝업 메시지 ---- */
   .town-toast{
     position:fixed; top:14px; left:50%; transform:translate(-50%,-10px);

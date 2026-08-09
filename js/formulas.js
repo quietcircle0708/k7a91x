@@ -376,22 +376,29 @@ function weaponUniqueOptionActive(type, level){
 }
 // 고유 옵션의 현재 발동 수치(%). 아직 활성화 조건(activateLevel) 미만이라면, 툴팁 미리보기용으로
 // 활성화 조건 시점의 수치를 대신 반환함(비활성 상태에서도 "몇 %짜리 옵션인지"는 미리 보여줘야 하므로).
+// opt.text가 있는 고정형 옵션은 성장 수치 자체가 없으므로 null(호출부는 opt.text로 별도 처리함).
 function weaponUniqueOptionChance(type, level){
   const opt = wpn(type).uniqueOption;
-  if(!opt) return null;
+  if(!opt || !opt.chanceByLevel) return null;
   const lookupLevel = level >= opt.activateLevel ? level : opt.activateLevel;
   return opt.chanceByLevel[lookupLevel] != null ? opt.chanceByLevel[lookupLevel] : null;
 }
 // 무기 툴팁에 표시할 고유 옵션 줄. 고유 옵션이 없는 무기는 빈 문자열을 반환(줄 자체가 생기지 않음).
 // 활성화 상태: 기존 무기 툴팁 서식(값 노란색)을 그대로 사용하고 활성화 조건 안내는 표시하지 않음.
 // 비활성화 상태: 회색 텍스트로 표시하고, "(+N 활성화)" 조건 안내를 아래 줄에 덧붙임.
+// opt.text가 있는 "고정형" 고유 옵션(성장치 없이 항상 같은 문구, 반월대도 등)은 chanceByLevel/
+// textTemplate 없이 이 문구를 그대로 사용함 — 활성화 여부 판단(activateLevel)과 회색/조건문구 서식은
+// 성장형 옵션과 완전히 동일하게 재사용됨.
 function weaponUniqueOptionTooltipHtml(type, level){
   const opt = wpn(type).uniqueOption;
   if(!opt) return '';
-  const chance = weaponUniqueOptionChance(type, level);
-  if(chance == null) return '';
-  const text = opt.textTemplate.replace('{chance}', chance);
-  if(weaponUniqueOptionActive(type, level)) return wtipRow('', text);
+  const active = weaponUniqueOptionActive(type, level);
+  const text = opt.text != null ? opt.text : (() => {
+    const chance = weaponUniqueOptionChance(type, level);
+    return chance != null ? opt.textTemplate.replace('{chance}', chance) : null;
+  })();
+  if(text == null) return '';
+  if(active) return wtipRow('', text);
   return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${text}<br>(+${opt.activateLevel} 활성화)</div>`;
 }
 // 같은 효과(effectId)를 가진 모든 "현재 활성 상태인" 소스(아티팩트 + 장착 무기의 고유 옵션)의 발동 확률을 합산.
@@ -415,6 +422,9 @@ function atkFor(type, level){ return wpn(type).atk[level]; }
 // uniqueOption이 있는 무기라면 자동으로 이 함수가 호출되어 강화 화면에 항목이 표시됨(무기별 개별 코드 없음).
 // textTemplate 작성 규칙: "{chance}%" 형태로 붙여서 써야 함(예: '...{chance}% 확률로...') — 수치가 다음 단계에서
 // 오르는 경우 "{chance}%" 부분 전체를 formatStatDelta 결과(화살표+증가량 표시)로 치환하기 때문.
+// opt.text가 있는 "고정형" 고유 옵션(반월대도처럼 강화해도 수치가 오르지 않는 경우)은 성장 로직을 전부
+// 건너뛰고 항상 같은 문구만 보여줌 — 활성화 여부(activateLevel) 판단과 회색/안내문구 서식은 성장형과
+// 동일하게 재사용됨. 앞으로 추가되는 고정형 고유 옵션 무기도 opt.text만 채우면 자동으로 이 분기를 탐.
 // 반환값이 null이면 무기에 고유 옵션이 없다는 뜻 — 호출부(render.js)에서 이 값으로 표시 여부를 결정함.
 function weaponUniqueOptionForgeHtml(type, level){
   const opt = wpn(type).uniqueOption;
@@ -423,6 +433,13 @@ function weaponUniqueOptionForgeHtml(type, level){
   const activeNow = weaponUniqueOptionActive(type, level);
   const hasNext = level < MAX_LEVEL;
   const activeNext = hasNext ? weaponUniqueOptionActive(type, level+1) : activeNow;
+
+  if(opt.text != null){
+    if(activeNow) return `<div style="color:var(--forge-cream);">${opt.text}</div>`;
+    const note = activeNext ? '고유 옵션 활성화' : `+${opt.activateLevel} 달성 시 활성화`;
+    return `<div style="color:var(--forge-cream-dim);">${opt.text}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${note}</div>`;
+  }
+
   const chanceNow = weaponUniqueOptionChance(type, level);
   const chanceNext = hasNext ? weaponUniqueOptionChance(type, level+1) : null;
 
@@ -686,8 +703,22 @@ function canLearnSkill(id){
   const pool = s.category === 'awakening' ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
   return pool >= (s.cost || 1);
 }
+// 착용 중인 무기의 고유 옵션이 "고정 스탯 보너스"(statBonus)를 갖고 있으면 해당 스탯의 보너스 값을
+// 반환. activateLevel 조건을 만족할 때만 적용됨(현재 강화 단계 기준, 무기 자체 판정 그대로 재사용).
+// 아티팩트 스탯 보너스(artifactStatBonus)와 동일한 역할 분담 — 반월대도처럼 statBonus를 등록한 무기라면
+// 어떤 무기든, 그리고 앞으로 추가되는 무기든 이 함수 하나로 자동 반영됨(개별 무기 코드 없음).
+function weaponUniqueOptionStatBonus(stat){
+  const equipped = getEquippedWeapon();
+  if(!equipped) return 0;
+  const opt = wpn(equipped.type).uniqueOption;
+  if(!opt || !opt.statBonus) return 0;
+  if(!weaponUniqueOptionActive(equipped.type, equipped.level)) return 0;
+  return opt.statBonus[stat] || 0;
+}
 // 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
 // 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
+// 착용 무기의 고유 옵션 statBonus(예: 반월대도의 힘+5)도 여기서 함께 합산됨 — 이름은 그대로 두지만
+// "장비로 인한 원시 스탯 보너스" 전반을 담당하는 함수로 확장됨.
 function artifactStatBonus(stat){
   let bonus = 0;
   if(stat === 'str'){
@@ -698,6 +729,7 @@ function artifactStatBonus(stat){
   if(stat === 'agi'){
     if(isArtifactEquipped('blackarmguard')) bonus += 3;
   }
+  bonus += weaponUniqueOptionStatBonus(stat);
   return bonus;
 }
 // 스탯 보너스가 반영된 실질 최대 체력/마나
@@ -709,6 +741,7 @@ function effectiveMaxHp(level){
   if(isArtifactEquipped('antlerflag')) hp += 500; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
   hp += armorStatBonus('hp'); // 착용 중인 방어구의 체력 보너스 합산
+  hp += weaponUniqueOptionStatBonus('maxHp'); // 착용 무기의 고유 옵션 중 고정 체력 보너스(예: 반월대도) 합산
   return hp;
 }
 function effectiveMaxMp(level){
@@ -747,6 +780,69 @@ function effectiveCritChance(type, level){
     bonus += weaponUniqueOptionChance(type, level) || 0;
   }
   return critChanceFor(type, level) + bonus;
+}
+
+// ---- 상점 "개수 지정 구매" 팝업 공용 헬퍼 ----
+// 상점의 모든 구매 가능 아이템은 buy-weapon(무기/방어구/장신구 공용) / buy-consumable / buy-artifact
+// 세 data-action 중 하나로 처리되므로(buildShopCardHtml 참고), 이 action 값 + typeId만으로 단가·최대
+// 구매 가능 개수·아이콘/툴팁을 구하는 범용 함수만 두면 됨 — 새 무기/방어구/장신구/소비 아이템/아티팩트가
+// 추가돼도(즉, 이 세 카테고리 중 하나로 등록되는 한) 별도 코드 없이 개수 지정 구매 UI가 자동으로 적용됨.
+function shopBuyUnitPrice(action, typeId){
+  if(action === 'buy-weapon') return weaponBuyPrice(typeId); // wpn()이 무기/방어구/장신구 세 테이블을 모두 조회
+  if(action === 'buy-consumable') return (CONSUMABLES[typeId] || {}).buyPrice || 0;
+  if(action === 'buy-artifact') return (ARTIFACTS[typeId] || {}).buyPrice || 0;
+  return 0;
+}
+// 지금 상태(보유 골드/장비 공용 슬롯 여유분/아티팩트 보유 여부) 기준으로 실제 구매 가능한 최대 개수.
+// "최대 100개 / 보유 골드로 가능한 수량 / (장비라면) 남은 인벤토리 슬롯" 중 가장 작은 값.
+function shopBuyMaxQty(action, typeId){
+  const price = shopBuyUnitPrice(action, typeId);
+  if(price <= 0) return 0;
+  const goldMax = Math.floor(state.gold / price);
+  let cap = 100;
+  if(action === 'buy-weapon'){
+    // 무기/방어구/장신구는 공용 장비 인벤토리 슬롯(INV_MAX)을 공유함(totalEquipInventoryCount 참고).
+    cap = INV_MAX - totalEquipInventoryCount();
+  } else if(action === 'buy-artifact'){
+    // 아티팩트는 종류당 1개만 보유 가능 — 이미 보유 중이면 애초에 구매 버튼이 비활성화되어 팝업까지
+    // 오지 않지만, 방어적으로 한 번 더 확인함.
+    if(ownsArtifact(typeId)) return 0;
+    cap = 1;
+  }
+  return Math.max(0, Math.min(100, goldMax, cap));
+}
+// 개수 지정 구매 팝업 상단에 표시할 아이콘/툴팁 — 기존 상점 카드가 쓰는 아이콘 출력 규칙·툴팁 함수를
+// 그대로 재사용함(무기/방어구/장신구는 buildWeaponShopCardHtml과 동일한 분기, 소비 아이템/아티팩트도
+// 각자의 기존 아이콘·툴팁을 그대로 사용).
+function shopBuyItemDisplay(action, typeId){
+  if(action === 'buy-weapon'){
+    const w = wpn(typeId);
+    const tooltipHtml = w.equipType === 'armor' ? buildArmorTooltipHtml(typeId, 0)
+      : w.equipType === 'accessory' ? buildAccessoryTooltipHtml(typeId, 0)
+      : buildWeaponTooltipHtml(typeId, 0);
+    return { iconHtml: weaponIconHtml(typeId, 'shop-icon-img'), tooltipHtml, borderColor: weaponNameColor(typeId, 0) };
+  }
+  if(action === 'buy-consumable'){
+    const item = CONSUMABLES[typeId];
+    return { iconHtml: item.icon, tooltipHtml: item.desc, borderColor: '#c13c3c' };
+  }
+  if(action === 'buy-artifact'){
+    const a = ARTIFACTS[typeId];
+    return { iconHtml: a.icon, tooltipHtml: buildArtifactTooltipHtml(typeId), borderColor: null };
+  }
+  return { iconHtml: '', tooltipHtml: '', borderColor: null };
+}
+
+// ---- 장비(무기/방어구/장신구) 공용 인벤토리 슬롯 ----
+// 세 종류가 각자 슬롯을 갖지 않고 INV_MAX(50)를 함께 나눠 쓰므로, "지금 몇 개나 차 있는지"는 항상
+// 이 함수로 계산함. EQUIP_INVENTORY_POOLS(data.js)를 그대로 순회하므로, 앞으로 새 장비 타입이 이
+// 풀에 등록되기만 하면 이 함수 수정 없이 자동으로 합산 대상에 포함됨.
+function totalEquipInventoryCount(){
+  return EQUIP_INVENTORY_POOLS.reduce((sum, pool) => sum + pool.items().length, 0);
+}
+// 공용 슬롯이 가득 찼는지 여부(구매/드랍 등 모든 장비 획득 지점이 이 함수로 통일해서 판단함).
+function equipInventoryFull(){
+  return totalEquipInventoryCount() >= INV_MAX;
 }
 
 // ---- 대장간 "강화 장비 선택" 팝업: 후보 목록 조회 ----
@@ -926,35 +1022,43 @@ function nearestLevelCandidates(list, targetLevel){
   eligible.forEach(w => { const diff = targetLevel - w.levelReq; if(diff < minDiff) minDiff = diff; });
   return eligible.filter(w => (targetLevel - w.levelReq) === minDiff);
 }
-// 모험가의 유해(무기) 드랍 판정.
-// 1) RELIC_DROP_CHANCE 확률로 드랍 판정 → 2) RELIC_GRADE_CHANCE로 장비 등급 선택 →
-// 3) 그 등급 중 아이템 레벨이 [max(1, 몬스터레벨-RELIC_LEVEL_WINDOW), 몬스터레벨] 구간인 후보만 필터 →
-//    (후보가 없으면 폴백: ① 같은 등급 안에서 레벨 구간 제한 없이 몬스터 레벨과 가장 가까운 아이템 레벨로 대체
-//     ② 그래도 없으면(해당 등급 무기가 아예 없음) 등급 상관없이 몬스터 레벨과 가장 가까운 무기로 대체) →
-// 4) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계 낮아질 때마다 ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨 →
-// 5) 그 레벨(+같은 등급, 폴백된 경우는 폴백된 등급)에 해당하는 무기 중 하나를 무작위로 선택 →
-// 6) RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리: 일반 +0~+4, 레어 +0~+3, 에픽 +0 고정, 유니크 +0 고정)로 강화 단계를 추첨.
-//    최종 선택된 무기(weaponType)의 등급을 기준으로 표를 고름(폴백 ②로 등급이 바뀌었을 수 있으므로,
-//    최초 추첨된 grade가 아니라 실제로 지급되는 weaponType.grade를 사용).
+// 모험가의 유해(장비) 드랍 판정.
+// 1) RELIC_DROP_CHANCE 확률로 드랍 판정 → 2) RELIC_EQUIP_TYPE_CHANCE로 장비 타입(무기/방어구/장신구)
+//    선택 → 3) 선택된 타입의 RELIC_GRADE_CHANCE로 등급 선택 → 4) 그 등급 중 아이템 레벨이
+//    [max(1, 몬스터레벨-RELIC_LEVEL_WINDOW), 몬스터레벨] 구간인 후보만 필터
+//    (후보가 없으면 폴백: ① 같은 등급 안에서 레벨 구간 제한 없이 몬스터 레벨과 가장 가까운 아이템
+//     레벨로 대체 ② 그래도 없으면(해당 등급 장비가 아예 없음) 등급 상관없이 몬스터 레벨과 가장 가까운
+//     장비로 대체) → 5) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계
+//    낮아질 때마다 ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨 → 6) 그 레벨(+같은 등급, 폴백된 경우는
+//    폴백된 등급)에 해당하는 장비 중 하나를 무작위로 선택 → 7) 강화 단계 결정: 무기는
+//    RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리)로 추첨(최종 선택된 장비의 등급 기준 — 폴백 ②로
+//    등급이 바뀌었을 수 있으므로 최초 추첨된 grade가 아니라 실제 지급 등급을 사용), 방어구/장신구는
+//    등급과 무관하게 항상 +0 고정.
+// 장비 타입별 도감은 EQUIP_INVENTORY_POOLS(data.js)의 typesTable을 그대로 재사용 — 새 방어구/장신구가
+// 거기에 등록되기만 하면 이 함수는 수정 없이 자동으로 후보에 포함시킴.
 function resolveWeaponRelicDrop(monsterLevel){
   if(Math.random() * 100 >= RELIC_DROP_CHANCE) return null;
 
-  const grade = pickWeighted(Object.entries(RELIC_GRADE_CHANCE));
+  const equipType = pickWeighted(Object.entries(RELIC_EQUIP_TYPE_CHANCE));
+  const typesTable = (EQUIP_INVENTORY_POOLS.find(p => p.kind === equipType) || {}).typesTable;
+  if(!typesTable) return null; // 해당 타입의 도감을 찾지 못한 극단적인 경우(정상 데이터에서는 발생하지 않음)
+
+  const grade = pickWeighted(Object.entries(RELIC_GRADE_CHANCE[equipType]));
 
   const minLevel = Math.max(1, monsterLevel - RELIC_LEVEL_WINDOW);
   const maxLevel = monsterLevel;
-  let candidates = Object.values(WEAPON_TYPES).filter(w =>
+  let candidates = Object.values(typesTable).filter(w =>
     w.grade === grade && w.levelReq >= minLevel && w.levelReq <= maxLevel
   );
   if(candidates.length === 0){
     // 폴백 ①: 레벨 구간 제한을 풀고, 같은 등급 안에서 몬스터 레벨 이하 중 가장 가까운 레벨로 대체
-    candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES).filter(w => w.grade === grade), monsterLevel);
+    candidates = nearestLevelCandidates(Object.values(typesTable).filter(w => w.grade === grade), monsterLevel);
   }
   if(candidates.length === 0){
-    // 폴백 ②: 이 등급에 등록된 무기가 아예 없으면(예: 유니크처럼 아직 등록된 무기가 없는 등급), 등급도 무시하고 몬스터 레벨 이하 중 가장 가까운 무기로 대체
-    candidates = nearestLevelCandidates(Object.values(WEAPON_TYPES), monsterLevel);
+    // 폴백 ②: 이 등급에 등록된 장비가 아예 없으면, 등급도 무시하고 몬스터 레벨 이하 중 가장 가까운 장비로 대체
+    candidates = nearestLevelCandidates(Object.values(typesTable), monsterLevel);
   }
-  if(candidates.length === 0) return null; // 등록된 무기가 하나도 없는 극단적인 경우
+  if(candidates.length === 0) return null; // 이 타입에 등록된 장비가 하나도 없는 극단적인 경우
 
   const levels = [...new Set(candidates.map(w => w.levelReq))].sort((a, b) => b - a); // 높은 레벨부터
   let weight = 100;
@@ -966,10 +1070,13 @@ function resolveWeaponRelicDrop(monsterLevel){
   const chosenLevel = pickWeighted(levelWeightPairs);
 
   const pool = candidates.filter(w => w.levelReq === chosenLevel);
-  const weaponType = pool[Math.floor(Math.random() * pool.length)];
-  const enhanceTable = RELIC_ENHANCE_LEVEL_CHANCE[weaponType.grade] || RELIC_ENHANCE_LEVEL_CHANCE.normal;
-  const enhanceLevel = pickWeighted(enhanceTable);
-  return { type: weaponType.id, level: enhanceLevel };
+  const chosenType = pool[Math.floor(Math.random() * pool.length)];
+
+  // 강화 단계: 무기만 기존 확률표로 추첨하고, 방어구/장신구는 항상 +0 고정.
+  const enhanceLevel = equipType === 'weapon'
+    ? pickWeighted(RELIC_ENHANCE_LEVEL_CHANCE[chosenType.grade] || RELIC_ENHANCE_LEVEL_CHANCE.normal)
+    : 0;
+  return { type: chosenType.id, level: enhanceLevel, equipType };
 }
 // 몬스터 데이터의 drops 항목(name) 중 재료성 아이템(MISC_ITEMS)에 등록된 이름과 일치하는 것을 찾음.
 // 이름 기반으로 매칭하므로, MISC_ITEMS에 새 재료 아이템을 추가하고 몬스터의 drops에 같은 이름만
@@ -1039,20 +1146,25 @@ function resolveDrops(monsterDef, dungeon, level){
 
   // 장비 드랍 우선순위 판정: 모험가의 유해(weaponDrop)와 확정 장비 드랍(weaponIdDrops)이 동시에
   // 당첨된 경우 이 몬스터에서는 최종적으로 1개만 지급되도록 정리함(1마리당 장비 드랍 1개 제한).
-  // weaponDrop의 비교용 확률은 "이 등급의 모험가의 유해가 나올 실제 확률"(RELIC_DROP_CHANCE ×
-  // RELIC_GRADE_CHANCE[등급])로 환산함 — 폴백으로 등급이 바뀌었을 수 있으므로 최종 지급 등급
-  // (wpn(weaponDrop.type).grade) 기준으로 계산(다른 곳의 폴백 등급 처리 규칙과 동일).
+  // weaponDrop의 비교용 확률은 "이 조합(장비 타입+등급)의 모험가의 유해가 나올 실제 확률"
+  // (RELIC_DROP_CHANCE × RELIC_EQUIP_TYPE_CHANCE[타입] × RELIC_GRADE_CHANCE[타입][등급])로 환산함 —
+  // 폴백으로 등급이 바뀌었을 수 있으므로 최종 지급 등급(wpn(weaponDrop.type).grade) 기준으로 계산
+  // (다른 곳의 폴백 등급 처리 규칙과 동일).
   const equipCandidates = [];
   if(weaponDrop){
+    const relicEquipType = weaponDrop.equipType;
     const relicGrade = wpn(weaponDrop.type).grade;
-    const relicChance = RELIC_DROP_CHANCE * (RELIC_GRADE_CHANCE[relicGrade] || 0) / 100;
-    equipCandidates.push({ type: weaponDrop.type, level: weaponDrop.level, chance: relicChance, _source: 'relic' });
+    const gradeChanceTable = RELIC_GRADE_CHANCE[relicEquipType] || {};
+    const relicChance = RELIC_DROP_CHANCE
+      * (RELIC_EQUIP_TYPE_CHANCE[relicEquipType] || 0) / 100
+      * (gradeChanceTable[relicGrade] || 0) / 100;
+    equipCandidates.push({ type: weaponDrop.type, level: weaponDrop.level, chance: relicChance, _source: 'relic', equipType: relicEquipType });
   }
   weaponIdDrops.forEach(d => equipCandidates.push({ type: d.type, level: d.level, chance: d.chance, _source: 'weaponId' }));
 
   if(equipCandidates.length > 1){
     const winner = pickPriorityEquipDrop(equipCandidates);
-    weaponDrop = winner._source === 'relic' ? { type: winner.type, level: winner.level } : null;
+    weaponDrop = winner._source === 'relic' ? { type: winner.type, level: winner.level, equipType: winner.equipType } : null;
     weaponIdDrops = winner._source === 'weaponId' ? [{ type: winner.type, level: winner.level }] : [];
   } else {
     weaponIdDrops = weaponIdDrops.map(d => ({ type: d.type, level: d.level }));

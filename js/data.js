@@ -5,7 +5,7 @@
 // ============================================================
 
 const MAX_LEVEL = 9;
-const INV_MAX = 10;
+const INV_MAX = 50; // 장비(무기/방어구/장신구) 공용 인벤토리 최대 슬롯 — 세 종류가 하나의 총량을 공유함(totalEquipInventoryCount 참고)
 
 // 장비 타입. 무기 / 방어구 / 장신구 / 아티팩트가 있으며, 방어구·장신구는 아직 실제 데이터가 없음(장비 탭
 // 구조만 먼저 준비된 상태 — 20번째 작업 "장비 탭 추가" 참고).
@@ -276,7 +276,31 @@ const WEAPON_TYPES = {
       textTemplate: '치명타 확률 {chance}% 증가',
     },
   },
+  moongreatsword: {
+    id: 'moongreatsword', name: '반월대도', desc: '거대한 반월형 칼날을 가진 대도',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'epic', // 에픽
+    attackPower: 146, attackSpeed: 0.6, critRate: 10,
+    purchasable: false, sellPrice: 5900, levelReq: 25,
+    image: 'epic_moongreatsword',
+    atk: [146], speed: [0.6], crit: [10], sell: [5900],
+    cost: [], odds: [],
+    // 고유 옵션: 성장치가 없는 "고정형" 고유 옵션 — chanceByLevel/textTemplate({chance}) 대신 완성된
+    // 문구(text)와 고정 스탯 보너스(statBonus)를 직접 등록함. activateLevel:0이라 +0부터 바로 활성화되고,
+    // 강화를 진행해도 수치가 오르지 않음(요청사항). statBonus는 artifactStatBonus/effectiveMaxHp에서
+    // weaponUniqueOptionStatBonus를 통해 자동으로 합산되어 실제 스탯에 반영됨(formulas.js).
+    // 이 스키마(opt.text + opt.statBonus)는 반월대도 전용이 아니라, 앞으로 추가되는 성장치 없는 고정
+    // 고유 옵션 무기라면 그대로 재사용 가능 — weaponUniqueOptionTooltipHtml/ForgeHtml이 opt.text 유무로
+    // 자동 분기함.
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +5<br>최대 체력 +800',
+      statBonus: { str: 5, maxHp: 800 },
+    },
+  },
 };
+
 
 // ---- 방어구 종류(투구/갑옷) ----
 const ARMOR_KINDS = { helmet: '투구', armor: '갑옷' };
@@ -862,6 +886,16 @@ const MISC_ITEMS = {
     desc: '곰의 강인한 생명력이 깃든 귀한 약재',
     sellPrice: 400, stateKey: 'bearBiles',
   },
+  mountainBoarMeat: {
+    id: 'mountainBoarMeat', name: '산돼지고기', icon: '🍖', itemClass: 'misc',
+    desc: '비싼 값에 팔리는 산돼지의 고기',
+    sellPrice: 200, stateKey: 'mountainBoarMeats',
+  },
+  forestBoarMeat: {
+    id: 'forestBoarMeat', name: '숲돼지고기', icon: '🍖', itemClass: 'misc',
+    desc: '구하기 어려운 숲돼지의 고기',
+    sellPrice: 250, stateKey: 'forestBoarMeats',
+  },
 };
 
 // ---- 상점/인벤토리 "장비" 탭 공용 하위 분류 ----
@@ -1060,13 +1094,26 @@ const STATUS_EFFECTS = {
   },
 };
 
-// 모험가의 유해(무기) 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
-const RELIC_DROP_CHANCE = 10; // 몬스터 처치 시 장비 드랍 판정 확률(%)
-const RELIC_GRADE_CHANCE = { normal: 70, rare: 29, epic: 1 }; // 드랍 판정 성공 시, 장비 등급 선택 확률(유니크는 0%라 후보에서 제외 — pickWeighted가 가중치0 항목을 고르는 부동소수점 예외 상황까지 원천 차단)
-const RELIC_LEVEL_WINDOW = 10; // 후보 아이템 레벨 하한 = max(1, 몬스터 레벨 - 이 값)
+// 모험가의 유해(장비) 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
+// 무기뿐 아니라 방어구/장신구도 대상이며(아티팩트·기타 아이템은 제외), 판정 순서는
+// [드랍 여부] → [장비 타입 선택] → [해당 타입의 등급 선택] → [레벨 선택] → [강화 단계 결정](formulas.js
+// resolveWeaponRelicDrop 참고).
+const RELIC_DROP_CHANCE = 8; // 몬스터 처치 시 장비 드랍 판정 확률(%)
+// 드랍 판정 성공 시, 가장 먼저 획득할 장비 타입을 결정하는 확률(%, 합계 100). 새 장비 타입이 추가되면
+// 이 표에 항목만 추가하면 됨.
+const RELIC_EQUIP_TYPE_CHANCE = { weapon: 45, armor: 40, accessory: 15 };
+// 장비 타입별 등급 선택 확률(유니크는 모든 타입에서 0%라 후보에서 제외 — pickWeighted가 가중치0 항목을
+// 고르는 부동소수점 예외 상황까지 원천 차단). 장비 타입마다 완전히 독립적으로 적용됨.
+const RELIC_GRADE_CHANCE = {
+  weapon: { normal: 70, rare: 29, epic: 1 },
+  armor: { normal: 65, rare: 27, epic: 8 },
+  accessory: { normal: 75, rare: 20, epic: 5 },
+};
+const RELIC_LEVEL_WINDOW = 10; // 후보 아이템 레벨 하한 = max(1, 몬스터 레벨 - 이 값) — 장비 타입 공통, 로직 불변
 const RELIC_LEVEL_WEIGHT_DECAY = 0.8; // 등록된 아이템 레벨이 한 단계 낮아질 때마다 가중치 ×이 값(최고 레벨 가중치는 100)
-// 드랍된 장비의 강화 단계(+N) 확률. 등급별로 별도 표를 사용함(일반=+0~+4, 레어=+0~+3, 에픽=+0, 유니크=+0).
-// 지금은 별도 공식 없이 하드코딩된 확률표를 사용(추후 공식으로 교체 가능하도록 이 표만 바꾸면 됨).
+// 드랍된 장비의 강화 단계(+N) 확률. "무기"에만 사용함(기존 값 그대로 유지) — 방어구/장신구는 등급과
+// 무관하게 항상 +0으로 고정 지급되므로 이 표를 참조하지 않음(resolveWeaponRelicDrop이 장비 타입에 따라
+// 분기함). 지금은 별도 공식 없이 하드코딩된 확률표를 사용(추후 공식으로 교체 가능하도록 이 표만 바꾸면 됨).
 const RELIC_ENHANCE_LEVEL_CHANCE = {
   normal: [[0, 20], [1, 30], [2, 30], [3, 10], [4, 10]],
   rare: [[0, 40], [1, 30], [2, 20], [3, 10]],
@@ -1182,6 +1229,24 @@ const MONSTERS = {
       { name: '흑색 검', chance: 8, weaponId: 'blacksword' },
     ],
   },
+  forest_boar: {
+    id: 'forest_boar', name: '숲돼지', icon: '🐗', grade: 'normal', level: 21, image: 'boar',
+    hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '숲돼지고기', chance: 15 } ],
+  },
+  mountain_boar: {
+    id: 'mountain_boar', name: '산돼지', icon: '🐗', grade: 'normal', level: 21, image: 'boar',
+    hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
+    drops: [ { name: '산돼지고기', chance: 20 } ],
+  },
+  red_boar: {
+    id: 'red_boar', name: '홍돼지', icon: '🐗', grade: 'epic', level: 25, image: 'redboar',
+    hpMult: 1.0, atkMult: 1.1, speedMult: 1.1,
+    drops: [
+      { name: '숲돼지고기', chance: 25 },
+      { name: '반월대도', chance: 8, weaponId: 'moongreatsword' },
+    ],
+  },
 };
 
 
@@ -1233,6 +1298,14 @@ const DUNGEONS = [
     icon: '',
     desc: '곰들의 울음소리가 끊이지 않는 어두운 굴. 용기 있는 자만이 발을 들일 수 있다.',
     monsters: ['red_bear', 'fierce_bear', 'black_bear'],
+    levelRange: 3,
+  },
+  {
+    id: 'boar_den',
+    name: '돼지굴',
+    icon: '',
+    desc: '거친 숨소리와 발굽 소리가 울려 퍼지는 맷돼지들의 소굴',
+    monsters: ['mountain_boar', 'forest_boar', 'red_boar'],
     levelRange: 3,
   },
 ];
