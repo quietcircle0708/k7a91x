@@ -485,11 +485,33 @@
   /* 치명타 피해: 표시 위치·이동 방식은 일반 피해(.float → dmg-float)와 동일하게 두고, 색상(기존 치명타
      표시 규칙)만 유지한 채 텍스트 크기만 일반 피해(17px)보다 1pt 크게(18px) 설정함. */
   .dmg-popup.crit{ font-size:18px; color:#ff4d4d; text-shadow:0 0 8px #ff4d4d99, 0 0 4px rgba(0,0,0,.7); }
+
+  /* 몬스터 처치 시 드랍 아이템 연출 — 실제 아이템 객체가 아닌 순수 이미지 애니메이션.
+     monster-slot이 아니라 monsterRow에 절대좌표(px)로 직접 붙기 때문에(effects.js 참고, 사망 애니메이션
+     으로 slot이 먼저 사라져도 연출이 끊기지 않게 하기 위함) top/left는 인라인 style로 지정됨. */
+  .drop-item-visual{
+    position:absolute; transform: translate(-50%,-50%);
+    pointer-events:none; z-index:6;
+    animation-name: drop-item-fall; animation-timing-function: ease-out; animation-fill-mode: forwards;
+  }
+  .drop-item-visual-inner{ display:block; }
+  .drop-item-visual-img{ width:26px; height:26px; object-fit:contain; display:block; }
+  .drop-item-visual-emoji{ font-size:22px; line-height:1; display:block; text-align:center; }
+  @keyframes drop-item-fall{
+    0%{ opacity:0; transform: translate(-50%,-50%) translateY(0) scale(.8); }
+    8%{ opacity:1; }
+    28%{ transform: translate(-50%,-50%) translateY(-28px) scale(1); }         /* 위로 튀어오름(정점) */
+    58%{ transform: translate(-50%,-50%) translateY(6px) scale(1); }           /* 낙하 후 바닥에 살짝 파묻힘 */
+    68%{ transform: translate(-50%,-50%) translateY(-5px) scale(1); }          /* 짧게 한 번 튕김 */
+    78%{ transform: translate(-50%,-50%) translateY(0) scale(1); opacity:1; }  /* 착지, 잠시 유지 시작 */
+    92%{ opacity:1; transform: translate(-50%,-50%) translateY(0) scale(1); }
+    100%{ opacity:0; transform: translate(-50%,-50%) translateY(0) scale(.85); } /* 페이드아웃 */
+  }
   /* 몬스터 UI 그룹(아이콘/이름/레벨/체력바)을 통째로 위로 이동 — 던전 입장 팝업(#spawnToast, top:2px,
      .monster-stage 기준)의 아래쪽 끝(약 31px)에서 20px 아래(약 51px)에 그룹 상단이 오도록, 원래 위치
      (.monster-stage 150px + margin-bottom 10px = 160px)에서 그만큼만 끌어올림. 내부 배치/간격은 그대로
      유지되고 그룹 전체가 한 덩어리로 이동하며, 몬스터 수와 무관하게 항상 동일하게 적용됨. */
-  .monster-row{ display:flex; justify-content:center; align-items:flex-start; gap:8px; margin-bottom:6px; margin-top:-109px; }
+  .monster-row{ display:flex; justify-content:center; align-items:flex-start; gap:8px; margin-bottom:6px; margin-top:-109px; position:relative; }
   .monster-slot{ display:flex; flex-direction:column; align-items:center; flex:1 1 0; min-width:0; max-width:170px; cursor:pointer; position:relative; }
   .monster-row.count-2 .monster-slot .monster-icon{ font-size:56px; }
   .monster-row.count-3 .monster-slot .monster-icon{ font-size:44px; }

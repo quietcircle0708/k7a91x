@@ -321,6 +321,10 @@ function killMonsterInstance(instanceId){
   hunt.deathAnimTimeouts.push(removalTimeout);
 
   const result = resolveDrops(monsterDef, dungeon, level);
+  // 이번 개체에서 실제로 지급이 확정된 아이템만 담아 연출에 넘김(연출은 이 목록을 "그리기"만 함 — 아래
+  // 각 지급 블록에서 실제 지급이 확정된 시점에만 push되므로, 인벤토리가 가득 차 드랍이 무산된 경우 등은
+  // 자동으로 연출 대상에서도 제외됨).
+  const dropVisualItems = [];
   const curseActive = isDeathCurseActive();
   if(curseActive) result.gold = Math.round(result.gold * DEATH_CURSE_MULTIPLIER);
   state.gold += result.gold;
@@ -329,6 +333,7 @@ function killMonsterInstance(instanceId){
   if(result.weaponDrop){
     if(grantRelicEquipDrop(result.weaponDrop)){
       hunt.pendingRewards.weaponDrops.push(result.weaponDrop);
+      dropVisualItems.push({ kind: 'equip', type: result.weaponDrop.type });
     } // 해당 장비 타입의 인벤토리가 가득 차면 기존과 동일하게 드랍 자체가 무산됨(합산 목록에도 반영 안 함)
   }
   if(result.weaponIdDrops && result.weaponIdDrops.length){
@@ -336,6 +341,7 @@ function killMonsterInstance(instanceId){
       if(!equipInventoryFull()){
         state.inventory.push({ id: state.nextItemId++, level: drop.level, type: drop.type });
         hunt.pendingRewards.weaponIdDrops.push(drop);
+        dropVisualItems.push({ kind: 'equip', type: drop.type });
       } // 공용 장비 슬롯이 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨
     }
   }
@@ -343,11 +349,13 @@ function killMonsterInstance(instanceId){
     const item = MISC_ITEMS[result.stoneDrop.itemId];
     state[item.stateKey] = (state[item.stateKey] || 0) + result.stoneDrop.qty;
     hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] = (hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] || 0) + result.stoneDrop.qty;
+    dropVisualItems.push({ kind: 'item', itemId: result.stoneDrop.itemId });
   }
   if(result.artifactDropIds && result.artifactDropIds.length){
     for(const id of result.artifactDropIds){
       grantArtifactSafe(id);
       hunt.pendingRewards.artifactDrops.push(id);
+      dropVisualItems.push({ kind: 'artifact', id });
     }
   }
   if(result.miscDrops && result.miscDrops.length){
@@ -356,8 +364,11 @@ function killMonsterInstance(instanceId){
       state[item.stateKey] = (state[item.stateKey] || 0) + drop.qty;
       if(!hunt.pendingRewards.miscDrops[drop.itemId]) hunt.pendingRewards.miscDrops[drop.itemId] = { icon: drop.icon, name: drop.name, qty: 0 };
       hunt.pendingRewards.miscDrops[drop.itemId].qty += drop.qty;
+      dropVisualItems.push({ kind: 'item', itemId: drop.itemId });
     }
   }
+  // 실제 지급이 전부 끝난 뒤, 그 결과를 그대로 보여주기만 하는 연출 호출(연출 성패는 위 지급 로직과 완전히 무관함).
+  playMonsterDropEffect(instanceId, dropVisualItems);
 
   let expGained = monsterExp(level);
   if(curseActive) expGained = Math.round(expGained * DEATH_CURSE_MULTIPLIER);
