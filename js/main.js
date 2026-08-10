@@ -328,4 +328,87 @@ el('closeQuickSlotPickerBtn').addEventListener('click', closeQuickSlotPicker);
 setInterval(updateQuickSlotCooldowns, 100);
 setInterval(updateSkillQuickSlotCooldowns, 100);
 
+// ---- 툴팁 위치 자동 보정 ----
+// 모든 툴팁(class="tooltip")은 CSS(:hover)만으로 위치가 고정되어 있어서, 화면 위/아래/좌우 경계에
+// 가까운 요소(예: 상단 망자의 저주 뱃지, 우측 끝 아티팩트 슬롯 등)에서는 툴팁이 화면 밖으로
+// 잘려나가는 문제가 있었음. 특정 클래스에 하드코딩하지 않고 "호버 대상의 직계 자식으로 .tooltip이
+// 있는 가장 가까운 조상"을 찾는 범용 방식이라, 향후 새로운 툴팁 UI가 추가돼도 그대로 자동 적용됨.
+// 기본 동작은 항상 기존 CSS 위치를 그대로 쓰고(요구사항 1), 실제로 화면을 벗어날 때만 인라인
+// style(position:fixed)로 좌표를 덮어써 보정한다 — 툴팁의 내용·크기·기존 디자인은 전혀 건드리지 않음
+// (요구사항 5·6). 마우스가 벗어나면 다음 호버 때 다시 기본 위치부터 재측정하므로 상태가 남지 않는다.
+const TOOLTIP_EDGE_MARGIN = 6; // 화면 경계에서 확보할 최소 여백(px)
+
+function findTooltipHost(target){
+  let node = target;
+  while(node && node.nodeType === 1 && node !== document.body){
+    const tip = node.querySelector(':scope > .tooltip');
+    if(tip) return { host: node, tip };
+    node = node.parentElement;
+  }
+  return null;
+}
+function resetTooltipPosition(tip){
+  tip.style.position = '';
+  tip.style.top = '';
+  tip.style.left = '';
+  tip.style.right = '';
+  tip.style.bottom = '';
+  tip.style.transform = '';
+}
+function adjustTooltipPosition(host, tip){
+  // 인라인 오버라이드를 전부 지우고 기존 CSS 기본 위치부터 다시 측정(요구사항 1)
+  resetTooltipPosition(tip);
+  const rect = tip.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+
+  let top = rect.top;
+  let left = rect.left;
+  let needsOverride = false;
+
+  // 2. 위쪽 경계를 넘어가면 커서(호버 대상) 아래쪽으로 출력 전환
+  if(top < TOOLTIP_EDGE_MARGIN){
+    const hostRect = host.getBoundingClientRect();
+    top = hostRect.bottom + 6;
+    needsOverride = true;
+  }
+  // 3. (전환 여부와 무관하게) 아래쪽 경계를 넘어가면 프레임 안에 들어오도록 세로 위치 보정
+  if(top + rect.height > vh - TOOLTIP_EDGE_MARGIN){
+    top = Math.max(TOOLTIP_EDGE_MARGIN, vh - TOOLTIP_EDGE_MARGIN - rect.height);
+    needsOverride = true;
+  }
+  // 4. 좌우도 동일하게 프레임 밖으로 나가지 않도록 보정
+  if(left < TOOLTIP_EDGE_MARGIN){
+    left = TOOLTIP_EDGE_MARGIN;
+    needsOverride = true;
+  } else if(left + rect.width > vw - TOOLTIP_EDGE_MARGIN){
+    left = Math.max(TOOLTIP_EDGE_MARGIN, vw - TOOLTIP_EDGE_MARGIN - rect.width);
+    needsOverride = true;
+  }
+
+  if(needsOverride){
+    tip.style.position = 'fixed';
+    tip.style.transform = 'none'; // left:50%+translateX(-50%) 등 CSS 좌우정렬용 transform과 겹치면 좌표가 이중으로 밀리므로 무효화
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+    tip.style.right = '';
+    tip.style.bottom = '';
+  }
+  // needsOverride가 false면 방금 초기화한 기본 CSS 위치를 그대로 둔다(요구사항 1)
+}
+let activeTooltipTip = null;
+document.addEventListener('mouseover', (e) => {
+  const found = findTooltipHost(e.target);
+  if(!found) return;
+  activeTooltipTip = found.tip;
+  adjustTooltipPosition(found.host, found.tip);
+});
+document.addEventListener('mouseout', (e) => {
+  const found = findTooltipHost(e.target);
+  if(!found) return;
+  if(e.relatedTarget && found.host.contains(e.relatedTarget)) return; // 여전히 같은 호버 대상 내부
+  resetTooltipPosition(found.tip);
+  if(activeTooltipTip === found.tip) activeTooltipTip = null;
+});
+
 loadState();
