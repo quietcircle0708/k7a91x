@@ -945,7 +945,10 @@ function buildSkillTabHtml(){
         <button class="nav-btn" data-action="reset-skill-quickslots">초기화</button>
       </div>
       <div class="inv-tabs">${catTabsHtml}</div>
-      <div class="char-menu-info-head">${pagerHtml('skillPage', page, SKILL_PAGES.length)}</div>
+      <div class="skill-menu-info-head">
+        <button class="nav-btn skill-reset-btn" data-action="reset-skills" title="스킬 초기화">⟲</button>
+        ${pagerHtml('skillPage', page, SKILL_PAGES.length)}
+      </div>
       ${buildSkillCategoryBodyHtml(activeSkillCategory)}
     </div>
   `;

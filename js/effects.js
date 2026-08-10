@@ -203,7 +203,9 @@ function monsterHitEffect(instanceId, dmg, isCrit){
   if(!slot) return;
   const p = document.createElement('div');
   p.className = 'dmg-popup float' + (isCrit ? ' crit' : '');
-  p.textContent = (isCrit ? '치명타! -' : '-') + dmg;
+  // 실제 피해 계산(target.hp -= dmg, 음수 반영)과 화면 표시값을 분리 — 여기서 받는 dmg는 이미 양수이므로
+  // 그대로 숫자만 표시함('-' 기호·'치명타!' 문구 없이). 몬스터 hp 차감 로직은 호출부에서 그대로 유지됨.
+  p.textContent = String(dmg);
   p.style.left = (42 + Math.random() * 16) + '%';
   slot.appendChild(p);
   setTimeout(() => p.remove(), 850);

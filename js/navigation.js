@@ -330,6 +330,8 @@ function switchSkillCategory(catId){
 // 스킬 습득: 포인트를 소비하고 해당 분류의 습득 목록(learnedSkills/learnedAwakeningSkills)에 추가함.
 // 에픽/유니크는 아직 해금 방식이 구현되지 않아(비급/깨달음 소비 예정) canLearnSkill이 항상 false를 반환하므로
 // 이 함수까지 도달해도 아무 일도 일어나지 않음 — 실제 해금 로직이 추가되면 이 함수만 손보면 됨.
+// 실제 데이터 변경(포인트 차감+습득)은 이 함수만 담당하고, 화면에서는 아래 스킬 습득 확인 모달을 거친 뒤에만
+// 호출됨(확인을 누르기 전까지는 데이터가 바뀌지 않아야 하므로).
 function learnSkill(id){
   if(!canLearnSkill(id)) return;
   const s = SKILLS[id];
@@ -348,6 +350,74 @@ function learnSkill(id){
 function resetSkillQuickSlots(){
   state.skillQuickSlots = Array.from({ length: SKILL_QUICK_SLOT_COUNT }, () => null);
   renderSkillQuickSlots();
+  saveState();
+}
+
+// ---- 스킬 습득 확인 모달 ----
+// 상점의 "개수 지정 구매" 팝업(buyQtyModal)과 동일한 레이아웃(아이콘 박스 + 수치 두 줄 + 구분선 +
+// 취소/확인 버튼)을 그대로 재사용함. 실제 습득(포인트 차감)은 확인 버튼을 눌러야만 기존 learnSkill이
+// 실행되며, 취소하거나 모달을 그냥 닫으면 데이터는 전혀 바뀌지 않음.
+let pendingLearnSkillId = null;
+function openSkillLearnConfirm(id){
+  if(!canLearnSkill(id)) return; // 습득 불가 상태(포인트 부족 등)에서는 버튼 자체가 비활성화되어 있어 방어적 처리
+  const s = SKILLS[id];
+  pendingLearnSkillId = id;
+  el('skillLearnIconBox').innerHTML = skillIconHtml(s) + `<span class="tooltip" id="skillLearnTooltip">${buildSkillTooltipHtml(id)}</span>`;
+  const pool = s.category === 'awakening' ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
+  el('skillLearnCurrentSp').textContent = pool;
+  el('skillLearnUseSp').textContent = s.cost || 1;
+  el('skillLearnConfirmModal').style.display = 'flex';
+}
+function closeSkillLearnConfirm(){
+  el('skillLearnConfirmModal').style.display = 'none';
+  pendingLearnSkillId = null;
+}
+function confirmSkillLearn(){
+  const id = pendingLearnSkillId;
+  closeSkillLearnConfirm();
+  if(id) learnSkill(id);
+}
+function cancelSkillLearn(){
+  closeSkillLearnConfirm();
+}
+
+// ---- 스킬 초기화 확인 모달 ----
+// 습득에 사용한 스킬 포인트 총합을 계산해 확인창에 보여주고, 확인 시 각 분류가 쓰던 풀(공용·특화는
+// skillPoints, 기연은 awakeningPoints — 기존 포인트 구조를 그대로 유지하고 새 습득 조건은 만들지 않음)에
+// 각각 정확히 되돌려줌. 확인창의 "현재 보유 SP"/"초기화 시 획득 SP"는 두 풀을 합산한 값으로 표시함.
+function learnedSkillCost(id){
+  const s = SKILLS[id];
+  return (s && s.cost) || 1;
+}
+function totalUnusedSkillPoints(){
+  return (state.skillPoints || 0) + (state.awakeningPoints || 0);
+}
+function totalSpentSkillPoints(){
+  const normal = (state.learnedSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
+  const awaken = (state.learnedAwakeningSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
+  return normal + awaken;
+}
+function openSkillResetConfirm(){
+  el('skillResetCurrentSp').textContent = totalUnusedSkillPoints();
+  el('skillResetGainSp').textContent = totalSpentSkillPoints();
+  el('skillResetConfirmModal').style.display = 'flex';
+}
+function closeSkillResetConfirm(){
+  el('skillResetConfirmModal').style.display = 'none';
+}
+function cancelSkillReset(){
+  closeSkillResetConfirm();
+}
+function confirmSkillReset(){
+  closeSkillResetConfirm();
+  const normalRefund = (state.learnedSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
+  const awakenRefund = (state.learnedAwakeningSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
+  state.skillPoints = (state.skillPoints || 0) + normalRefund;
+  state.awakeningPoints = (state.awakeningPoints || 0) + awakenRefund;
+  state.learnedSkills = [];
+  state.learnedAwakeningSkills = [];
+  resetSkillQuickSlots(); // 습득 스킬이 사라지므로 등록된 스킬 퀵슬롯도 전부 초기화(내부에서 렌더+저장까지 처리)
+  renderCharacterMenu();
   saveState();
 }
 

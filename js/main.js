@@ -153,7 +153,7 @@ el('charTabPanels').addEventListener('click', (e)=>{
   if(skillCatBtn){ switchSkillCategory(skillCatBtn.dataset.skillCat); return; }
 
   const learnBtn = e.target.closest('button[data-learn-skill]');
-  if(learnBtn){ learnSkill(learnBtn.dataset.learnSkill); return; }
+  if(learnBtn){ openSkillLearnConfirm(learnBtn.dataset.learnSkill); return; }
 
   const skillUseBtn = e.target.closest('button[data-action="use-skill"]');
   const skillAssignBtn = e.target.closest('button[data-action="assign-skill"]');
@@ -187,6 +187,7 @@ el('charTabPanels').addEventListener('click', (e)=>{
   else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
   else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
   else if(actionBtn.dataset.action === 'reset-skill-quickslots') resetSkillQuickSlots();
+  else if(actionBtn.dataset.action === 'reset-skills') openSkillResetConfirm();
   else if(actionBtn.dataset.action === 'page-prev') goPage(actionBtn.dataset.pageTarget, -1);
   else if(actionBtn.dataset.action === 'page-next') goPage(actionBtn.dataset.pageTarget, 1);
 });
@@ -198,6 +199,10 @@ el('buyQtyConfirmBtn').addEventListener('click', confirmBuyQty);
 el('buyQtyUpBtn').addEventListener('click', ()=> adjustBuyQty('up'));
 el('buyQtyDownBtn').addEventListener('click', ()=> adjustBuyQty('down'));
 el('buyQtyInput').addEventListener('input', (e)=> setBuyQty(e.target.value));
+el('skillLearnCancelBtn').addEventListener('click', cancelSkillLearn);
+el('skillLearnConfirmBtn').addEventListener('click', confirmSkillLearn);
+el('skillResetCancelBtn').addEventListener('click', cancelSkillReset);
+el('skillResetConfirmBtn').addEventListener('click', confirmSkillReset);
 el('krStopBtn').addEventListener('click', returnToVillage);
 el('krContinueBtn').addEventListener('click', advanceStage);
 el('dungeonListPager').addEventListener('click', (e)=>{

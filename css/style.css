@@ -475,20 +475,16 @@
   }
   .dmg-popup{
     position:absolute; left:50%; top:20%; font-family:'JetBrains Mono', monospace; font-weight:700;
-    font-size:17px; color:#ffb84d; text-shadow: 0 0 6px rgba(0,0,0,.6); pointer-events:none; opacity:0;
+    font-size:17px; color:#ffffff; text-shadow: 0 0 6px rgba(0,0,0,.6); pointer-events:none; opacity:0;
   }
   .dmg-popup.float{ animation: dmg-float .8s ease-out forwards; }
   @keyframes dmg-float{
     0%{ opacity:1; transform: translate(-50%,0); }
     100%{ opacity:0; transform: translate(-50%,-45px); }
   }
-  .dmg-popup.crit{ font-size:21px; color:#ff4d4d; text-shadow:0 0 8px #ff4d4d99, 0 0 4px rgba(0,0,0,.7); }
-  .dmg-popup.crit.float{ animation: dmg-float-crit .85s ease-out forwards; }
-  @keyframes dmg-float-crit{
-    0%{ opacity:1; transform: translate(-50%,0) scale(1.3); }
-    30%{ transform: translate(-50%,-8px) scale(1.5); }
-    100%{ opacity:0; transform: translate(-50%,-50px) scale(1.1); }
-  }
+  /* 치명타 피해: 표시 위치·이동 방식은 일반 피해(.float → dmg-float)와 동일하게 두고, 색상(기존 치명타
+     표시 규칙)만 유지한 채 텍스트 크기만 일반 피해(17px)보다 1pt 크게(18px) 설정함. */
+  .dmg-popup.crit{ font-size:18px; color:#ff4d4d; text-shadow:0 0 8px #ff4d4d99, 0 0 4px rgba(0,0,0,.7); }
   /* 몬스터 UI 그룹(아이콘/이름/레벨/체력바)을 통째로 위로 이동 — 던전 입장 팝업(#spawnToast, top:2px,
      .monster-stage 기준)의 아래쪽 끝(약 31px)에서 20px 아래(약 51px)에 그룹 상단이 오도록, 원래 위치
      (.monster-stage 150px + margin-bottom 10px = 160px)에서 그만큼만 끌어올림. 내부 배치/간격은 그대로
@@ -576,10 +572,13 @@
     background: var(--forge-panel-2);
   }
   .skill-icon-btn .skill-icon img.skill-icon-img{ width:22px; height:22px; object-fit:contain; display:block; }
-  /* 미습득 스킬: 흑백(약 50% 밝기)으로 출력, 습득하면 원본 그대로 */
-  .skill-icon-btn.locked{ filter: grayscale(1) brightness(.5); }
+  /* 미습득 스킬: 흑백(약 50% 밝기)으로 출력, 습득하면 원본 그대로.
+     filter/opacity는 버튼 전체가 아닌 아이콘(.skill-icon)에만 걸어서, 형제 요소인 .tooltip은
+     영향받지 않고(투명도 없이 정상 출력) 아이콘만 흐리게 보이도록 함. */
+  .skill-icon-btn.locked .skill-icon{ filter: grayscale(1) brightness(.5); }
   /* 습득 불가(에픽·유니크 미구현/포인트 부족/공용·특화 습득 제한 충돌) — 요구사항 4번: 습득 버튼 비활성화 */
-  .skill-icon-btn:disabled{ cursor:not-allowed; opacity:.6; }
+  .skill-icon-btn:disabled{ cursor:not-allowed; }
+  .skill-icon-btn:disabled .skill-icon{ opacity:.6; }
   .skill-icon-btn .tooltip{ width:200px; left:50%; transform:translateX(-50%); bottom:120%; text-align:center; }
   .skill-icon-btn:hover .tooltip{ visibility:visible; opacity:1; }
 
@@ -630,6 +629,10 @@
 
   /* 캐릭터 메뉴 "캐릭터 정보" 탭 — 화면 폭이 좁아 페이지 이동 버튼만 우측 정렬로 표시 */
   .char-menu-info-head{ display:flex; justify-content:flex-end; margin-bottom:10px; }
+  /* 스킬 탭 전용 헤더 — 페이지 이동 버튼(pagerHtml)은 그대로 우측에 두고, 왼쪽에 스킬 초기화(⟲) 버튼을
+     별도로 배치함(요구사항: "페이지 이동 버튼 줄의 왼쪽" + "기존 페이지 UI와 충돌 없음"). */
+  .skill-menu-info-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .skill-reset-btn{ font-size:15px; line-height:1; padding:6px 10px; }
 
   .char-stats-modal{ max-width:680px; text-align:left; }
   .char-stats-title-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }

@@ -353,6 +353,50 @@
     </div>
   </div>
 
+  <div id="skillLearnConfirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">스킬 포인트 사용</div>
+      <div class="buy-qty-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box weapon-name-wrap" id="skillLearnIconBox">
+          <span class="tooltip" id="skillLearnTooltip"></span>
+        </span>
+      </div>
+      <div class="buy-qty-gold-row">
+        <span>현재 보유 SP</span>
+        <span id="skillLearnCurrentSp"></span>
+      </div>
+      <div class="buy-qty-divider"></div>
+      <div class="buy-qty-gold-row total">
+        <span>사용 SP</span>
+        <span id="skillLearnUseSp"></span>
+      </div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="skillLearnCancelBtn">취소</button>
+        <button class="btn btn-main" id="skillLearnConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="skillResetConfirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">스킬 초기화</div>
+      <div class="modal-body">계속 진행할 경우, 사용한 SP를 돌려받고<br>습득했던 스킬이 초기화됩니다.</div>
+      <div class="buy-qty-gold-row" style="margin-top:14px;">
+        <span>현재 보유 SP</span>
+        <span id="skillResetCurrentSp"></span>
+      </div>
+      <div class="buy-qty-divider"></div>
+      <div class="buy-qty-gold-row total">
+        <span>초기화 시 획득 SP</span>
+        <span id="skillResetGainSp"></span>
+      </div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="skillResetCancelBtn">취소</button>
+        <button class="btn btn-main" id="skillResetConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
+      </div>
+    </div>
+  </div>
+
   <div id="charStatsModal" class="modal-overlay" style="display:none;">
     <div class="modal-box char-stats-modal">
       <div class="char-stats-title-row">
