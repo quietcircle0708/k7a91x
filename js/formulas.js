@@ -692,13 +692,14 @@ function activeBuffBonus(key){
   });
   return total;
 }
-// 지금 습득할 수 있는지(포인트 충분 + 아직 미습득 + 습득 제한에 걸리지 않음). 에픽/유니크는 해금 방식이
-// 아직 구현되지 않아(비급/깨달음 소비 예정) 항상 불가로 처리 — SKILLS에 실제 항목이 등록되고 해금 로직이
-// 추가되면 이 부분만 손보면 됨.
+// 지금 습득할 수 있는지(레벨 조건 충족 + 포인트 충분 + 아직 미습득 + 습득 제한에 걸리지 않음). 에픽/유니크는
+// 해금 방식이 아직 구현되지 않아(비급/깨달음 소비 예정) 항상 불가로 처리 — SKILLS에 실제 항목이 등록되고
+// 해금 로직이 추가되면 이 부분만 손보면 됨.
 function canLearnSkill(id){
   const s = SKILLS[id];
   if(!s || isSkillLearned(id)) return false;
   if(s.grade === 'epic' || s.grade === 'unique') return false;
+  if(s.levelReq && (state.playerLevel || 1) < s.levelReq) return false;
   if(hasConflictingLearnedSkill(id)) return false;
   const pool = s.category === 'awakening' ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
   return pool >= (s.cost || 1);

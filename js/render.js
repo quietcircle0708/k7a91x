@@ -1037,7 +1037,7 @@ function buildSkillLevelRowHtml(categoryId, level){
   return `<div class="skill-level-row"><span class="skill-level-label">LV${level}</span><span class="skill-level-icons">${iconsHtml}</span></div>`;
 }
 // 스킬 한 칸: 습득 전이면 흑백(50% 밝기), 습득했으면 원본 그대로. 클릭하면 학습을 시도함(learnSkill).
-// 습득 불가(등급 미구현/포인트 부족/공용·특화 습득 제한 충돌)면 버튼 자체를 비활성화함(요구사항 4번:
+// 습득 불가(등급 미구현/레벨 미달/포인트 부족/공용·특화 습득 제한 충돌)면 버튼 자체를 비활성화함(요구사항 4번:
 // "이미 하나를 습득한 경우 나머지 스킬은 습득 버튼을 비활성화합니다").
 function buildSkillIconBtnHtml(id){
   const s = SKILLS[id];
