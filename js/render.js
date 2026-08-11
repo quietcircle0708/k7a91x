@@ -1284,7 +1284,10 @@ function renderStatusBadges(){
     }
     row.innerHTML = instance.statusEffects.map(s => {
       const def = STATUS_EFFECTS[s.key];
-      return `<span class="status-badge" style="color:${def.color}; border-color:${def.color};">${def.icon} ${def.name} ${s.ticksRemaining}s</span>`;
+      // 중독(틱 기반)은 ticksRemaining을 그대로 표시(기존과 동일), 기절/둔화 등 지속시간형은
+      // 만료시각(expiresAt) 기준으로 남은 초를 실시간 계산해서 표시함
+      const remainSec = def.type === 'dot' ? s.ticksRemaining : Math.max(0, Math.ceil((s.expiresAt - Date.now()) / 1000));
+      return `<span class="status-badge" style="color:${def.color}; border-color:${def.color};">${def.icon} ${def.name} ${remainSec}s</span>`;
     }).join('');
   });
 }

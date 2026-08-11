@@ -389,10 +389,10 @@ function adjustTooltipPosition(host, tip){
   if(needsOverride){
     tip.style.position = 'fixed';
     tip.style.transform = 'none'; // left:50%+translateX(-50%) 등 CSS 좌우정렬용 transform과 겹치면 좌표가 이중으로 밀리므로 무효화
-    tip.style.left = left + 'px';
     tip.style.top = top + 'px';
-    tip.style.right = '';
-    tip.style.bottom = '';
+    tip.style.bottom = 'auto'; // CSS 클래스가 지정한 bottom(예: .equip-slot .tooltip의 bottom:135%, .curse-badge .tooltip의 bottom:130%)이
+    tip.style.left = left + 'px'; // 빈 문자열로는 지워지지 않고 계속 살아있어 top과 충돌해 위치가 어긋나던 버그 수정 — 명시적으로 auto를 줘야 완전히 무효화됨
+    tip.style.right = 'auto'; // 마찬가지로 .curse-badge .tooltip의 right:0도 auto로 명시 무효화(안 그러면 left와 충돌해 화면 밖으로 밀려나 완전히 안 보이게 됨)
   }
   // needsOverride가 false면 방금 초기화한 기본 CSS 위치를 그대로 둔다(요구사항 1)
 }

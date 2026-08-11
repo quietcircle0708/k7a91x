@@ -49,7 +49,7 @@ let state = {
 };
 let isEnhancing = false;
 let currentView = 'forge';
-let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null };
+let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] } };
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
 // equipTab: "장비" 최상위 탭 안에서 마지막으로 보고 있던 하위탭(weapon/armor/accessory/artifact)을
 // 기억해뒀다가, "장비" 최상위 버튼을 다시 눌렀을 때 그 탭으로 돌아가기 위한 값.
@@ -183,29 +183,80 @@ function grantArtifactSafe(id){
 function statusEffectById(id){
   return Object.values(STATUS_EFFECTS).find(e => e.id === id) || null;
 }
-// 대상(target: {maxHp, statusEffects:[]})에게 상태 이상을 적용(이미 걸려있으면 지속시간 갱신)
-function applyStatusEffect(target, key){
+// 대상(target: {maxHp?, statusEffects:[]})에게 상태 이상을 적용(이미 걸려있으면 지속시간 갱신).
+// - 중독(type:'dot')처럼 틱 기반 상태 이상은 def.maxTicks를 그대로 사용(durationMs는 무시 — 기존 로직과 100% 동일)
+// - 기절/둔화처럼 지속시간형(type:'disable'|'atkSpeedMult') 상태 이상은 호출부(스킬/아이템 등)가 durationMs(밀리초)를
+//   넘겨서 그때그때 지속시간을 지정함(요구사항 4번). 만료 시각(expiresAt)을 저장해두고 매번 실시간으로 판정하므로
+//   1.25초처럼 1초 틱 간격에 맞아떨어지지 않는 지속시간도 정확하게 처리됨.
+function applyStatusEffect(target, key, durationMs){
   const def = STATUS_EFFECTS[key];
   if(!def) return;
   if(!target.statusEffects) target.statusEffects = [];
   const existing = target.statusEffects.find(s => s.key === key);
-  if(existing){
-    existing.ticksRemaining = def.maxTicks;
-  } else {
-    target.statusEffects.push({ key, ticksRemaining: def.maxTicks });
+  if(def.type === 'dot'){
+    if(existing) existing.ticksRemaining = def.maxTicks;
+    else target.statusEffects.push({ key, ticksRemaining: def.maxTicks });
+    return;
   }
+  const expiresAt = Date.now() + Math.max(0, durationMs || 0);
+  if(existing) existing.expiresAt = expiresAt;
+  else target.statusEffects.push({ key, expiresAt });
 }
-// 대상에게 걸린 모든 상태 이상을 1틱 진행시키고, 이번 틱에 발생한 총 피해를 반환
+// 대상에게 걸린 상태 이상 중 "지속 피해형(중독 등, type:'dot')"만 1틱 진행시키고, 이번 틱에 발생한 총 피해를 반환.
+// 기절/둔화처럼 지속시간형(type이 'dot'이 아닌 것) 상태 이상은 여기서 건드리지 않고 배열에 그대로 남겨둠 —
+// 이 함수가 예전처럼 모든 항목에 대해 ticksRemaining--를 하면 지속시간형 항목(ticksRemaining이 애초에 없음)이
+// 매 틱 잘못 제거되므로, dot 타입만 골라서 처리하도록 분리함(중독 자체의 계산식/동작은 완전히 그대로 유지).
 function tickStatusEffects(target){
   if(!target.statusEffects || target.statusEffects.length === 0) return 0;
   let totalDamage = 0;
   target.statusEffects = target.statusEffects.filter(s => {
     const def = STATUS_EFFECTS[s.key];
+    if(!def || def.type !== 'dot') return true;
     totalDamage += Math.max(1, Math.round(target.maxHp * def.damagePercentOfMaxHp / 100));
     s.ticksRemaining--;
     return s.ticksRemaining > 0;
   });
   return totalDamage;
+}
+// 지속시간형 상태 이상(기절/둔화 등) 중 만료된 것을 정리. 중독(틱 기반)은 tickStatusEffects가 별도로
+// 제거를 처리하므로 여기서는 건드리지 않음(dot 타입은 항상 유지).
+function pruneExpiredStatusEffects(target){
+  if(!target.statusEffects || target.statusEffects.length === 0) return;
+  const now = Date.now();
+  target.statusEffects = target.statusEffects.filter(s => {
+    const def = STATUS_EFFECTS[s.key];
+    if(!def || def.type === 'dot') return true;
+    return s.expiresAt > now;
+  });
+}
+// 대상이 특정 상태 이상에 지금 걸려있는지(지속시간형은 만료 여부까지 실시간으로 판정 — 배열 정리 주기와
+// 무관하게 항상 정확함)
+function hasActiveStatusEffect(target, key){
+  if(!target || !target.statusEffects) return false;
+  const s = target.statusEffects.find(x => x.key === key);
+  if(!s) return false;
+  const def = STATUS_EFFECTS[key];
+  if(!def) return false;
+  if(def.type === 'dot') return true; // 배열에 남아있으면 곧 살아있는 중독(만료 제거는 tickStatusEffects 담당)
+  return s.expiresAt > Date.now();
+}
+// 기절 여부 — 기절 중에는 기본공격/스킬사용/회복 등 모든 전투 행동을 정지시켜야 하므로, 각 행동 함수의
+// 진입부에서 이 함수로 분기함(dungeon.js attackTick/monsterAttackTick, actions.js canUseSkillNow/useFlask)
+function isStunned(target){
+  return hasActiveStatusEffect(target, 'stun');
+}
+// 현재 적용 중인 공격속도 배율(둔화 등 type:'atkSpeedMult'인 상태 이상을 전부 곱산). 아무것도 없으면 1(배율 없음).
+// 공격 간격을 직접 늘리는 방식이 아니라, 공격속도(초당 공격 횟수) 값 자체에 곱해서 쓰는 방식(요구사항 5번)이라
+// 호출부는 "기존 공격속도 x 이 배율"만 계산하면 됨.
+function attackSpeedMultiplier(target){
+  if(!target || !target.statusEffects || target.statusEffects.length === 0) return 1;
+  const now = Date.now();
+  let mult = 1;
+  target.statusEffects.forEach(s => {
+    const def = STATUS_EFFECTS[s.key];
+    if(def && def.type === 'atkSpeedMult' && s.expiresAt > now) mult *= def.atkSpeedMultiplier;
+  });
+  return mult;
 }
 
 // ---- 저장/불러오기 ----

@@ -13,6 +13,7 @@ function enterDungeon(id){
   hunt.targetId = null;
   hunt.paused = true;
   hunt.started = false;
+  hunt.player = { statusEffects: [] }; // 새 던전 진입 시 플레이어의 전투용 상태 이상(기절/둔화 등)도 초기화
   showView('hunt');
   enterStage(1);
 }
@@ -112,7 +113,8 @@ function beginStageCombat(){
 function startHuntLoop(){
   stopHuntLoop();
   const equipped = getEquippedWeapon(); // 공격속도는 실제 착용 무기 기준(대장간 선택 대상과 무관)
-  const speed = equipped ? effectiveAtkSpeed(equipped.type || 'longsword', equipped.level) : 0.5;
+  const baseSpeed = equipped ? effectiveAtkSpeed(equipped.type || 'longsword', equipped.level) : 0.5;
+  const speed = baseSpeed * attackSpeedMultiplier(hunt.player); // 둔화 등 공격속도 배율형 상태 이상 반영
   const intervalMs = Math.round(1000 / speed);
 
   // 플레이어 첫 공격: 전투 시작 0.5초 후, 이후 무기 공격속도 주기로 반복
@@ -128,12 +130,65 @@ function startHuntLoop(){
 function startMonsterAttackTimer(instance){
   const monsterDef = MONSTERS[instance.monsterId];
   const speedMult = (monsterDef && monsterDef.speedMult != null) ? monsterDef.speedMult : 1;
-  const monsterSpeed = MONSTER_ATTACK_SPEED * speedMult;
+  const monsterSpeed = MONSTER_ATTACK_SPEED * speedMult * attackSpeedMultiplier(instance); // 둔화 등 반영
   const intervalMs = Math.round(1000 / monsterSpeed);
   instance.atkFirstTimeout = setTimeout(() => {
     monsterAttackTick(instance.instanceId);
     instance.atkIntervalId = setInterval(() => monsterAttackTick(instance.instanceId), intervalMs);
   }, 1000);
+}
+// ---- 공격속도 배율형 상태 이상(둔화 등) 적용/만료 시 타이머 재계산 ----
+// 이미 setInterval로 도는 공격 타이머는 간격이 고정돼있어서, 전투 도중 배율이 바뀌면(둔화가 걸리거나
+// 풀리면) 새 간격으로 다시 시작해줘야만 실제로 반영됨. 진행 중이던 타이머의 남은 시간은 보존하지 않고
+// 새 간격으로 즉시 재시작하는 단순한 방식(요구사항 5번: 간격을 직접 조작하지 않고 "공격속도 값"에
+// 배율을 곱해서 다시 계산하는 방식).
+function refreshPlayerAttackTimer(){
+  if(!hunt.started || hunt.paused || !hunt.timerId) return; // 아직 첫 공격 대기 중이면 시작될 때 자연히 반영됨
+  clearInterval(hunt.timerId);
+  const equipped = getEquippedWeapon();
+  if(!equipped) return;
+  const baseSpeed = effectiveAtkSpeed(equipped.type || 'longsword', equipped.level);
+  const speed = baseSpeed * attackSpeedMultiplier(hunt.player);
+  hunt.timerId = setInterval(attackTick, Math.round(1000 / speed));
+}
+function refreshMonsterAttackTimer(instance){
+  if(!instance || !instance.atkIntervalId) return; // 아직 첫 공격 전(atkFirstTimeout 대기 중)이면 시작될 때 자연히 반영됨
+  clearInterval(instance.atkIntervalId);
+  const monsterDef = MONSTERS[instance.monsterId];
+  const speedMult = (monsterDef && monsterDef.speedMult != null) ? monsterDef.speedMult : 1;
+  const baseSpeed = MONSTER_ATTACK_SPEED * speedMult;
+  const speed = baseSpeed * attackSpeedMultiplier(instance);
+  instance.atkIntervalId = setInterval(() => monsterAttackTick(instance.instanceId), Math.round(1000 / speed));
+}
+// 플레이어에게 상태 이상을 부여하는 공통 진입점(기절/둔화를 실제로 부여하는 스킬/아이템 기능은 추후 추가 —
+// 그 기능들이 이 함수를 호출하게 될 예정). 공격속도 배율형 상태 이상은 부여 즉시 타이머에 반영하고,
+// 지속시간형 상태 이상은 만료되는 정확한 시점에 자동으로 정리 + 타이머 재계산까지 처리함.
+function applyStatusEffectToPlayer(key, durationMs){
+  applyStatusEffect(hunt.player, key, durationMs);
+  const def = STATUS_EFFECTS[key];
+  if(!def) return;
+  if(def.type === 'atkSpeedMult') refreshPlayerAttackTimer();
+  if(def.type !== 'dot' && durationMs > 0){
+    setTimeout(() => {
+      pruneExpiredStatusEffects(hunt.player);
+      if(def.type === 'atkSpeedMult') refreshPlayerAttackTimer();
+    }, durationMs);
+  }
+}
+// 몬스터 개체에게 상태 이상을 부여하는 공통 진입점(용도는 위 applyStatusEffectToPlayer와 동일)
+function applyStatusEffectToMonster(instance, key, durationMs){
+  applyStatusEffect(instance, key, durationMs);
+  const def = STATUS_EFFECTS[key];
+  if(!def) return;
+  if(def.type === 'atkSpeedMult') refreshMonsterAttackTimer(instance);
+  if(def.type !== 'dot' && durationMs > 0){
+    setTimeout(() => {
+      pruneExpiredStatusEffects(instance);
+      if(def.type === 'atkSpeedMult') refreshMonsterAttackTimer(instance);
+      renderStatusBadges();
+    }, durationMs);
+  }
+  renderStatusBadges();
 }
 // flaskEndMode: 'flush'(기본, 생존 상태로 전투 종료 — 남은 회복량 즉시 적용 후 종료) |
 //               'discard'(사망으로 전투 종료 — 남은 회복량 적용 없이 폐기, HP 변경 없음)
@@ -160,6 +215,7 @@ function stopHuntLoop(flaskEndMode = 'flush'){
 // 플레이어의 자동 공격: 현재 지정된 대상(hunt.targetId)을 우선 공격하고, 대상이 없으면(사망 등) 살아있는 첫 몬스터를 공격
 function attackTick(){
   if(hunt.paused || hunt.monsters.length === 0) return;
+  if(isStunned(hunt.player)) return; // 기절 중에는 기본 공격도 정지
   const equipped = getEquippedWeapon(); // 실제 공격에 사용되는 착용 무기(대장간 선택 대상과 무관)
   if(!equipped){
     showHuntMsg('장착한 무기가 없어 사냥을 중단합니다.');
@@ -177,8 +233,13 @@ function attackTick(){
   const critChance = effectiveCritChance(type, equipped.level);
   const isCrit = Math.random() * 100 < critChance;
   const baseDmg = isCrit ? Math.round(atk * 1.5) : atk;
+  // 기본 공격 전용 피해량 증가 버프(예: 야수의 심장 +25%). effectiveAtk가 아니라 여기서만 곱하는 이유는
+  // effectiveAtk를 스킬 데미지 계산(actions.js resolveSkillEffect)도 그대로 쓰기 때문 — 여기서 곱해야
+  // 기본 공격에만 적용되고 스킬 데미지에는 전혀 영향을 주지 않음(야수의 심장 요구사항).
+  const basicAtkBonusPercent = activeBuffBonus('basicAtkDamagePercent');
+  const boostedDmg = Math.round(baseDmg * (1 + basicAtkBonusPercent / 100));
   const levelDiff = state.playerLevel - target.level;
-  const dmg = Math.max(1, Math.round(baseDmg * playerDamageMultiplier(levelDiff)));
+  const dmg = Math.max(1, Math.round(boostedDmg * playerDamageMultiplier(levelDiff)));
   target.hp -= dmg;
   monsterHitEffect(target.instanceId, dmg, isCrit);
   if(target.hp > 0){
@@ -210,6 +271,7 @@ function monsterAttackTick(instanceId){
   if(hunt.paused) return;
   const instance = hunt.monsters.find(m => m.instanceId === instanceId);
   if(!instance) return; // 이미 처치되어 제거된 개체면 무시
+  if(isStunned(instance)) return; // 기절 중인 몬스터는 공격하지 못함
   ensurePlayerVitals();
   if(state.playerHp <= 0) return; // 이미 쓰러진 상태면 추가 피해 없음
   const levelDiff = state.playerLevel - instance.level;
@@ -262,6 +324,8 @@ function startStatusTicker(){
     // 순회 중 killMonsterInstance가 hunt.monsters를 변경할 수 있으므로 스냅샷을 떠서 순회
     const snapshot = hunt.monsters.slice();
     for(const instance of snapshot){
+      pruneExpiredStatusEffects(instance); // 기절/둔화 등 지속시간형 상태 이상의 실제 만료 처리는 정확한
+      // 시점에 applyStatusEffectToMonster의 setTimeout이 이미 처리하므로, 여기서는 배열 정리(뱃지 표시 동기화) 용도
       if(!instance.statusEffects || instance.statusEffects.length === 0) continue;
       const activeKeys = instance.statusEffects.map(s => s.key);
       const dmg = tickStatusEffects(instance);
@@ -276,6 +340,7 @@ function startStatusTicker(){
         updateMonsterSlot(instance);
       }
     }
+    pruneExpiredStatusEffects(hunt.player);
     renderStatusBadges();
   }, 1000);
 }

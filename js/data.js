@@ -1036,6 +1036,27 @@ const SKILLS = {
     cooldown: 8, resourceType: 'mp', resourceAmount: 110, castTime: 0.1,
     damagePercent: 115, hits: 1,
   },
+  sword_strike: {
+    name: '소드 스트라이크', desc: '110% 데미지로 적을 공격하고, 피해를 입은 적을 2초 동안 기절시킨다.',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 20,
+    cooldown: 10, resourceType: 'mp', resourceAmount: 120, castTime: 0.2,
+    damagePercent: 110, hits: 1, icon: 'lv20atk',
+    onHitStatus: { key: 'stun', durationMs: 2000 }, // 적중(=피해를 입혀 대상이 생존)한 경우에만 부여, 처치시엔 부여 안 함
+  },
+  beast_heart: {
+    name: '야수의 심장', desc: '[버프] 25초 동안 기본 공격 피해량이 25% 증가한다.',
+    grade: 'normal', category: 'common', target: 'buff', levelReq: 20,
+    cooldown: 60, resourceType: 'mp', resourceAmount: 200, castTime: 0, icon: 'lv20buff',
+    // basicAtkDamagePercent는 effectiveAtk(스킬 데미지 계산도 함께 쓰는 함수)가 아니라 dungeon.js
+    // attackTick(기본 공격)에서만 별도로 읽어서 적용함 — 스킬 데미지에는 영향을 주지 않기 위한 설계.
+    buffEffect: { basicAtkDamagePercent: 25, durationMs: 25000 },
+  },
+  earth_vigor: {
+    name: '대지의 기운', desc: '체력 500을 회복한다.',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 25,
+    cooldown: 20, resourceType: 'mp', resourceAmount: 300, castTime: 1.0, icon: 'lv25buff',
+    healFlat: 500, // 시전 완료 시점에 체력 500 회복(최대체력 초과 회복 안 함) — actions.js resolveSkillEffect 참고
+  },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
 // (일반/레어/에픽/유니크 라벨·색상이 이미 동일하므로 SKILLS[id].grade를 WEAPON_GRADES에 그대로 대입해 조회).
@@ -1082,15 +1103,38 @@ const EQUIPMENT_SLOTS = [
 
 // ---- 상태 이상(디버프) 클래스 ----
 // 앞으로 종류가 계속 추가될 예정. 새 상태 이상은 이 객체에 항목만 추가하면 됨.
+// type으로 상태 이상의 처리 방식을 구분함(state.js의 applyStatusEffect/tickStatusEffects/pruneExpiredStatusEffects,
+// dungeon.js의 전투 행동 가드가 이 값을 보고 분기함):
+//  - 'dot' (중독): 매 틱 최대체력 비례 피해 + maxTicks로 지속시간이 고정됨(기존 로직 그대로 유지, 변경 없음)
+//  - 'disable' (기절): 지속시간 동안 전투 행동(기본공격/스킬/회복 등)을 전부 정지시킴
+//  - 'atkSpeedMult' (둔화): 지속시간 동안 공격속도(초당 공격 횟수) 값에 atkSpeedMultiplier를 곱해서 적용
+// 'disable'/'atkSpeedMult'류는 데이터에 고정 지속시간을 두지 않음 — 상태 이상을 부여하는 스킬/아이템 등
+// 호출부가 매번 durationMs(밀리초)를 넘겨서 그때그때 지속시간을 지정함(요구사항 4번).
 const STATUS_EFFECTS = {
   poison: {
     id: 1,
     name: '중독',
     icon: '☠️',
     color: '#7fd67f', // 초록 계열
+    type: 'dot',
     tickIntervalMs: 1000,        // 1초마다
     maxTicks: 5,                 // 최대 5초(=5틱) 지속
     damagePercentOfMaxHp: 1,     // 매 틱 최대 체력의 1% 피해
+  },
+  stun: {
+    id: 2,
+    name: '기절',
+    icon: '💤',
+    color: '#ff5e26',
+    type: 'disable',
+  },
+  slow: {
+    id: 3,
+    name: '둔화',
+    icon: '🐌',
+    color: '#fff5ae',
+    type: 'atkSpeedMult',
+    atkSpeedMultiplier: 0.65, // 공격속도(초당 공격 횟수) x 0.65
   },
 };
 

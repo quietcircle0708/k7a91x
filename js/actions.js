@@ -562,6 +562,7 @@ function canUseSkillNow(id){
   if(!s) return false;
   if(skillKindOf(s) === 'passive') return false; // 패시브는 항상 자동 적용이라 "사용" 개념이 없음
   if(currentView !== 'hunt' || !hunt.started || hunt.paused || hunt.monsters.length === 0) return false;
+  if(isStunned(hunt.player)) return false; // 기절 중에는 스킬 사용 불가
   if(isSkillOnCooldown(id)) return false;
   const pool = s.resourceType === 'hp' ? (state.playerHp || 0) : (state.playerMp || 0);
   return pool >= (s.resourceAmount || 0);
@@ -590,6 +591,14 @@ function resolveSkillEffect(id){
   const s = SKILLS[id];
   if(!s) return;
   if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return;
+  if(s.healFlat){
+    // 회복형 스킬(예: 대지의 기운) — 데미지 계산 없이 시전 완료 시점에 고정량 회복, 최대체력 초과 회복 안 함
+    state.playerHp = Math.min(effectiveMaxHp(state.playerLevel), (state.playerHp || 0) + s.healFlat);
+    refreshCharDisplays();
+    renderHuntCharPanel();
+    saveState();
+    return;
+  }
   if(skillKindOf(s) === 'buff'){
     applySkillBuff(id);
     refreshCharDisplays();
@@ -615,6 +624,9 @@ function resolveSkillEffect(id){
       const dmg = Math.max(1, Math.round(perHit * playerDamageMultiplier(levelDiff)));
       t.hp -= dmg;
       monsterHitEffect(t.instanceId, dmg, false);
+      // 적중(=피해를 입혀 대상이 생존)한 경우에만 상태 이상 부여(예: 소드 스트라이크의 기절). 처치되는
+      // 순간의 히트에는 부여하지 않음 — s.onHitStatus가 없는 기존 스킬들은 전혀 영향받지 않음.
+      if(t.hp > 0 && s.onHitStatus) applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
     }
     if(t.hp <= 0) killMonsterInstance(t.instanceId);
     else updateMonsterSlot(t);
@@ -630,6 +642,8 @@ function useFlask(id){
   const item = CONSUMABLES[id];
   if(!item) return;
   if(isFlaskOnCooldown(id)) return; // 쿨타임 중이면 수동/자동 사용 모두 무시
+  // 전투 중 기절 상태면 회복(플라스크 사용)도 정지 — 마을/상점 등 전투 밖에서는 기절 상태가 아니므로 영향 없음
+  if(currentView === 'hunt' && hunt.started && !hunt.paused && isStunned(hunt.player)) return;
   if(!state.consumables) state.consumables = { hpFlask: 0, mpFlask: 0 };
   if((state.consumables[id] || 0) <= 0) return;
   state.consumables[id]--;
