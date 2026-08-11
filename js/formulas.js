@@ -569,7 +569,7 @@ function monsterExp(level){
   return Math.round(1000 * Math.pow(1.08, level - 1));
 }
 function requiredKills(level){
-  return Math.round(10 + Math.pow(level - 1, 1.65));
+  return Math.round(10 + Math.pow(level - 1, 1.35));
 }
 function requiredExp(level){
   return monsterExp(level) * requiredKills(level);

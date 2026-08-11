@@ -155,6 +155,8 @@ function render(){
   // totalEquipInventoryCount()로 세 종류를 합산해 표시함(무기 개수만 보여주면 실제 남은 공용 슬롯과
   // 어긋나 보일 수 있음).
   el('invCount').textContent = totalEquipInventoryCount() + ' / ' + INV_MAX;
+  if(el('invCountArmor')) el('invCountArmor').textContent = totalEquipInventoryCount() + ' / ' + INV_MAX;
+  if(el('invCountAccessory')) el('invCountAccessory').textContent = totalEquipInventoryCount() + ' / ' + INV_MAX;
   renderInvTabs();
   renderInventoryList();
   renderArmorInventoryList();
@@ -273,12 +275,19 @@ function renderInventoryList(){
 function renderArmorInventoryList(){
   const wrap = el('armorInventoryList');
   if(!wrap) return;
+  const pagerWrap = el('invArmorPager');
   const items = state.armorInventory || [];
   if(items.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 방어구가 없습니다.<br>상점에서 <b>방어구</b>를 구매해보세요.</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
     return;
   }
-  wrap.innerHTML = items.map(item => {
+  const pageSize = PAGE_SIZE.invArmor;
+  const totalPageCount = pageCount(items.length, pageSize);
+  pageState.invArmor = clampPage(pageState.invArmor, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invArmor', pageState.invArmor, totalPageCount);
+  const pageItems = pageSlice(items, pageState.invArmor, pageSize);
+  wrap.innerHTML = pageItems.map(item => {
     const type = item.type;
     const def = ARMOR_TYPES[type];
     if(!def) return '';
@@ -321,14 +330,21 @@ function renderArmorInventoryList(){
 function renderAccessoryInventoryList(){
   const wrap = el('accessoryInventoryList');
   if(!wrap) return;
+  const pagerWrap = el('invAccessoryPager');
   const items = state.accessoryInventory || [];
   if(items.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 장신구가 없습니다.<br>상점에서 <b>장신구</b>를 구매해보세요.</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
     return;
   }
+  const pageSize = PAGE_SIZE.invAccessory;
+  const totalPageCount = pageCount(items.length, pageSize);
+  pageState.invAccessory = clampPage(pageState.invAccessory, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invAccessory', pageState.invAccessory, totalPageCount);
+  const pageItems = pageSlice(items, pageState.invAccessory, pageSize);
   const wornList = Array.isArray(state.equippedAccessories) ? state.equippedAccessories : [];
   const slotsFull = wornList.filter(id => id != null).length >= ACCESSORY_SLOT_MAX;
-  wrap.innerHTML = items.map(item => {
+  wrap.innerHTML = pageItems.map(item => {
     const type = item.type;
     const def = ACCESSORY_TYPES[type];
     if(!def) return '';

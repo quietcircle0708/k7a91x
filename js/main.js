@@ -222,6 +222,18 @@ el('invWeaponPager').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
+el('invArmorPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
+el('invAccessoryPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 el('inventoryList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;

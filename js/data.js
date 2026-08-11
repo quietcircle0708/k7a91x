@@ -299,6 +299,138 @@ const WEAPON_TYPES = {
       statBonus: { str: 5, maxHp: 800 },
     },
   },
+  bent_greatsword: {
+    id: 'bent_greatsword', name: '휘어진 양손 검', desc: '날이 휘어져 절삭력이 좋지 않다',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 35, attackSpeed: 0.6, critRate: 8,
+    purchasable: false, sellPrice: 200, levelReq: 4,
+    image: 'common_longsword', // 기존 이미지 재사용
+    atk: [35], speed: [0.6], crit: [8], sell: [200],
+    cost: [], odds: [],
+  },
+  doubleedge_greatsword: {
+    id: 'doubleedge_greatsword', name: '양날대검', desc: '세월의 흔적이 담긴 양손 검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 40, attackSpeed: 0.6, critRate: 9,
+    purchasable: false, sellPrice: 350, levelReq: 7,
+    image: 'common_longsword', // 기존 이미지 재사용
+    atk: [40], speed: [0.6], crit: [9], sell: [350],
+    cost: [], odds: [],
+  },
+  doubleedge_sword: {
+    id: 'doubleedge_sword', name: '양날검', desc: '세월의 흔적이 담긴 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 27, attackSpeed: 0.8, critRate: 4,
+    purchasable: false, sellPrice: 350, levelReq: 7,
+    image: 'common_shortsword', // 기존 이미지 재사용
+    atk: [27], speed: [0.8], crit: [4], sell: [350],
+    cost: [], odds: [],
+  },
+  iron_sword: {
+    id: 'iron_sword', name: '철검', desc: '조잡하지만 위력은 있는 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 24, attackSpeed: 0.8, critRate: 3,
+    purchasable: false, sellPrice: 195, levelReq: 4,
+    image: 'common_shortsword', // 기존 이미지 재사용
+    atk: [24], speed: [0.8], crit: [3], sell: [195],
+    cost: [], odds: [],
+  },
+  plain_dagger: {
+    id: 'plain_dagger', name: '단검', desc: '가볍지만 균형이 어긋나있다.',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'normal', // 일반
+    attackPower: 14, attackSpeed: 1.0, critRate: 9,
+    purchasable: false, sellPrice: 195, levelReq: 4,
+    image: 'common_dagger', // 기존 이미지 재사용
+    atk: [14], speed: [1.0], crit: [9], sell: [195],
+    cost: [], odds: [],
+  },
+  sharp_dagger: {
+    id: 'sharp_dagger', name: '날카로운 단검', desc: '날 끝을 예리하게 갈아낸 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검 (사용자 확인 후 검→단검으로 수정함)
+    grade: 'normal', // 일반
+    attackPower: 16, attackSpeed: 1.0, critRate: 9,
+    purchasable: false, sellPrice: 340, levelReq: 7,
+    image: 'common_dagger', // 기존 이미지 재사용
+    atk: [16], speed: [1.0], crit: [9], sell: [340],
+    cost: [], odds: [],
+  },
+  bastardsword: {
+    id: 'bastardsword', name: '바스타드 소드', desc: '상황에 따라 어떤 손으로든,<br>자유롭게 휘두를 수 있는 중검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'rare', // 레어
+    attackPower: 116, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 1750, levelReq: 25,
+    image: 'rare_basterdsword',
+    atk: [116], speed: [0.6], crit: [10], sell: [1750],
+    cost: [], odds: [],
+  },
+  armingsword: {
+    id: 'armingsword', name: '아밍소드', desc: '균형 잡힌 검신을 가진<br>아름다운 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'rare', // 레어
+    attackPower: 73, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 1750, levelReq: 25,
+    image: 'rare_armingsword',
+    atk: [73], speed: [0.8], crit: [5], sell: [1750],
+    cost: [], odds: [],
+  },
+  silverdagger: {
+    id: 'silverdagger', name: '실버 대거', desc: '어둠 속에서 빛나는<br>은빛 칼날의 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'rare', // 레어
+    attackPower: 47, attackSpeed: 1.0, critRate: 10,
+    purchasable: true, sellPrice: 1750, levelReq: 25,
+    image: 'rare_silverdagger',
+    atk: [47], speed: [1.0], crit: [10], sell: [1750],
+    cost: [], odds: [],
+  },
+  steelsword: {
+    id: 'steelsword', name: '강철 검', desc: '단단한 강철로 벼려낸 믿음직한 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 82, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 2250, levelReq: 30,
+    image: 'common_shortsword4',
+    atk: [82], speed: [0.8], crit: [5], sell: [2250],
+    cost: [], odds: [],
+  },
+  steelgreatsword: {
+    id: 'steelgreatsword', name: '강철 대검', desc: '무거운 강철로 만들어진 강력한 양손 검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 123, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 2250, levelReq: 30,
+    image: 'common_longsword4',
+    atk: [123], speed: [0.6], crit: [10], sell: [2250],
+    cost: [], odds: [],
+  },
+  steeldagger: {
+    id: 'steeldagger', name: '강철 단검', desc: '날카롭게 벼려낸 가볍고 재빠른 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'normal', // 일반
+    attackPower: 49, attackSpeed: 1.0, critRate: 10,
+    purchasable: true, sellPrice: 2250, levelReq: 30,
+    image: 'common_dagger4',
+    atk: [49], speed: [1.0], crit: [10], sell: [2250],
+    cost: [], odds: [],
+  },
 };
 
 
@@ -319,7 +451,7 @@ const ARMOR_DEFAULT_IMAGE = { helmet: 'helmetbase', armor: 'armorbase' };
 // defArr/hpArr/manaArr: 강화 단계별(+0~+9) 값 배열 — 아래 forEach가 자동으로 계산해서 채움(직접 적을 필요 없음).
 const ARMOR_TYPES = {
   oldarmor: {
-    id: 'oldarmor', name: '낡은 갑옷', desc: '낡았지만 아직 입을 만한 갑옷',
+    id: 'oldarmor', name: '천 옷', desc: '낡았지만 아직 입을 만한 갑옷',
     equipType: 'armor',
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
@@ -328,13 +460,52 @@ const ARMOR_TYPES = {
     image: '',
   },
   oldhelmet: {
-    id: 'oldhelmet', name: '낡은 투구', desc: '기본적인 방호력은 유지하고 있다',
+    id: 'oldhelmet', name: '천 모자', desc: '기본적인 방호력은 유지하고 있다',
     equipType: 'armor',
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -1,
     purchasable: true, sellPrice: 100, levelReq: 1,
     image: '',
+  },
+  // 원본 문서엔 방어도가 양수(3/1/5/2)로 적혀있었으나, 기존 방어구 데이터는 전부 음수 값만
+  // 사용하는 규칙(defenseFor 공식이 음수를 전제로 함, 같은 요청에 포함된 신규 장신구 3종의
+  // 방어도는 이미 음수(-2,-2,-1)로 정확히 적혀있었음)이라 부호를 반전해 반영함(응답 참고, 확인 필요).
+  linenarmor: {
+    id: 'linenarmor', name: '리넨 옷', desc: '가볍고 편안해 초보 모험가에게 적합한 기본 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'rare', // 레어
+    defense: -3, hp: 100,
+    purchasable: true, sellPrice: 400, levelReq: 8,
+    image: 'armorbase',
+  },
+  linenhelmet: {
+    id: 'linenhelmet', name: '리넨 모자', desc: '볍고 편안하게 머리를 보호하는 초보자용 모자',
+    equipType: 'armor',
+    armorKind: 'helmet', // 투구
+    grade: 'rare', // 레어
+    defense: -1, hp: 50,
+    purchasable: true, sellPrice: 400, levelReq: 8,
+    image: 'helmetbase',
+  },
+  leatherarmor: {
+    id: 'leatherarmor', name: '가죽 옷', desc: '가볍고 질긴 가죽으로 만들어진 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'normal', // 일반
+    defense: -5, hp: 100,
+    purchasable: true, sellPrice: 500, levelReq: 10,
+    image: 'armorbase',
+  },
+  leatherhelmet: {
+    id: 'leatherhelmet', name: '가죽 모자', desc: '질긴 가죽으로 머리를 보호하는 모자',
+    equipType: 'armor',
+    armorKind: 'helmet', // 투구
+    grade: 'normal', // 일반
+    defense: -2, hp: 30,
+    purchasable: true, sellPrice: 500, levelReq: 10,
+    image: 'helmetbase',
   },
 };
 
@@ -398,6 +569,33 @@ const ACCESSORY_TYPES = {
     defense: -1,
     mana: 50,
     purchasable: true, sellPrice: 500, levelReq: 5,
+    image: '',
+  },
+  agilityring: {
+    id: 'agilityring', name: '민첩의 반지', desc: '몸을 가볍게 하여 움직임을 돕는 반지',
+    equipType: 'accessory',
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -2, hp: 30, mana: 30,
+    purchasable: true, sellPrice: 1400, levelReq: 15,
+    image: '',
+  },
+  strengthring: {
+    id: 'strengthring', name: '힘의 반지', desc: '미약한 힘이 깃드는 반지',
+    equipType: 'accessory',
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -2, hp: 100,
+    purchasable: true, sellPrice: 1400, levelReq: 15,
+    image: '',
+  },
+  wisdomring: {
+    id: 'wisdomring', name: '지혜의 반지', desc: '정신을 맑게 하고 지혜를 더하는 반지',
+    equipType: 'accessory',
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -1, mana: 100,
+    purchasable: true, sellPrice: 1400, levelReq: 15,
     image: '',
   },
 };
@@ -945,6 +1143,8 @@ const SHOP_SORT_FIELDS = [
 // (그 두 탭은 이 객체에 키 자체가 없음 → renderShopTab에서 자동으로 페이지 UI 없이 전체 출력됨).
 const PAGE_SIZE = {
   invWeapon: 6,        // 인벤토리 무기 탭
+  invArmor: 6,          // 인벤토리 방어구 탭
+  invAccessory: 6,       // 인벤토리 장신구 탭
   forgeSelect: 6,       // 대장간 "강화 장비 선택" 팝업
   shopWeapon: 6,        // 상점 무기 탭
   shopArmor: 6,          // 상점 방어구 탭

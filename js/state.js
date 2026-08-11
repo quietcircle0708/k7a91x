@@ -60,6 +60,8 @@ let invUI = { tab: 'weapon', equipTab: 'weapon' };
 // 새 화면을 추가할 때 여기 초기값 1과 PAGE_SIZE에 같은 키만 추가하면 동일한 페이지 시스템을 그대로 재사용함.
 let pageState = {
   invWeapon: 1,
+  invArmor: 1,
+  invAccessory: 1,
   forgeSelect: 1,
   shopWeapon: 1, shopArmor: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,

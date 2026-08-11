@@ -132,6 +132,8 @@ function toggleShopSortDir(){
 // 화면을 자동으로 다시 그려줌(다른 화면의 페이지 이동 로직에는 영향 없음).
 const PAGE_RENDER_FN = {
   invWeapon: renderInventoryList,
+  invArmor: renderArmorInventoryList,
+  invAccessory: renderAccessoryInventoryList,
   forgeSelect: renderForgeSelectList,
   shopWeapon: renderShopTab, shopArmor: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
