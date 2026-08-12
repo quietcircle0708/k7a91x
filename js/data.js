@@ -54,6 +54,13 @@ const WEAPON_IMAGE_FALLBACK = 'common_shortsword';
 const MONSTER_IMAGE_DIR = 'assets/monster/';
 const MONSTER_IMAGE_EXT = '.png';
 
+// 기타/아티팩트/소비 아이템 이미지 파일 경로 규칙(무기·몬스터와 동일한 방식). ARTIFACTS/CONSUMABLES/
+// MISC_ITEMS 항목에 선택 필드 image(파일명만, 확장자/경로 제외)를 등록하면 이모지(icon) 대신 PNG가
+// 출력됨(itemIconHtml/itemImgError, formulas.js). image 필드가 없거나 파일 로드에 실패하면 항상
+// 기존처럼 icon(이모지)이 그대로 출력됨 — 새로 추가되는 기타/아티팩트/소비 아이템도 동일하게 동작함.
+const ITEM_IMAGE_DIR = 'assets/MiscItems/';
+const ITEM_IMAGE_EXT = '.png';
+
 // 무기 종류 도감. 새로운 옵션(필드)이 필요해지면 이 객체에 항목만 추가하면 됨 — 언제든 확장 가능한 구조.
 // ---- 항목 설명 ----
 // desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고) / weaponKind: 무기 종류(WEAPON_KINDS) /
@@ -732,7 +739,7 @@ const GRADE_ENHANCE_ODDS_EPIC = [
 ];
 const GRADE_ENHANCE_ODDS_UNIQUE = [
   [80, 20, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0], [55, 20, 25, 0], [45, 20, 35, 0],
-  [35, 20, 45, 0], [25, 20, 55, 4], [15, 10, 65, 10], [5, 5, 70, 20],
+  [35, 20, 45, 0], [25, 20, 51, 4], [15, 10, 65, 10], [5, 5, 70, 20],
 ];
 const GRADE_ENHANCE_ODDS = {
   normal: GRADE_ENHANCE_ODDS_NORMAL_RARE,
@@ -930,6 +937,8 @@ const ACCESSORY_SLOT_MAX = 2; // 장신구1/장신구2 — 반지는 같은 아�
 // desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고, 항상 'artifact') / grade: 아티팩트 등급(WEAPON_GRADES와 동일한 키 체계 재사용) /
 // effect: 장착 효과(장착 시 실제로 적용되는 효과 — 게임 로직 설명용) / effectText: 효과 설명(아이템 툴팁에 "효과"로 표시되는 문구) /
 // buyPrice: 상점 구매 가격(비어있으면=null, 상점 구매 불가 + 상점 목록에서 제외됨) / icon: 아티팩트 아이콘
+// (이모지) / image: 선택 필드. PNG 이미지 파일명(확장자/경로 제외, assets/MiscItems/<image>.png)을 등록하면
+// icon 대신 PNG가 출력됨(itemIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 그대로 출력됨.
 const ARTIFACTS = {
   ring: {
     id: 'ring', name: '아주르의 강아지풀 반지', icon: '🌾',
@@ -1001,6 +1010,8 @@ const QUICK_SLOT_COUNT = 2;
 // 특정 플라스크 id를 분기하지 않고 useFlask()가 이 값을 그대로 사용하므로, 새 플라스크를
 // CONSUMABLES에 추가하기만 하면 별도 코드 수정 없이 동일한 쿨타임 시스템이 적용됨.
 const FLASK_COOLDOWN_MS = 2000;
+// icon: 이모지 / image: 선택 필드. PNG 이미지 파일명(assets/MiscItems/<image>.png, 확장자/경로 제외)을
+// 등록하면 icon 대신 PNG가 출력됨(itemIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 출력됨.
 const CONSUMABLES = {
   hpFlask: {
     id: 'hpFlask', name: '[하급]체력 회복 플라스크', class: '플라스크', icon: '🧪',
@@ -1023,6 +1034,8 @@ const CONSUMABLES = {
 // 아이템 이름이 아니라 이 값만 보고 자동으로 결정됨.
 // grade: 마석류 아이템의 등급(WEAPON_GRADES와 동일한 키 체계를 공유 — 이름 색상 공식도 그대로 재사용). 기타(misc) 아이템은 등급이 없음.
 const ITEM_CLASS_LABELS = { stone: '마석', misc: '기타' };
+// icon: 이모지 / image: 선택 필드. PNG 이미지 파일명(assets/MiscItems/<image>.png, 확장자/경로 제외)을
+// 등록하면 icon 대신 PNG가 출력됨(itemIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 출력됨.
 const MISC_ITEMS = {
   manaFragment: {
     id: 'manaFragment', name: '마석 파편', icon: '💠', itemClass: 'stone', grade: 'normal',

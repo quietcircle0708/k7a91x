@@ -431,6 +431,10 @@
      기존 이모지가 font-size로 크기를 정하던 방식을 그대로 재사용하는 것이라, 몬스터 수(1/2/3마리)별
      크기 변화나 던전목록/킬결과창의 서로 다른 크기에도 별도 클래스 없이 자동으로 맞춰짐. */
   .monster-icon-img{ display:block; width:1em; height:1em; object-fit:contain; }
+  /* 기타/아티팩트/소비 아이템 PNG 공통 스타일(monster-icon-img와 동일한 방식). 1em 크기라 부모 요소의
+     font-size(equip-slot/inv-icon/artifact-icon-box/quickslot-icon 등)를 그대로 물려받아 기존 이모지가
+     차지하던 자리와 크기에 자동으로 맞춰짐 — 화면별 별도 CSS 없이도 기존 레이아웃이 그대로 유지됨. */
+  .item-icon-img{ display:block; width:1em; height:1em; object-fit:contain; }
   /* .monster-icon.hit / .dead / .spawn-in 은 모두 명시도가 동일한 2-클래스 선택자였는데, 스폰 시 붙는
      spawn-in 클래스가 이후 제거되지 않고 계속 남아있고(css 소스 순서상 아래쪽에 선언되어 있어)
      캐스케이드에서 계속 이겨버려 히트/사망 애니메이션(keyframe)이 실제로는 전혀 재생되지 않던 버그가 있었음.

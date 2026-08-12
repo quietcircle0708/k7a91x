@@ -66,6 +66,24 @@ function monsterIconHtml(monsterDefLike, className){
 function monsterImgError(img){
   img.replaceWith(document.createTextNode(img.dataset.fallbackEmoji || ''));
 }
+
+// 기타/아티팩트/소비 아이템 아이콘 HTML 생성(monsterIconHtml과 완전히 동일한 구조 재사용). image 필드가
+// 있으면 PNG를 출력하고, 없으면 기존과 동일하게 icon(이모지)을 그대로 반환함. className은 화면별 크기
+// 클래스를 넘겨받지만, item-icon-img 자체가 부모 요소의 font-size를 1em 기준으로 그대로 물려받으므로
+// 대부분의 화면(equip-slot/inv-icon/artifact-icon-box/quickslot-icon 등)은 클래스 없이도 기존 이모지가
+// 쓰던 font-size 기반 크기 규칙에 자동으로 맞춰짐. PNG 파일이 없거나 로드에 실패하면 itemImgError(onerror)가
+// img를 이모지 텍스트로 즉시 대체함 — 오류 없이 항상 무언가는 표시됨. itemDefLike는 { icon, image } 형태면
+// 되므로 ARTIFACTS/CONSUMABLES/MISC_ITEMS 항목뿐 아니라 필요한 필드만 담은 객체를 넘겨도 동일하게 동작함.
+function itemIconHtml(itemDefLike, className){
+  if(!itemDefLike || !itemDefLike.image) return itemDefLike ? itemDefLike.icon : '';
+  const cls = 'item-icon-img' + (className ? ' ' + className : '');
+  const path = ITEM_IMAGE_DIR + itemDefLike.image + ITEM_IMAGE_EXT;
+  return `<img src="${path}" class="${cls}" alt="" data-fallback-emoji="${itemDefLike.icon}" onerror="itemImgError(this)">`;
+}
+// itemIconHtml의 <img onerror>에서 호출됨: PNG 로드 실패 시 오류 없이 이모지 텍스트로 즉시 대체.
+function itemImgError(img){
+  img.replaceWith(document.createTextNode(img.dataset.fallbackEmoji || ''));
+}
 // 무기 아이콘을 표시하는 모든 화면(강화/인벤토리/상점/보상 등)에서 공통으로 쓰는 <img> HTML 생성 함수.
 // PNG가 없거나 로드에 실패하면 onerror로 WEAPON_IMAGE_FALLBACK(common_shortsword)로 자동 대체됨.
 // 화면마다 크기가 다르므로 className만 다르게 넘겨서 CSS로 크기만 조절하고, 출력 방식 자체는 항상 동일함.

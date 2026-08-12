@@ -497,7 +497,8 @@ function openKillResultModal(rewards){
   });
   Object.keys(rewards.miscDrops).forEach(itemId => {
     const drop = rewards.miscDrops[itemId];
-    rewardsHtml += `<div><span class="txt-shard">${drop.icon} ${drop.name}</span> +${drop.qty} 획득</div>`;
+    const item = MISC_ITEMS[itemId];
+    rewardsHtml += `<div><span class="txt-shard">${itemIconHtml({ icon: drop.icon, image: item && item.image })} ${drop.name}</span> +${drop.qty} 획득</div>`;
   });
   if(anyEquipInventoryFull()){
     rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;

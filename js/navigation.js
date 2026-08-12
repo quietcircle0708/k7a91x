@@ -168,7 +168,7 @@ function openQuickSlotPicker(idx){
   const list = el('quickSlotPickerList');
   list.innerHTML = Object.values(CONSUMABLES).map(item => `
     <button class="quickslot-pick-item" data-item="${item.id}">
-      <span style="font-size:20px;">${item.icon}</span>
+      <span style="font-size:20px;">${itemIconHtml(item)}</span>
       <span>${item.name} <span style="color:var(--forge-cream-dim);">×${(state.consumables && state.consumables[item.id]) || 0}</span></span>
     </button>
   `).join('');

@@ -25,7 +25,7 @@ function render(){
     const id = state.equippedArtifacts[i];
     if(!id) return `<div class="equip-slot"></div>`;
     const a = ARTIFACTS[id];
-    return `<div class="equip-slot filled">${a.icon}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
+    return `<div class="equip-slot filled">${itemIconHtml(a)}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
   }).join('');
 
   if(!equipped){
@@ -430,7 +430,7 @@ function renderArtifactList(){
       : equipBtnHtml;
     return `
       <div class="inv-card ${equipped?'equipped':''}">
-        <div class="inv-icon" style="border-color:${nameColor};">${a.icon}</div>
+        <div class="inv-icon" style="border-color:${nameColor};">${itemIconHtml(a)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${nameColor};">${a.name}</span> ${equipped?'<span class="inv-badge">장착 중</span>':''}
@@ -460,7 +460,7 @@ function renderMiscList(){
   }
   wrap.innerHTML = entries.map(({ item, count }) => `
     <div class="inv-card">
-      <div class="inv-icon" style="border-color: var(--forge-line);">${item.icon}</div>
+      <div class="inv-icon" style="border-color: var(--forge-line);">${itemIconHtml(item)}</div>
       <div class="inv-info">
         <div class="inv-name weapon-name-wrap">
           <span class="txt-shard">${item.name}</span> ×${count}
@@ -529,7 +529,7 @@ function renderConsumableList(){
 
   html += flasks.map(({ item, count }) => `
     <div class="inv-card">
-      <div class="inv-icon" style="border-color: var(--forge-line);">${item.icon}</div>
+      <div class="inv-icon" style="border-color: var(--forge-line);">${itemIconHtml(item)}</div>
       <div class="inv-info">
         <div class="inv-name">${item.name} ×${count}</div>
         <div class="inv-sub">${item.desc}</div>
@@ -599,7 +599,7 @@ function renderQuickSlots(){
     return `
       <div class="quickslot-wrap">
         <button class="quickslot-btn filled" data-action="use" data-item="${itemId}" ${(count <= 0 || onCooldown) ? 'disabled' : ''} title="${item.name}">
-          <span class="quickslot-icon" style="${onCooldown ? 'visibility:hidden;' : ''}">${item.icon}</span>
+          <span class="quickslot-icon" style="${onCooldown ? 'visibility:hidden;' : ''}">${itemIconHtml(item)}</span>
           <span class="quickslot-count" style="${onCooldown ? 'visibility:hidden;' : ''}">${count}</span>
           <span class="quickslot-cooldown" style="display:${onCooldown ? 'flex' : 'none'};">${cooldownLeft.toFixed(1)}</span>
         </button>
@@ -740,7 +740,7 @@ function equipArtifactSlotsHtml(){
     const id = state.equippedArtifacts[i];
     if(!id) return `<div class="eq-slot eq-slot-artifact"><span class="eq-slot-empty-label">아티팩트</span></div>`;
     const a = ARTIFACTS[id];
-    return `<div class="eq-slot eq-slot-artifact filled">${a.icon}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
+    return `<div class="eq-slot eq-slot-artifact filled">${itemIconHtml(a)}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
   }).join('');
 }
 // 장비창 아래 "장착 아이템 정보" — 현재 장착 중인 장비만 한 줄씩 출력(EQUIPMENT_SLOTS 기반이라
@@ -754,7 +754,7 @@ function equippedItemInfoLinesHtml(){
   });
   state.equippedArtifacts.forEach(id => {
     const a = ARTIFACTS[id];
-    lines.push(`<div class="char-equip-info-line" style="color:${artifactNameColor(id)};">${a.icon} ${a.name}</div>`);
+    lines.push(`<div class="char-equip-info-line" style="color:${artifactNameColor(id)};">${itemIconHtml(a)} ${a.name}</div>`);
   });
   return lines.length > 0 ? lines.join('') : `<div class="char-stat-empty">장착 중인 장비가 없습니다.</div>`;
 }
@@ -888,7 +888,7 @@ function buildArtifactEffectsHtml(){
   let html = `<div class="char-stat-sub-title">적용 중인 아티팩트 효과</div>`;
   html += state.equippedArtifacts.map(id => {
     const a = ARTIFACTS[id];
-    return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${a.icon} ${a.name}</b><br>${a.effectText}</div>`;
+    return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${itemIconHtml(a)} ${a.name}</b><br>${a.effectText}</div>`;
   }).join('');
   return html;
 }
@@ -1130,7 +1130,7 @@ function buildDungeonDropIcons(d){
       if(!drop.artifactId || seenArtifactIds.has(drop.artifactId)) return;
       seenArtifactIds.add(drop.artifactId);
       icons.push({
-        icon: ARTIFACTS[drop.artifactId].icon,
+        iconHtml: itemIconHtml(ARTIFACTS[drop.artifactId]),
         borderColor: artifactGradeColor(drop.artifactId),
         tooltip: buildArtifactTooltipHtml(drop.artifactId),
       });
@@ -1147,7 +1147,7 @@ function buildDungeonDropIcons(d){
       const item = miscItemByName(drop.name);
       if(!item || item.itemClass !== 'misc' || seenMiscIds.has(item.id)) return;
       seenMiscIds.add(item.id);
-      icons.push({ icon: item.icon, borderColor: 'var(--forge-line)', tooltip: buildMiscTooltipHtml(item.id) });
+      icons.push({ iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltip: buildMiscTooltipHtml(item.id) });
     });
   });
 
@@ -1527,7 +1527,7 @@ function buildConsumableShopCardHtml(id){
     <div class="scroll-card">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">${item.icon}</div>
+          <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">${itemIconHtml(item)}</div>
           <span class="scroll-name-wrap">
             <span class="scroll-name" style="color:var(--forge-cream);">${item.name}</span>
             <span class="tooltip">${item.desc}</span>
@@ -1551,7 +1551,7 @@ function buildArtifactShopCardHtml(id){
     <div class="scroll-card artifact">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box">${a.icon}</div>
+          <div class="artifact-icon-box">${itemIconHtml(a)}</div>
           <span class="scroll-name-wrap">
             <span class="scroll-name artifact" style="color:${artifactNameColor(id)};">${a.name}</span>
             <span class="tooltip">${buildArtifactTooltipHtml(id)}</span>
@@ -1573,7 +1573,7 @@ function buildMiscShopCardHtml(id){
     <div class="scroll-card">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${item.icon}</div>
+          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${itemIconHtml(item)}</div>
           <span class="weapon-name-wrap">
             <span class="scroll-name txt-shard">${item.name}</span>
             <span class="tooltip">${buildMiscTooltipHtml(id)}</span>

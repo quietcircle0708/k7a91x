@@ -248,11 +248,11 @@ function dropItemVisualInner(item){
   }
   if(item.kind === 'artifact'){
     const a = ARTIFACTS[item.id];
-    return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(a.grade)}">${a.icon}</span>`;
+    return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(a.grade)}">${itemIconHtml(a)}</span>`;
   }
   // item.kind === 'item' — 마석/재료 등 MISC_ITEMS
   const it = MISC_ITEMS[item.itemId];
-  return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(it.grade)}">${it.icon}</span>`;
+  return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(it.grade)}">${itemIconHtml(it)}</span>`;
 }
 // 실제로 이 이미지 하나를 등장→낙하→튕김→유지→소멸 애니메이션으로 재생함.
 // container는 monster-slot이 아니라 그보다 오래 살아있는 상위 컨테이너(monsterRow)를 받아서, 몬스터
