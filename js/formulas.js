@@ -364,14 +364,18 @@ function buildStoneTooltipHtml(id){
   html += `</div>`;
   return html;
 }
-// 기타(misc) 아이템 툴팁: 마석과 달리 등급이 없으므로 이름 색상은 기본색을 사용하고,
-// 표시 항목은 이름/아이템 분류/설명/판매 가격으로 구성함(레이아웃/서식은 buildWeaponTooltipHtml과 동일).
+// 기타(misc) 아이템 이름 색상: 마석과 동일하게 무기 등급 색상 공식(WEAPON_GRADES)을 그대로 재사용함.
+function miscGradeInfo(id){ return WEAPON_GRADES[MISC_ITEMS[id].grade]; }
+function miscNameColor(id){ const g = miscGradeInfo(id); return g ? g.color : '#ffffff'; }
+// 기타(misc) 아이템 툴팁: 이름 텍스트 색상에만 등급 공식(miscNameColor)을 적용하고, 나머지 표시 항목
+// (설명/아이템 분류/판매 가격)과 레이아웃/서식은 등급 추가 이전과 동일하게 유지함 — 마석 툴팁과 달리
+// 등급을 별도 줄로 표시하지 않음.
 function buildMiscTooltipHtml(id){
   const item = MISC_ITEMS[id];
   let html = `<div style="text-align:center;">`;
 
-  // 1. 이름
-  html += `<div style="color:var(--forge-cream); font-weight:700; margin-bottom:2px;">${item.name}</div>`;
+  // 1. 이름 — 등급 색상 효과 적용
+  html += `<div style="color:${miscNameColor(id)}; font-weight:700; margin-bottom:2px;">${item.name}</div>`;
 
   // 2. 설명
   if(item.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${item.desc}</div>`;

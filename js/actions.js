@@ -616,6 +616,12 @@ function resolveSkillEffect(id){
   const targets = s.target === 'aoe'
     ? hunt.monsters.slice()
     : [hunt.monsters.find(m => m.instanceId === hunt.targetId) || hunt.monsters[0]];
+  // hitDelayMs가 지정된 스킬(예: 이연격)은 타수 사이에 지연을 두는 별도 경로로 처리하고 여기서 끝냄 —
+  // 지정되지 않은 스킬은 아래 기존 동기 루프를 그대로 타므로 다른 스킬은 전혀 영향받지 않음.
+  if(s.hitDelayMs){
+    targets.forEach(t => { if(t) applyDelayedSkillHits(t, s, perHit); });
+    return;
+  }
   targets.forEach(t => {
     if(!t) return;
     for(let i = 0; i < hits; i++){
@@ -631,6 +637,33 @@ function resolveSkillEffect(id){
     if(t.hp <= 0) killMonsterInstance(t.instanceId);
     else updateMonsterSlot(t);
   });
+}
+// hitDelayMs가 지정된 다타수 공격 스킬 전용 처리(예: 이연격 — 1타 즉시 + 2타는 hitDelayMs초 뒤).
+// 데미지 계산·상태이상 부여·처치 판정 공식은 위 동기 루프(resolveSkillEffect)와 완전히 동일하게 유지함.
+// 1타는 즉시 적용하고, 이후 타수는 hitDelayMs*순번(ms) 뒤에 setTimeout으로 순차 적용함. 지연된 타수는
+// 실행 시점에 전투가 여전히 진행 중이고 대상이 아직 hunt.monsters에 남아있는지(=생존) 다시 확인한 뒤 적용함 —
+// 그 사이 전투 종료/대상 처치/화면 이동 가능성이 있으므로 target 객체를 그대로 붙들지 않고 instanceId로 매번 재조회함.
+function applyDelayedSkillHits(target, s, perHit){
+  const instanceId = target.instanceId;
+  const hits = s.hits || 1;
+  const applyOneHit = () => {
+    const t = hunt.monsters.find(m => m.instanceId === instanceId);
+    if(!t || t.hp <= 0) return;
+    const levelDiff = state.playerLevel - t.level;
+    const dmg = Math.max(1, Math.round(perHit * playerDamageMultiplier(levelDiff)));
+    t.hp -= dmg;
+    monsterHitEffect(t.instanceId, dmg, false);
+    if(t.hp > 0 && s.onHitStatus) applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
+    if(t.hp <= 0) killMonsterInstance(t.instanceId);
+    else updateMonsterSlot(t);
+  };
+  applyOneHit();
+  for(let i = 1; i < hits; i++){
+    setTimeout(() => {
+      if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return;
+      applyOneHit();
+    }, Math.round(s.hitDelayMs * i * 1000));
+  }
 }
 
 // ---- 소비 아이템 사용 ----

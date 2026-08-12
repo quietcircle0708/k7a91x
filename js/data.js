@@ -1036,6 +1036,9 @@ const CONSUMABLES = {
 const ITEM_CLASS_LABELS = { stone: '마석', misc: '기타' };
 // icon: 이모지 / image: 선택 필드. PNG 이미지 파일명(assets/MiscItems/<image>.png, 확장자/경로 제외)을
 // 등록하면 icon 대신 PNG가 출력됨(itemIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 출력됨.
+// grade: itemClass가 'misc'인 항목에 한해 등급(WEAPON_GRADES와 동일한 키 체계 재사용, 이름 색상 공식도
+// stoneNameColor와 동일한 방식으로 재사용됨 — miscNameColor, formulas.js). stone류는 기존처럼 grade가
+// 곧 마석 종류 자체를 나타내므로 이 필드의 의미가 다름(둘 다 itemClass로 이미 명확히 구분되어 섞이지 않음).
 const MISC_ITEMS = {
   manaFragment: {
     id: 'manaFragment', name: '마석 파편', icon: '💠', itemClass: 'stone', grade: 'normal',
@@ -1058,54 +1061,64 @@ const MISC_ITEMS = {
     sellPrice: 1000, stateKey: 'manaStones',
   },
   acorn: {
-    id: 'acorn', name: '도토리', icon: '🌰', itemClass: 'misc',
+    id: 'acorn', name: '도토리', icon: '🌰', itemClass: 'misc', grade: 'normal',
     desc: '다람쥐의 먹이',
     sellPrice: 5, stateKey: 'acorns',
   },
   ratMeat: {
-    id: 'ratMeat', name: '쥐고기', icon: '🍖', itemClass: 'misc',
+    id: 'ratMeat', name: '쥐고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
     desc: '쥐의 고기',
     sellPrice: 10, stateKey: 'ratMeats',
   },
   batMeat: {
-    id: 'batMeat', name: '박쥐고기', icon: '🍖', itemClass: 'misc',
+    id: 'batMeat', name: '박쥐고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
     desc: '박쥐의 고기',
     sellPrice: 100, stateKey: 'batMeats',
   },
   snakeMeat: {
-    id: 'snakeMeat', name: '뱀고기', icon: '🍖', itemClass: 'misc',
+    id: 'snakeMeat', name: '뱀고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
     desc: '뱀의 고기',
     sellPrice: 15, stateKey: 'snakeMeats',
   },
   deerMeat: {
-    id: 'deerMeat', name: '사슴고기', icon: '🍖', itemClass: 'misc',
+    id: 'deerMeat', name: '사슴고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
     desc: '사슴의 고기',
     sellPrice: 20, stateKey: 'deerMeats',
   },
   deerAntler: {
-    id: 'deerAntler', name: '녹용', icon: '🦴', itemClass: 'misc',
+    id: 'deerAntler', name: '녹용', icon: '🦴', itemClass: 'misc', grade: 'rare',
     desc: '약재로 사용되는 귀한 재료',
     sellPrice: 200, stateKey: 'deerAntlers',
   },
   bearHide: {
-    id: 'bearHide', name: '곰 가죽', icon: '🍖', itemClass: 'misc',
+    id: 'bearHide', name: '곰 가죽', icon: '🍖', itemClass: 'misc', grade: 'normal',
     desc: '곰의 가죽',
     sellPrice: 50, stateKey: 'bearHides',
   },
   bearBile: {
-    id: 'bearBile', name: '웅담', icon: '🍖', itemClass: 'misc',
+    id: 'bearBile', name: '웅담', icon: '🍖', itemClass: 'misc', grade: 'rare',
     desc: '곰의 강인한 생명력이 깃든 귀한 약재',
     sellPrice: 400, stateKey: 'bearBiles',
   },
   mountainBoarMeat: {
-    id: 'mountainBoarMeat', name: '산돼지고기', icon: '🍖', itemClass: 'misc',
+    id: 'mountainBoarMeat', name: '산돼지고기', icon: '🍖', itemClass: 'misc', grade: 'rare',
     desc: '비싼 값에 팔리는 산돼지의 고기',
     sellPrice: 200, stateKey: 'mountainBoarMeats',
   },
   forestBoarMeat: {
-    id: 'forestBoarMeat', name: '숲돼지고기', icon: '🍖', itemClass: 'misc',
+    id: 'forestBoarMeat', name: '숲돼지고기', icon: '🍖', itemClass: 'misc', grade: 'rare',
     desc: '구하기 어려운 숲돼지의 고기',
     sellPrice: 250, stateKey: 'forestBoarMeats',
+  },
+  rareScrapmetal: {
+    id: 'rareScrapmetal', name: '쇠조각', icon: '⚙️', image: 'rare_scrapmetal', itemClass: 'misc', grade: 'rare',
+    desc: '희귀한 장비 제작에 사용된다',
+    sellPrice: 400, stateKey: 'rareScrapmetals',
+  },
+  epicShinystone: {
+    id: 'epicShinystone', name: '반짝이는 돌', icon: '💎', image: 'epic_ShinyStone', itemClass: 'misc', grade: 'epic',
+    desc: '하늘에서 떨어진 돌의 일부<br>특별한 장비 제작에 사용된다',
+    sellPrice: 1000, stateKey: 'epicShinystones',
   },
 };
 
@@ -1207,6 +1220,10 @@ const CHAR_MENU_INFO_PAGE_COUNT = 3;
 //   buffEffect: { atkFlat: N, atkSpeedPercent: N, durationMs: N } — 버프 스킬 사용 시 그 시간 동안 적용되는
 //     보너스(activeSkillBuffs에 등록되고 activeBuffBonus가 합산함. hpFlat과 동일하게 키 기반이라 확장 가능 —
 //     atkFlat은 effectiveAtk, atkSpeedPercent는 effectiveAtkSpeed 쪽에서 각각 더해줌).
+//   hitDelayMs: 선택 필드(초 단위, castTime과 동일한 단위). hits가 2 이상인 공격 스킬에서 타수 사이에 지연을
+//     두고 싶을 때만 지정(예: 이연격 — 1타 즉시 + 2타는 0.1초 뒤). 지정하면 resolveSkillEffect가
+//     applyDelayedSkillHits(actions.js)로 처리를 넘기고, 지정하지 않으면 기존처럼 모든 타수가 동기적으로
+//     즉시 적용됨(회귀 없음) — 새로 추가되는 다타수 스킬도 이 필드 유무로 동일하게 선택 가능.
 // }
 const SKILLS = {
   adventurer_will: {
@@ -1215,10 +1232,10 @@ const SKILLS = {
     passiveEffect: { hpFlat: 100 },
   },
   slash: {
-    name: '슬래시', desc: '무기를 휘둘러 120%의 데미지로 적을 공격한다.',
+    name: '내려베기', desc: '무기를 휘둘러 130%의 데미지로 적을 공격한다.',
     grade: 'normal', category: 'common', target: 'single', levelReq: 5,
     cooldown: 6, resourceType: 'mp', resourceAmount: 30, castTime: 0,
-    damagePercent: 120, hits: 1,
+    damagePercent: 130, hits: 1,
   },
   rage: {
     name: '분노', desc: '[버프] 5초 동안 자신의 공격력을 30 증가시킨다.',
@@ -1226,11 +1243,12 @@ const SKILLS = {
     cooldown: 10, resourceType: 'mp', resourceAmount: 50, castTime: 0.1,
     buffEffect: { atkFlat: 30, durationMs: 5000 },
   },
-  fluent_attack: {
-    name: '플루언트 어택', desc: '빠르게 무기를 휘둘러 70%의 데미지로 적을 2번 공격한다.',
+  double_strike: {
+    name: '이연격', desc: '빠르게 무기를 휘둘러 75%의 데미지로 적을 2번 공격한다.',
     grade: 'normal', category: 'common', target: 'single', levelReq: 10,
     cooldown: 5.5, resourceType: 'mp', resourceAmount: 50, castTime: 0,
-    damagePercent: 70, hits: 2, icon: 'lv10atk',
+    damagePercent: 75, hits: 2, icon: 'lv10atk',
+    hitDelayMs: 0.1, // 1타는 즉시, 2타는 이 시간(초) 뒤에 순차 적용(resolveSkillEffect의 hitDelayMs 분기 참고)
   },
   preemptive_strike: {
     name: '선공', desc: '[버프] 8초 동안 자신의 공격 속도를 20% 증가시킨다.',
@@ -1243,17 +1261,17 @@ const SKILLS = {
     grade: 'normal', category: 'common', target: 'passive', levelReq: 10,
     passiveEffect: { hpFlat: 500 }, icon: 'lv10passive',
   },
-  sword_nova: {
-    name: '소드 노바', desc: '115%의 데미지로 모든 적을 공격한다.',
+  cleave: {
+    name: '참격 1성', desc: '140%의 데미지로 모든 적을 공격한다.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 15,
     cooldown: 8, resourceType: 'mp', resourceAmount: 110, castTime: 0.1,
-    damagePercent: 115, hits: 1,
+    damagePercent: 140, hits: 1,
   },
   sword_strike: {
-    name: '소드 스트라이크', desc: '110% 데미지로 적을 공격하고, 피해를 입은 적을 2초 동안 기절시킨다.',
+    name: '지면 강타', desc: '120% 데미지로 적을 공격하고, 피해를 입은 적을 2초 동안 기절시킨다.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 20,
     cooldown: 10, resourceType: 'mp', resourceAmount: 120, castTime: 0.2,
-    damagePercent: 110, hits: 1, icon: 'lv20atk',
+    damagePercent: 120, hits: 1, icon: 'lv20atk',
     onHitStatus: { key: 'stun', durationMs: 2000 }, // 적중(=피해를 입혀 대상이 생존)한 경우에만 부여, 처치시엔 부여 안 함
   },
   beast_heart: {
