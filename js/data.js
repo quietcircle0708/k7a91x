@@ -727,12 +727,12 @@ const GRADE_ENHANCE_ODDS_NORMAL_RARE = [
   [50, 45, 5, 0], [40, 30, 29, 1], [25, 30, 40, 5], [20, 20, 50, 10],
 ];
 const GRADE_ENHANCE_ODDS_EPIC = [
-  [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [60, 40, 0, 0], [50, 40, 10, 0],
-  [40, 45, 15, 0], [30, 30, 29, 2], [20, 30, 40, 10], [15, 25, 40, 20],
+  [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [60, 20, 20, 0], [50, 20, 30, 0],
+  [40, 20, 40, 0], [30, 20, 48, 2], [20, 10, 60, 10], [15, 10, 60, 15],
 ];
 const GRADE_ENHANCE_ODDS_UNIQUE = [
-  [80, 20, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0], [55, 45, 0, 0], [45, 30, 25, 0],
-  [35, 30, 35, 0], [25, 40, 31, 4], [15, 30, 45, 10], [5, 25, 50, 20],
+  [80, 20, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0], [55, 20, 25, 0], [45, 20, 35, 0],
+  [35, 20, 45, 0], [25, 20, 55, 4], [15, 10, 65, 10], [5, 5, 70, 20],
 ];
 const GRADE_ENHANCE_ODDS = {
   normal: GRADE_ENHANCE_ODDS_NORMAL_RARE,
@@ -807,7 +807,7 @@ Object.values(WEAPON_TYPES).forEach(w => {
 // ============================================================
 
 // 강화 단계별 판매 배율. index = 강화 단계(1~9). 무기 종류/등급과 무관하게 고정값.
-const ENHANCE_SELL_STEP_MULT = [null, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.20, 1.20];
+const ENHANCE_SELL_STEP_MULT = [null, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.08, 1.10];
 
 // 선형연립방정식 Ax=b를 가우스 소거법(부분 피벗팅)으로 푸는 범용 함수.
 // 평균 기대비용 계산 전용으로 쓰지만, 그 자체로는 강화 시스템과 무관한 독립적인 수학 유틸리티.
@@ -1445,7 +1445,7 @@ const MONSTERS = {
     ],
   },
   red_bear: {
-    id: 'red_bear', name: '적웅', icon: '🐻', grade: 'normal', level: 16, image: 'bear',
+    id: 'red_bear', name: '적웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
     hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '곰 가죽', chance: 25 },
@@ -1454,7 +1454,7 @@ const MONSTERS = {
     ],
   },
   fierce_bear: {
-    id: 'fierce_bear', name: '사웅', icon: '🐻', grade: 'normal', level: 16, image: 'bear',
+    id: 'fierce_bear', name: '사웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
     hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [
       { name: '곰 가죽', chance: 30 },
@@ -1474,12 +1474,12 @@ const MONSTERS = {
     ],
   },
   forest_boar: {
-    id: 'forest_boar', name: '숲돼지', icon: '🐗', grade: 'normal', level: 21, image: 'boar',
+    id: 'forest_boar', name: '숲돼지', icon: '🐗', grade: 'normal', level: 20, image: 'boar',
     hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '숲돼지고기', chance: 15 } ],
   },
   mountain_boar: {
-    id: 'mountain_boar', name: '산돼지', icon: '🐗', grade: 'normal', level: 21, image: 'boar',
+    id: 'mountain_boar', name: '산돼지', icon: '🐗', grade: 'normal', level: 20, image: 'boar',
     hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [ { name: '산돼지고기', chance: 20 } ],
   },
