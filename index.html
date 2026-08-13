@@ -405,6 +405,52 @@
     </div>
   </div>
 
+  <div id="traceRestoreModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">아이템 복구</div>
+      <div class="buy-qty-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box weapon-name-wrap" id="traceRestoreIconBox"></span>
+      </div>
+      <div class="modal-body" id="traceRestoreName" style="margin-top:6px;"></div>
+      <div class="buy-qty-gold-row" style="margin-top:14px;">
+        <span>🪙 현재 보유 골드</span>
+        <span id="traceRestoreCurrentGold"></span>
+      </div>
+      <div class="buy-qty-divider"></div>
+      <div class="buy-qty-gold-row total">
+        <span>🪙 복구 비용</span>
+        <span id="traceRestoreCost"></span>
+      </div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="traceRestoreCancelBtn">취소</button>
+        <button class="btn btn-main" id="traceRestoreConfirmBtn" style="width:auto; padding:10px 18px;">복구</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="traceRestoreResultModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">복구 결과</div>
+      <div class="buy-qty-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box weapon-name-wrap" id="traceRestoreResultIconBox"></span>
+      </div>
+      <div class="modal-body" id="traceRestoreResultText" style="margin-top:6px;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-main" id="traceRestoreResultOkBtn" style="width:auto; padding:10px 24px;">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="traceSlotFullModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">알림</div>
+      <div class="modal-body">남은 인벤토리 슬롯을 확인해 주세요</div>
+      <div class="modal-actions">
+        <button class="btn btn-main" id="traceSlotFullOkBtn" style="width:auto; padding:10px 24px;">확인</button>
+      </div>
+    </div>
+  </div>
+
   <div id="charStatsModal" class="modal-overlay" style="display:none;">
     <div class="modal-box char-stats-modal">
       <div class="char-stats-title-row">

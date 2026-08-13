@@ -22,6 +22,9 @@ let state = {
   equippedArmor: { helmet: null, armor: null }, // 착용 중인 방어구(종류당 1개) — 강화 대상(forgeTargetId)과는 별개 개념
   accessoryInventory: [],                       // 보유 장신구 목록({id,type,level})
   equippedAccessories: [null, null],            // 착용 중인 장신구(장신구1/장신구2 슬롯, 최대 ACCESSORY_SLOT_MAX개) — 같은 아이템 2개 착용 가능
+  traceInventory: [],                           // 보유 흔적 목록({id,forType} — forType은 복구할 장비의 WEAPON_TYPES/
+                                                  // ARMOR_TYPES/ACCESSORY_TYPES 키. 강화 파괴 시 processDestroyReward가
+                                                  // 지급하고, useTraceItem→confirmTraceRestore로 소모해 +0 장비로 복구함)
   charmCount: 0, charmPrice: 1500, charmActive: false,
   blessingCount: 0, blessingPrice: 15000, blessingActive: false,
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
@@ -291,6 +294,8 @@ function applyLoadedRaw(raw){
   if(!Array.isArray(state.accessoryInventory)) state.accessoryInventory = [];
   if(!Array.isArray(state.equippedAccessories)) state.equippedAccessories = [null, null];
   while(state.equippedAccessories.length < ACCESSORY_SLOT_MAX) state.equippedAccessories.push(null);
+  // 강화 파괴/흔적 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
+  if(!Array.isArray(state.traceInventory)) state.traceInventory = [];
   // 대장간 강화 대상(forgeTargetId) 추가 이전 세이브 마이그레이션: 예전엔 equippedId 하나가 "착용
   // 무기"와 "대장간 표시 대상"을 겸했으므로, 없으면 기존 equippedId 값을 그대로 이어받음.
   if(state.forgeTargetId === undefined) state.forgeTargetId = state.equippedId != null ? state.equippedId : null;
@@ -383,6 +388,7 @@ function resetGame(){
     gold: 1000, inventory: [], equippedId: null, forgeTargetId: null, nextItemId: 1,
     armorInventory: [], equippedArmor: { helmet: null, armor: null },
     accessoryInventory: [], equippedAccessories: [null, null],
+    traceInventory: [],
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,

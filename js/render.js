@@ -511,7 +511,12 @@ function renderConsumableList(){
     .map(item => ({ item, count: (state.consumables && state.consumables[item.id]) || 0 }))
     .filter(({ count }) => count > 0);
 
-  if(scrolls.length === 0 && flasks.length === 0){
+  // 흔적(강화 파괴 보상) — CONSUMABLES처럼 정적 데이터표가 아니라 state.traceInventory에 개별 인스턴스로
+  // 저장됨(같은 장비의 흔적이라도 서로 다른 id를 가진 별개 아이템). 아이콘은 복구 대상 장비의 실제 아이콘을
+  // weaponIconHtml로 그대로 재사용함(별도 흔적 전용 이미지 없이도 어떤 장비의 흔적인지 한눈에 구분됨).
+  const traces = state.traceInventory || [];
+
+  if(scrolls.length === 0 && flasks.length === 0 && traces.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 소비 아이템이 없습니다.<br>대장간 강화 화면이나 상점에서 구매할 수 있어요.</div>`;
     return;
   }
@@ -538,6 +543,21 @@ function renderConsumableList(){
         <button class="inv-btn" data-action="use-flask" data-id="${item.id}">사용하기</button>
       </div>
     </div>`).join('');
+
+  html += traces.map(t => {
+    const name = `${weaponName(t.forType)}의 흔적`;
+    return `
+    <div class="inv-card">
+      <div class="inv-icon" style="border-color: var(--forge-line);">${weaponIconHtml(t.forType, 'inv-icon-img')}</div>
+      <div class="inv-info">
+        <div class="inv-name">${name}</div>
+        <div class="inv-sub">단련의 힘을 견디지 못한 ${weaponName(t.forType)}의 흔적</div>
+      </div>
+      <div class="inv-actions">
+        <button class="inv-btn" data-action="use-trace" data-id="${t.id}">사용하기</button>
+      </div>
+    </div>`;
+  }).join('');
 
   wrap.innerHTML = html;
 }

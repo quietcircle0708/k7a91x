@@ -1122,6 +1122,42 @@ const MISC_ITEMS = {
   },
 };
 
+// ---- 강화 파괴 및 흔적 시스템 ----
+// 강화 중 파괴 판정이 나면(기존 확률/로직은 그대로) 더 이상 +0으로 초기화하지 않고, 장비를 인벤토리에서
+// 완전히 소멸시킨 뒤 아래 데이터로 파괴 보상을 판정함(무기/방어구/장신구 공통, 아티팩트는 강화 대상이
+// 아니므로 제외). 실제 처리는 actions.js의 resolveEnhance 파괴 분기(processDestroyReward)가 담당함.
+
+// 흔적 복구 비용 배율. 복구 비용 = 파괴된 장비의 기본 판매 가격(sellPrice, 강화 단계 무관) × 이 값.
+const TRACE_RECOVERY_COST_MULT = 3;
+
+// 등급별 파괴 보상 종류/확률(%). pickWeighted(formulas.js)가 그대로 쓸 수 있는 [값, 가중치] 쌍 배열이며,
+// 각 등급의 가중치 합이 정확히 100이 되도록 구성함. 일반 등급은 이 테이블에 아예 없음 — processDestroyReward가
+// 등급이 'normal'이면 이 테이블을 조회하지 않고 보상 판정 자체를 생략함(요구사항: 일반은 파괴 보상 없음).
+const DESTROY_REWARD_ODDS = {
+  rare:   [ ['trace', 50], ['scrapmetal', 50] ],
+  epic:   [ ['trace', 50], ['scrapmetal', 30], ['shinystone', 20] ],
+  unique: [ ['trace', 50], ['shinystone', 50] ],
+};
+
+// 쇠조각/반짝이는 돌 지급 개수 = 아래 "아이템 레벨" 구간表 개수 + "강화 단계" 구간表 개수(합산).
+// min/max는 각 표가 조회하는 값의 구간(아이템 레벨표는 levelReq, 강화 단계표는 파괴 당시 강화 단계 0~8)이며,
+// tierQty(formulas.js)가 위에서부터 순서대로 검사해 값이 속하는 첫 구간의 qty를 반환함.
+const DESTROY_SCRAPMETAL_LEVEL_QTY = [
+  { min: 1, max: 9, qty: 0 }, { min: 10, max: 19, qty: 1 }, { min: 20, max: 29, qty: 2 },
+  { min: 30, max: 39, qty: 3 }, { min: 40, max: 49, qty: 4 }, { min: 50, max: 59, qty: 5 },
+  { min: 60, max: 69, qty: 6 }, { min: 70, max: 79, qty: 7 }, { min: 80, max: 89, qty: 8 },
+  { min: 90, max: 99, qty: 9 },
+];
+const DESTROY_SCRAPMETAL_ENHANCE_QTY = [
+  { min: 0, max: 0, qty: 0 }, { min: 1, max: 4, qty: 1 }, { min: 5, max: 6, qty: 2 }, { min: 7, max: 8, qty: 3 },
+];
+const DESTROY_SHINYSTONE_LEVEL_QTY = [
+  { min: 1, max: 9, qty: 0 }, { min: 10, max: 49, qty: 1 }, { min: 50, max: 89, qty: 2 }, { min: 90, max: 99, qty: 3 },
+];
+const DESTROY_SHINYSTONE_ENHANCE_QTY = [
+  { min: 0, max: 6, qty: 0 }, { min: 7, max: 7, qty: 1 }, { min: 8, max: 8, qty: 2 },
+];
+
 // ---- 상점/인벤토리 "장비" 탭 공용 하위 분류 ----
 // 무기/방어구/장신구/아티팩트 4종. 인벤토리·상점 양쪽의 "장비" 최상위 탭이 이 배열을 그대로 공유해서
 // 하위탭을 만듦 — 새 장비 소분류가 필요해지면 여기에 항목만 추가하면 양쪽 화면에 자동으로 반영됨.

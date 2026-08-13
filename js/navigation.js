@@ -383,6 +383,75 @@ function cancelSkillLearn(){
   closeSkillLearnConfirm();
 }
 
+// ---- 흔적 사용(장비 복구) 확인 모달 ----
+// 상점 "개수 지정 구매" 팝업/스킬 습득 확인 모달과 동일한 레이아웃(아이콘 박스 + 골드 두 줄 + 구분선 +
+// 취소/확인 버튼)을 그대로 재사용함. 흔적은 개수 개념이 없는 1회성 소비 아이템이라 수량 스텝퍼는 없음.
+// "소비 아이템" 탭의 흔적 카드에서 "사용하기"를 누르면 이 흐름이 시작됨(main.js → useTraceItem).
+let pendingTraceRestoreId = null;
+function useTraceItem(id){
+  const trace = (state.traceInventory || []).find(t => t.id === id);
+  if(!trace) return;
+  // 인벤토리 슬롯이 없으면 복구 확인 팝업 자체를 열지 않고 안내 팝업만 띄움(흔적을 소모하지 않음 — 요구사항 10).
+  if(equipInventoryFull()){
+    el('traceSlotFullModal').style.display = 'flex';
+    return;
+  }
+  pendingTraceRestoreId = id;
+  renderTraceRestoreModal();
+  el('traceRestoreModal').style.display = 'flex';
+}
+function closeTraceRestoreConfirm(){
+  el('traceRestoreModal').style.display = 'none';
+  pendingTraceRestoreId = null;
+}
+function renderTraceRestoreModal(){
+  const trace = (state.traceInventory || []).find(t => t.id === pendingTraceRestoreId);
+  if(!trace) return;
+  const cost = traceRecoveryCost(trace.forType);
+  el('traceRestoreIconBox').innerHTML = weaponIconHtml(trace.forType, 'shop-icon-img');
+  el('traceRestoreName').textContent = `${weaponName(trace.forType)}의 흔적`;
+  el('traceRestoreCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
+  el('traceRestoreCost').textContent = '🪙 ' + cost.toLocaleString();
+  el('traceRestoreConfirmBtn').disabled = state.gold < cost;
+}
+function confirmTraceRestore(){
+  const trace = (state.traceInventory || []).find(t => t.id === pendingTraceRestoreId);
+  closeTraceRestoreConfirm();
+  if(!trace) return;
+  // 팝업이 열려있는 사이 골드/슬롯 상황이 바뀌었을 가능성에 대비한 방어적 재확인(정상 흐름에서는
+  // 확인 버튼이 이미 골드 부족을 막아주고, 슬롯 부족은 애초에 팝업이 열리지 않으므로 도달하지 않음).
+  if(equipInventoryFull()){ el('traceSlotFullModal').style.display = 'flex'; return; }
+  const cost = traceRecoveryCost(trace.forType);
+  if(state.gold < cost) return;
+
+  state.gold -= cost;
+  const idx = state.traceInventory.findIndex(t => t.id === trace.id);
+  if(idx !== -1) state.traceInventory.splice(idx, 1);
+
+  // 복구되는 장비는 파괴 당시 강화 단계가 아닌 +0으로 지급됨(요구사항 8) — 능력치/등급/아이템 레벨 등은
+  // 원래 장비 데이터(forType의 WEAPON_TYPES/ARMOR_TYPES/ACCESSORY_TYPES 항목)를 그대로 사용함.
+  const w = wpn(trace.forType);
+  const newItem = { id: state.nextItemId++, level: 0, type: trace.forType };
+  if(w.equipType === 'armor') state.armorInventory.push(newItem);
+  else if(w.equipType === 'accessory') state.accessoryInventory.push(newItem);
+  else state.inventory.push(newItem);
+
+  openTraceRestoreResult(trace.forType, w.name);
+  render();
+  saveState();
+}
+function closeTraceSlotFullModal(){
+  el('traceSlotFullModal').style.display = 'none';
+}
+function openTraceRestoreResult(type, itemName){
+  el('traceRestoreResultIconBox').innerHTML = weaponIconHtml(type, 'shop-icon-img');
+  el('traceRestoreResultText').innerHTML = `'${itemName}' 이/가<br>인벤토리로 지급되었습니다.`;
+  el('traceRestoreResultModal').style.display = 'flex';
+}
+function closeTraceRestoreResult(){
+  el('traceRestoreResultModal').style.display = 'none';
+}
+
 // ---- 스킬 초기화 확인 모달 ----
 // 습득에 사용한 스킬 포인트 총합을 계산해 확인창에 보여주고, 확인 시 각 분류가 쓰던 풀(공용·특화는
 // skillPoints, 기연은 awakeningPoints — 기존 포인트 구조를 그대로 유지하고 새 습득 조건은 만들지 않음)에

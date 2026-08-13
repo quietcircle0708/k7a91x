@@ -201,6 +201,10 @@ el('buyQtyDownBtn').addEventListener('click', ()=> adjustBuyQty('down'));
 el('buyQtyInput').addEventListener('input', (e)=> setBuyQty(e.target.value));
 el('skillLearnCancelBtn').addEventListener('click', cancelSkillLearn);
 el('skillLearnConfirmBtn').addEventListener('click', confirmSkillLearn);
+el('traceRestoreCancelBtn').addEventListener('click', closeTraceRestoreConfirm);
+el('traceRestoreConfirmBtn').addEventListener('click', confirmTraceRestore);
+el('traceRestoreResultOkBtn').addEventListener('click', closeTraceRestoreResult);
+el('traceSlotFullOkBtn').addEventListener('click', closeTraceSlotFullModal);
 el('skillResetCancelBtn').addEventListener('click', cancelSkillReset);
 el('skillResetConfirmBtn').addEventListener('click', confirmSkillReset);
 el('krStopBtn').addEventListener('click', returnToVillage);
@@ -267,9 +271,10 @@ el('artifactList').addEventListener('click', (e)=>{
   else if(btn.dataset.action === 'unequip-artifact') unequipArtifact(id);
 });
 el('consumableList').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action="use-flask"]');
+  const btn = e.target.closest('button[data-action]');
   if(!btn) return;
-  useFlask(btn.dataset.id);
+  if(btn.dataset.action === 'use-flask') useFlask(btn.dataset.id);
+  else if(btn.dataset.action === 'use-trace') useTraceItem(Number(btn.dataset.id));
 });
 el('quickSlotRow').addEventListener('click', (e)=>{
   const useBtn = e.target.closest('button[data-action="use"]');

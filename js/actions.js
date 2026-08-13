@@ -134,13 +134,13 @@ function resolveEnhance(itemId, level){
       showMsg('실패! 레벨이 하락했습니다 (+' + item.level + ')', 'down');
     }
   } else if(outcome === 'destroy'){
-    item.level = 0;
     state.totalDestroys++;
     stage.classList.add('shake-hard');
     burstSparks('#c13c3c', 14);
     shatterBurst(18);
     flashCard('rgba(193,60,60,0.55)');
-    showMsg('💥 아이템이 파괴되었습니다...', 'destroy');
+    const rewardMsg = processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem);
+    showMsg('💥 아이템이 파괴되었습니다...' + (rewardMsg ? ' ' + rewardMsg : ''), 'destroy');
   }
 
   clampPlayerVitals(); // 방어구 강화로 체력/마나 보너스가 바뀌었을 수 있으므로 현재값을 새 최대치에 맞춰 정리
@@ -152,6 +152,55 @@ function resolveEnhance(itemId, level){
     ld.classList.add('pop');
     setTimeout(()=>ld.classList.remove('pop'), 500);
   }
+}
+
+// 강화 파괴 처리: 파괴된 장비를 (+0으로 되돌리는 대신) 인벤토리에서 완전히 소멸시킨 뒤, 장비 등급에
+// 따라 파괴 보상(흔적/쇠조각/반짝이는 돌)을 판정해 지급함. level 파라미터는 파괴 판정이 발생한 강화
+// 시도의 "이전" 강화 단계(예: +7 강화 시도 중 파괴 = level 7)이며, 쇠조각/반짝이는 돌 개수 계산에서
+// "강화 단계에 따른 개수" 구간표 조회값으로 그대로 재사용됨(요구사항 4/5의 예시와 동일한 값). 강화
+// 성공/실패/하락 확률과 강화 비용 등 기존 강화 로직은 이 함수와 무관하게 전혀 건드리지 않음 — 파괴
+// 판정이 발생한 "이후"의 처리(소멸+보상)만 담당함. 반환값은 showMsg에 이어붙일 보상 안내 문구(보상이
+// 없으면 null — 일반 등급이거나, 등급별 확률 판정에서 재료 보상이 뽑혔는데 개수 구간표가 0인 경우도
+// 정상적으로 0개 획득 문구를 반환함, 별도로 숨기지 않음).
+function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem){
+  const w = wpn(type);
+  const displayName = w.name;
+
+  // 1. 파괴된 장비를 소속 인벤토리에서 완전히 제거 + 착용/대장간 강화대상 참조 정리
+  //    (sellItem/sellArmorItem/sellAccessoryItem의 정리 패턴과 동일)
+  if(isArmorItem){
+    const idx = (state.armorInventory || []).findIndex(i => i.id === itemId);
+    if(idx !== -1) state.armorInventory.splice(idx, 1);
+    if(w.armorKind && state.equippedArmor && state.equippedArmor[w.armorKind] === itemId) state.equippedArmor[w.armorKind] = null;
+  } else if(isAccessoryItem){
+    const idx = (state.accessoryInventory || []).findIndex(i => i.id === itemId);
+    if(idx !== -1) state.accessoryInventory.splice(idx, 1);
+    if(Array.isArray(state.equippedAccessories)){
+      const slotIdx = state.equippedAccessories.indexOf(itemId);
+      if(slotIdx !== -1) state.equippedAccessories[slotIdx] = null;
+    }
+  } else {
+    const idx = state.inventory.findIndex(i => i.id === itemId);
+    if(idx !== -1) state.inventory.splice(idx, 1);
+    if(state.equippedId === itemId) state.equippedId = null;
+  }
+  if(state.forgeTargetId === itemId) state.forgeTargetId = null;
+
+  // 2. 등급별 파괴 보상 판정. 일반 등급은 DESTROY_REWARD_ODDS에 항목 자체가 없어 여기서 판정 없이 종료.
+  const odds = DESTROY_REWARD_ODDS[w.grade];
+  if(!odds) return null;
+  const rewardKind = pickWeighted(odds);
+
+  if(rewardKind === 'trace'){
+    state.traceInventory.push({ id: state.nextItemId++, forType: type });
+    return `'${displayName}의 흔적'을 획득했습니다.`;
+  }
+  const isScrap = rewardKind === 'scrapmetal';
+  const qty = tierQty(isScrap ? DESTROY_SCRAPMETAL_LEVEL_QTY : DESTROY_SHINYSTONE_LEVEL_QTY, w.levelReq || 1)
+            + tierQty(isScrap ? DESTROY_SCRAPMETAL_ENHANCE_QTY : DESTROY_SHINYSTONE_ENHANCE_QTY, level);
+  const rewardItem = MISC_ITEMS[isScrap ? 'rareScrapmetal' : 'epicShinystone'];
+  state[rewardItem.stateKey] = (state[rewardItem.stateKey] || 0) + qty;
+  return `${rewardItem.name} ${qty}개를 획득했습니다.`;
 }
 
 // ---- 판매/장착 ----

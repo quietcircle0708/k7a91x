@@ -1036,6 +1036,16 @@ function pickWeighted(pairs){
   }
   return pairs[pairs.length - 1][0];
 }
+// 구간표(min/max/qty 배열)를 위에서부터 순서대로 검사해 value가 속하는 첫 구간의 qty를 반환함
+// (STONE_GRADE_RULES와 동일한 구간 조회 패턴). 어느 구간에도 안 걸리면 0(해당 없음)을 반환함.
+function tierQty(rules, value){
+  const r = rules.find(x => value >= x.min && value <= x.max);
+  return r ? r.qty : 0;
+}
+// 흔적 복구 비용 = 파괴된 장비의 기본 판매 가격(강화 단계·강화 비용과 무관) × TRACE_RECOVERY_COST_MULT.
+function traceRecoveryCost(type){
+  return (wpn(type).sellPrice || 0) * TRACE_RECOVERY_COST_MULT;
+}
 // 폴백 후보 선정: 최우선 조건으로 "아이템 레벨이 targetLevel(몬스터 레벨)과 같거나 낮은" 무기만 남긴 뒤,
 // 그 중 targetLevel과 아이템 레벨 차이가 가장 작은 무기들만 남김(동률이면 전부 후보로 남음).
 function nearestLevelCandidates(list, targetLevel){
