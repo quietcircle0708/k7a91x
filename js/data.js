@@ -966,8 +966,8 @@ const ARTIFACTS = {
     desc: '마법사 아주르가 마력을 불어넣어 만든 반지',
     equipType: 'artifact',
     grade: 'normal',
-    effect: '최대 마나 +500',
-    effectText: '마나 +500',
+    effect: '최대 마나 +150',
+    effectText: '마나 +150',
     buyPrice: 10000,
   },
   batwing: {
@@ -998,8 +998,8 @@ const ARTIFACTS = {
     grade: 'normal',
     // 힘 +2는 다른 힘 스탯과 동일하게 공격력/최대체력 공식에 그대로 반영되고(formulas.js의
     // artifactStatBonus 경유), 최대 체력 +500은 그와 별개로 effectiveMaxHp에 고정값으로 더해짐.
-    effect: '힘+2<br>최대 체력 +500',
-    effectText: '힘+2<br>체력 +500',
+    effect: '힘+2<br>최대 체력 +200',
+    effectText: '힘+2<br>체력 +200',
     buyPrice: null,
   },
   oldarmguard: {
@@ -1457,7 +1457,7 @@ const STATUS_EFFECTS = {
 // 무기뿐 아니라 방어구/장신구도 대상이며(아티팩트·기타 아이템은 제외), 판정 순서는
 // [드랍 여부] → [장비 타입 선택] → [해당 타입의 등급 선택] → [레벨 선택] → [강화 단계 결정](formulas.js
 // resolveWeaponRelicDrop 참고).
-const RELIC_DROP_CHANCE = 8; // 몬스터 처치 시 장비 드랍 판정 확률(%)
+const RELIC_DROP_CHANCE = 5; // 몬스터 처치 시 장비 드랍 판정 확률(%)
 // 드랍 판정 성공 시, 가장 먼저 획득할 장비 타입을 결정하는 확률(%, 합계 100). 새 장비 타입이 추가되면
 // 이 표에 항목만 추가하면 됨.
 const RELIC_EQUIP_TYPE_CHANCE = { weapon: 45, armor: 40, accessory: 15 };
@@ -1550,8 +1550,8 @@ const MONSTERS = {
     hpMult: 1.0, atkMult: 0.5, speedMult: 2.0,
     drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
-  three_eyed_deer: {
-    id: 'three_eyed_deer', name: '세개의 눈을 가진 사슴', icon: '🦌', grade: 'epic', level: 14,
+  bluehorn_deer: {
+    id: 'bluehorn_deer', name: '청각수', icon: '🦌', grade: 'epic', level: 15,
     hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '사슴고기', chance: 50 },
@@ -1585,7 +1585,7 @@ const MONSTERS = {
       { name: '웅담', chance: 20 },
       { name: '낡은 팔 보호대', chance: 20, artifactId: 'oldarmguard' },
       { name: '흑색 팔 보호대', chance: 7, artifactId: 'blackarmguard' },
-      { name: '흑색 검', chance: 8, weaponId: 'blacksword' },
+      { name: '흑색 검', chance: 5, weaponId: 'blacksword' },
     ],
   },
   forest_boar: {
@@ -1603,7 +1603,7 @@ const MONSTERS = {
     hpMult: 1.0, atkMult: 1.1, speedMult: 1.1,
     drops: [
       { name: '숲돼지고기', chance: 25 },
-      { name: '반월대도', chance: 8, weaponId: 'moongreatsword' },
+      { name: '반월대도', chance: 5, weaponId: 'moongreatsword' },
     ],
   },
   fox: {
@@ -1680,9 +1680,9 @@ const DUNGEONS = [
     id: 'deer_den',
     name: '사슴굴',
     icon: '',
-    desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다. 세 개의 눈을 가진 사슴은 예사롭지 않은 기운을 뿜습니다.',
-    monsters: ['blue_deer', 'red_deer', 'three_eyed_deer'],
-    levelRange: 2,
+    desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다.',
+    monsters: ['blue_deer', 'red_deer', 'bluehorn_deer'],
+    levelRange: 4,
   },
   {
     id: 'bear_den',
@@ -1690,7 +1690,7 @@ const DUNGEONS = [
     icon: '',
     desc: '곰들의 울음소리가 끊이지 않는 어두운 굴. 용기 있는 자만이 발을 들일 수 있다.',
     monsters: ['red_bear', 'fierce_bear', 'black_bear'],
-    levelRange: 3,
+    levelRange: 4,
   },
   {
     id: 'boar_den',
@@ -1698,7 +1698,7 @@ const DUNGEONS = [
     icon: '',
     desc: '거친 숨소리와 발굽 소리가 울려 퍼지는 맷돼지들의 소굴',
     monsters: ['mountain_boar', 'forest_boar', 'red_boar'],
-    levelRange: 3,
+    levelRange: 4,
   },
   {
     id: 'fox_den',

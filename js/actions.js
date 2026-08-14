@@ -705,23 +705,30 @@ function resolveSkillEffect(id){
   const atk = effectiveAtk(type, equipped.level);
   const perHit = Math.max(1, Math.round(atk * (s.damagePercent || 0) / 100));
   const hits = s.hits || 1;
+  // 스킬 피해에도 기본 공격(dungeon.js attackTick)과 동일한 치명타 확률/배율을 적용함(요청사항) — 단,
+  // 기본 공격은 "전체 공격에 1회" 판정인 반면 스킬은 "타수마다 독립적으로" 판정해야 하므로, 확률 자체는
+  // 스킬 시전 시점(무기·레벨 고정)에 한 번만 계산해 두고, 실제 치명타 여부(Math.random())는 아래 각
+  // 타격(및 지연 타격)마다 매번 새로 굴림. 치명타 배율(1.5배)은 기본 공격과 동일한 값을 그대로 사용.
+  const critChance = effectiveCritChance(type, equipped.level);
   const targets = s.target === 'aoe'
     ? hunt.monsters.slice()
     : [hunt.monsters.find(m => m.instanceId === hunt.targetId) || hunt.monsters[0]];
   // hitDelayMs가 지정된 스킬(예: 이연격)은 타수 사이에 지연을 두는 별도 경로로 처리하고 여기서 끝냄 —
   // 지정되지 않은 스킬은 아래 기존 동기 루프를 그대로 타므로 다른 스킬은 전혀 영향받지 않음.
   if(s.hitDelayMs){
-    targets.forEach(t => { if(t) applyDelayedSkillHits(t, s, perHit); });
+    targets.forEach(t => { if(t) applyDelayedSkillHits(t, s, perHit, critChance); });
     return;
   }
   targets.forEach(t => {
     if(!t) return;
     for(let i = 0; i < hits; i++){
       if(t.hp <= 0) break;
+      const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
+      const hitDmg = isCrit ? Math.round(perHit * 1.5) : perHit;
       const levelDiff = state.playerLevel - t.level;
-      const dmg = Math.max(1, Math.round(perHit * playerDamageMultiplier(levelDiff)));
+      const dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
       t.hp -= dmg;
-      monsterHitEffect(t.instanceId, dmg, false);
+      monsterHitEffect(t.instanceId, dmg, isCrit);
       // 적중(=피해를 입혀 대상이 생존)한 경우에만 상태 이상 부여(예: 소드 스트라이크의 기절). 처치되는
       // 순간의 히트에는 부여하지 않음 — s.onHitStatus가 없는 기존 스킬들은 전혀 영향받지 않음.
       if(t.hp > 0 && s.onHitStatus) applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
@@ -731,20 +738,24 @@ function resolveSkillEffect(id){
   });
 }
 // hitDelayMs가 지정된 다타수 공격 스킬 전용 처리(예: 이연격 — 1타 즉시 + 2타는 hitDelayMs초 뒤).
-// 데미지 계산·상태이상 부여·처치 판정 공식은 위 동기 루프(resolveSkillEffect)와 완전히 동일하게 유지함.
+// 데미지 계산·상태이상 부여·처치 판정 공식은 위 동기 루프(resolveSkillEffect)와 완전히 동일하게 유지함
+// (치명타 판정도 동일하게 타격마다 독립적으로 이뤄짐 — critChance는 스킬 시전 시점에 고정해 넘겨받고,
+// 실제 치명타 여부는 즉시타/지연타 각각 실행되는 시점에 새로 판정함).
 // 1타는 즉시 적용하고, 이후 타수는 hitDelayMs*순번(ms) 뒤에 setTimeout으로 순차 적용함. 지연된 타수는
 // 실행 시점에 전투가 여전히 진행 중이고 대상이 아직 hunt.monsters에 남아있는지(=생존) 다시 확인한 뒤 적용함 —
 // 그 사이 전투 종료/대상 처치/화면 이동 가능성이 있으므로 target 객체를 그대로 붙들지 않고 instanceId로 매번 재조회함.
-function applyDelayedSkillHits(target, s, perHit){
+function applyDelayedSkillHits(target, s, perHit, critChance){
   const instanceId = target.instanceId;
   const hits = s.hits || 1;
   const applyOneHit = () => {
     const t = hunt.monsters.find(m => m.instanceId === instanceId);
     if(!t || t.hp <= 0) return;
+    const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
+    const hitDmg = isCrit ? Math.round(perHit * 1.5) : perHit;
     const levelDiff = state.playerLevel - t.level;
-    const dmg = Math.max(1, Math.round(perHit * playerDamageMultiplier(levelDiff)));
+    const dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
     t.hp -= dmg;
-    monsterHitEffect(t.instanceId, dmg, false);
+    monsterHitEffect(t.instanceId, dmg, isCrit);
     if(t.hp > 0 && s.onHitStatus) applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
     if(t.hp <= 0) killMonsterInstance(t.instanceId);
     else updateMonsterSlot(t);

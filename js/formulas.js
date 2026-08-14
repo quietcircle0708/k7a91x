@@ -799,7 +799,7 @@ function effectiveMaxHp(level){
   const str = (s.str || 0) + artifactStatBonus('str');
   const agi = (s.agi || 0) + artifactStatBonus('agi');
   let hp = playerBaseHp(level) + str * 20 + agi * 5;
-  if(isArtifactEquipped('antlerflag')) hp += 500; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
+  if(isArtifactEquipped('antlerflag')) hp += 200; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   if(isArtifactEquipped('squareshield')) hp += 300; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
   hp += armorStatBonus('hp'); // 착용 중인 방어구의 체력 보너스 합산
@@ -810,7 +810,7 @@ function effectiveMaxMp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
   const int = (s.int || 0) + artifactStatBonus('int');
   let mp = playerBaseMp(level) + int * 30;
-  if(isArtifactEquipped('ring')) mp += 500;
+  if(isArtifactEquipped('ring')) mp += 150;
   if(isArtifactEquipped('foxorb')) mp += 500; // 지능 보너스와 별개로 적용되는 고정 마나 보너스
   mp += armorStatBonus('mana'); // 착용 중인 방어구의 마나 보너스 합산
   mp += weaponUniqueOptionStatBonus('maxMana'); // 착용 무기의 고유 옵션 중 고정 마나 보너스(예: 제령도) 합산
