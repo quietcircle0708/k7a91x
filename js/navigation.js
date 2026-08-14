@@ -262,6 +262,7 @@ function applyStatAlloc(){
   ensurePlayerVitals();
   state.stats = { str: draftStats.str, agi: draftStats.agi, int: draftStats.int };
   state.statPoints = draftStatPoints;
+  recheckEquipRequirements(); // 스탯이 바뀌었으므로(전체 초기화 포함) 현재 장착 중인 장비 요구조건 재검사, 만족 못하면 즉시 해제
   // 스탯으로 늘어난 최대 체력/마나만큼 그대로 채워줌 (아직 피해를 입는 시스템이 없으므로 항상 풀피 유지)
   state.playerHp = effectiveMaxHp(state.playerLevel);
   state.playerMp = effectiveMaxMp(state.playerLevel);

@@ -240,7 +240,7 @@ function renderInventoryList(){
     const itemColor = weaponNameColor(type, item.level);
     const isEquipped = item.id === state.equippedId;
     const sellVal = sellValueFor(type, item.level);
-    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, state.stats);
+    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
     const equipDisabled = isEquipped || !reqOk;
     const equipBtnHtml = `<button class="inv-btn equip ${isEquipped?'active':''}" data-action="equip" data-id="${item.id}" ${equipDisabled?'disabled':''}>${isEquipped?'장착 중':'강화 선택'}</button>`;
     const equipBtnFinal = (!isEquipped && !reqOk)
@@ -294,7 +294,7 @@ function renderArmorInventoryList(){
     const itemColor = weaponNameColor(type, item.level);
     const isWorn = !!(state.equippedArmor && state.equippedArmor[def.armorKind] === item.id);
     const sellVal = sellValueFor(type, item.level);
-    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, state.stats);
+    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
     const wearBtnHtml = isWorn
       ? `<button class="inv-btn equip active" data-action="unwear-armor" data-id="${item.id}">착용 해제</button>`
       : `<button class="inv-btn equip" data-action="wear-armor" data-id="${item.id}" ${reqOk ? '' : 'disabled'}>착용</button>`;
@@ -351,7 +351,7 @@ function renderAccessoryInventoryList(){
     const itemColor = weaponNameColor(type, item.level);
     const isWorn = wornList.includes(item.id);
     const sellVal = sellValueFor(type, item.level);
-    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, state.stats);
+    const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
     const canWear = !isWorn && reqOk && !slotsFull;
     const wearBtnHtml = isWorn
       ? `<button class="inv-btn equip active" data-action="unwear-accessory" data-id="${item.id}">착용 해제</button>`

@@ -247,6 +247,43 @@ function doSell(){
   else if((state.armorInventory || []).some(i => i.id === equipped.id)) sellArmorItem(equipped.id);
   else sellAccessoryItem(equipped.id);
 }
+// ---- 착용 요구 스탯 재검사(장비/아티팩트 착용상태 변경, 스탯 초기화 등으로 effectiveStats가 바뀔 때) ----
+// 현재 착용 중인 무기(equippedId)/방어구(equippedArmor.helmet, .armor)/장신구(equippedAccessories 각 슬롯)
+// 전부에 대해 착용 조건(meetsWeaponEquipRequirements — 레벨 조건은 그대로, 스탯 조건만 effectiveStats로
+// 재계산됨)을 다시 검사해서, 더 이상 조건을 만족하지 못하는 장비는 즉시 장착 해제함. 레벨 조건은 플레이어
+// 레벨이 낮아지는 경우가 없으므로 재검사로 새로 불만족되는 일이 없음(스탯 변화만으로 충분).
+// 아티팩트 자체는 착용 요구 조건이 없어 이 함수의 재검사 대상은 아니지만(artifacts는 buyArtifact/
+// equipArtifact/unequipArtifact 어디서도 meetsWeaponEquipRequirements를 거치지 않음), 아티팩트
+// 착용상태 변경이 이 함수를 호출하는 트리거는 됨(effectiveStats의 artifactStatBonus에 반영되므로).
+// 무기/방어구/장신구가 실제로 해제되면 clampPlayerVitals로 체력/마나도 즉시 새 최대치에 맞춰 잘라줌.
+function recheckEquipRequirements(){
+  const stats = effectiveStats();
+  if(state.equippedId != null){
+    const equippedWeapon = state.inventory.find(i => i.id === state.equippedId);
+    if(equippedWeapon && !meetsWeaponEquipRequirements(equippedWeapon.type, state.playerLevel, stats)){
+      state.equippedId = null;
+    }
+  }
+  if(state.equippedArmor){
+    ['helmet', 'armor'].forEach(kind => {
+      const id = state.equippedArmor[kind];
+      if(id == null) return;
+      const item = (state.armorInventory || []).find(i => i.id === id);
+      if(item && !meetsWeaponEquipRequirements(item.type, state.playerLevel, stats)){
+        state.equippedArmor[kind] = null;
+      }
+    });
+  }
+  if(Array.isArray(state.equippedAccessories)){
+    state.equippedAccessories = state.equippedAccessories.map(id => {
+      if(id == null) return null;
+      const item = (state.accessoryInventory || []).find(i => i.id === id);
+      if(item && !meetsWeaponEquipRequirements(item.type, state.playerLevel, stats)) return null;
+      return id;
+    });
+  }
+  clampPlayerVitals();
+}
 // 강화 대상 선택. 무기를 선택하면 "착용 무기"(equippedId, 전투에 실제 사용)와 "대장간 표시 대상"
 // (forgeTargetId)을 함께 갱신함(기존 동작과 동일 — 무기는 강화 선택이 곧 착용). 방어구를 선택하면
 // forgeTargetId만 바뀌고 equippedId(착용 무기)는 그대로 유지됨 — 방어구는 별도의 "착용"(equipArmorPiece)
@@ -255,9 +292,10 @@ function equipItem(id){
   if(isEnhancing) return;
   const weaponItem = state.inventory.find(i => i.id === id);
   if(weaponItem){
-    if(!meetsWeaponEquipRequirements(weaponItem.type, state.playerLevel, state.stats)) return;
+    if(!meetsWeaponEquipRequirements(weaponItem.type, state.playerLevel, effectiveStats())) return;
     state.equippedId = id;
     state.forgeTargetId = id;
+    recheckEquipRequirements(); // 무기 교체로 무기 고유 옵션의 스탯 보너스가 바뀌었을 수 있어 재검사
     showMsg('', '');
     render();
     saveState();
@@ -265,7 +303,7 @@ function equipItem(id){
   }
   const armorItem = (state.armorInventory || []).find(i => i.id === id);
   if(armorItem){
-    if(!meetsWeaponEquipRequirements(armorItem.type, state.playerLevel, state.stats)) return;
+    if(!meetsWeaponEquipRequirements(armorItem.type, state.playerLevel, effectiveStats())) return;
     state.forgeTargetId = id;
     showMsg('', '');
     render();
@@ -274,7 +312,7 @@ function equipItem(id){
   }
   const accessoryItem = (state.accessoryInventory || []).find(i => i.id === id);
   if(accessoryItem){
-    if(!meetsWeaponEquipRequirements(accessoryItem.type, state.playerLevel, state.stats)) return;
+    if(!meetsWeaponEquipRequirements(accessoryItem.type, state.playerLevel, effectiveStats())) return;
     state.forgeTargetId = id;
     showMsg('', '');
     render();
@@ -326,7 +364,10 @@ function buyArtifact(id, btn, silent){
   state.gold -= a.buyPrice;
   state.artifacts.push(id);
   // 빈 장착 슬롯이 있을 때만 자동 장착(기존 장착 중인 아티팩트를 교체하지 않음).
-  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX) state.equippedArtifacts.push(id);
+  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX){
+    state.equippedArtifacts.push(id);
+    recheckEquipRequirements(); // 자동 장착도 착용상태 변경이므로 동일하게 재검사(스탯이 느는 방향이라 실제로 해제될 일은 없음)
+  }
   if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
   return true;
 }
@@ -336,6 +377,7 @@ function equipArtifact(id){
   if(!ownsArtifact(id) || isArtifactEquipped(id)) return;
   if(state.equippedArtifacts.length >= ARTIFACT_SLOT_MAX) return;
   state.equippedArtifacts.push(id);
+  recheckEquipRequirements(); // 아티팩트 스탯 보너스가 늘어 요구 스탯 재계산이 필요할 수 있음(다른 장비에는 항상 유리한 방향)
   render(); saveState();
 }
 // 인벤토리에서 장착 중인 아티팩트를 해제. 해제 즉시 해당 능력치/효과가 사라짐
@@ -344,6 +386,7 @@ function unequipArtifact(id){
   const idx = state.equippedArtifacts.indexOf(id);
   if(idx === -1) return;
   state.equippedArtifacts.splice(idx, 1);
+  recheckEquipRequirements(); // 아티팩트 스탯 보너스가 사라져 다른 장비의 요구 스탯을 더 이상 만족 못 할 수 있음
   render(); saveState();
 }
 // 상점에 등록된(purchasable) 무기를 구매. 가격은 sellPrice×2. 아이템 레벨(levelReq)은 "착용" 조건일 뿐
@@ -424,13 +467,13 @@ function performSellAccessoryItem(id){
 function equipAccessoryPiece(id){
   const item = (state.accessoryInventory || []).find(i => i.id === id);
   if(!item) return;
-  if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, state.stats)) return;
+  if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
   if(!Array.isArray(state.equippedAccessories)) state.equippedAccessories = [null, null];
   if(state.equippedAccessories.includes(id)) return; // 이미 착용 중
   const emptyIdx = state.equippedAccessories.indexOf(null);
   if(emptyIdx === -1) return; // 슬롯 가득참
   state.equippedAccessories[emptyIdx] = id;
-  clampPlayerVitals();
+  recheckEquipRequirements();
   render(); saveState();
 }
 function unequipAccessoryPiece(id){
@@ -438,7 +481,7 @@ function unequipAccessoryPiece(id){
   const idx = state.equippedAccessories.indexOf(id);
   if(idx === -1) return;
   state.equippedAccessories[idx] = null;
-  clampPlayerVitals();
+  recheckEquipRequirements();
   render(); saveState();
 }
 
@@ -476,10 +519,10 @@ function equipArmorPiece(id){
   if(!item) return;
   const def = ARMOR_TYPES[item.type];
   if(!def) return;
-  if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, state.stats)) return;
+  if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
   if(!state.equippedArmor) state.equippedArmor = { helmet: null, armor: null };
   state.equippedArmor[def.armorKind] = id;
-  clampPlayerVitals();
+  recheckEquipRequirements();
   render(); saveState();
 }
 function unequipArmorPiece(id){
@@ -488,7 +531,7 @@ function unequipArmorPiece(id){
   const def = ARMOR_TYPES[item.type];
   if(!def) return;
   if(state.equippedArmor[def.armorKind] === id) state.equippedArmor[def.armorKind] = null;
-  clampPlayerVitals();
+  recheckEquipRequirements();
   render(); saveState();
 }
 // 방어구 강화는 대장간 화면(startEnhance/resolveEnhance)을 무기와 완전히 동일하게 재사용함(사용자

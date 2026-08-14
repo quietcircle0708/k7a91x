@@ -124,7 +124,10 @@ function weaponRequirementText(type){
   return parts.length ? parts.join(', ') : null;
 }
 // 착용(장착) 조건 충족 여부 — 아이템 레벨(플레이어 레벨 이상 필요) + 무기 종류별 요구 스탯 모두 확인.
-// playerStats는 { str, agi, int } 형태. 구매/강화는 이 조건과 무관하게 항상 가능하며, 이 함수는 "장착" 액션에서만 사용됨.
+// playerStats는 { str, agi, int } 형태(호출부에서 effectiveStats()를 넘겨 레벨업 투자 스탯 + 장비/아티팩트
+// 보너스가 합산된 "최종 스탯" 기준으로 판정함). 구매/강화는 이 조건과 무관하게 항상 가능하며, 이 함수는
+// "장착" 액션에서만 사용됨. 함수 자체의 판정 로직(레벨/스탯 비교)은 변경하지 않았고, 호출부가 넘기는
+// playerStats의 계산 기준만 바뀜.
 function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
   const w = wpn(type);
   if(w.levelReq && playerLevel < w.levelReq) return false;
@@ -250,9 +253,10 @@ function wornAccessoryItems(){
 // 방어도/체력/마나/치명타 보너스에 실제로 기여하는 "착용 중인 모든 방어형 장비"(방어구+장신구) 목록.
 // 무기는 포함하지 않음(무기는 별도의 effectiveAtk 등으로 처리됨).
 function wornEquipmentItems(){ return wornArmorItems().concat(wornAccessoryItems()); }
-// 착용 중인 방어구+장신구 전체의 방어도 합산.
+// 착용 중인 방어구+장신구+아티팩트 전체의 방어도 합산.
 function playerTotalDefense(){
-  return wornEquipmentItems().reduce((sum, item) => sum + (defenseFor(item.type, item.level) || 0), 0);
+  return wornEquipmentItems().reduce((sum, item) => sum + (defenseFor(item.type, item.level) || 0), 0)
+    + artifactDefenseBonus(); // 사각 방패 등 방어도를 갖는 아티팩트 합산
 }
 // 착용 중인 방어구+장신구 전체의 체력/마나/치명타 보너스 합산. key: 'hp' | 'mana' | 'crit'
 function armorStatBonus(key){
@@ -411,15 +415,23 @@ function weaponUniqueOptionChance(type, level){
 // opt.text가 있는 "고정형" 고유 옵션(성장치 없이 항상 같은 문구, 반월대도 등)은 chanceByLevel/
 // textTemplate 없이 이 문구를 그대로 사용함 — 활성화 여부 판단(activateLevel)과 회색/조건문구 서식은
 // 성장형 옵션과 완전히 동일하게 재사용됨.
+// simplifyUniqueOptionTooltipText: 툴팁 "표시상"으로만 "최대 " 접두어를 생략(예: "최대 체력"→"체력",
+// "최대 마나"→"마나"). 실제 적용되는 능력치(opt.statBonus 등)는 이 함수를 거치지 않으므로 전혀 영향 없음.
+// data.js에 등록된 opt.text/textTemplate 원본 문구는 그대로 두고, 여기 한 곳에서만 표시 문구를 가공하므로
+// 앞으로 추가되는 고유 옵션도 "최대 XX" 형태로만 적으면 개별 수정 없이 자동으로 이 규칙이 적용됨.
+function simplifyUniqueOptionTooltipText(text){
+  return text.replace(/최대 /g, '');
+}
 function weaponUniqueOptionTooltipHtml(type, level){
   const opt = wpn(type).uniqueOption;
   if(!opt) return '';
   const active = weaponUniqueOptionActive(type, level);
-  const text = opt.text != null ? opt.text : (() => {
+  const rawText = opt.text != null ? opt.text : (() => {
     const chance = weaponUniqueOptionChance(type, level);
     return chance != null ? opt.textTemplate.replace('{chance}', chance) : null;
   })();
-  if(text == null) return '';
+  if(rawText == null) return '';
+  const text = simplifyUniqueOptionTooltipText(rawText);
   if(active) return wtipRow('', text);
   return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${text}<br>(+${opt.activateLevel} 활성화)</div>`;
 }
@@ -748,11 +760,37 @@ function artifactStatBonus(stat){
     if(isArtifactEquipped('antlerflag')) bonus += 2;
     if(isArtifactEquipped('oldarmguard')) bonus += 3;
     if(isArtifactEquipped('blackarmguard')) bonus += 5;
+    if(isArtifactEquipped('squareshield')) bonus += 3;
   }
   if(stat === 'agi'){
     if(isArtifactEquipped('blackarmguard')) bonus += 3;
   }
+  if(stat === 'int'){
+    if(isArtifactEquipped('foxorb')) bonus += 10;
+  }
   bonus += weaponUniqueOptionStatBonus(stat);
+  return bonus;
+}
+// 레벨업으로 투자한 기본 스탯 + 현재 장착 중인 무기/방어구/장신구/아티팩트의 스탯 보너스(artifactStatBonus,
+// 이름은 그대로 두지만 실제로는 무기 고유 옵션까지 포함해 "장비 전반의 원시 스탯 보너스"를 담당함)를
+// 모두 합산한 "최종 스탯". 장비 착용 요구 스탯 판정(meetsWeaponEquipRequirements)에 사용됨 — 장착하지
+// 않은 장비의 스탯은 포함되지 않으며(artifactStatBonus가 isArtifactEquipped/weaponUniqueOptionActive로
+// "착용/활성화 중"인 것만 골라 더하므로 자동 보장됨), 방어구/장신구가 나중에 원시 스탯 보너스를 갖게
+// 되더라도 artifactStatBonus 안에 이어서 추가하기만 하면 이 함수도 코드 수정 없이 자동 반영됨.
+function effectiveStats(){
+  const s = state.stats || { str: 0, agi: 0, int: 0 };
+  return {
+    str: (s.str || 0) + artifactStatBonus('str'),
+    agi: (s.agi || 0) + artifactStatBonus('agi'),
+    int: (s.int || 0) + artifactStatBonus('int'),
+  };
+}
+// 착용 중인 방어구+장신구+아티팩트 전체의 방어도 합산. 아티팩트는 방어형 장비 목록(wornEquipmentItems)에
+// 포함되지 않으므로(무기와 동일하게 defArr 기반 계산 대상이 아님) 여기서 별도로 더함 — 현재는 사각
+// 방패(squareshield)의 방어도 -5뿐이며, 앞으로 방어도를 갖는 아티팩트가 추가되면 이 자리에 이어서 더하면 됨.
+function artifactDefenseBonus(){
+  let bonus = 0;
+  if(isArtifactEquipped('squareshield')) bonus -= 5;
   return bonus;
 }
 // 스탯 보너스가 반영된 실질 최대 체력/마나
@@ -762,16 +800,20 @@ function effectiveMaxHp(level){
   const agi = (s.agi || 0) + artifactStatBonus('agi');
   let hp = playerBaseHp(level) + str * 20 + agi * 5;
   if(isArtifactEquipped('antlerflag')) hp += 500; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
+  if(isArtifactEquipped('squareshield')) hp += 300; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
   hp += armorStatBonus('hp'); // 착용 중인 방어구의 체력 보너스 합산
-  hp += weaponUniqueOptionStatBonus('maxHp'); // 착용 무기의 고유 옵션 중 고정 체력 보너스(예: 반월대도) 합산
+  hp += weaponUniqueOptionStatBonus('maxHp'); // 착용 무기의 고유 옵션 중 고정 체력 보너스(예: 반월대도, 제령도) 합산
   return hp;
 }
 function effectiveMaxMp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
-  let mp = playerBaseMp(level) + (s.int || 0) * 30;
+  const int = (s.int || 0) + artifactStatBonus('int');
+  let mp = playerBaseMp(level) + int * 30;
   if(isArtifactEquipped('ring')) mp += 500;
+  if(isArtifactEquipped('foxorb')) mp += 500; // 지능 보너스와 별개로 적용되는 고정 마나 보너스
   mp += armorStatBonus('mana'); // 착용 중인 방어구의 마나 보너스 합산
+  mp += weaponUniqueOptionStatBonus('maxMana'); // 착용 무기의 고유 옵션 중 고정 마나 보너스(예: 제령도) 합산
   return mp;
 }
 function effectiveAtkSpeed(type, level){
@@ -1277,6 +1319,29 @@ function pickStageMonsterGrades(stageNum, count){
   }
   return grades;
 }
+// 에픽 몬스터 출현이 결정된 이후, 이 던전(dungeon)의 등록된 에픽 몬스터 중 이번 굴(stageNum)에
+// 실제로 어떤 몬스터가 등장할지 결정. 에픽 몬스터 출현 여부 자체(pickStageGrade)는 이 함수와 무관하며 전혀 변경되지 않음.
+// 우선순위: ①이 굴에서 등장 가능한 에픽 몬스터만 남김(monsterDef.epicSpawnStages에 stageNum이 없으면 제외,
+// epicSpawnStages 필드가 아예 없으면 모든 굴에서 등장 가능) → ②남은 후보가 전부 monsterDef.epicSpawnWeight를
+// 갖고 있으면 그 가중치로 추첨(pickWeighted 재사용) → ③하나라도 가중치가 없으면 남은 후보를 동일 확률로 추첨.
+// 에픽 몬스터가 1종만 등록된 던전은 후보가 1개뿐이라 추첨 없이 그 몬스터를 그대로 반환(기존 동작과 완전히 동일).
+function pickEpicMonsterId(dungeon, stageNum){
+  const allEpic = dungeon.monsters.filter(id => MONSTERS[id].grade === 'epic');
+  if(allEpic.length <= 1) return allEpic[0];
+  let candidates = allEpic.filter(id => {
+    const stages = MONSTERS[id].epicSpawnStages;
+    return !stages || stages.includes(stageNum);
+  });
+  // 굴 제한 데이터 실수 등으로 이 굴에서 등장 가능한 에픽 몬스터가 하나도 안 남는 안전장치: 굴 제한을 무시하고 전체 에픽 후보로 폴백
+  if(candidates.length === 0) candidates = allEpic;
+  if(candidates.length === 1) return candidates[0];
+  const hasAllWeights = candidates.every(id => typeof MONSTERS[id].epicSpawnWeight === 'number');
+  if(hasAllWeights){
+    return pickWeighted(candidates.map(id => [id, MONSTERS[id].epicSpawnWeight]));
+  }
+  return candidates[Math.floor(Math.random() * candidates.length)]; // 별도 확률 미설정: 동일 확률 추첨
+}
+
 // 던전의 최소 레벨(가장 낮은 등장 몬스터 레벨) 기준 골드에 배율/편차를 적용한 숨겨진 장소 보상 골드 계산.
 function rollTreasureGold(minLevel){
   const base = monsterGoldBase(minLevel) * TREASURE_GOLD_MULT;

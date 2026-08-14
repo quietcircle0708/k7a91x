@@ -438,6 +438,27 @@ const WEAPON_TYPES = {
     atk: [49], speed: [1.0], crit: [10], sell: [2250],
     cost: [], odds: [],
   },
+  ninetaildagger: {
+    id: 'ninetaildagger', name: '제령도', desc: '희생된 영혼을 기리는 제사에 사용한 단검<br>강한 사념이 깃들어 많은 체력이 소모된다',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'epic', // 에픽
+    attackPower: 86, attackSpeed: 0.8, critRate: 15,
+    purchasable: false, sellPrice: 7000, levelReq: 33,
+    image: 'epic_ninetaildagger',
+    atk: [86], speed: [0.8], crit: [15], sell: [7000],
+    cost: [], odds: [],
+    // ---- 고유 옵션(에픽/유니크 전용) ----
+    // 반월대도(moongreatsword)와 동일한 "고정형" 옵션 스키마(opt.text+opt.statBonus) — 강화해도 수치가
+    // 오르지 않으며 activateLevel:0이라 +0부터 바로 활성화됨. maxHp에 음수를 넣으면 effectiveMaxHp에서
+    // 그대로 차감되고(착용 해제시 자동 원상복구, 별도 처리 불필요), maxMana도 동일한 방식으로 effectiveMaxMp에
+    // 가산됨(음수/양수 구분 없이 동일한 가산 로직 재사용).
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +3<br>민첩 +3<br>지능 +3<br>최대 체력 -500<br>최대 마나 +200',
+      statBonus: { str: 3, agi: 3, int: 3, maxHp: -500, maxMana: 200 },
+    },
+  },
 };
 
 
@@ -644,19 +665,19 @@ const EQUIP_INVENTORY_POOLS = [
     kind: 'weapon',
     items: () => state.inventory,
     typesTable: WEAPON_TYPES,
-    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
+    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats()),
   },
   {
     kind: 'armor',
     items: () => state.armorInventory || [],
     typesTable: ARMOR_TYPES,
-    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
+    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats()),
   },
   {
     kind: 'accessory',
     items: () => state.accessoryInventory || [],
     typesTable: ACCESSORY_TYPES,
-    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, state.stats),
+    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats()),
   },
 ];
 
@@ -730,16 +751,16 @@ Object.values(WEAPON_TYPES).forEach(w => {
 // 등급별 강화 확률 표. 각 배열의 index 0=+1, index 8=+9. 값 순서: [성공%, 유지%, 하락%, 파괴%]
 // 일반과 레어는 같은 표를 사용(같은 배열을 그대로 참조 — 데이터 중복 방지)
 const GRADE_ENHANCE_ODDS_NORMAL_RARE = [
-  [95, 5, 0, 0], [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0],
-  [50, 45, 5, 0], [40, 30, 29, 1], [25, 30, 40, 5], [20, 20, 50, 10],
+  [95, 5, 0, 0], [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [65, 30, 5, 0],
+  [50, 40, 10, 0], [40, 30, 29, 1], [25, 30, 40, 5], [20, 20, 50, 10],
 ];
 const GRADE_ENHANCE_ODDS_EPIC = [
-  [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [60, 20, 20, 0], [50, 20, 30, 0],
-  [40, 20, 40, 0], [30, 20, 48, 2], [20, 10, 60, 10], [15, 10, 60, 15],
+  [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [60, 40, 0, 0], [50, 40, 10, 0],
+  [40, 40, 20, 0], [30, 40, 28, 2], [20, 30, 40, 10], [15, 10, 60, 15],
 ];
 const GRADE_ENHANCE_ODDS_UNIQUE = [
-  [80, 20, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0], [55, 20, 25, 0], [45, 20, 35, 0],
-  [35, 20, 45, 0], [25, 20, 51, 4], [15, 10, 65, 10], [5, 5, 70, 20],
+  [80, 20, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0], [55, 45, 0, 0], [45, 45, 10, 0],
+  [35, 35, 30, 0], [25, 20, 51, 4], [15, 10, 65, 10], [5, 5, 70, 20],
 ];
 const GRADE_ENHANCE_ODDS = {
   normal: GRADE_ENHANCE_ODDS_NORMAL_RARE,
@@ -946,7 +967,7 @@ const ARTIFACTS = {
     equipType: 'artifact',
     grade: 'normal',
     effect: '최대 마나 +500',
-    effectText: '최대 마나 +500',
+    effectText: '마나 +500',
     buyPrice: 10000,
   },
   batwing: {
@@ -978,7 +999,7 @@ const ARTIFACTS = {
     // 힘 +2는 다른 힘 스탯과 동일하게 공격력/최대체력 공식에 그대로 반영되고(formulas.js의
     // artifactStatBonus 경유), 최대 체력 +500은 그와 별개로 effectiveMaxHp에 고정값으로 더해짐.
     effect: '힘+2<br>최대 체력 +500',
-    effectText: '힘+2<br>최대 체력 +500',
+    effectText: '힘+2<br>체력 +500',
     buyPrice: null,
   },
   oldarmguard: {
@@ -1000,6 +1021,28 @@ const ARTIFACTS = {
     // 힘/민첩/치명타 확률 모두 합산 적용(힘·민첩은 artifactStatBonus, 치명타는 effectiveCritChance 경유)
     effect: '힘+5<br>민첩+3<br>치명타 확률 +8%',
     effectText: '힘 +5<br>민첩 +3<br>치명타 확률 +8%',
+    buyPrice: null,
+  },
+  squareshield: {
+    id: 'squareshield', name: '사각 방패', icon: '🛡️',
+    desc: '견고한 사각형 철판 위에 오래된 수호 문양이 새겨진 방패',
+    equipType: 'artifact',
+    grade: 'epic',
+    // 방어도 -5는 playerTotalDefense(formulas.js)에서 artifactDefenseBonus로 합산, 힘 +3은 다른 힘
+    // 스탯과 동일하게 artifactStatBonus 경유, 체력 +300은 그와 별개로 effectiveMaxHp에 고정값으로 더해짐.
+    effect: '방어도 -5<br>힘 +3<br>최대 체력 +300',
+    effectText: '방어도 -5<br>힘 +3<br>체력 +300',
+    buyPrice: null,
+  },
+  foxorb: {
+    id: 'foxorb', name: '빛나는 여우 구슬', icon: '🔮',
+    desc: '희미한 푸른빛을 머금은 신비로운 구슬<br>밤이 깊어질수록 더욱 강하게 빛난다',
+    equipType: 'artifact',
+    grade: 'epic',
+    // 지능 +10은 artifactStatBonus('int') 경유(다른 원시 스탯과 동일한 방식으로 신규 추가),
+    // 마나 +500은 아주르의 강아지풀 반지(ring)와 동일하게 effectiveMaxMp에 고정값으로 더해짐.
+    effect: '지능 +10<br>최대 마나 +500',
+    effectText: '지능 +10<br>마나 +500',
     buyPrice: null,
   },
 };
@@ -1119,6 +1162,11 @@ const MISC_ITEMS = {
     id: 'epicShinystone', name: '반짝이는 돌', icon: '💎', image: 'epic_ShinyStone', itemClass: 'misc', grade: 'epic',
     desc: '하늘에서 떨어진 돌의 일부<br>특별한 장비 제작에 사용된다',
     sellPrice: 1000, stateKey: 'epicShinystones',
+  },
+  foxFur: {
+    id: 'foxFur', name: '여우 모피', icon: '🍖', itemClass: 'misc', grade: 'normal', // 요청 표에 등급 미기재 → 등급 미표기 기존 아이템 규칙(전부 '일반')과 동일하게 적용
+    desc: '여우의 가죽, 귀중한 재료로 쓰인다',
+    sellPrice: 200, stateKey: 'foxFurs',
   },
 };
 
@@ -1558,6 +1606,39 @@ const MONSTERS = {
       { name: '반월대도', chance: 8, weaponId: 'moongreatsword' },
     ],
   },
+  fox: {
+    id: 'fox', name: '여우', icon: '🦊', grade: 'normal', level: 25, image: 'fox',
+    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '여우 모피', chance: 20 } ],
+  },
+  greenfox: {
+    id: 'greenfox', name: '사여우', icon: '🦊', grade: 'normal', level: 25, image: 'greenfox',
+    hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
+    drops: [ { name: '여우 모피', chance: 25 } ],
+  },
+  blackfox: {
+    id: 'blackfox', name: '흑여우', icon: '🦊', grade: 'epic', level: 30, image: 'blackfox',
+    hpMult: 1.0, atkMult: 1.25, speedMult: 1.0,
+    epicSpawnWeight: 85, // 여우굴 전용 — 구미호와 합쳐 100%(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '여우 모피', chance: 40 },
+      { name: '사각 방패', chance: 5, artifactId: 'squareshield' },
+      { name: '제령도', chance: 2, weaponId: 'ninetaildagger' },
+    ],
+  },
+  // 이미지 파일명 참고: 기획서상 image 필드는 'ninetailfox'였으나 실제 업로드된 파일명은
+  // 'ninetail.png'라 실제 업로드 파일명 기준으로 image를 등록함(다른 신규 이미지와 동일 처리 원칙).
+  ninetailfox: {
+    id: 'ninetailfox', name: '구미호', icon: '🦊', grade: 'epic', level: 33, image: 'ninetail',
+    hpMult: 1.0, atkMult: 1.4, speedMult: 1.1,
+    epicSpawnWeight: 15, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '여우 모피', chance: 90 },
+      { name: '사각 방패', chance: 12, artifactId: 'squareshield' },
+      { name: '빛나는 여우 구슬', chance: 10, artifactId: 'foxorb' },
+      { name: '제령도', chance: 8, weaponId: 'ninetaildagger' },
+    ],
+  },
 };
 
 
@@ -1618,6 +1699,14 @@ const DUNGEONS = [
     desc: '거친 숨소리와 발굽 소리가 울려 퍼지는 맷돼지들의 소굴',
     monsters: ['mountain_boar', 'forest_boar', 'red_boar'],
     levelRange: 3,
+  },
+  {
+    id: 'fox_den',
+    name: '여우굴',
+    icon: '',
+    desc: '붉은 노을이 지는 언덕 아래, 영악한 여우들이 무리 지어 사는 굴',
+    monsters: ['fox', 'greenfox', 'blackfox', 'ninetailfox'],
+    levelRange: 4,
   },
 ];
 

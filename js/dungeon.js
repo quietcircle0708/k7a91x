@@ -90,11 +90,15 @@ function createMonsterInstance(dungeon, grade){
     atkIntervalId: null, atkFirstTimeout: null,
   };
 }
-// 주어진 등급에 해당하는 이 던전의 몬스터 종류 중 하나를 균등 추첨.
+// 주어진 등급에 해당하는 이 던전의 몬스터 종류 중 하나를 결정.
+// - 에픽 등급: 이 던전에 등록된 에픽 몬스터가 2종 이상이면 pickEpicMonsterId로 굴 제한/개별 확률을 적용해 결정,
+//   1종뿐이면 그 몬스터를 그대로 반환(추가 로직 없이 기존 동작과 동일).
+// - 일반 등급 및 그 외: 기존과 동일하게 균등 추첨.
 // 해당 등급 몬스터가 이 던전에 하나도 없으면(예: 다람쥐굴처럼 에픽 몬스터가 없는 던전) 등급 제한 없이 폴백.
 function pickSpawnMonsterOfGrade(dungeon, grade){
   let candidates = dungeon.monsters.filter(id => MONSTERS[id].grade === grade);
-  if(candidates.length === 0) candidates = dungeon.monsters;
+  if(grade === 'epic' && candidates.length > 0) return pickEpicMonsterId(dungeon, hunt.stage);
+  if(candidates.length === 0) candidates = dungeon.monsters; // 이 던전에 해당 등급 몬스터가 아예 없으면(예: 에픽 없는 던전) 등급 제한 없이 폴백
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
