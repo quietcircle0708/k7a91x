@@ -542,7 +542,7 @@ function unequipArmorPiece(id){
 function buyFlask(id, btn, silent){
   const item = CONSUMABLES[id];
   if(!item || state.gold < item.buyPrice) return false;
-  if(!state.consumables) state.consumables = { hpFlask: 0, mpFlask: 0 };
+  if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
   state.gold -= item.buyPrice;
   state.consumables[id] = (state.consumables[id] || 0) + 1;
   if(!silent){
@@ -592,8 +592,20 @@ function checkAutoHeal(){
   if(!state.settings || !state.settings.autoHeal) return;
   if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return; // 마을/상점/인벤토리 등 전투 외 상태에서는 동작 안 함
   ensurePlayerVitals();
-  autoHealTry('hpFlask', 'autoHealThreshold', state.playerHp, effectiveMaxHp(state.playerLevel));
-  autoHealTry('mpFlask', 'autoManaThreshold', state.playerMp, effectiveMaxMp(state.playerLevel));
+  // 특정 플라스크 id를 하드코딩하지 않고, 퀵슬롯에 실제 등록된 각 아이템의 effect.type을 보고
+  // 체력 회복류(healHp/healHpInstant)/마나 회복류(healMp/healMpInstant)인지만 판별함 — 회복 방식
+  // (지속/즉시)과 무관하게 동일한 자동 사용 조건이 적용되며, 앞으로 새 회복 방식이 추가돼도
+  // effect.type 분류만 맞으면 이 함수 수정 없이 자동으로 대상에 포함됨.
+  (state.quickSlots || []).forEach(id => {
+    const item = CONSUMABLES[id];
+    if(!item || !item.effect) return;
+    const type = item.effect.type;
+    if(type === 'healHp' || type === 'healHpInstant'){
+      autoHealTry(id, 'autoHealThreshold', state.playerHp, effectiveMaxHp(state.playerLevel));
+    } else if(type === 'healMp' || type === 'healMpInstant'){
+      autoHealTry(id, 'autoManaThreshold', state.playerMp, effectiveMaxMp(state.playerLevel));
+    }
+  });
 }
 // checkAutoHeal 전용 공통 체크 헬퍼 (체력/마나 각각에 대해 동일한 판단 로직을 재사용 — 중복 코드 방지)
 function autoHealTry(flaskId, thresholdKey, current, max){
@@ -618,7 +630,9 @@ function flaskCooldownRemainingSec(id){
   return remainMs > 0 ? remainMs / 1000 : 0;
 }
 function startFlaskCooldown(id){
-  flaskCooldownUntil[id] = Date.now() + FLASK_COOLDOWN_MS;
+  const item = CONSUMABLES[id];
+  const isInstant = item && (item.effect.type === 'healHpInstant' || item.effect.type === 'healMpInstant');
+  flaskCooldownUntil[id] = Date.now() + (isInstant ? FLASK_INSTANT_COOLDOWN_MS : FLASK_COOLDOWN_MS);
 }
 
 // ---- 스킬 쿨타임/버프 (기존 플라스크 쿨타임 방식을 그대로 재사용) ----
@@ -780,11 +794,29 @@ function useFlask(id){
   if(isFlaskOnCooldown(id)) return; // 쿨타임 중이면 수동/자동 사용 모두 무시
   // 전투 중 기절 상태면 회복(플라스크 사용)도 정지 — 마을/상점 등 전투 밖에서는 기절 상태가 아니므로 영향 없음
   if(currentView === 'hunt' && hunt.started && !hunt.paused && isStunned(hunt.player)) return;
-  if(!state.consumables) state.consumables = { hpFlask: 0, mpFlask: 0 };
+  if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
   if((state.consumables[id] || 0) <= 0) return;
   state.consumables[id]--;
   startFlaskCooldown(id);
   ensurePlayerVitals();
+
+  // 즉시 회복류(healHpInstant/healMpInstant): 지속 회복(healHp/healMp)과 다른 종류의 회복 아이템이라
+  // 틱 진행 없이 고정값(amount)을 사용 즉시 전부 적용하고 끝냄 — 진행 중인 지속 회복(hpFlaskHeal/
+  // mpFlaskHeal)과는 서로 간섭하지 않고 별개로 더해짐(같은 종류 지속 회복이 있어도 flush하지 않음).
+  if(item.effect.type === 'healHpInstant' || item.effect.type === 'healMpInstant'){
+    const isHpInstant = item.effect.type === 'healHpInstant';
+    if(isHpInstant){
+      state.playerHp = Math.min(effectiveMaxHp(state.playerLevel), (state.playerHp || 0) + item.effect.amount);
+    } else {
+      state.playerMp = Math.min(effectiveMaxMp(state.playerLevel), (state.playerMp || 0) + item.effect.amount);
+    }
+    renderHuntCharPanel();
+    refreshCharDisplays();
+    render();
+    saveState();
+    return;
+  }
+
   render();
   saveState();
 

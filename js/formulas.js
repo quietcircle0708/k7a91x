@@ -220,7 +220,20 @@ function buildArmorTooltipHtml(type, level){
   html += `</div>`;
   return html;
 }
-// ---- 방어구 방어력 → 피해 감소 공식 ----
+// 소비 아이템(플라스크 등) 툴팁: 무기/방어구 툴팁과 동일한 레이아웃/서식(중앙 정렬, wtipRow 구조)을 그대로
+// 재사용하되, 표시 항목은 이름/종류(class)/효과(effectText)/구매 가격 4가지로 단순화함(등급·레벨 제한 등
+// 장비 전용 필드는 소비 아이템에 없으므로 표시하지 않음).
+function buildConsumableTooltipHtml(id){
+  const item = CONSUMABLES[id];
+  if(!item) return '';
+  let html = `<div style="text-align:center;">`;
+  html += `<div style="color:var(--forge-cream); font-weight:700; margin-bottom:4px;">${item.name}</div>`;
+  if(item.class) html += wtipRow('', item.class);
+  if(item.effectText) html += wtipRow('효과', item.effectText);
+  if(item.buyPrice != null) html += wtipRow('구매 가격', item.buyPrice);
+  html += `</div>`;
+  return html;
+}
 // 최종 데미지 비율 = {(200 + 방어도) / 20}² × 0.01. 방어도는 음수 값(0 이하)만 사용됨.
 // 결과는 퍼센트 기준 소수 둘째 자리에서 반올림(비율로는 소수 넷째 자리). 플레이어/몬스터 공용 공식으로
 // 설계됨 — 현재는 플레이어(착용 방어구 합산)에만 적용되고, 몬스터 쪽은 이후 별도로 연결될 예정.
@@ -889,7 +902,9 @@ function shopBuyItemDisplay(action, typeId){
   }
   if(action === 'buy-consumable'){
     const item = CONSUMABLES[typeId];
-    return { iconHtml: item.icon, tooltipHtml: item.desc, borderColor: '#c13c3c' };
+    // 실제 아이템 아이콘(PNG 등록시 자동 대체)과 기존 아이템 툴팁 서식(buildConsumableTooltipHtml)을
+    // 그대로 재사용함 — 사용 효과(desc)만 단독으로 보여주던 기존 방식은 여기서 교체됨.
+    return { iconHtml: itemIconHtml(item, 'shop-icon-img'), tooltipHtml: buildConsumableTooltipHtml(typeId), borderColor: '#c13c3c' };
   }
   if(action === 'buy-artifact'){
     const a = ARTIFACTS[typeId];

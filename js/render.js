@@ -1550,7 +1550,7 @@ function buildConsumableShopCardHtml(id){
           <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">${itemIconHtml(item)}</div>
           <span class="scroll-name-wrap">
             <span class="scroll-name" style="color:var(--forge-cream);">${item.name}</span>
-            <span class="tooltip">${item.desc}</span>
+            <span class="tooltip">${buildConsumableTooltipHtml(id)}</span>
           </span>
         </div>
         <span class="scroll-count">보유 ${owned}개</span>

@@ -44,7 +44,7 @@ let state = {
   skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
   learnedSkills: [], learnedAwakeningSkills: [], // 습득한 스킬 id 목록(공용·특화 공용 / 기연 별도)
   skillQuickSlots: [null, null, null, null, null], // 스킬 퀵슬롯(왼쪽 5칸)에 등록된 스킬 id
-  consumables: { hpFlask: 0, mpFlask: 0 }, // 보유 플라스크 개수
+  consumables: { hpFlask6: 0, mpFlask6: 0 }, // 보유 플라스크 개수
   quickSlots: [null, null], // 사냥 화면 퀵슬롯에 등록된 소비 아이템 id
   settings: {}, // 설정값 저장 (키: SETTINGS_SCHEMA의 항목 id). ensureSettingsDefaults()가 누락된 키를 기본값으로 채움
   deathCurseUntil: null, // 망자의 저주(사망 패널티) 만료 시각(epoch ms). null이면 미적용
@@ -314,7 +314,20 @@ function applyLoadedRaw(raw){
     const prevSkillSlots = Array.isArray(state.skillQuickSlots) ? state.skillQuickSlots : [];
     state.skillQuickSlots = Array.from({ length: SKILL_QUICK_SLOT_COUNT }, (_, i) => prevSkillSlots[i] || null);
   }
-  if(!state.consumables) state.consumables = { hpFlask: 0, mpFlask: 0 };
+  if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
+  // 구버전(플라스크 리네임 이전) 마이그레이션: 기존 hpFlask/mpFlask로 저장된 보유 수량을
+  // 동일한 지속 회복 플라스크인 hpFlask6/mpFlask6로 그대로 이전(수량 손실 없이 합산).
+  if(state.consumables.hpFlask){
+    state.consumables.hpFlask6 = (state.consumables.hpFlask6 || 0) + state.consumables.hpFlask;
+    delete state.consumables.hpFlask;
+  }
+  if(state.consumables.mpFlask){
+    state.consumables.mpFlask6 = (state.consumables.mpFlask6 || 0) + state.consumables.mpFlask;
+    delete state.consumables.mpFlask;
+  }
+  if(Array.isArray(state.quickSlots)){
+    state.quickSlots = state.quickSlots.map(id => id === 'hpFlask' ? 'hpFlask6' : id === 'mpFlask' ? 'mpFlask6' : id);
+  }
   if(!Array.isArray(state.quickSlots) || state.quickSlots.length !== QUICK_SLOT_COUNT){
     const prev = Array.isArray(state.quickSlots) ? state.quickSlots : [];
     state.quickSlots = Array.from({ length: QUICK_SLOT_COUNT }, (_, i) => prev[i] || null);
@@ -398,7 +411,7 @@ function resetGame(){
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
     skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [],
     skillQuickSlots: [null, null, null, null, null],
-    consumables: { hpFlask: 0, mpFlask: 0 },
+    consumables: { hpFlask6: 0, mpFlask6: 0 },
     quickSlots: [null, null],
     settings: {},
     deathCurseUntil: null,

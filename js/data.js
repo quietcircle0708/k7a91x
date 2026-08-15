@@ -73,7 +73,7 @@ const ITEM_IMAGE_EXT = '.png';
 // atk/speed/crit: 단계별 공격력/공격속도/치명타확률 배열 / cost: 단계별 강화 비용 / sell: 단계별 판매가 / odds: 단계별 강화 확률
 const WEAPON_TYPES = {
   longsword: {
-    id: 'longsword', name: '견습 모험가의 대검', desc: '균형 잡힌 장검',
+    id: 'longsword', name: '낡은 대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
@@ -97,7 +97,7 @@ const WEAPON_TYPES = {
   // ---- 아래 두 무기는 강화 단계별 증가 공식이 아직 없어서, 우선 +0(기본) 값만 담아둠.
   // cost/odds가 비어있으면(강화 데이터 없음) 강화 화면에서 "강화 준비 중"으로 자동 표시됨(render.js 참고).
   shortsword: {
-    id: 'shortsword', name: '견습 모험가의 검', desc: '한 손으로 휘두르는 검',
+    id: 'shortsword', name: '낡은 검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
@@ -108,7 +108,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   dagger: {
-    id: 'dagger', name: '견습 모험가의 단검', desc: '짧은 두 개의 단검',
+    id: 'dagger', name: '낡은 비도', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
@@ -141,7 +141,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   longsword2: {
-    id: 'longsword2', name: '초보 모험가의 대검', desc: '균형 잡힌 장검',
+    id: 'longsword2', name: '대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
@@ -152,7 +152,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   shortsword2: {
-    id: 'shortsword2', name: '초보 모험가의 검', desc: '한 손으로 휘두르는 검',
+    id: 'shortsword2', name: '검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
@@ -163,7 +163,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   dagger2: {
-    id: 'dagger2', name: '초보 모험가의 단검', desc: '짧은 두 개의 단검',
+    id: 'dagger2', name: '비도', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
@@ -231,7 +231,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   longsword3: {
-    id: 'longsword3', name: '모험가의 대검', desc: '튼튼한 내구성을 갖춘 모험가용 대검',
+    id: 'longsword3', name: '철제중검', desc: '튼튼한 내구성을 갖춘 모험가용 대검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
@@ -242,7 +242,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   shortsword3: {
-    id: 'shortsword3', name: '모험가의 검', desc: '균형 잡힌 성능의 모험가용 검',
+    id: 'shortsword3', name: '철검', desc: '균형 잡힌 성능의 모험가용 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
@@ -253,7 +253,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   dagger3: {
-    id: 'dagger3', name: '모험가의 단검', desc: '가볍고 다루기 쉬운 모험가용 단검',
+    id: 'dagger3', name: '철단도', desc: '가볍고 다루기 쉬운 모험가용 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검 (표기상 "양손 검"은 오타로 확인함)
     grade: 'normal', // 일반
@@ -340,7 +340,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   iron_sword: {
-    id: 'iron_sword', name: '철검', desc: '조잡하지만 위력은 있는 검',
+    id: 'iron_sword', name: '낡은 철검', desc: '조잡하지만 위력은 있는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
     grade: 'normal', // 일반
@@ -417,7 +417,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   steelgreatsword: {
-    id: 'steelgreatsword', name: '강철 대검', desc: '무거운 강철로 만들어진 강력한 양손 검',
+    id: 'steelgreatsword', name: '강철중검', desc: '무거운 강철로 만들어진 강력한 양손 검',
     equipType: 'weapon',
     weaponKind: 'two_handed_sword', // 양손 검
     grade: 'normal', // 일반
@@ -428,7 +428,7 @@ const WEAPON_TYPES = {
     cost: [], odds: [],
   },
   steeldagger: {
-    id: 'steeldagger', name: '강철 단검', desc: '날카롭게 벼려낸 가볍고 재빠른 단검',
+    id: 'steeldagger', name: '강철단도', desc: '날카롭게 벼려낸 가볍고 재빠른 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
@@ -534,6 +534,42 @@ const ARMOR_TYPES = {
     defense: -2, hp: 30,
     purchasable: true, sellPrice: 500, levelReq: 10,
     image: 'helmetbase',
+  },
+  ironhelmet: {
+    id: 'ironhelmet', name: '철 투구', desc: '거친 철로 벼려낸 투구',
+    equipType: 'armor',
+    armorKind: 'helmet', // 투구
+    grade: 'normal', // 일반
+    defense: -3, hp: 50,
+    purchasable: true, sellPrice: 1250, levelReq: 20,
+    image: '',
+  },
+  ironarmor: {
+    id: 'ironarmor', name: '철 갑옷', desc: '묵직한 철로 단련된 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'normal', // 일반
+    defense: -8, hp: 150,
+    purchasable: true, sellPrice: 1250, levelReq: 20,
+    image: '',
+  },
+  steelhelmet: {
+    id: 'steelhelmet', name: '강철 투구', desc: '단단하게 벼려낸 강철 투구',
+    equipType: 'armor',
+    armorKind: 'helmet', // 투구
+    grade: 'normal', // 일반
+    defense: -5, hp: 90,
+    purchasable: true, sellPrice: 2250, levelReq: 30,
+    image: '',
+  },
+  steelarmor: {
+    id: 'steelarmor', name: '강철 갑옷', desc: '정교하게 단련된 강철 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'normal', // 일반
+    defense: -12, hp: 250,
+    purchasable: true, sellPrice: 2250, levelReq: 30,
+    image: '',
   },
 };
 
@@ -1049,24 +1085,82 @@ const ARTIFACTS = {
 
 // 소비 아이템(플라스크 등) 도감
 const QUICK_SLOT_COUNT = 2;
-// 모든 플라스크(현재 등록된 것 + 앞으로 추가될 것)에 공통으로 적용되는 사용 쿨타임(ms).
-// 특정 플라스크 id를 분기하지 않고 useFlask()가 이 값을 그대로 사용하므로, 새 플라스크를
-// CONSUMABLES에 추가하기만 하면 별도 코드 수정 없이 동일한 쿨타임 시스템이 적용됨.
-const FLASK_COOLDOWN_MS = 2000;
+// 플라스크 사용 쿨타임(ms). 지속 회복(over-time, effect.type이 healHp/healMp)과 즉시 회복(instant,
+// healHpInstant/healMpInstant)은 서로 다른 쿨타임을 쓰며, 종류별로 독립 계산됨(같은 종류 안에서는
+// 아이템 id별로도 독립 관리 — flaskCooldownUntil, actions.js). 특정 id를 하드코딩하지 않고 effect.type만
+// 보고 분기하므로, 각 카테고리에 새 플라스크를 추가하기만 하면 별도 코드 수정 없이 동일하게 적용됨.
+const FLASK_COOLDOWN_MS = 2000; // 지속 회복 플라스크
+const FLASK_INSTANT_COOLDOWN_MS = 1500; // 즉시 회복 플라스크
 // icon: 이모지 / image: 선택 필드. PNG 이미지 파일명(assets/MiscItems/<image>.png, 확장자/경로 제외)을
 // 등록하면 icon 대신 PNG가 출력됨(itemIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 출력됨.
+// effectText: 툴팁 전용 짧은 효과 문구(buildConsumableTooltipHtml, formulas.js) — desc(상세 설명)와는
+// 별개로, 툴팁의 "효과" 항목에는 이 필드만 사용함.
+// effect.type: 'healHp'/'healMp'(지속 회복, percent+durationMs 기준 — 기존 방식) |
+//   'healHpInstant'/'healMpInstant'(즉시 회복, amount 고정값을 사용 즉시 전부 회복 — 신규).
 const CONSUMABLES = {
-  hpFlask: {
-    id: 'hpFlask', name: '[하급]체력 회복 플라스크', class: '플라스크', icon: '🧪',
-    desc: '사용시 2초에 걸쳐 최대 체력의 25%를 회복한다',
-    buyPrice: 70, sellPrice: 35,
+  hpFlask6: {
+    id: 'hpFlask6', name: '하급 체력 엘릭서', class: '플라스크', icon: '🧪', image: 'hpflask6',
+    desc: '2초에 걸쳐 최대 체력의 25%를 회복한다', effectText: '체력 25% 회복',
+    buyPrice: 1800, sellPrice: 900,
     effect: { type: 'healHp', percent: 25, durationMs: 2000 },
   },
-  mpFlask: {
-    id: 'mpFlask', name: '[하급]마나 회복 플라스크', class: '플라스크', icon: '💧',
-    desc: '사용시 2초에 걸쳐 최대 마나의 25%를 회복한다',
-    buyPrice: 70, sellPrice: 35,
+  mpFlask6: {
+    id: 'mpFlask6', name: '하급 마나 엘릭서', class: '플라스크', icon: '💧', image: 'mpflask6',
+    // 원본 요청에는 이 항목의 desc도 "최대 체력의 25%"로 적혀있었으나(하급 체력 엘릭서 desc와 동일 문구),
+    // 마나 엘릭서이고 effect도 healMp이므로 "마나"로 바로잡아 반영함(응답 참고, 확인 필요).
+    desc: '2초에 걸쳐 최대 마나의 25%를 회복한다', effectText: '마나 25% 회복',
+    buyPrice: 1800, sellPrice: 900,
     effect: { type: 'healMp', percent: 25, durationMs: 2000 },
+  },
+  hpFlask1: {
+    id: 'hpFlask1', name: '하급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask1',
+    desc: '사용 즉시 체력 100을 회복한다', effectText: '체력 100 회복',
+    buyPrice: 100, sellPrice: 50,
+    effect: { type: 'healHpInstant', amount: 100 },
+  },
+  mpFlask1: {
+    id: 'mpFlask1', name: '하급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask1',
+    desc: '사용 즉시 마나 100을 회복한다', effectText: '마나 100 회복',
+    buyPrice: 100, sellPrice: 50,
+    effect: { type: 'healMpInstant', amount: 100 },
+  },
+  hpFlask2: {
+    id: 'hpFlask2', name: '중급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask2',
+    desc: '사용 즉시 체력 300을 회복한다', effectText: '체력 300 회복',
+    buyPrice: 200, sellPrice: 100,
+    effect: { type: 'healHpInstant', amount: 300 },
+  },
+  mpFlask2: {
+    id: 'mpFlask2', name: '중급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask2',
+    desc: '사용 즉시 마나 300을 회복한다', effectText: '마나 300 회복',
+    buyPrice: 200, sellPrice: 100,
+    effect: { type: 'healMpInstant', amount: 300 },
+  },
+  hpFlask3: {
+    id: 'hpFlask3', name: '상급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask3',
+    desc: '사용 즉시 체력 800을 회복한다', effectText: '체력 800 회복',
+    buyPrice: 400, sellPrice: 200,
+    effect: { type: 'healHpInstant', amount: 800 },
+  },
+  mpFlask3: {
+    id: 'mpFlask3', name: '상급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask3',
+    desc: '사용 즉시 마나 800을 회복한다', effectText: '마나 800 회복',
+    buyPrice: 400, sellPrice: 200,
+    effect: { type: 'healMpInstant', amount: 800 },
+  },
+  hpFlask4: {
+    id: 'hpFlask4', name: '최상급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask4',
+    desc: '사용 즉시 체력 1200을 회복한다', effectText: '체력 1200 회복',
+    buyPrice: 900, sellPrice: 450,
+    effect: { type: 'healHpInstant', amount: 1200 },
+  },
+  mpFlask4: {
+    id: 'mpFlask4', name: '최상급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask4',
+    // 원본 요청 표의 효과 값이 "체력 1200 회복"으로 적혀있었으나(마나 포션인데 체력으로 표기),
+    // 마나 포션이므로 "마나"로 바로잡아 반영함(응답 참고, 확인 필요).
+    desc: '사용 즉시 마나 1200을 회복한다', effectText: '마나 1200 회복',
+    buyPrice: 900, sellPrice: 450,
+    effect: { type: 'healMpInstant', amount: 1200 },
   },
 };
 
@@ -1371,6 +1465,27 @@ const SKILLS = {
     grade: 'rare', category: 'common', target: 'buff', levelReq: 25,
     cooldown: 20, resourceType: 'mp', resourceAmount: 300, castTime: 1.0, icon: 'lv25buff',
     healFlat: 500, // 시전 완료 시점에 체력 500 회복(최대체력 초과 회복 안 함) — actions.js resolveSkillEffect 참고
+  },
+  triple_strike: {
+    name: '삼연격', desc: '물 흐르듯 움직여 70%의 데미지로 세 번 공격한다',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 30,
+    cooldown: 5.4, resourceType: 'mp', resourceAmount: 125, castTime: 0,
+    damagePercent: 70, hits: 3, icon: 'lv30atk',
+  },
+  ankle_slash: {
+    name: '발목 가르기', desc: '150% 데미지로 공격한 후<br>피해를 입은 적을 3초 동안 둔화시킨다',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 30,
+    cooldown: 10, resourceType: 'mp', resourceAmount: 150, castTime: 0.2,
+    damagePercent: 150, hits: 1, icon: 'lv30atk2',
+    onHitStatus: { key: 'slow', durationMs: 3000 }, // 적중(=피해를 입혀 대상이 생존)한 경우에만 부여
+  },
+  cleave2: {
+    // 원본 요청 표에 설명(200%)과 데미지%(190) 값이 서로 다르게 적혀있어, 실제 데미지 계산에 쓰이는
+    // 명시적 수치 필드(데미지% 190)를 기준으로 반영함(응답 참고, 확인 필요).
+    name: '참격 2성', desc: '190%의 데미지로 모든 적을 공격한다.',
+    grade: 'rare', category: 'common', target: 'aoe', levelReq: 35,
+    cooldown: 7, resourceType: 'mp', resourceAmount: 200, castTime: 0.1,
+    damagePercent: 190, hits: 1, icon: 'lv35atk',
   },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함

@@ -166,12 +166,19 @@ function openQuickSlotPicker(idx){
   pendingQuickSlotKind = 'flask';
   pendingQuickSlotIndex = idx;
   const list = el('quickSlotPickerList');
-  list.innerHTML = Object.values(CONSUMABLES).map(item => `
-    <button class="quickslot-pick-item" data-item="${item.id}">
-      <span style="font-size:20px;">${itemIconHtml(item)}</span>
-      <span>${item.name} <span style="color:var(--forge-cream-dim);">×${(state.consumables && state.consumables[item.id]) || 0}</span></span>
-    </button>
-  `).join('');
+  // 보유 수량이 1개 이상인 플라스크만 후보로 나열함(0개 보유 종류는 제외) — 실제 보유 수량(state.consumables)과
+  // 실시간으로 연동되므로, 이 팝업을 다시 열 때마다 그 시점의 최신 보유 현황이 그대로 반영됨.
+  const ownedItems = Object.values(CONSUMABLES).filter(item => ((state.consumables && state.consumables[item.id]) || 0) > 0);
+  if(ownedItems.length === 0){
+    list.innerHTML = `<div class="inv-empty">등록 가능한 플라스크가 없습니다.</div>`;
+  } else {
+    list.innerHTML = ownedItems.map(item => `
+      <button class="quickslot-pick-item" data-item="${item.id}">
+        <span style="font-size:20px;">${itemIconHtml(item)}</span>
+        <span>${item.name} <span style="color:var(--forge-cream-dim);">×${state.consumables[item.id]}</span></span>
+      </button>
+    `).join('');
+  }
   el('quickSlotPickerModal').style.display = 'flex';
 }
 // 스킬 퀵슬롯 선택 목록 — 습득한 스킬(공용/특화 + 기연 전부)만 후보로 나열함. 실제 스킬 데이터가
