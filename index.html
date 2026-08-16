@@ -243,17 +243,22 @@
       </div>
       <div class="tier-label" id="huntDungeonName">다람쥐 굴</div>
 
-      <div class="hunt-char-panel">
-        <div class="char-stat-row big" style="margin-bottom:2px;"><span>캐릭터 레벨</span><span class="v" id="huntPlayerLevel">Lv.1</span></div>
-        <div class="player-bar-label">체력 <span id="huntHpText">100 / 100</span></div>
-        <div class="player-bar-wrap"><div class="player-bar-fill hp" id="huntHpBar"></div></div>
-        <div class="player-bar-label">마나 <span id="huntMpText">50 / 50</span></div>
-        <div class="player-bar-wrap"><div class="player-bar-fill mp" id="huntMpBar"></div></div>
-        <div class="player-bar-label">경험치 <span id="huntExpText">0%</span></div>
-        <div class="player-bar-wrap"><div class="player-bar-fill exp" id="huntExpBar"></div></div>
-      </div>
+      <div class="hunt-top-section" id="huntTopSection" style="display:none;">
+        <div class="hunt-top-row">
+          <div class="hunt-char-panel">
+            <div class="char-stat-row big" style="margin-bottom:2px;"><span>캐릭터 레벨</span><span class="v" id="huntPlayerLevel">Lv.1</span></div>
+            <div class="player-bar-label">체력 <span id="huntHpText">100 / 100</span></div>
+            <div class="player-bar-wrap"><div class="player-bar-fill hp" id="huntHpBar"></div></div>
+            <div class="player-bar-label">마나 <span id="huntMpText">50 / 50</span></div>
+            <div class="player-bar-wrap"><div class="player-bar-fill mp" id="huntMpBar"></div></div>
+          </div>
+          <div class="hunt-equip-col">
+            <div id="huntEquipPanel"></div>
+          </div>
+        </div>
 
-      <div class="hunter-info" id="hunterInfo">장착 무기: - (공격력 -)</div>
+        <div class="hunter-info" id="hunterInfo">장착 무기: - (공격력 -)</div>
+      </div>
 
       <div class="monster-stage" id="monsterStage">
         <div id="spawnToast"></div>
@@ -263,10 +268,31 @@
       <div class="treasure-hint" id="treasureHint" style="display:none;">던전 구석진 곳에서 반짝이는 상자를 발견했다.... 열어볼까?</div>
 
       <div id="huntCombatPanel">
-        <div class="monster-row" id="monsterRow"></div>
+        <div class="combat-arena" id="combatArena">
+          <button type="button" class="hunt-top-toggle-btn" id="huntTopToggleBtn">‹</button>
+          <div class="player-slot" id="combatPlayerSlot">
+            <div class="hp-bar-wrap">
+              <div class="hp-bar-fill" id="combatPlayerHpFill" style="width:100%"></div>
+              <div class="hp-text" id="combatPlayerHpText">100 / 100</div>
+            </div>
+            <div class="hp-bar-wrap mp-bar-wrap">
+              <div class="hp-bar-fill mp" id="combatPlayerMpFill" style="width:100%"></div>
+              <div class="hp-text" id="combatPlayerMpText">50 / 50</div>
+            </div>
+            <div class="monster-icon player-icon" id="combatPlayerIcon"></div>
+            <div class="player-lv-text" id="combatPlayerLevel">Lv.1</div>
+          </div>
+          <div class="monster-row" id="monsterRow"></div>
+        </div>
         <div class="skill-quickslot-row">
           <div class="quickslot-row" id="huntSkillQuickSlotRow"></div>
           <div class="quickslot-row" id="quickSlotRow"></div>
+        </div>
+        <div class="hunt-exp-wrap">
+          <div class="hp-bar-wrap exp-bar-wrap">
+            <div class="hp-bar-fill exp" id="huntExpBar" style="width:0%"></div>
+            <div class="hp-text" id="huntExpText">0.0%</div>
+          </div>
         </div>
       </div>
 

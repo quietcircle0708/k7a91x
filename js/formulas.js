@@ -67,6 +67,15 @@ function monsterImgError(img){
   img.replaceWith(document.createTextNode(img.dataset.fallbackEmoji || ''));
 }
 
+// 던전 전투 화면 중앙에 표시되는 플레이어 아이콘 HTML(monsterIconHtml과 완전히 동일한 구조 재사용).
+// 이미지 파일명은 PLAYER_IMAGE_FILE 데이터 값 하나로만 결정되므로, 나중에 다른 이미지로 교체하려면
+// 이 상수만 바꾸면 되고 코드는 그대로 재사용됨. 로드 실패 시에도 기존 몬스터 아이콘과 동일하게
+// monsterImgError로 이모지로 즉시 대체되어 화면이 깨지지 않음.
+function playerCombatIconHtml(){
+  const path = PLAYER_IMAGE_DIR + PLAYER_IMAGE_FILE + PLAYER_IMAGE_EXT;
+  return `<img src="${path}" class="monster-icon-img" alt="" data-fallback-emoji="${PLAYER_IMAGE_FALLBACK_EMOJI}" onerror="monsterImgError(this)">`;
+}
+
 // 기타/아티팩트/소비 아이템 아이콘 HTML 생성(monsterIconHtml과 완전히 동일한 구조 재사용). image 필드가
 // 있으면 PNG를 출력하고, 없으면 기존과 동일하게 icon(이모지)을 그대로 반환함. className은 화면별 크기
 // 클래스를 넘겨받지만, item-icon-img 자체가 부모 요소의 font-size를 1em 기준으로 그대로 물려받으므로
@@ -810,8 +819,7 @@ function artifactDefenseBonus(){
 function effectiveMaxHp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
   const str = (s.str || 0) + artifactStatBonus('str');
-  const agi = (s.agi || 0) + artifactStatBonus('agi');
-  let hp = playerBaseHp(level) + str * 20 + agi * 5;
+  let hp = playerBaseHp(level) + str * 20;
   if(isArtifactEquipped('antlerflag')) hp += 200; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   if(isArtifactEquipped('squareshield')) hp += 300; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
@@ -833,15 +841,15 @@ function effectiveAtkSpeed(type, level){
   let s = atkSpeedFor(type, level);
   if(isArtifactEquipped('batwing')) s *= 1.05;
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  s *= 1 + agi * 0.001; // 민첩 1당 공격속도 +0.1%
+  s *= 1 + agi * 0.003; // 민첩 1당 공격속도 +0.3%
   s *= 1 + activeBuffBonus('atkSpeedPercent') / 100; // 활성화된 버프 스킬(예: 선공)의 공격속도% 보너스
   return s;
 }
 function effectiveAtk(type, level){
   const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  // 힘 1당 공격력 +2, 민첩 1당 공격력 +1, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함
-  return atkFor(type, level) + str * 2 + agi * 1 + activeBuffBonus('atkFlat');
+  // 힘 1당 공격력 +4, 민첩 1당 공격력 +2, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함
+  return atkFor(type, level) + str * 4 + agi * 2 + activeBuffBonus('atkFlat');
 }
 // 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
 // 미리보기에서 그대로 쓰이고(무기 하나만의 값을 보여줘야 하므로), 실제 전투 판정과 캐릭터 정보창의
@@ -850,6 +858,8 @@ function effectiveCritChance(type, level){
   let bonus = 0;
   if(isArtifactEquipped('oldarmguard')) bonus += 3;
   if(isArtifactEquipped('blackarmguard')) bonus += 8;
+  const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
+  bonus += agi * 0.2; // 민첩 1당 치명타 확률 +0.2%(합연산)
   bonus += armorStatBonus('crit'); // 착용 중인 방어구/장신구의 치명타 확률 보너스 합산
   // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
   // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
@@ -978,11 +988,11 @@ function rollStoneDrop(level, monsterGrade){
 }
 
 // ---- 몬스터 체력/공격력 ----
-// 일반: Lv1=150, 이후 (이전 레벨 HP + 50) x 1.08 / 에픽: 같은 레벨 일반 몬스터의 3배(수정 없음)
+// 일반: Lv1=150, 이후 (이전 레벨 HP + 50) x 1.07 / 에픽: 같은 레벨 일반 몬스터의 3배(수정 없음)
 function normalMonsterHP(level){
   let hp = 150;
   for(let l = 2; l <= level; l++){
-    hp = (hp + 50) * 1.08;
+    hp = (hp + 50) * 1.07;
   }
   return Math.round(hp);
 }
@@ -1092,6 +1102,22 @@ function pickWeighted(pairs){
     r -= w;
   }
   return pairs[pairs.length - 1][0];
+}
+// 배열을 제자리에서 무작위로 섞음(Fisher–Yates). 몬스터 전투 위치 배정(assignMonsterPositions) 등
+// "겹치지 않게 무작위로 나눠 배정"하는 곳에서 공용으로 재사용.
+function shuffleArray(arr){
+  for(let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+// 몬스터 개체 배열에 상/하/좌/우(MONSTER_COMBAT_POSITIONS) 중 서로 겹치지 않는 위치를 하나씩 무작위로
+// 배정(instance.pos 필드). 위치 후보 전체를 먼저 무작위로 섞은 뒤 앞에서부터 순서대로 나눠주는 방식이라,
+// 몇 마리가 등장하든(1~MONSTER_COUNT_MAX) 항상 서로 다른 슬롯을 받고 이미 배정된 위치는 재사용되지 않음.
+function assignMonsterPositions(monsters){
+  const positions = shuffleArray(MONSTER_COMBAT_POSITIONS.slice());
+  monsters.forEach((m, i) => { m.pos = positions[i]; });
 }
 // 구간표(min/max/qty 배열)를 위에서부터 순서대로 검사해 value가 속하는 첫 구간의 qty를 반환함
 // (STONE_GRADE_RULES와 동일한 구간 조회 패턴). 어느 구간에도 안 걸리면 0(해당 없음)을 반환함.

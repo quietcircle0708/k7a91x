@@ -85,6 +85,7 @@ document.querySelector('.back-from-inv').addEventListener('click', closeToForge)
 document.querySelector('.back-from-character').addEventListener('click', closeToForge);
 document.querySelector('.back-from-dlist').addEventListener('click', closeToForge);
 el('exitHuntBtn').addEventListener('click', ()=> guardedNav('dungeonlist'));
+el('huntTopToggleBtn').addEventListener('click', toggleHuntTopUi);
 el('treasureChest').addEventListener('click', clickTreasureChest);
 el('monsterRow').addEventListener('click', (e)=>{
   const slot = e.target.closest('.monster-slot[data-instance-id]');

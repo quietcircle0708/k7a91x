@@ -186,29 +186,53 @@ function purchaseEffect(target){
 // ---- 던전 전투 연출 ----
 function playerHitEffect(dmg){
   const panel = document.querySelector('.hunt-char-panel');
-  if(!panel) return;
-  panel.classList.remove('player-hit'); void panel.offsetWidth; panel.classList.add('player-hit');
+  if(panel){
+    panel.classList.remove('player-hit'); void panel.offsetWidth; panel.classList.add('player-hit');
+    const p = document.createElement('div');
+    p.className = 'dmg-popup float player-dmg';
+    p.textContent = '-' + dmg;
+    p.style.left = (42 + Math.random() * 16) + '%';
+    panel.appendChild(p);
+    setTimeout(() => { panel.classList.remove('player-hit'); p.remove(); }, 850);
+  }
+  // 전투 화면 중앙 플레이어 아이콘도 몬스터와 동일한 피격 애니메이션(.hit, monster-hit 키프레임)을 재사용.
+  const combatIcon = el('combatPlayerIcon');
+  if(combatIcon){
+    combatIcon.classList.remove('hit'); void combatIcon.offsetWidth; combatIcon.classList.add('hit');
+  }
+  // 플레이어 이미지(전투 화면 중앙)에서도 몬스터 피해량 출력과 완전히 동일한 로직/서식(spawnDmgPopupIn)으로
+  // 피해량을 띄움 — 실제 체력 계산에는 영향 없는 순수 표시 전용 팝업.
+  spawnDmgPopupIn(el('combatPlayerSlot'), dmg, false);
+}
+
+// 플레이어 사망 시 전투 화면 중앙 아이콘에 몬스터와 동일한 사망 애니메이션(.dead, monster-dead 키프레임)을
+// 재생함. 새로 만들지 않고 기존 클래스/키프레임을 그대로 재사용(요구사항: 플레이어 전용 기능 신규 제작 지양).
+function playerDeathEffect(){
+  const combatIcon = el('combatPlayerIcon');
+  if(!combatIcon) return;
+  combatIcon.classList.remove('hit');
+  void combatIcon.offsetWidth;
+  combatIcon.classList.add('dead');
+}
+
+// 피해량 숫자를 특정 컨테이너(위치 기준 요소, position:relative 필요) 안에 띄우는 공용 로직.
+// 실제 피해 계산(hp -= dmg)과 화면 표시값은 완전히 분리되어 있음 — 여기서 받는 dmg는 이미 양수이므로
+// 그대로 숫자만 표시함('-' 기호·'치명타!' 문구 없이). monsterHitEffect·playerHitEffect가 공통으로 사용.
+function spawnDmgPopupIn(container, dmg, isCrit){
+  if(!container) return;
   const p = document.createElement('div');
-  p.className = 'dmg-popup float player-dmg';
-  p.textContent = '-' + dmg;
+  p.className = 'dmg-popup float' + (isCrit ? ' crit' : '');
+  p.textContent = String(dmg);
   p.style.left = (42 + Math.random() * 16) + '%';
-  panel.appendChild(p);
-  setTimeout(() => { panel.classList.remove('player-hit'); p.remove(); }, 850);
+  container.appendChild(p);
+  setTimeout(() => p.remove(), 850);
 }
 
 function monsterHitEffect(instanceId, dmg, isCrit){
   const icon = el('monster-icon-' + instanceId);
   const slot = el('monster-slot-' + instanceId);
   if(icon){ icon.classList.remove('hit'); void icon.offsetWidth; icon.classList.add('hit'); }
-  if(!slot) return;
-  const p = document.createElement('div');
-  p.className = 'dmg-popup float' + (isCrit ? ' crit' : '');
-  // 실제 피해 계산(target.hp -= dmg, 음수 반영)과 화면 표시값을 분리 — 여기서 받는 dmg는 이미 양수이므로
-  // 그대로 숫자만 표시함('-' 기호·'치명타!' 문구 없이). 몬스터 hp 차감 로직은 호출부에서 그대로 유지됨.
-  p.textContent = String(dmg);
-  p.style.left = (42 + Math.random() * 16) + '%';
-  slot.appendChild(p);
-  setTimeout(() => p.remove(), 850);
+  spawnDmgPopupIn(slot, dmg, isCrit);
 }
 
 // 상태이상(중독 등) 틱 데미지 숫자를 화면에 띄움 (실제 데미지 계산/처치 판정은 dungeon.js의 startStatusTicker가 담당)
@@ -255,8 +279,10 @@ function dropItemVisualInner(item){
   return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(it.grade)}">${itemIconHtml(it)}</span>`;
 }
 // 실제로 이 이미지 하나를 등장→낙하→튕김→유지→소멸 애니메이션으로 재생함.
-// container는 monster-slot이 아니라 그보다 오래 살아있는 상위 컨테이너(monsterRow)를 받아서, 몬스터
-// 사망 애니메이션이 끝나 slot이 DOM에서 사라진 뒤에도(0.4초) 연출(기본 1초)이 끊기지 않고 끝까지 재생됨.
+// container는 실제 좌표 기준(position:relative)이 되는 .combat-arena를 받음(아래 playMonsterDropEffect
+// 참고 — #monsterRow는 display:contents라 좌표 기준으로 쓸 수 없음). combat-arena는 몬스터 슬롯이
+// 재렌더링되어도(renderMonsterRow가 #monsterRow의 innerHTML만 교체함) 그 자체는 사라지지 않는 안정적인
+// 상위 요소라, 몬스터 사망 애니메이션이 끝나 slot이 사라진 뒤에도(0.4초) 연출(기본 1초)이 끊기지 않음.
 function spawnDropItemVisual(container, left, top, item){
   if(!container.isConnected) return; // 화면이 이미 전환된 경우 등 — 조용히 무시(연출 실패가 지급에 영향 없음)
   const wrap = document.createElement('div');
@@ -276,19 +302,24 @@ function spawnDropItemVisual(container, left, top, item){
 function playMonsterDropEffect(instanceId, items){
   if(!items || !items.length) return;
   const slot = el('monster-slot-' + instanceId);
-  const row = el('monsterRow');
-  if(!slot || !row) return;
+  // 던전 전투 화면 개편(플레이어 중앙 고정 레이아웃) 이후 #monsterRow는 display:contents로 바뀌어 그
+  // 자체로는 박스를 만들지 않음 — getBoundingClientRect()가 항상 0에 가까운 값을 반환하고,
+  // position:absolute 자식의 실제 위치 기준(containing block)도 monsterRow를 건너뛰어 그 다음 조상인
+  // .combat-arena가 되어버림. 좌표 계산 기준과 실제 렌더링 기준이 어긋나 연출이 화면 밖에 그려지던
+  // 문제가 있었음 — 좌표 계산과 부착 대상을 실제 위치 기준 요소인 combat-arena로 통일해서 수정함.
+  const arena = el('combatArena');
+  if(!slot || !arena) return;
   const slotRect = slot.getBoundingClientRect();
-  const rowRect = row.getBoundingClientRect();
+  const arenaRect = arena.getBoundingClientRect();
   // "몬스터 이미지 중앙 부근"을 기준 좌표로 잡음(슬롯 가로 중앙, 세로로는 살짝 위쪽 — 아이콘이 위치한
-  // 지점). 좌표는 slot이 살아있는 지금 시점에 한 번만 계산해서 monsterRow 기준 절대 px로 고정해둠.
-  const baseLeft = slotRect.left - rowRect.left + slotRect.width / 2;
-  const baseTop = slotRect.top - rowRect.top + slotRect.height * 0.32;
+  // 지점). 좌표는 slot이 살아있는 지금 시점에 한 번만 계산해서 combat-arena 기준 절대 px로 고정해둠.
+  const baseLeft = slotRect.left - arenaRect.left + slotRect.width / 2;
+  const baseTop = slotRect.top - arenaRect.top + slotRect.height * 0.32;
   // 여러 아이템이 동시에 드랍되면 완전히 겹치지 않도록 항목마다 가로 위치를 살짝 흩뿌리고, 짧은
   // 시간차(90ms)를 두고 순서대로 등장시켜 각각 드랍되었음을 구분할 수 있게 함.
   items.forEach((item, i) => {
     const jitter = (i - (items.length - 1) / 2) * 14 + (Math.random() * 8 - 4);
-    setTimeout(() => spawnDropItemVisual(row, baseLeft + jitter, baseTop, item), i * 90);
+    setTimeout(() => spawnDropItemVisual(arena, baseLeft + jitter, baseTop, item), i * 90);
   });
 }
 

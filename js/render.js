@@ -588,12 +588,26 @@ function renderHuntCharPanel(){
   const expPct = lv >= PLAYER_MAX_LEVEL ? 100 : Math.min(100, Math.round(state.playerExp / expReq * 1000) / 10);
 
   elLv.textContent = 'Lv.' + lv;
-  el('huntHpText').textContent = hp.toLocaleString() + ' / ' + maxHp.toLocaleString();
+  // 던전 전투 화면(상단 패널 + 전투 영역)에서는 요청에 따라 체력/마나 텍스트에 현재 수치만 표시함
+  // (최대치는 표시하지 않음 — 실제 계산·최대치 데이터 자체는 변경 없이 표시 형식만 다름).
+  el('huntHpText').textContent = hp.toLocaleString();
   el('huntHpBar').style.width = (hp / maxHp * 100) + '%';
-  el('huntMpText').textContent = mp.toLocaleString() + ' / ' + maxMp.toLocaleString();
+  el('huntMpText').textContent = mp.toLocaleString();
   el('huntMpBar').style.width = (mp / maxMp * 100) + '%';
   el('huntExpText').textContent = lv >= PLAYER_MAX_LEVEL ? 'MAX' : expPct.toFixed(1) + '%';
   el('huntExpBar').style.width = expPct + '%';
+
+  // 전투 화면 중앙(플레이어 슬롯)의 체력/마나 바도 동일한 값으로 함께 갱신(기존 몬스터 체력바와 같은
+  // .hp-bar-wrap/.hp-bar-fill 구조를 재사용하므로, 감소 시 자연스러운 전환 애니메이션도 그대로 적용됨).
+  const combatHpFill = el('combatPlayerHpFill');
+  if(combatHpFill){
+    combatHpFill.style.width = Math.max(0, Math.min(100, hp / maxHp * 100)) + '%';
+    el('combatPlayerHpText').textContent = Math.max(0, hp).toLocaleString();
+    el('combatPlayerMpFill').style.width = Math.max(0, Math.min(100, mp / maxMp * 100)) + '%';
+    el('combatPlayerMpText').textContent = Math.max(0, mp).toLocaleString();
+  }
+  const combatLv = el('combatPlayerLevel');
+  if(combatLv) combatLv.textContent = 'Lv.' + lv;
 }
 
 // 플라스크 퀵슬롯이 표시되는 모든 위치. 사냥 화면(quickSlotRow)에 있던 기존 UI를 그대로 재사용해
@@ -779,15 +793,21 @@ function equippedItemInfoLinesHtml(){
   return lines.length > 0 ? lines.join('') : `<div class="char-stat-empty">장착 중인 장비가 없습니다.</div>`;
 }
 // 좌측 "장비창" 전체(슬롯 그리드 + 아티팩트 칸 + 장착 아이템 정보 목록) HTML 조립.
-function buildEquipPanelHtml(){
+// includeInfo=false면 "장착 아이템 정보" 목록(구분선 포함)을 생략하고 슬롯 그리드만 반환함 —
+// 던전 전투 화면(renderHunt)에서만 이 목록을 표시하지 않기 위한 옵션이며, 기존 호출부(캐릭터 정보창,
+// 캐릭터 메뉴)는 인자를 넘기지 않으므로 기본값(true)으로 기존과 완전히 동일하게 동작함.
+function buildEquipPanelHtml(includeInfo){
+  if(includeInfo === undefined) includeInfo = true;
   const byKey = key => EQUIPMENT_SLOTS.find(s => s.key === key);
   const gridHtml = equipSlotHtml(byKey('weapon')) + equipSlotHtml(byKey('helmet')) + equipSlotHtml(byKey('armor'))
     + `<div class="eq-slot-accessories area-accessories">${equipSlotHtml(byKey('accessory1'))}${equipSlotHtml(byKey('accessory2'))}</div>`;
-  return `
+  const panelHtml = `
     <div class="equip-panel">
       <div class="equip-slots-grid">${gridHtml}</div>
       <div class="equip-artifact-col">${equipArtifactSlotsHtml()}</div>
-    </div>
+    </div>`;
+  if(!includeInfo) return panelHtml;
+  return panelHtml + `
     <div class="char-stat-divider"></div>
     <div class="char-stat-sub-title">장착 아이템 정보</div>
     <div class="equipped-item-info">${equippedItemInfoLinesHtml()}</div>
@@ -1224,11 +1244,33 @@ function renderDungeonList(){
   }).join('');
 }
 
+// ---- 던전 상단 UI 접기/펼치기 ----
+// hunt.topUiExpanded 값만 바꾸고 DOM 반영은 이 함수가 전담 — 토글 버튼 클릭과 던전 재입장(enterDungeon,
+// 기본값으로 초기화) 양쪽에서 공통으로 호출됨.
+function updateHuntTopUiToggle(){
+  const section = el('huntTopSection');
+  const btn = el('huntTopToggleBtn');
+  if(!section || !btn) return;
+  section.style.display = hunt.topUiExpanded ? 'block' : 'none';
+  section.classList.toggle('expanded', hunt.topUiExpanded);
+  btn.textContent = hunt.topUiExpanded ? '›' : '‹';
+}
+function toggleHuntTopUi(){
+  hunt.topUiExpanded = !hunt.topUiExpanded;
+  updateHuntTopUiToggle();
+}
+
 // ---- 던전(사냥) 전투 화면 ----
 function renderHunt(){
   const d = hunt.dungeon;
   if(!d) return;
   el('huntDungeonName').textContent = d.name + ' - ' + stageLabel(hunt.stage);
+
+  // 우측 장비창은 캐릭터 정보창(2번 주제)에서 쓰는 buildEquipPanelHtml()을 그대로 재사용 —
+  // 착용 장비가 바뀌어도(대장간에서 강화 대상만 바뀔 뿐 실제 착용은 인벤토리에서 이뤄지므로, 이 화면에
+  // 다시 진입/갱신될 때마다) 항상 최신 장착 상태를 그대로 반영함.
+  const equipPanelWrap = el('huntEquipPanel');
+  if(equipPanelWrap) equipPanelWrap.innerHTML = buildEquipPanelHtml(false);
 
   const equipped = getEquippedWeapon();
   if(equipped){
@@ -1238,10 +1280,20 @@ function renderHunt(){
     let info = `장착 무기: ${nameHtml} (공격력 ${effectiveAtk(type, lv)}, 공격속도 ${effectiveAtkSpeed(type, lv).toFixed(2)}회/초`;
     const crit = effectiveCritChance(type, lv);
     if(crit > 0) info += `, 치명타 ${crit}%`;
+    const def = playerTotalDefense();
+    if(def < 0) info += `, 방어도 ${def}`;
     info += ')';
     el('hunterInfo').innerHTML = info;
   } else {
     el('hunterInfo').textContent = '장착 무기 없음';
+  }
+
+  // 전투 화면 중앙 플레이어 아이콘 — 매번 새로 그려도 무방하지만(정적 요소라 애니메이션 진행 중에는
+  // 굳이 다시 그릴 필요가 없으므로) 비어있을 때만 채워 넣어 진행 중인 hit/dead 애니메이션이 끊기지 않게 함.
+  const playerIcon = el('combatPlayerIcon');
+  if(playerIcon && !playerIcon.dataset.filled){
+    playerIcon.innerHTML = playerCombatIconHtml();
+    playerIcon.dataset.filled = '1';
   }
 
   const isTreasureStage = hunt.stage === DUNGEON_TREASURE_STAGE;
@@ -1264,12 +1316,13 @@ function buildMonsterSlotHtml(instance){
   const grade = MONSTER_GRADES[monsterDef.grade];
   const pct = Math.max(0, Math.min(100, (instance.hp / instance.maxHp) * 100));
   const targetedClass = instance.instanceId === hunt.targetId ? ' targeted' : '';
+  const posClass = instance.pos ? ' pos-' + instance.pos : '';
   return `
-    <div class="monster-slot${targetedClass}" id="monster-slot-${instance.instanceId}" data-instance-id="${instance.instanceId}">
+    <div class="monster-slot${targetedClass}${posClass}" id="monster-slot-${instance.instanceId}" data-instance-id="${instance.instanceId}">
       <div class="target-marker">▼</div>
       <div class="hp-bar-wrap">
         <div class="hp-bar-fill" id="monster-hpfill-${instance.instanceId}" style="width:${pct}%"></div>
-        <div class="hp-text" id="monster-hptext-${instance.instanceId}">${Math.max(0, instance.hp)} / ${instance.maxHp}</div>
+        <div class="hp-text" id="monster-hptext-${instance.instanceId}">${Math.max(0, instance.hp)}</div>
       </div>
       <div class="monster-icon spawn-in" id="monster-icon-${instance.instanceId}">${monsterIconHtml(monsterDef)}</div>
       <div class="monster-name-row">
@@ -1284,7 +1337,6 @@ function buildMonsterSlotHtml(instance){
 function renderMonsterRow(){
   const row = el('monsterRow');
   if(!row) return;
-  row.className = 'monster-row count-' + hunt.monsters.length;
   row.innerHTML = hunt.monsters.map(buildMonsterSlotHtml).join('');
   // spawn-in은 등장 연출(.5s) 전용 클래스라 재생이 끝나면 더는 필요 없음 — 계속 남겨두면
   // 나중에 hit/dead 클래스가 붙어도 같은 명시도의 css 규칙끼리 소스 순서로 우선순위가 갈려
@@ -1301,7 +1353,7 @@ function updateMonsterSlot(instance){
   const text = el('monster-hptext-' + instance.instanceId);
   const pct = Math.max(0, Math.min(100, (instance.hp / instance.maxHp) * 100));
   if(fill) fill.style.width = pct + '%';
-  if(text) text.textContent = Math.max(0, instance.hp) + ' / ' + instance.maxHp;
+  if(text) text.textContent = Math.max(0, instance.hp);
 }
 // 공격 대상 선택 표시(빨간 테두리)만 갱신 — 슬롯을 다시 그리지 않고 클래스만 토글함
 function updateTargetHighlight(){

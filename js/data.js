@@ -1856,14 +1856,25 @@ const STAGE_GRADE_CHANCE = {
 };
 
 // ---- 전투 개편: 복수 몬스터 동시 등장 ----
-const MONSTER_COUNT_MAX = 3; // 전투 중 동시에 등장 가능한 최대 몬스터 수
+const MONSTER_COUNT_MAX = 4; // 전투 중 동시에 등장 가능한 최대 몬스터 수
 
 // 전투 시작 시 동시에 등장하는 몬스터 수 확률(전역 설정, 합계 100). 언제든 쉽게 바꿀 수 있도록 별도 상수로 관리함.
-const MONSTER_COUNT_CHANCE = { 1: 70, 2: 25, 3: 5 };
+const MONSTER_COUNT_CHANCE = { 1: 50, 2: 35, 3: 10, 4: 5 };
 
 // 에픽 몬스터가 확정 스폰되는 스테이지(5, 10)는 예외적으로 항상 1마리만 등장함.
 // 11스테이지(숨겨진 장소)는 몬스터가 아예 등장하지 않으므로 이 표와 무관함(별도 처리).
 const MONSTER_COUNT_FORCED_SINGLE_STAGES = [5, 10];
+
+// ---- 전투 화면 개편: 플레이어 중앙 고정 + 몬스터 상/하/좌/우 배치 ----
+// 몬스터가 배치될 수 있는 4개 고정 슬롯. MONSTER_COUNT_MAX(4)와 슬롯 개수가 같아야 함
+// (몬스터 수가 늘어나면 이 배열도 함께 늘려야 하며, 현재 작업 범위는 4슬롯까지로 한정됨).
+const MONSTER_COMBAT_POSITIONS = ['top', 'bottom', 'left', 'right'];
+// 전투 화면에 표시할 플레이어 이미지. 파일명만 데이터로 관리해 특정 이미지 파일에 종속되지 않도록 함
+// (추후 다른 이미지로 교체하려면 이 값만 바꾸면 되고, 관련 코드는 전혀 수정할 필요 없음).
+const PLAYER_IMAGE_DIR = 'assets/ui/';
+const PLAYER_IMAGE_EXT = '.png';
+const PLAYER_IMAGE_FILE = 'player';
+const PLAYER_IMAGE_FALLBACK_EMOJI = '🧑'; // PNG 로드 실패 시 대체(몬스터 아이콘과 동일한 폴백 방식)
 
 // 스테이지 입장 메시지. {name}은 던전 이름으로 치환됨(1스테이지 전용).
 const STAGE_ENTER_MSG = {

@@ -14,6 +14,8 @@ function enterDungeon(id){
   hunt.paused = true;
   hunt.started = false;
   hunt.player = { statusEffects: [] }; // 새 던전 진입 시 플레이어의 전투용 상태 이상(기절/둔화 등)도 초기화
+  hunt.topUiExpanded = false; // 던전 입장 시 상단 UI는 항상 접힌 상태로 시작
+  updateHuntTopUiToggle();
   showView('hunt');
   enterStage(1);
 }
@@ -30,6 +32,8 @@ function enterStage(stageNum){
   renderHunt();
   const row = el('monsterRow');
   if(row) row.innerHTML = ''; // 이전 스테이지의 몬스터 슬롯 잔재 제거 — 입장 메시지가 끝나기 전엔 아무것도 안 보임
+  const playerIcon = el('combatPlayerIcon');
+  if(playerIcon){ playerIcon.classList.remove('hit', 'dead'); } // 이전 전투의 피격/사망 애니메이션 잔재 제거
   showDungeonMsg(stageEnterMessage(stageNum, hunt.dungeon.name));
   hunt.stageEnterTimeout = setTimeout(() => {
     if(stageNum === DUNGEON_TREASURE_STAGE){
@@ -49,6 +53,7 @@ function spawnMonsters(){
   const count = pickMonsterCount(hunt.stage);
   const grades = pickStageMonsterGrades(hunt.stage, count);
   hunt.monsters = grades.map(grade => createMonsterInstance(d, grade));
+  assignMonsterPositions(hunt.monsters); // 각 개체에 상/하/좌/우 중 겹치지 않는 위치를 무작위 배정(instance.pos)
   hunt.targetId = hunt.monsters.length ? hunt.monsters[0].instanceId : null;
   // 이번 전투(그룹 전멸까지)에서 처치한 모든 몬스터의 보상을 합산해 담아둘 그릇
   hunt.pendingRewards = {
@@ -82,8 +87,8 @@ function createMonsterInstance(dungeon, grade){
     : monsterDef.level;
   const maxHp = monsterHPFor(monsterDef, level);
   // 몬스터 공격속도가 0.5→1.0(2초→1초당 1회)로 빨라진 밸런스 보정으로, 공격 빈도가 2배가 된 만큼
-  // 최종 공격력에만 0.5배를 곱해서 DPS를 맞춤(monsterAtkFor 공식 자체는 변경하지 않음).
-  const atk = Math.round(monsterAtkFor(monsterDef, level) * 0.5);
+  // 최종 공격력에 배율을 곱해 DPS를 조정함(monsterAtkFor 공식 자체는 변경하지 않음). 배율 0.5→0.8로 상향(밸런스 조정).
+  const atk = Math.round(monsterAtkFor(monsterDef, level) * 0.8);
   return {
     instanceId: hunt.nextInstanceId++,
     monsterId: monsterDef.id, level, hp: maxHp, maxHp, atk, statusEffects: [],
@@ -286,7 +291,8 @@ function monsterAttackTick(instanceId){
   playerHitEffect(dmg);
   renderHuntCharPanel();
   if(state.playerHp <= 0){
-    playerDied(instance);
+    playerDeathEffect(); // 몬스터와 동일한 사망 애니메이션(.dead, monster-dead 키프레임) 재생
+    setTimeout(() => playerDied(instance), MONSTER_DEAD_ANIM_MS); // 애니메이션이 끝난 뒤 사망 모달 표시
   } else {
     checkAutoHeal();
   }
