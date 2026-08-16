@@ -71,6 +71,7 @@ let pageState = {
   charStats: 1,
   charMenuInfo: 1,
   skillPage: 1,
+  huntCharStats: 1,
 };
 let shopFilterMenuOpen = false;
 

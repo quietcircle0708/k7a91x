@@ -140,6 +140,7 @@ const PAGE_RENDER_FN = {
   charStats: renderCharStats,
   charMenuInfo: renderCharacterMenu,
   skillPage: renderCharacterMenu,
+  huntCharStats: renderHuntCharStatsToggle,
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
@@ -232,6 +233,7 @@ function pendingStatPoints(key){
 function refreshCharDisplays(){
   renderCharStats();
   renderCharacterMenu();
+  renderHuntCharStatsToggle(); // 던전 화면 토글에 재사용 중인 캐릭터 정보창 UI도 함께 갱신
 }
 function allocateStat(key){
   if(!draftStats) return;

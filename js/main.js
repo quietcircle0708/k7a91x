@@ -50,6 +50,12 @@ el('charStatsPager').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
+el('huntCharStatsPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 document.addEventListener('click', (e)=>{
   if(!shopFilterMenuOpen) return;
   if(e.target.closest('.shop-filter-wrap')) return;
@@ -123,6 +129,24 @@ el('settingsBody').addEventListener('click', (e)=>{
   if(stepperBtn && !stepperBtn.disabled){ adjustSetting(stepperBtn.dataset.stepper, stepperBtn.dataset.dir); }
 });
 el('charStatsBody').addEventListener('click', (e)=>{
+  const statBtn = e.target.closest('button[data-stat]');
+  if(statBtn && !statBtn.disabled){
+    const statKey = statBtn.dataset.stat;
+    const statAction = statBtn.dataset.statAction;
+    if(statAction === 'add-bulk') allocateStatBulk(statKey);
+    else if(statAction === 'sub') deallocateStat(statKey);
+    else allocateStat(statKey);
+    return;
+  }
+  const actionBtn = e.target.closest('button[data-action]');
+  if(!actionBtn || actionBtn.disabled) return;
+  if(actionBtn.dataset.action === 'apply-stats') applyStatAlloc();
+  else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
+  else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
+});
+// 던전 전투 화면 토글(huntCharStatsBody)도 charStatsBody와 완전히 동일한 콘텐츠(buildCharStatsInfoHtml)를
+// 그대로 재사용하므로, 클릭 위임 로직도 동일하게 복제(대상 컨테이너만 다름).
+el('huntCharStatsBody').addEventListener('click', (e)=>{
   const statBtn = e.target.closest('button[data-stat]');
   if(statBtn && !statBtn.disabled){
     const statKey = statBtn.dataset.stat;

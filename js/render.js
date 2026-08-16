@@ -608,6 +608,8 @@ function renderHuntCharPanel(){
   }
   const combatLv = el('combatPlayerLevel');
   if(combatLv) combatLv.textContent = 'Lv.' + lv;
+  // 토글 메뉴(캐릭터 정보창 UI)가 펼쳐진 상태라면 그 안의 체력/마나/공격력 등도 전투 중 실시간으로 갱신.
+  if(hunt.topUiExpanded) renderHuntCharStatsToggle();
 }
 
 // 플라스크 퀵슬롯이 표시되는 모든 위치. 사냥 화면(quickSlotRow)에 있던 기존 UI를 그대로 재사용해
@@ -1252,12 +1254,26 @@ function updateHuntTopUiToggle(){
   const btn = el('huntTopToggleBtn');
   if(!section || !btn) return;
   section.style.display = hunt.topUiExpanded ? 'block' : 'none';
-  section.classList.toggle('expanded', hunt.topUiExpanded);
   btn.textContent = hunt.topUiExpanded ? '›' : '‹';
+  if(hunt.topUiExpanded) renderHuntCharStatsToggle(); // 펼치는 시점에 최신 내용으로 갱신
 }
 function toggleHuntTopUi(){
   hunt.topUiExpanded = !hunt.topUiExpanded;
   updateHuntTopUiToggle();
+}
+// 던전 전투 화면의 `<`/`>` 토글 메뉴 내용 — 기존 캐릭터 정보창(charStatsModal)과 완전히 동일한 콘텐츠
+// 빌더(buildEquipPanelHtml/buildCharStatsInfoHtml/buildArtifactEffectsHtml)와 페이지네이션 패턴
+// (renderCharStatsPage1/2와 동일 구조)을 그대로 재사용함 — 새 캐릭터 정보 UI를 따로 만들지 않음.
+// pageState 키만 'huntCharStats'로 별도 관리해서, 캐릭터 정보창(모달)의 현재 페이지와는 독립적으로 동작함.
+function renderHuntCharStatsToggle(){
+  pageState.huntCharStats = clampPage(pageState.huntCharStats, CHAR_STATS_PAGE_COUNT);
+  const pagerWrap = el('huntCharStatsPager');
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('huntCharStats', pageState.huntCharStats, CHAR_STATS_PAGE_COUNT);
+  const body = el('huntCharStatsBody');
+  if(!body) return;
+  body.innerHTML = pageState.huntCharStats === 2
+    ? buildArtifactEffectsHtml()
+    : `<div class="char-stats-page1"><div class="char-stats-left">${buildEquipPanelHtml()}</div><div class="char-stats-right">${buildCharStatsInfoHtml()}</div></div>`;
 }
 
 // ---- 던전(사냥) 전투 화면 ----
@@ -1265,28 +1281,6 @@ function renderHunt(){
   const d = hunt.dungeon;
   if(!d) return;
   el('huntDungeonName').textContent = d.name + ' - ' + stageLabel(hunt.stage);
-
-  // 우측 장비창은 캐릭터 정보창(2번 주제)에서 쓰는 buildEquipPanelHtml()을 그대로 재사용 —
-  // 착용 장비가 바뀌어도(대장간에서 강화 대상만 바뀔 뿐 실제 착용은 인벤토리에서 이뤄지므로, 이 화면에
-  // 다시 진입/갱신될 때마다) 항상 최신 장착 상태를 그대로 반영함.
-  const equipPanelWrap = el('huntEquipPanel');
-  if(equipPanelWrap) equipPanelWrap.innerHTML = buildEquipPanelHtml(false);
-
-  const equipped = getEquippedWeapon();
-  if(equipped){
-    const lv = equipped.level;
-    const type = equipped.type || 'longsword';
-    const nameHtml = `<span class="weapon-name-wrap">${weaponName(type)}${levelSuffix(lv)}<span class="tooltip">${buildWeaponTooltipHtml(type, lv)}</span></span>`;
-    let info = `장착 무기: ${nameHtml} (공격력 ${effectiveAtk(type, lv)}, 공격속도 ${effectiveAtkSpeed(type, lv).toFixed(2)}회/초`;
-    const crit = effectiveCritChance(type, lv);
-    if(crit > 0) info += `, 치명타 ${crit}%`;
-    const def = playerTotalDefense();
-    if(def < 0) info += `, 방어도 ${def}`;
-    info += ')';
-    el('hunterInfo').innerHTML = info;
-  } else {
-    el('hunterInfo').textContent = '장착 무기 없음';
-  }
 
   // 전투 화면 중앙 플레이어 아이콘 — 매번 새로 그려도 무방하지만(정적 요소라 애니메이션 진행 중에는
   // 굳이 다시 그릴 필요가 없으므로) 비어있을 때만 채워 넣어 진행 중인 hit/dead 애니메이션이 끊기지 않게 함.

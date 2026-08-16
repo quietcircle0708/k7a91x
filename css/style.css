@@ -413,19 +413,19 @@
   .dungeon-enter-btn:disabled{ opacity:.4; cursor:not-allowed; }
 
   /* ---- hunt view ---- */
-  /* 상단 UI 전체를 감싸는 접기/펼치기 대상 섹션. 기본은 인라인 style(display:none)로 접혀 있고,
-     펼쳐지면(.expanded) zoom으로 전체 내용을 약 55% 크기로 축소해 전투 화면을 최대한 덜 가리게 함
-     (transform:scale과 달리 zoom은 실제 차지하는 레이아웃 공간도 함께 줄어듦). */
-  .hunt-top-section{ margin-bottom:4px; }
-  .hunt-top-section.expanded{ zoom:.55; }
-  /* 상단 영역을 좌(플레이어 정보)/우(장비창)로 절반씩 나눔 */
-  .hunt-top-row{ display:flex; gap:10px; align-items:flex-start; margin-bottom:10px; }
+  /* 플레이어 정보(레벨/체력/마나/경험치) — 토글과 무관하게 항상 노출. combat-arena가 아니라
+     forge-card(#huntCard, position:relative)를 기준으로 절대좌표 배치해, "던전 이름 - 스테이지" 행과
+     같은 높이(top:0)에서 좌측 끝(left:0)에 붙도록 함(HTML상으로도 huntDungeonName 바로 다음, combat-arena
+     밖으로 이동). 가로 폭은 원래 크기(약 215px)를 유지하고, 폭만 억지로 줄여 글자가 비좁아지는 대신
+     zoom으로 전체(가로/세로/글자 크기 전부)를 70% 크기로 축소함(zoom은 transform:scale과 달리 실제
+     차지하는 레이아웃 공간도 함께 줄어듦). */
+  .hunt-player-info{
+    position:absolute; top:0; left:0; z-index:2; width:215px; zoom:.7;
+  }
   .hunt-char-panel{
-    flex:1; min-width:0;
     background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:12px;
     padding:12px 14px 10px; position:relative;
   }
-  .hunt-equip-col{ flex:1; min-width:0; }
   .hunt-char-panel.player-hit{ animation: player-hit-flash .3s; }
   @keyframes player-hit-flash{
     0%{ box-shadow: 0 0 0 0 rgba(193,60,60,0); border-color: var(--forge-line); }
@@ -433,7 +433,15 @@
     100%{ box-shadow: 0 0 0 0 rgba(193,60,60,0); border-color: var(--forge-line); }
   }
   .dmg-popup.player-dmg{ top:-6px; color: var(--forge-blood); }
-  .hunter-info{ text-align:center; font-size:12.5px; color: var(--forge-cream-dim); font-family:'JetBrains Mono', monospace; margin-bottom:8px; }
+  /* 토글(`<`/`>`) 패널 — 기존 캐릭터 정보창(charStatsModal)과 동일한 콘텐츠를 그대로 재사용하되,
+     combat-arena 위에 떠 있는 오버레이 카드로 표시하고 zoom으로 약 55% 크기로 축소해 전투 화면을
+     최대한 덜 가리게 함(transform:scale과 달리 zoom은 실제 차지하는 레이아웃 공간도 함께 줄어듦).
+     펼쳐진 상태에서만 렌더링/표시되므로(display:none일 때는 비용 없음) 별도의 .expanded 클래스는 불필요. */
+  .hunt-toggle-panel{
+    position:absolute; top:30px; right:2px; z-index:8; width:560px; max-height:600px; overflow:auto;
+    background: var(--forge-panel); border:1px solid var(--forge-line); border-radius:12px;
+    padding:14px; box-shadow: 0 8px 24px rgba(0,0,0,.55); zoom:.55;
+  }
   .monster-stage{ display:flex; justify-content:center; align-items:center; height:36px; position:relative; margin-bottom:6px; }
   .monster-icon{ font-size:72px; transition: transform .1s, filter .15s; position:relative; z-index:1; }
   /* 몬스터 PNG는 부모(.monster-icon 등)의 font-size를 1em 기준으로 그대로 물려받아 크기를 맞춤 —
@@ -521,21 +529,22 @@
     92%{ opacity:1; transform: translate(-50%,-50%) translateY(0) scale(1); }
     100%{ opacity:0; transform: translate(-50%,-50%) translateY(0) scale(.85); } /* 페이드아웃 */
   }
-  /* 전투 영역(플레이어 중앙 고정 + 몬스터 상/하/좌/우) — 출현한 몬스터 수와 무관하게 항상 동일한
-     고정 크기를 갖도록 행/열 트랙 크기를 전부 고정 px로 지정함(auto를 쓰면 특정 위치가 비었을 때 그
-     방향의 트랙이 줄어들어 버림). 몬스터가 없는 슬롯도 자리만 비워둘 뿐 트랙 크기 자체는 그대로 유지됨. */
+  /* 전투 영역(플레이어 중앙 고정 + 몬스터 상/좌/우, 하단 슬롯 제거) — 출현한 몬스터 수와 무관하게
+     항상 동일한 고정 크기를 갖도록 행/열 트랙 크기를 전부 고정 px로 지정함(auto를 쓰면 특정 위치가
+     비었을 때 그 방향의 트랙이 줄어들어 버림). 몬스터가 없는 슬롯도 자리만 비워둘 뿐 트랙 크기 자체는
+     그대로 유지됨. 플레이어 정보 UI는 combat-arena 밖(huntCard 기준)으로 옮겨졌으므로 1행은 [상] 몬스터
+     슬롯만 고려해 2행과 동일한 높이(140px)로 둠. */
   .combat-arena{
     position:relative; display:grid;
     grid-template-columns: 96px 1fr 96px;
-    grid-template-rows: 140px 140px 140px;
+    grid-template-rows: 140px 140px;
     grid-template-areas:
       ".    top    ."
-      "left player right"
-      ".    bottom .";
+      "left player right";
     align-items:center; justify-items:center;
     gap:2px 6px; margin-bottom:6px;
   }
-  /* 상단 UI 접기/펼치기 버튼 — 상단(top) 몬스터 슬롯과 같은 첫 행이면서, 그 옆(3번째 컬럼)은
+  /* 상단 UI 접기/펼치기 버튼 — [상] 몬스터 슬롯과 같은 첫 행이면서, 그 옆(3번째 컬럼)은
      grid-template-areas상 빈 칸(".")이라 몬스터/플레이어와 절대 겹치지 않음. */
   .hunt-top-toggle-btn{
     position:absolute; top:2px; right:2px; z-index:6;
@@ -548,18 +557,16 @@
      상위 그리드(.combat-arena)의 grid-area에 배치되도록 함 — 몬스터 스폰 시 이 요소의 innerHTML을
      통째로 다시 그려도(renderMonsterRow) 별도로 존재하는 .player-slot(정적 요소)은 전혀 영향받지 않음. */
   .monster-row{ display:contents; }
-  /* 좌/우 슬롯은 그리드 컬럼 폭(96px)에 맞춤. 상/하 슬롯은 플레이어와 같은 넓은 가운데 컬럼(1fr)에
-     놓이지만 width:100%로 그 폭을 그대로 채우면 좌/우보다 훨씬 커지므로(기존 버그), 좌/우 폭 기준
-     정확히 10% 더 긴 고정값(96px × 1.1 ≈ 106px)으로 네 위치의 체력바 크기를 통일함. */
+  /* 좌/우 슬롯은 그리드 컬럼 폭(96px)에 맞춤. 상단 슬롯은 플레이어와 같은 넓은 가운데 컬럼(1fr)에
+     놓이지만 width:100%로 그 폭을 그대로 채우면 좌/우보다 훨씬 커지므로, 좌/우 폭 기준 정확히 10%
+     더 긴 고정값(96px × 1.1 ≈ 106px)으로 통일함(하단 슬롯은 제거되어 더 이상 존재하지 않음). */
   .monster-slot{ display:flex; flex-direction:column; align-items:center; cursor:pointer; position:relative; width:96px; }
-  .monster-slot.pos-top, .monster-slot.pos-bottom{ width:106px; }
-  .monster-slot.pos-top{ grid-area: top; }
-  .monster-slot.pos-bottom{ grid-area: bottom; }
+  .monster-slot.pos-top{ width:106px; grid-area: top; }
   .monster-slot.pos-left{ grid-area: left; }
   .monster-slot.pos-right{ grid-area: right; }
   .player-slot{ grid-area: player; display:flex; flex-direction:column; align-items:center; width:150px; position:relative; z-index:1; }
   /* 전투 영역 안에서는 몬스터/플레이어 아이콘을 공통으로 조금 더 작게(기본 72px → 46px) 표시해
-     상/하/좌/우 4슬롯이 좁은 화면 폭에도 한 번에 들어오도록 함. */
+     상/좌/우 슬롯이 좁은 화면 폭에도 한 번에 들어오도록 함. */
   .combat-arena .monster-icon{ font-size:46px; }
   .player-slot .hp-bar-wrap{ width:100%; }
   .player-slot .mp-bar-wrap{ margin-top:-2px; }
@@ -569,12 +576,6 @@
   }
   .hp-bar-fill.mp{ background: linear-gradient(90deg, #4fa3d1, #2f6f96); }
   .hp-bar-fill.exp{ background: linear-gradient(90deg, #ffe9a8, #e0b13c); }
-  /* 경험치 바 — 퀵슬롯 아래, 좌우 10px만 남기고 폭을 최대한 넓게 사용. 기존 몬스터/플레이어 체력바와
-     같은 .hp-bar-wrap/.hp-bar-fill/.hp-text 구조(가운데 정렬된 오버레이 텍스트)를 그대로 재사용하되,
-     눈에 더 잘 띄도록 높이만 더 키움(exp-bar-wrap). */
-  .hunt-exp-wrap{ padding:0 10px; margin-top:10px; }
-  .exp-bar-wrap{ height:20px; }
-  .exp-bar-wrap .hp-text{ font-size:12px; }
   .monster-slot.targeted .monster-icon{
     /* 사각형 outline 대신, 여러 방향의 drop-shadow를 겹쳐 몬스터 이미지(글리프) 외곽 실루엣만 따라가는
        붉은 테두리를 만듦(정사각형 틀이 생기지 않음). */

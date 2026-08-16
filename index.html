@@ -243,21 +243,16 @@
       </div>
       <div class="tier-label" id="huntDungeonName">다람쥐 굴</div>
 
-      <div class="hunt-top-section" id="huntTopSection" style="display:none;">
-        <div class="hunt-top-row">
-          <div class="hunt-char-panel">
-            <div class="char-stat-row big" style="margin-bottom:2px;"><span>캐릭터 레벨</span><span class="v" id="huntPlayerLevel">Lv.1</span></div>
-            <div class="player-bar-label">체력 <span id="huntHpText">100 / 100</span></div>
-            <div class="player-bar-wrap"><div class="player-bar-fill hp" id="huntHpBar"></div></div>
-            <div class="player-bar-label">마나 <span id="huntMpText">50 / 50</span></div>
-            <div class="player-bar-wrap"><div class="player-bar-fill mp" id="huntMpBar"></div></div>
-          </div>
-          <div class="hunt-equip-col">
-            <div id="huntEquipPanel"></div>
-          </div>
-        </div>
-
-        <div class="hunter-info" id="hunterInfo">장착 무기: - (공격력 -)</div>
+      <!-- 플레이어 정보(레벨/체력/마나/경험치) — 토글과 무관하게 항상 노출. huntCard(position:relative)
+           기준 절대좌표로 배치해 "던전 이름 - 스테이지" 행과 같은 높이, 좌측 끝에 붙도록 함. -->
+      <div class="hunt-player-info hunt-char-panel" id="huntPlayerInfo">
+        <div class="char-stat-row big" style="margin-bottom:2px;"><span>캐릭터 레벨</span><span class="v" id="huntPlayerLevel">Lv.1</span></div>
+        <div class="player-bar-label">체력 <span id="huntHpText">100 / 100</span></div>
+        <div class="player-bar-wrap"><div class="player-bar-fill hp" id="huntHpBar"></div></div>
+        <div class="player-bar-label">마나 <span id="huntMpText">50 / 50</span></div>
+        <div class="player-bar-wrap"><div class="player-bar-fill mp" id="huntMpBar"></div></div>
+        <div class="player-bar-label">경험치 <span id="huntExpText">0%</span></div>
+        <div class="player-bar-wrap"><div class="player-bar-fill exp" id="huntExpBar"></div></div>
       </div>
 
       <div class="monster-stage" id="monsterStage">
@@ -270,6 +265,12 @@
       <div id="huntCombatPanel">
         <div class="combat-arena" id="combatArena">
           <button type="button" class="hunt-top-toggle-btn" id="huntTopToggleBtn">‹</button>
+          <!-- 토글 메뉴 — 기존 캐릭터 정보창(charStatsModal)과 완전히 동일한 UI(장비창+스탯+장착정보 /
+               적용 중인 아티팩트 효과, 2페이지)를 그대로 재사용해서 출력함(별도 신규 UI 아님). -->
+          <div class="hunt-toggle-panel" id="huntTopSection" style="display:none;">
+            <div class="pager" id="huntCharStatsPager"></div>
+            <div id="huntCharStatsBody"></div>
+          </div>
           <div class="player-slot" id="combatPlayerSlot">
             <div class="hp-bar-wrap">
               <div class="hp-bar-fill" id="combatPlayerHpFill" style="width:100%"></div>
@@ -287,12 +288,6 @@
         <div class="skill-quickslot-row">
           <div class="quickslot-row" id="huntSkillQuickSlotRow"></div>
           <div class="quickslot-row" id="quickSlotRow"></div>
-        </div>
-        <div class="hunt-exp-wrap">
-          <div class="hp-bar-wrap exp-bar-wrap">
-            <div class="hp-bar-fill exp" id="huntExpBar" style="width:0%"></div>
-            <div class="hp-text" id="huntExpText">0.0%</div>
-          </div>
         </div>
       </div>
 
