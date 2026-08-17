@@ -413,8 +413,10 @@ function killMonsterInstance(instanceId){
   }
   if(result.weaponIdDrops && result.weaponIdDrops.length){
     for(const drop of result.weaponIdDrops){
-      if(!equipInventoryFull()){
-        state.inventory.push({ id: state.nextItemId++, level: drop.level, type: drop.type });
+      // 기존엔 확정 장비 드랍이 전부 무기였어서 state.inventory에 직접 넣었지만, 이제 방어구 확정 드랍도
+      // 생겨서(자호굴 강철 갑옷/투구) grantRelicEquipDrop(모험가의 유해와 동일 함수)을 재사용해
+      // drop.equipType 기준으로 무기/방어구/장신구 인벤토리에 맞게 나뉘어 들어가도록 함.
+      if(grantRelicEquipDrop(drop)){
         hunt.pendingRewards.weaponIdDrops.push(drop);
         dropVisualItems.push({ kind: 'equip', type: drop.type });
       } // 공용 장비 슬롯이 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨

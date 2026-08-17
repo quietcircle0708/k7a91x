@@ -306,6 +306,42 @@ const WEAPON_TYPES = {
       statBonus: { str: 5, maxHp: 800 },
     },
   },
+  tigersword: {
+    id: 'tigersword', name: '척호검', desc: '맹수의 기운이 서려 있다.',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'epic', // 에픽
+    attackPower: 123, attackSpeed: 0.8, critRate: 5,
+    purchasable: false, sellPrice: 6000, levelReq: 30,
+    image: 'epic_tigersword',
+    atk: [123], speed: [0.8], crit: [5], sell: [6000],
+    cost: [], odds: [],
+    // 고유 옵션: moongreatsword/ninetaildagger와 동일한 "고정형" 스키마(opt.text+opt.statBonus).
+    // 공격 속도 +10%는 statBonus에 새 키 atkSpeedPercent로 등록 — effectiveAtkSpeed(formulas.js)가
+    // weaponUniqueOptionStatBonus('atkSpeedPercent')를 참조하도록 확장해 자동 반영됨(기존 str/maxHp/
+    // maxMana와 동일한 방식으로 일반화, 이 무기 전용 코드 없음).
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +3<br>공격 속도 +10%',
+      statBonus: { str: 3, atkSpeedPercent: 10 },
+    },
+  },
+  bloodtigerlongsword: {
+    id: 'bloodtigerlongsword', name: '혈호대검', desc: '붉은 호랑이의 피와 살의를<br>머금은 거대한 양손 검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'epic', // 에픽
+    attackPower: 302, attackSpeed: 0.6, critRate: 7,
+    purchasable: false, sellPrice: 9000, levelReq: 40,
+    image: 'epic_tigerlongsword',
+    atk: [302], speed: [0.6], crit: [7], sell: [9000],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +10<br>최대 체력 +300',
+      statBonus: { str: 10, maxHp: 300 },
+    },
+  },
   bent_greatsword: {
     id: 'bent_greatsword', name: '휘어진 양손 검', desc: '날이 휘어져 절삭력이 좋지 않다',
     equipType: 'weapon',
@@ -661,6 +697,18 @@ const ACCESSORY_TYPES = {
     defense: -1, mana: 100,
     purchasable: true, sellPrice: 1400, levelReq: 15,
     image: '',
+  },
+  // 상점 구매 여부가 원본 표에 비어있었으나, 이 정도 고가(30000)의 유니크 등급 확정 장비 드랍은
+  // 기존 사례(척호검/혈호대검/제령도 등)와 동일하게 전부 상점 구매 불가(판매 전용)였어서 동일하게
+  // purchasable: false로 반영함(확인 필요 사항으로 응답에 안내).
+  wolfmoonring: {
+    id: 'wolfmoonring', name: '현랑반지', desc: '현랑귀의 날카로운 기운을 머금은 반지',
+    equipType: 'accessory',
+    accessoryKind: 'ring',
+    grade: 'unique', // 유니크
+    defense: -4, hp: 200, mana: 100, crit: 9,
+    purchasable: false, sellPrice: 30000, levelReq: 50,
+    image: '', // 비워두면 반지 기본 이미지(ringbase) 자동 적용(ACCESSORY_DEFAULT_IMAGE)
   },
 };
 
@@ -1262,6 +1310,26 @@ const MISC_ITEMS = {
     desc: '여우의 가죽, 귀중한 재료로 쓰인다',
     sellPrice: 200, stateKey: 'foxFurs',
   },
+  tigerHide: {
+    id: 'tigerHide', name: '자호의 가죽', icon: '🍖', itemClass: 'misc', grade: 'normal', // 요청 표에 등급 미기재 → 등급 미표기 기존 아이템 규칙(전부 '일반')과 동일하게 적용
+    desc: '보랏빛을 띈 줄무늬 가죽',
+    sellPrice: 250, stateKey: 'tigerHides',
+  },
+  amber: {
+    id: 'amber', name: '호박', icon: '🟠', image: 'epic_amber', itemClass: 'misc', grade: 'epic',
+    desc: '태고의 수액이 굳어 만들어진 신비로운 호박',
+    sellPrice: 400, stateKey: 'ambers',
+  },
+  // 원본 요청 표에 두 아이템 모두 이름이 "호박"으로 동일하게 적혀 있었으나(아이콘/판매가는 서로 다름),
+  // 이름이 같으면 miscItemByName(이름으로 아이템을 찾는 함수)이 첫 번째 것만 찾고 두 번째는 영영
+  // 못 찾게 되는 실질적 버그가 생기고, 사마귀굴 몬스터 드랍표에도 "호박"(사마귀·사마귀랑)과
+  // "진호박"(현랑귀랑·현랑귀)이 이름으로 이미 구분되어 있어, 이 두 번째 아이템은 "진호박"으로
+  // 간주해 반영함(확인 필요 — 응답 참고).
+  purpleAmber: {
+    id: 'purpleAmber', name: '진호박', icon: '🟣', image: 'epic_purple_amber', itemClass: 'misc', grade: 'epic',
+    desc: '태고의 수액이 굳어 만들어진 신비로운 호박',
+    sellPrice: 800, stateKey: 'purpleAmbers',
+  },
 };
 
 // ---- 강화 파괴 및 흔적 시스템 ----
@@ -1471,6 +1539,10 @@ const SKILLS = {
     grade: 'rare', category: 'common', target: 'single', levelReq: 30,
     cooldown: 5.4, resourceType: 'mp', resourceAmount: 125, castTime: 0,
     damagePercent: 70, hits: 3, icon: 'lv30atk',
+    // 이연격(double_strike)과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용.
+    // applyDelayedSkillHits(actions.js)가 hits 값에 따라 자동으로 반복하므로 3타도 별도 처리 없이
+    // 1타(즉시)→2타(0.1초 뒤)→3타(0.2초 뒤) 순으로 그대로 동작함.
+    hitDelayMs: 0.1,
   },
   ankle_slash: {
     name: '발목 가르기', desc: '150% 데미지로 공격한 후<br>피해를 입은 적을 3초 동안 둔화시킨다',
@@ -1754,6 +1826,71 @@ const MONSTERS = {
       { name: '제령도', chance: 8, weaponId: 'ninetaildagger' },
     ],
   },
+  tiger1: {
+    id: 'tiger1', name: '자호', icon: '🐅', grade: 'normal', level: 30, image: 'tiger1',
+    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '자호의 가죽', chance: 20 } ],
+  },
+  tiger2: {
+    id: 'tiger2', name: '친자호', icon: '🐅', grade: 'normal', level: 30, image: 'tiger2',
+    hpMult: 0.9, atkMult: 2.0, speedMult: 0.6,
+    drops: [
+      { name: '자호의 가죽', chance: 20 },
+      { name: '강철 갑옷', chance: 5, weaponId: 'steelarmor' },
+    ],
+  },
+  tiger3: {
+    id: 'tiger3', name: '구자호', icon: '🐅', grade: 'epic', level: 37, image: 'tiger3',
+    hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    epicSpawnWeight: 50, // 자호굴 전용 — 적호와 합쳐 100%(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '자호의 가죽', chance: 20 },
+      { name: '강철 투구', chance: 5, weaponId: 'steelhelmet' },
+      { name: '척호검', chance: 5, weaponId: 'tigersword' },
+    ],
+  },
+  tiger4: {
+    id: 'tiger4', name: '적호', icon: '🐅', grade: 'epic', level: 40, image: 'tiger4',
+    hpMult: 1.0, atkMult: 1.3, speedMult: 1.1,
+    epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '자호의 가죽', chance: 70 },
+      { name: '강철 갑옷', chance: 10, weaponId: 'steelarmor' },
+      { name: '강철 투구', chance: 10, weaponId: 'steelhelmet' },
+      { name: '척호검', chance: 5, weaponId: 'tigersword' },
+      // 원본 요청 표엔 드랍명이 "적랑대검"으로 적혀 있었으나, 같은 요청의 무기 목록에는 "적랑대검"이
+      // 없고 "혈호대검"만 정의되어 있어 동일 아이템으로 간주해 반영함(확인 필요 — 응답에 플래그함).
+      { name: '혈호대검', chance: 5, weaponId: 'bloodtigerlongsword' },
+    ],
+  },
+  mantis: {
+    id: 'mantis', name: '사마귀', icon: '🦗', grade: 'normal', level: 37, image: 'mantis',
+    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '호박', chance: 15 } ],
+  },
+  mantis2: {
+    id: 'mantis2', name: '사마귀랑', icon: '🦗', grade: 'normal', level: 37, image: 'mantis2',
+    hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
+    drops: [ { name: '호박', chance: 20 } ],
+  },
+  epicmantis1: {
+    id: 'epicmantis1', name: '현랑귀랑', icon: '🦗', grade: 'epic', level: 45, image: 'epicmantis1',
+    hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    epicSpawnWeight: 70, // 사마귀굴 전용 — 현랑귀와 합쳐 100%(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '현랑반지', chance: 0.1, weaponId: 'wolfmoonring' },
+    ],
+  },
+  epicmantis2: {
+    id: 'epicmantis2', name: '현랑귀', icon: '🦗', grade: 'epic', level: 48, image: 'epicmantis2',
+    hpMult: 1.0, atkMult: 1.4, speedMult: 1.1,
+    epicSpawnWeight: 30, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '현랑반지', chance: 2, weaponId: 'wolfmoonring' },
+    ],
+  },
 };
 
 
@@ -1822,6 +1959,22 @@ const DUNGEONS = [
     desc: '붉은 노을이 지는 언덕 아래, 영악한 여우들이 무리 지어 사는 굴',
     monsters: ['fox', 'greenfox', 'blackfox', 'ninetailfox'],
     levelRange: 4,
+  },
+  {
+    id: 'tiger_den',
+    name: '자호굴',
+    icon: '',
+    desc: '호랑이들이 서식하는 깊고 험난한 동굴',
+    monsters: ['tiger1', 'tiger2', 'tiger3', 'tiger4'],
+    levelRange: 6,
+  },
+  {
+    id: 'mantis_den',
+    name: '사마귀굴',
+    icon: '',
+    desc: '어둠 속에서 낫을 휘두르는 사마귀들의 소굴',
+    monsters: ['mantis', 'mantis2', 'epicmantis1', 'epicmantis2'],
+    levelRange: 6,
   },
 ];
 

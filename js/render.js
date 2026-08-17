@@ -1149,18 +1149,23 @@ function buildDungeonDropIcons(d){
   icons.push({ icon: '💀', borderColor: 'var(--forge-green)',
     tooltip: `<span class="txt-relic">모험가의 유해</span><br>낮은 확률로 쓰러진 모험가의 장비를 획득합니다.` });
 
-  // 4. 장비 아이템 — 몬스터 드랍 테이블에 직접 등록된 무기(weaponId, 모험가의 유해와는 별개의 확정 드랍)가
-  //    있다면 무기 툴팁/PNG 아이콘 공식을 그대로 사용해 표시. 현재 등록된 몬스터 중에는 이런 항목이 없어
-  //    지금은 아무 것도 표시되지 않지만, 몬스터 drops에 { weaponId, chance } 항목이 추가되는 즉시 자동 반영됨.
+  // 4. 장비 아이템 — 몬스터 드랍 테이블에 직접 등록된 장비(weaponId, 모험가의 유해와는 별개의 확정 드랍)가
+  //    있다면 해당 장비 종류(무기/방어구/장신구)에 맞는 아이콘/툴팁 공식을 사용해 표시. weaponIconHtml·
+  //    weaponGradeColor는 wpn()으로 세 종류를 통합 조회해 이미 범용이지만, 툴팁은 종류별 함수가 따로
+  //    있어(buildWeaponTooltipHtml/buildArmorTooltipHtml/buildAccessoryTooltipHtml) equipType으로 분기함.
   const seenWeaponIds = new Set();
   d.monsters.forEach(id => {
     (MONSTERS[id].drops || []).forEach(drop => {
       if(!drop.weaponId || seenWeaponIds.has(drop.weaponId)) return;
       seenWeaponIds.add(drop.weaponId);
+      const equipType = wpn(drop.weaponId).equipType;
+      const tooltip = equipType === 'armor' ? buildArmorTooltipHtml(drop.weaponId, 0)
+        : equipType === 'accessory' ? buildAccessoryTooltipHtml(drop.weaponId, 0)
+        : buildWeaponTooltipHtml(drop.weaponId, 0);
       icons.push({
         iconHtml: weaponIconHtml(drop.weaponId, 'drop-icon-img'),
         borderColor: weaponGradeColor(drop.weaponId),
-        tooltip: buildWeaponTooltipHtml(drop.weaponId, 0),
+        tooltip,
       });
     });
   });

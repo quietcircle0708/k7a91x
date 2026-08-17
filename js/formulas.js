@@ -843,6 +843,7 @@ function effectiveAtkSpeed(type, level){
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
   s *= 1 + agi * 0.003; // 민첩 1당 공격속도 +0.3%
   s *= 1 + activeBuffBonus('atkSpeedPercent') / 100; // 활성화된 버프 스킬(예: 선공)의 공격속도% 보너스
+  s *= 1 + weaponUniqueOptionStatBonus('atkSpeedPercent') / 100; // 착용 무기의 고유 옵션 중 공격속도% 보너스(예: 척호검) 합산
   return s;
 }
 function effectiveAtk(type, level){
@@ -1256,7 +1257,10 @@ function resolveDrops(monsterDef, dungeon, level){
   for(const drop of (monsterDef.drops || [])){
     if(!drop.weaponId) continue;
     if(Math.random() * 100 < drop.chance){
-      weaponIdDrops.push({ type: drop.weaponId, level: 0, chance: drop.chance });
+      // weaponId 필드는 이름과 달리 무기 전용이 아니라 wpn()이 통합 조회하는 무기/방어구/장신구 전체를
+      // 가리키는 범용 "확정 장비 드랍" 식별자임(자호굴 강철 갑옷/투구 드랍이 최초의 방어구 사례).
+      // equipType을 함께 담아 지급 시 올바른 인벤토리(무기/방어구/장신구)로 나뉘어 들어가도록 함.
+      weaponIdDrops.push({ type: drop.weaponId, level: 0, chance: drop.chance, equipType: wpn(drop.weaponId).equipType });
     }
   }
 
@@ -1276,14 +1280,14 @@ function resolveDrops(monsterDef, dungeon, level){
       * (gradeChanceTable[relicGrade] || 0) / 100;
     equipCandidates.push({ type: weaponDrop.type, level: weaponDrop.level, chance: relicChance, _source: 'relic', equipType: relicEquipType });
   }
-  weaponIdDrops.forEach(d => equipCandidates.push({ type: d.type, level: d.level, chance: d.chance, _source: 'weaponId' }));
+  weaponIdDrops.forEach(d => equipCandidates.push({ type: d.type, level: d.level, chance: d.chance, equipType: d.equipType, _source: 'weaponId' }));
 
   if(equipCandidates.length > 1){
     const winner = pickPriorityEquipDrop(equipCandidates);
     weaponDrop = winner._source === 'relic' ? { type: winner.type, level: winner.level, equipType: winner.equipType } : null;
-    weaponIdDrops = winner._source === 'weaponId' ? [{ type: winner.type, level: winner.level }] : [];
+    weaponIdDrops = winner._source === 'weaponId' ? [{ type: winner.type, level: winner.level, equipType: winner.equipType }] : [];
   } else {
-    weaponIdDrops = weaponIdDrops.map(d => ({ type: d.type, level: d.level }));
+    weaponIdDrops = weaponIdDrops.map(d => ({ type: d.type, level: d.level, equipType: d.equipType }));
   }
 
   // drops 중 artifactId/weaponId가 없는 항목(도토리/쥐고기 등 재료류)은 MISC_ITEMS에 등록된 재료

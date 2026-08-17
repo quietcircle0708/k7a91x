@@ -36,7 +36,7 @@ let state = {
   manaShards: 0,       // 마석 조각 보유 개수
   manaCrystals: 0,     // 마석 결정 보유 개수
   manaStones: 0,       // 마석 보유 개수
-  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, // 기타(재료) 아이템 보유 개수
+  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
   autoRebuy: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
@@ -406,7 +406,7 @@ function resetGame(){
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
-    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0,
+    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0,
     skipEffects:false, autoRebuy:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
