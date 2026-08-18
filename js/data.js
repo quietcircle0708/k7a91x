@@ -809,7 +809,7 @@ const ARMOR_TYPES = {
     equipType: 'armor',
     armorKind: 'armor', // 갑옷
     grade: 'unique', // 유니크
-    defense: -19, hp: 1000, mana: 200,
+    defense: -23, hp: 1000, mana: 200,
     purchasable: false, sellPrice: 24000, levelReq: 50,
     image: 'unique_spider_armor',
     // 고유 옵션: "피격 시 확률로 중독 부여" 계열 — effectId(poison_on_taking_damage)로

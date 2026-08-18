@@ -1371,9 +1371,13 @@ function renderStatusBadges(){
     }
     row.innerHTML = instance.statusEffects.map(s => {
       const def = STATUS_EFFECTS[s.key];
-      // 중독(틱 기반)은 ticksRemaining을 그대로 표시(기존과 동일), 기절/둔화 등 지속시간형은
-      // 만료시각(expiresAt) 기준으로 남은 초를 실시간 계산해서 표시함
-      const remainSec = def.type === 'dot' ? s.ticksRemaining : Math.max(0, Math.ceil((s.expiresAt - Date.now()) / 1000));
+      // 중독(틱 기반) 남은 시간 = 남은 틱 수 × 틱 간격(초). 예전엔 ticksRemaining(틱 개수)을 그대로
+      // "초"로 표시해서(중독처럼 tickIntervalMs가 1초가 아닌 경우) 실제 지속시간보다 길게 보이는 버그가
+      // 있었음(예: tickIntervalMs 500ms·maxTicks 10이면 실제 5초인데 화면엔 "10s"로 표시됨). 기절/둔화 등
+      // 지속시간형은 기존처럼 만료시각(expiresAt) 기준으로 남은 초를 실시간 계산해서 표시함.
+      const remainSec = def.type === 'dot'
+        ? Math.max(0, Math.ceil(s.ticksRemaining * (def.tickIntervalMs / 1000)))
+        : Math.max(0, Math.ceil((s.expiresAt - Date.now()) / 1000));
       return `<span class="status-badge" style="color:${def.color}; border-color:${def.color};">${def.icon} ${def.name} ${remainSec}s</span>`;
     }).join('');
   });
