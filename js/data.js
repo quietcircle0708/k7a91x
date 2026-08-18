@@ -666,8 +666,9 @@ const ARMOR_DEFAULT_IMAGE = { helmet: 'helmetbase', armor: 'armorbase' };
 // 고유 옵션/상점 구매 여부/판매 가격/이미지는 무기와 동일한 규칙). 레벨 제한은 레벨만 검사하고(힘/민첩 등
 // 추가 조건 없음), 각 방어구 종류(투구/갑옷)당 하나의 아이템만 동시 착용 가능함.
 // ---- 항목 설명 ----
-// armorKind: 방어구 종류('helmet'|'armor') / defense: 기본 방어도(음수 값만 사용) / hp: 기본 체력 보너스 /
-// mana: 기본 마나 보너스 — defense/hp/mana는 공란(값 없음=undefined)이면 해당 옵션이 없는 것으로 간주됨.
+// armorKind: 방어구 종류('helmet'|'armor') / defense: 기본 방어도(음수/양수 모두 사용 가능 — 양수면 피해 증가) /
+// hp: 기본 체력 보너스 / mana: 기본 마나 보너스 — defense/hp/mana는 공란(값 없음=undefined)이면 해당
+// 옵션이 없는 것으로 간주됨.
 // defArr/hpArr/manaArr: 강화 단계별(+0~+9) 값 배열 — 아래 forEach가 자동으로 계산해서 채움(직접 적을 필요 없음).
 const ARMOR_TYPES = {
   oldarmor: {
@@ -688,9 +689,6 @@ const ARMOR_TYPES = {
     purchasable: true, sellPrice: 100, levelReq: 1,
     image: '',
   },
-  // 원본 문서엔 방어도가 양수(3/1/5/2)로 적혀있었으나, 기존 방어구 데이터는 전부 음수 값만
-  // 사용하는 규칙(defenseFor 공식이 음수를 전제로 함, 같은 요청에 포함된 신규 장신구 3종의
-  // 방어도는 이미 음수(-2,-2,-1)로 정확히 적혀있었음)이라 부호를 반전해 반영함(응답 참고, 확인 필요).
   linenarmor: {
     id: 'linenarmor', name: '리넨 옷', desc: '가볍고 편안해 초보 모험가에게 적합한 기본 갑옷',
     equipType: 'armor',
@@ -714,7 +712,7 @@ const ARMOR_TYPES = {
     equipType: 'armor',
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
-    defense: -5, hp: 100,
+    defense: -5,
     purchasable: true, sellPrice: 500, levelReq: 10,
     image: 'armorbase',
   },
@@ -723,7 +721,7 @@ const ARMOR_TYPES = {
     equipType: 'armor',
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
-    defense: -2, hp: 30,
+    defense: -2,
     purchasable: true, sellPrice: 500, levelReq: 10,
     image: 'helmetbase',
   },
@@ -732,7 +730,7 @@ const ARMOR_TYPES = {
     equipType: 'armor',
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
-    defense: -3, hp: 50,
+    defense: -3,
     purchasable: true, sellPrice: 1250, levelReq: 20,
     image: '',
   },
@@ -741,7 +739,7 @@ const ARMOR_TYPES = {
     equipType: 'armor',
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
-    defense: -8, hp: 150,
+    defense: -8,
     purchasable: true, sellPrice: 1250, levelReq: 20,
     image: '',
   },
@@ -750,7 +748,7 @@ const ARMOR_TYPES = {
     equipType: 'armor',
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
-    defense: -5, hp: 90,
+    defense: -5,
     purchasable: true, sellPrice: 2250, levelReq: 30,
     image: '',
   },
@@ -759,9 +757,47 @@ const ARMOR_TYPES = {
     equipType: 'armor',
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
-    defense: -12, hp: 250,
+    defense: -12,
     purchasable: true, sellPrice: 2250, levelReq: 30,
     image: '',
+  },
+  // 신규 방어구 4종(은 장식/금 장식). 일반 등급 방어구는 이번 작업부터 hp 옵션을 붙이지 않기로 해
+  // (leatherarmor 등 기존 6종의 hp 필드도 함께 제거함, 위 참고) hp 필드 자체를 아예 적지 않음.
+  silverhelmet: {
+    id: 'silverhelmet', name: '은 장식 투구', desc: '은빛 문양이 새겨진 투구',
+    equipType: 'armor',
+    armorKind: 'helmet', // 투구
+    grade: 'normal', // 일반
+    defense: -7,
+    purchasable: true, sellPrice: 5000, levelReq: 40,
+    image: '', // 이미지 미할당 — armorKind 기본 이미지(helmetbase) 재사용
+  },
+  silverarmor: {
+    id: 'silverarmor', name: '은 장식 갑옷', desc: '은빛 문양이 새겨진 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'normal', // 일반
+    defense: -16,
+    purchasable: true, sellPrice: 5000, levelReq: 40,
+    image: '', // 이미지 미할당 — armorKind 기본 이미지(armorbase) 재사용
+  },
+  goldhelmet: {
+    id: 'goldhelmet', name: '금 장식 투구', desc: '금빛 문양이 새겨진 투구',
+    equipType: 'armor',
+    armorKind: 'helmet', // 투구
+    grade: 'normal', // 일반
+    defense: -9,
+    purchasable: true, sellPrice: 12000, levelReq: 50,
+    image: 'gold_helmet',
+  },
+  goldarmor: {
+    id: 'goldarmor', name: '금 장식 갑옷', desc: '금빛 문양이 새겨진 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'normal', // 일반
+    defense: -20,
+    purchasable: true, sellPrice: 12000, levelReq: 50,
+    image: 'gold_armor',
   },
   // 신규 아이템 2종 사전 추가(2번: 백현갑) — 방어구 등급 중 첫 유니크 등급 사례. defense/hp/mana의
   // 강화 단계별 배열은 기존 방어구 공식(computeArmorDefenseArray/computeArmorVitalArray, 아래 forEach)이
@@ -2095,6 +2131,37 @@ const MONSTERS = {
       { name: '현랑반지', chance: 2, weaponId: 'wolfmoonring' },
     ],
   },
+  // 거미굴 신규 몬스터 4종. 서현거미/백현귀는 이번 던전에 처음 등록되는 2종째 에픽 몬스터쌍이라
+  // pickEpicMonsterId(자호굴 적호/구미호, 사마귀굴 현랑귀랑/현랑귀와 동일한 방식)로 굴 내 개별 확률을
+  // 적용함. 백현귀는 이 던전의 스테이지10(가장 깊은 스테이지)에서만 등장(epicSpawnStages:[10]).
+  spider: {
+    id: 'spider', name: '거미', icon: '🕷️', grade: 'normal', level: 40, image: 'spider',
+    defense: -10, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '호박', chance: 15 } ],
+  },
+  spider2: {
+    id: 'spider2', name: '거미랑', icon: '🕷️', grade: 'normal', level: 40, image: 'spider2',
+    defense: -10, hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
+    drops: [ { name: '호박', chance: 20 } ],
+  },
+  epicspider1: {
+    id: 'epicspider1', name: '서현거미', icon: '🕷️', grade: 'epic', level: 47, image: 'epicspider1',
+    defense: -10, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    epicSpawnWeight: 50, // 거미굴 전용 — 백현귀와 합쳐 100%(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '팔각비도', chance: 5, weaponId: 'eight_knife' },
+    ],
+  },
+  epicspider2: {
+    id: 'epicspider2', name: '백현귀', icon: '🕷️', grade: 'epic', level: 50, image: 'epicspider2',
+    defense: -10, hpMult: 1.0, atkMult: 1.3, speedMult: 1.15,
+    epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '백현갑', chance: 2, weaponId: 'spiderarmor' },
+    ],
+  },
 };
 
 
@@ -2178,6 +2245,14 @@ const DUNGEONS = [
     icon: '',
     desc: '어둠 속에서 낫을 휘두르는 사마귀들의 소굴',
     monsters: ['mantis', 'mantis2', 'epicmantis1', 'epicmantis2'],
+    levelRange: 6,
+  },
+  {
+    id: 'spider_den',
+    name: '거미굴',
+    icon: '',
+    desc: '어둠 속에 끝없이 이어진 거미들의 소굴',
+    monsters: ['spider', 'spider2', 'epicspider1', 'epicspider2'],
     levelRange: 6,
   },
 ];
