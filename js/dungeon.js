@@ -325,7 +325,12 @@ function respawnAtVillage(){
   showTownToast('마을로 돌아와 지친 육신을 회복했습니다.');
 }
 
-// 상태이상(중독 등) 데미지 판정 — 1초마다 실행, 살아있는 모든 몬스터 개체에 대해 각자 독립적으로 처리
+// 상태이상(중독 등) 데미지 판정 — STATUS_TICK_RESOLUTION_MS(현재 100ms)마다 실행해 살아있는 모든 몬스터
+// 개체에 대해 각자 독립적으로 처리. 예전엔 이 루프 자체가 1초 고정이라 STATUS_EFFECTS의 tickIntervalMs
+// 값이 사실상 무시됐는데(항상 1초마다만 틱), 지금은 훨씬 촘촘한 주기로 돌면서 실제 틱 판정은
+// tickStatusEffects(state.js)가 각 상태 이상 자신의 tickIntervalMs를 기준으로 정확히 결정함 — 이 루프
+// 주기는 "그 판정을 놓치지 않을 만큼 촘촘하게 확인하는 해상도"일 뿐, 실제 틱 간격을 결정하지 않음.
+const STATUS_TICK_RESOLUTION_MS = 100;
 let statusTickInterval = null;
 function startStatusTicker(){
   stopStatusTicker();
@@ -352,7 +357,7 @@ function startStatusTicker(){
     }
     pruneExpiredStatusEffects(hunt.player);
     renderStatusBadges();
-  }, 1000);
+  }, STATUS_TICK_RESOLUTION_MS);
 }
 function stopStatusTicker(){
   if(statusTickInterval){ clearInterval(statusTickInterval); statusTickInterval = null; }

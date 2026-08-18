@@ -495,6 +495,138 @@ const WEAPON_TYPES = {
       statBonus: { str: 3, agi: 3, int: 3, maxHp: -500, maxMana: 200 },
     },
   },
+  dopplehander: {
+    id: 'dopplehander', name: '쯔바이핸더', desc: '긴 검신과 묵직함으로 적을 분쇄하는 양손 검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'rare', // 레어
+    attackPower: 190, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 3500, levelReq: 35,
+    image: 'rare_dopplehander',
+    atk: [190], speed: [0.6], crit: [10], sell: [3500],
+    cost: [], odds: [],
+  },
+  saber: {
+    id: 'saber', name: '세이버', desc: '속도와 기동성을 극대화한 우아한 곡검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'rare', // 레어
+    attackPower: 126, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 3500, levelReq: 35,
+    image: 'rare_saber',
+    atk: [126], speed: [0.8], crit: [5], sell: [3500],
+    cost: [], odds: [],
+  },
+  guardsdagger: {
+    id: 'guardsdagger', name: '가즈 대거', desc: '좁은 틈을 파고들어 치명상을 남기는 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'rare', // 레어
+    attackPower: 76, attackSpeed: 1.0, critRate: 10,
+    purchasable: true, sellPrice: 3500, levelReq: 35,
+    image: 'rare_guards_dagger',
+    atk: [76], speed: [1.0], crit: [10], sell: [3500],
+    cost: [], odds: [],
+  },
+  claymore: {
+    id: 'claymore', name: '클레이모어', desc: '거대한 검신에 강력한 참격을 담아내는 양손 검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'rare', // 레어
+    attackPower: 308, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 10000, levelReq: 45,
+    image: 'rare_claymore',
+    atk: [308], speed: [0.6], crit: [10], sell: [10000],
+    cost: [], odds: [],
+  },
+  falchion: {
+    id: 'falchion', name: '파르치온', desc: '묵직한 검신과 날카로움을 겸비한 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'rare', // 레어
+    attackPower: 171, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 10000, levelReq: 45,
+    image: 'rare_falchion',
+    atk: [171], speed: [0.8], crit: [5], sell: [10000],
+    cost: [], odds: [],
+  },
+  mercenaryknife: {
+    id: 'mercenaryknife', name: '머서너리 나이프', desc: '용병들이 애용하는 실용적인 전투용 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'rare', // 레어
+    attackPower: 124, attackSpeed: 1.0, critRate: 10,
+    purchasable: true, sellPrice: 10000, levelReq: 45,
+    image: 'rare_mercenary_knife',
+    atk: [124], speed: [1.0], crit: [10], sell: [10000],
+    cost: [], odds: [],
+  },
+  silvergreatsword: {
+    id: 'silvergreatsword', name: '은제중검', desc: '거대한 은빛 검신의 강력한 중검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 201, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 5000, levelReq: 40,
+    image: 'common_longsword4', // 기존 이미지 재사용
+    atk: [201], speed: [0.6], crit: [10], sell: [5000],
+    cost: [], odds: [],
+  },
+  silversword: {
+    id: 'silversword', name: '은가검', desc: '은빛 칼날로 빛을 머금은 듯한 장검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 134, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 5000, levelReq: 40,
+    image: 'common_shortsword4', // 기존 이미지 재사용
+    atk: [134], speed: [0.8], crit: [5], sell: [5000],
+    cost: [], odds: [],
+  },
+  silverdagger2: {
+    id: 'silverdagger2', name: '은비도', desc: '은빛 칼날로 빈틈을 노리는 비도',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'normal', // 일반
+    attackPower: 80, attackSpeed: 1.0, critRate: 10,
+    purchasable: true, sellPrice: 5000, levelReq: 40,
+    image: 'common_dagger4', // 기존 이미지 재사용
+    atk: [80], speed: [1.0], crit: [10], sell: [5000],
+    cost: [], odds: [],
+  },
+  goldgreatsword: {
+    id: 'goldgreatsword', name: '금제중검', desc: '찬란한 금빛 검신으로 일격을 내리꽂는 중검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'normal', // 일반
+    attackPower: 328, attackSpeed: 0.6, critRate: 10,
+    purchasable: true, sellPrice: 12000, levelReq: 50,
+    image: 'common_longsword2', // 기존 이미지 재사용
+    atk: [328], speed: [0.6], crit: [10], sell: [12000],
+    cost: [], odds: [],
+  },
+  goldsword: {
+    id: 'goldsword', name: '금협검', desc: '황금빛 검신에 날렵함을 담아낸 우아한 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'normal', // 일반
+    attackPower: 218, attackSpeed: 0.8, critRate: 5,
+    purchasable: true, sellPrice: 12000, levelReq: 50,
+    image: 'common_shortsword4', // 원래 의도대로 은가검과 동일 이미지 재사용(사용자 확인 완료)
+    atk: [218], speed: [0.8], crit: [5], sell: [12000],
+    cost: [], odds: [],
+  },
+  golddagger: {
+    id: 'golddagger', name: '금장비도', desc: '황금빛 칼날로 치명적인 일격을 노리는 비도',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'normal', // 일반
+    attackPower: 131, attackSpeed: 1.0, critRate: 10,
+    purchasable: true, sellPrice: 12000, levelReq: 50,
+    image: 'common_dagger2', // 기존 이미지 재사용
+    atk: [131], speed: [1.0], crit: [10], sell: [12000],
+    cost: [], odds: [],
+  },
 };
 
 
@@ -1559,6 +1691,28 @@ const SKILLS = {
     cooldown: 7, resourceType: 'mp', resourceAmount: 200, castTime: 0.1,
     damagePercent: 190, hits: 1, icon: 'lv35atk',
   },
+  sea_vigor: {
+    // 대지의 기운(earth_vigor)과 완전히 동일한 스킴(target:'buff'+healFlat)의 회복 스킬 — 이름/수치/아이콘만 다름.
+    name: '바다의 기운', desc: '체력 500을 회복한다',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 40,
+    cooldown: 15, resourceType: 'mp', resourceAmount: 300, castTime: 1.0, icon: 'lv40buff',
+    healFlat: 500,
+  },
+  cleave3: {
+    name: '참격 3성', desc: '250%데미지로 모든 적을 공격한다',
+    grade: 'rare', category: 'common', target: 'aoe', levelReq: 45,
+    cooldown: 7, resourceType: 'mp', resourceAmount: 250, castTime: 0.1,
+    damagePercent: 250, hits: 1, icon: 'lv35atk', // 요청대로 참격 1·2성과 동일한 lv35atk 아이콘 재사용
+  },
+  quad_strike: {
+    name: '사연격', desc: '맹렬하게 움직여 <br>62.5%의 데미지로 네 번 공격한다',
+    grade: 'epic', category: 'common', target: 'single', levelReq: 50,
+    cooldown: 5.1, resourceType: 'mp', resourceAmount: 200, castTime: 0,
+    damagePercent: 62.5, hits: 4, icon: 'lv50atk',
+    // 이연격/삼연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
+    // hits 값에 따라 자동 반복하므로 4타도 별도 처리 없이 1타(즉시)→2타(0.1초)→3타(0.2초)→4타(0.3초) 순으로 동작).
+    hitDelayMs: 0.1,
+  },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
 // (일반/레어/에픽/유니크 라벨·색상이 이미 동일하므로 SKILLS[id].grade를 WEAPON_GRADES에 그대로 대입해 조회).
@@ -1619,9 +1773,9 @@ const STATUS_EFFECTS = {
     icon: '☠️',
     color: '#7fd67f', // 초록 계열
     type: 'dot',
-    tickIntervalMs: 1000,        // 1초마다
-    maxTicks: 5,                 // 최대 5초(=5틱) 지속
-    damagePercentOfMaxHp: 1,     // 매 틱 최대 체력의 1% 피해
+    tickIntervalMs: 500,         // 0.5초마다
+    maxTicks: 10,                // 최대 10틱(=0.5초×10=5초) 지속
+    damagePercentOfMaxHp: 1.5,   // 매 틱 최대 체력의 1.5% 피해
   },
   stun: {
     id: 2,

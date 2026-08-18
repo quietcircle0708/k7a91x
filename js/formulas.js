@@ -625,7 +625,12 @@ function monsterExp(level){
   return Math.round(1000 * Math.pow(1.08, level - 1));
 }
 function requiredKills(level){
-  return Math.round(10 + Math.pow(level - 1, 1.35));
+  let exponent;
+  if(level <= 49) exponent = 1.05;
+  else if(level <= 79) exponent = 1.10;
+  else if(level <= 89) exponent = 1.12;
+  else exponent = 1.30;
+  return Math.round(10 + Math.pow(level - 1, exponent));
 }
 function requiredExp(level){
   return monsterExp(level) * requiredKills(level);

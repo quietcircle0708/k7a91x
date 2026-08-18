@@ -235,14 +235,16 @@ function monsterHitEffect(instanceId, dmg, isCrit){
   spawnDmgPopupIn(slot, dmg, isCrit);
 }
 
-// 상태이상(중독 등) 틱 데미지 숫자를 화면에 띄움 (실제 데미지 계산/처치 판정은 dungeon.js의 startStatusTicker가 담당)
+// 상태이상(중독 등) 틱 데미지 숫자를 화면에 띄움 (실제 데미지 계산/처치 판정은 dungeon.js의 startStatusTicker가 담당).
+// 색상(color)은 상태 이상별로 그대로 유지하되, 표시 형식은 기존 다른 피해량 출력(spawnDmgPopupIn)과 동일하게
+// '-' 기호 없이 숫자만 표시함(예전엔 '-'+dmg로 표시했었음).
 function statusTickEffect(instanceId, dmg, color){
   const slot = el('monster-slot-' + instanceId);
   if(!slot) return;
   const p = document.createElement('div');
   p.className = 'dmg-popup float';
   p.style.color = color;
-  p.textContent = '-' + dmg;
+  p.textContent = String(dmg);
   p.style.left = (42 + Math.random() * 16) + '%';
   slot.appendChild(p);
   setTimeout(() => p.remove(), 850);

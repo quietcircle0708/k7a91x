@@ -200,25 +200,34 @@ function applyStatusEffect(target, key, durationMs){
   if(!target.statusEffects) target.statusEffects = [];
   const existing = target.statusEffects.find(s => s.key === key);
   if(def.type === 'dot'){
-    if(existing) existing.ticksRemaining = def.maxTicks;
-    else target.statusEffects.push({ key, ticksRemaining: def.maxTicks });
+    // lastTickAt: 이 상태 이상 자신의 tickIntervalMs 간격을 실시간으로 재는 기준 시각.
+    // 틱 판정 자체는 tickStatusEffects가 담당(아래 참고) — 여기서는 갱신/신규 부여 시 기준 시각만 초기화.
+    if(existing){ existing.ticksRemaining = def.maxTicks; existing.lastTickAt = Date.now(); }
+    else target.statusEffects.push({ key, ticksRemaining: def.maxTicks, lastTickAt: Date.now() });
     return;
   }
   const expiresAt = Date.now() + Math.max(0, durationMs || 0);
   if(existing) existing.expiresAt = expiresAt;
   else target.statusEffects.push({ key, expiresAt });
 }
-// 대상에게 걸린 상태 이상 중 "지속 피해형(중독 등, type:'dot')"만 1틱 진행시키고, 이번 틱에 발생한 총 피해를 반환.
-// 기절/둔화처럼 지속시간형(type이 'dot'이 아닌 것) 상태 이상은 여기서 건드리지 않고 배열에 그대로 남겨둠 —
-// 이 함수가 예전처럼 모든 항목에 대해 ticksRemaining--를 하면 지속시간형 항목(ticksRemaining이 애초에 없음)이
-// 매 틱 잘못 제거되므로, dot 타입만 골라서 처리하도록 분리함(중독 자체의 계산식/동작은 완전히 그대로 유지).
+// 대상에게 걸린 상태 이상 중 "지속 피해형(중독 등, type:'dot')"만 판정해, 이번 호출 시점까지 실제로 발생한
+// 총 피해를 반환. 예전에는 이 함수가 호출될 때마다(=dungeon.js의 1초 고정 루프가 돌 때마다) 무조건 1틱씩
+// 진행시켰는데, 그러면 STATUS_EFFECTS 데이터의 tickIntervalMs 값이 실제로는 전혀 읽히지 않고 항상 "루프
+// 주기(1초)"로만 틱이 도는 문제가 있었음(중독의 tickIntervalMs를 500으로 바꿔도 아무 효과가 없었을 것).
+// 지금은 각 상태 이상 인스턴스가 자신의 lastTickAt을 갖고, "이번 호출 시점 - lastTickAt >= 그 상태 이상의
+// tickIntervalMs"일 때만 실제로 1틱을 진행시키도록 바꿔서, 호출 주기(dungeon.js 루프의 실제 해상도)와
+// 무관하게 데이터에 적힌 tickIntervalMs가 그대로 반영됨 — 앞으로 tickIntervalMs가 다른 dot 상태 이상이
+// 추가돼도(예: 어떤 상태이상은 0.5초마다, 어떤 상태이상은 2초마다) 동시에 정확히 처리됨.
 function tickStatusEffects(target){
   if(!target.statusEffects || target.statusEffects.length === 0) return 0;
+  const now = Date.now();
   let totalDamage = 0;
   target.statusEffects = target.statusEffects.filter(s => {
     const def = STATUS_EFFECTS[s.key];
     if(!def || def.type !== 'dot') return true;
+    if(now - (s.lastTickAt || 0) < def.tickIntervalMs) return true; // 아직 이 상태 이상 자신의 틱 간격이 안 지남
     totalDamage += Math.max(1, Math.round(target.maxHp * def.damagePercentOfMaxHp / 100));
+    s.lastTickAt = now;
     s.ticksRemaining--;
     return s.ticksRemaining > 0;
   });
