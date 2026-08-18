@@ -5,6 +5,22 @@
 // 밸런스 공식을 수정할 때는 이 파일을 보면 됨.
 // ============================================================
 
+// ---- 피해량 계산 순서 (전역 기준) ----
+// 앞으로 추가되는 치명타/방어도/상태 이상 및 조건부 피해 증가 효과는 아래 순서를 기준으로 삼는다.
+// 기존에 이미 정상 동작 중인 계산 로직(dungeon.js attackTick, actions.js resolveSkillEffect/
+// applyDelayedSkillHits 등)은 이 기준에 맞춰 임의로 재배열하지 않는다 — 신규 피해 관련 효과를
+// 추가하거나 기존 계산 로직을 직접 수정할 때 참고하는 순서.
+//   1. 기본 피해량 계산       — 공격력 또는 스킬 피해량%을 기준으로 최초 피해량을 계산.
+//   2. 공격/스킬 자체 피해량 배율 적용 — 스킬 데미지%, 기본 공격 피해 증가 등 공격 자체에 직접
+//      적용되는 배율.
+//   3. 치명타 판정             — 타격마다 치명타 확률을 기준으로 개별 판정.
+//   4. 치명타 피해 배율 적용   — 치명타로 판정된 경우 기존 치명타 피해 배율(1.5배) 적용.
+//   5. 방어도에 따른 피해 보정 — defenseDamageMultiplier(defense) = {(200+방어도)/20}²×0.01.
+//      방어도는 음수/양수 모두 가능(양수면 피해 증가).
+//   6. 상태 이상 및 조건부 피해 증가 적용 — 방어도 계산까지 끝난 피해량을 기준으로 적용
+//      (예: "중독 상태 적 피해 +10%" → 방어도 적용 후 피해량에 ×1.10).
+//   7. 최종 피해량 반올림       — 모든 보정을 적용한 뒤 반올림해 실제 피해량으로 사용.
+
 // ---- 무기 스탯 조회 ----
 // 방어구 시스템 추가 이후: WEAPON_TYPES에 없으면 ARMOR_TYPES(→ACCESSORY_TYPES)도 찾아봄. 아이템 id는
 // 도감 간에 겹치지 않으므로 기존 무기 id 조회 동작은 완전히 그대로 유지됨(항상 WEAPON_TYPES가 먼저
@@ -243,14 +259,20 @@ function buildConsumableTooltipHtml(id){
   html += `</div>`;
   return html;
 }
-// 최종 데미지 비율 = {(200 + 방어도) / 20}² × 0.01. 방어도는 음수 값(0 이하)만 사용됨.
+// 최종 데미지 비율 = {(200 + 방어도) / 20}² × 0.01. 방어도는 음수/양수 모두 사용 가능(양수면 피해 증가).
 // 결과는 퍼센트 기준 소수 둘째 자리에서 반올림(비율로는 소수 넷째 자리). 플레이어/몬스터 공용 공식으로
-// 설계됨 — 현재는 플레이어(착용 방어구 합산)에만 적용되고, 몬스터 쪽은 이후 별도로 연결될 예정.
+// 설계됨 — 플레이어(착용 방어구 합산)와 몬스터(데이터에 등록된 방어도) 양쪽 모두 이 함수를 그대로 사용함.
 // ※ 기획 문서의 예시(방어도 -12 → 72.25%)는 이 식을 그대로 계산하면 88.36%가 나와 문서 예시와
 // 어긋남 — 식 자체는 문서에 적힌 그대로 구현했고, 예시 쪽 오탈자로 보여 별도로 알려드림.
 function defenseDamageMultiplier(defense){
   const raw = Math.pow((200 + (defense || 0)) / 20, 2) * 0.01;
   return Math.round(raw * 10000) / 10000;
+}
+// 몬스터 개체(전투 인스턴스)의 방어도. 데이터(MONSTERS)에 등록된 값을 그대로 사용하고,
+// 방어도가 등록되지 않은 몬스터는 0으로 처리(몬스터 방어도 시스템 — 방어도 기본값 규칙).
+function monsterDefenseFor(instance){
+  const def = MONSTERS[instance.monsterId];
+  return (def && def.defense) || 0;
 }
 // 현재 착용 중인 방어구(투구/갑옷) 아이템 목록을 반환.
 function wornArmorItems(){
@@ -471,6 +493,35 @@ function activeEffectChance(effectId){
     }
   }
   return total;
+}
+// 착용 중인 방어구(투구/갑옷)의 고유 옵션 중 특정 효과(effectId)를 가진 "현재 활성 상태인" 소스의 발동
+// 확률을 합산. activeEffectChance(무기 고유 옵션 전용, 공격 적중 시 발동)와 트리거 시점이 달라
+// 별도 함수로 둠 — 이 함수는 "피격 시 발동"하는 방어구 계열 효과(백현갑 등)를 대상으로 함. 투구+갑옷
+// 양쪽에 같은 effectId가 있어도(현재는 사례 없음) 정상적으로 합산됨.
+function armorUniqueOptionChance(effectId){
+  return wornArmorItems().reduce((sum, item) => {
+    const opt = wpn(item.type).uniqueOption;
+    if(opt && opt.effectId === effectId && weaponUniqueOptionActive(item.type, item.level)){
+      return sum + (weaponUniqueOptionChance(item.type, item.level) || 0);
+    }
+    return sum;
+  }, 0);
+}
+// 착용 무기 고유 옵션 중 "대상 상태 이상 조건부 피해 증가" 계열 효과(예: 팔각비도 — 중독 대상 추가
+// 피해)의 배율. 대상이 해당 상태 이상을 갖고 있을 때만 발동하며, 방어도 계산까지 끝난 피해량에 곱하는
+// 단계(피해량 계산 순서 6번, formulas.js 상단 "피해량 계산 순서(전역 기준)" 참고)에서 사용됨.
+// 조건을 만족하는 무기 고유 옵션이 없으면 1(배율 없음)을 반환 — 무조건 중독 대상에게 추가 피해를
+// 주는 것이 아니라, 이 effectId를 가진 무기(팔각비도)를 착용하고 있을 때만 발동함.
+function targetStatusDamageMultiplier(target){
+  const equipped = getEquippedWeapon();
+  if(!equipped) return 1;
+  const opt = wpn(equipped.type).uniqueOption;
+  if(!opt || opt.effectId !== 'poison_target_damage_percent') return 1;
+  if(!weaponUniqueOptionActive(equipped.type, equipped.level)) return 1;
+  const hasPoison = !!(target.statusEffects && target.statusEffects.some(s => s.key === 'poison'));
+  if(!hasPoison) return 1;
+  const percent = weaponUniqueOptionChance(equipped.type, equipped.level) || 0;
+  return 1 + percent / 100;
 }
 function atkFor(type, level){ return wpn(type).atk[level]; }
 

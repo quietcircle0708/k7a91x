@@ -248,7 +248,12 @@ function attackTick(){
   const basicAtkBonusPercent = activeBuffBonus('basicAtkDamagePercent');
   const boostedDmg = Math.round(baseDmg * (1 + basicAtkBonusPercent / 100));
   const levelDiff = state.playerLevel - target.level;
-  const dmg = Math.max(1, Math.round(boostedDmg * playerDamageMultiplier(levelDiff)));
+  let dmg = Math.max(1, Math.round(boostedDmg * playerDamageMultiplier(levelDiff)));
+  // 대상 몬스터의 방어도를 최종 피해 감소/증가 공식에 적용(몬스터 방어도 시스템).
+  dmg = Math.max(1, Math.round(dmg * defenseDamageMultiplier(monsterDefenseFor(target))));
+  // 대상의 상태 이상에 따른 조건부 피해 증가 적용(예: 팔각비도 — 중독 대상 추가 피해). 방어도 계산까지
+  // 끝난 피해량을 기준으로 곱함(피해량 계산 순서 6번, formulas.js 상단 기준 참고).
+  dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(target)));
   target.hp -= dmg;
   monsterHitEffect(target.instanceId, dmg, isCrit);
   if(target.hp > 0){
@@ -289,6 +294,13 @@ function monsterAttackTick(instanceId){
   dmg = Math.max(1, Math.round(dmg * defenseDamageMultiplier(playerTotalDefense())));
   state.playerHp = Math.max(0, state.playerHp - dmg);
   playerHitEffect(dmg);
+  // 백현갑 등 "피해 입을 시 확률로 중독 부여" 방어구 고유 옵션 판정 — 공격해온 몬스터 개체(instance)를
+  // 대상으로 함(activeEffectChance의 무기 고유 옵션 패턴과 동일하게 합산 후 1회만 판정).
+  const poisonBackChance = armorUniqueOptionChance('poison_on_taking_damage');
+  if(poisonBackChance > 0 && Math.random() * 100 < poisonBackChance){
+    applyStatusEffect(instance, 'poison');
+    renderStatusBadges();
+  }
   renderHuntCharPanel();
   if(state.playerHp <= 0){
     playerDeathEffect(); // 몬스터와 동일한 사망 애니메이션(.dead, monster-dead 키프레임) 재생

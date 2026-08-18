@@ -740,7 +740,11 @@ function resolveSkillEffect(id){
       const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
       const hitDmg = isCrit ? Math.round(perHit * 1.5) : perHit;
       const levelDiff = state.playerLevel - t.level;
-      const dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
+      let dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
+      // 대상 몬스터의 방어도를 최종 피해 감소/증가 공식에 적용(몬스터 방어도 시스템).
+      dmg = Math.max(1, Math.round(dmg * defenseDamageMultiplier(monsterDefenseFor(t))));
+      // 대상의 상태 이상에 따른 조건부 피해 증가 적용(예: 팔각비도 — 중독 대상 추가 피해).
+      dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(t)));
       t.hp -= dmg;
       monsterHitEffect(t.instanceId, dmg, isCrit);
       // 적중(=피해를 입혀 대상이 생존)한 경우에만 상태 이상 부여(예: 소드 스트라이크의 기절). 처치되는
@@ -767,7 +771,11 @@ function applyDelayedSkillHits(target, s, perHit, critChance){
     const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
     const hitDmg = isCrit ? Math.round(perHit * 1.5) : perHit;
     const levelDiff = state.playerLevel - t.level;
-    const dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
+    let dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
+    // 대상 몬스터의 방어도를 최종 피해 감소/증가 공식에 적용(몬스터 방어도 시스템).
+    dmg = Math.max(1, Math.round(dmg * defenseDamageMultiplier(monsterDefenseFor(t))));
+    // 대상의 상태 이상에 따른 조건부 피해 증가 적용(예: 팔각비도 — 중독 대상 추가 피해).
+    dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(t)));
     t.hp -= dmg;
     monsterHitEffect(t.instanceId, dmg, isCrit);
     if(t.hp > 0 && s.onHitStatus) applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);

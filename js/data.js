@@ -627,6 +627,30 @@ const WEAPON_TYPES = {
     atk: [131], speed: [1.0], crit: [10], sell: [12000],
     cost: [], odds: [],
   },
+  // 신규 아이템 2종 사전 추가(1번: 팔각비도) — 추후 던전/몬스터 드랍 시스템이 추가되면 드랍 데이터에
+  // 연결할 예정. 현재는 데이터 등록 및 고유 옵션만 구현되어 직접 획득 경로는 없음(요청사항 그대로).
+  eight_knife: {
+    id: 'eight_knife', name: '팔각비도', desc: '팔각형의 날을 가진 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'epic', // 에픽
+    attackPower: 155, attackSpeed: 1.0, critRate: 12,
+    purchasable: false, sellPrice: 15000, levelReq: 45,
+    image: 'epic_eight_knife',
+    atk: [155], speed: [1.0], crit: [12], sell: [15000],
+    cost: [], odds: [],
+    // 고유 옵션: "대상 상태 이상 조건부 피해 증가" 계열 — effectId(poison_target_damage_percent)로
+    // targetStatusDamageMultiplier(formulas.js)가 인식해, 착용 중 공격 대상이 중독 상태일 때만 최종
+    // 피해량에 배율을 곱함(방어도 계산 이후 단계, 피해량 계산 순서 6번 — formulas.js 상단 기준 참고).
+    // chanceByLevel은 확률이 아니라 "피해 증가율(%)"로 재사용됨(치명타 확률 증가형 고유 옵션인
+    // blacksword의 crit_chance_bonus와 동일하게, chanceByLevel 필드 자체는 %값 범용 테이블).
+    uniqueOption: {
+      effectId: 'poison_target_damage_percent',
+      activateLevel: 0,
+      chanceByLevel: { 0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 11, 6: 11, 7: 12, 8: 13, 9: 15 },
+      textTemplate: '중독 상태 적 피해 {chance}% 증가',
+    },
+  },
 };
 
 
@@ -738,6 +762,29 @@ const ARMOR_TYPES = {
     defense: -12, hp: 250,
     purchasable: true, sellPrice: 2250, levelReq: 30,
     image: '',
+  },
+  // 신규 아이템 2종 사전 추가(2번: 백현갑) — 방어구 등급 중 첫 유니크 등급 사례. defense/hp/mana의
+  // 강화 단계별 배열은 기존 방어구 공식(computeArmorDefenseArray/computeArmorVitalArray, 아래 forEach)이
+  // 등급 구분 없이 전체 ARMOR_TYPES에 그대로 적용되므로 별도 처리가 필요 없음(무기 성장 공식과 달리
+  // 유니크를 제외하지 않는 기존 동작 그대로). 강화 확률/비용도 GRADE_ENHANCE_ODDS_UNIQUE/computeGradeCost가
+  // 이미 'unique' 등급을 지원하므로 그대로 재사용됨.
+  spiderarmor: {
+    id: 'spiderarmor', name: '백현갑', desc: '거미의 독을 머금은 갑옷',
+    equipType: 'armor',
+    armorKind: 'armor', // 갑옷
+    grade: 'unique', // 유니크
+    defense: -19, hp: 1000, mana: 200,
+    purchasable: false, sellPrice: 24000, levelReq: 50,
+    image: 'unique_spider_armor',
+    // 고유 옵션: "피격 시 확률로 중독 부여" 계열 — effectId(poison_on_taking_damage)로
+    // armorUniqueOptionChance(formulas.js)가 인식해, 플레이어가 피해를 입을 때마다 공격한 몬스터
+    // 개체에게 확률로 중독을 부여함(dungeon.js monsterAttackTick). chanceByLevel은 발동 확률(%).
+    uniqueOption: {
+      effectId: 'poison_on_taking_damage',
+      activateLevel: 0,
+      chanceByLevel: { 0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 15 },
+      textTemplate: '피해 입을 시 {chance}% 확률로 중독 부여',
+    },
   },
 };
 
@@ -1834,6 +1881,9 @@ const STONE_GRADE_RULES = [
 ];
 
 // 개별 몬스터 테이블.
+// defense: 몬스터 방어도(몬스터 방어도 시스템). 플레이어 방어도와 동일한 공식(defenseDamageMultiplier,
+// formulas.js)을 그대로 사용해 이 몬스터가 입는 최종 피해량에 적용됨. 음수/양수 모두 가능(양수면 피해
+// 증가). 값이 등록되지 않은 몬스터는 monsterDefenseFor(formulas.js)가 0으로 처리함.
 // 체력/공격력은 등급 공식(MONSTER_GRADES)으로 먼저 계산한 뒤, 그 결과에 hpMult/atkMult를 곱해서 최종값을 냄.
 // 공격속도도 마찬가지로 기본 몬스터 공격속도(MONSTER_ATTACK_SPEED)에 speedMult를 곱해서 이 몬스터만의 공격속도를 냄.
 // drops: 이 몬스터를 처치했을 때 나오는 드랍 목록. 각 항목은 { name, chance }이며, chance는 항목별로 "개별" 판정함
@@ -1845,17 +1895,17 @@ const STONE_GRADE_RULES = [
 const MONSTERS = {
   squirrel: {
     id: 'squirrel', name: '다람쥐', icon: '🐿️', grade: 'normal', level: 1,
-    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '도토리', chance: 50 } ],
   },
   rat: {
     id: 'rat', name: '쥐', icon: '🐀', grade: 'normal', level: 3,
-    hpMult: 1.0, atkMult: 0.6, speedMult: 1.5,
+    defense: 0, hpMult: 1.0, atkMult: 0.6, speedMult: 1.5,
     drops: [ { name: '쥐고기', chance: 50 } ],
   },
   bat: {
     id: 'bat', name: '박쥐', icon: '🦇', grade: 'epic', level: 6,
-    extraGoldBonus: 0.10, // 등급 보너스 위에 추가로 붙는 골드 보너스(기존 그대로 유지)
+    defense: 0, extraGoldBonus: 0.10, // 등급 보너스 위에 추가로 붙는 골드 보너스(기존 그대로 유지)
     hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
     drops: [
       { name: '박쥐고기', chance: 50 },
@@ -1864,17 +1914,17 @@ const MONSTERS = {
   },
   blue_snake: {
     id: 'blue_snake', name: '청사', icon: '🐍', grade: 'normal', level: 6,
-    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '뱀고기', chance: 50 } ],
   },
   tailless_snake: {
     id: 'tailless_snake', name: '꼬리잘린 뱀', icon: '🐍', grade: 'normal', level: 6,
-    hpMult: 0.9, atkMult: 1.0, speedMult: 1.1,
+    defense: 0, hpMult: 0.9, atkMult: 1.0, speedMult: 1.1,
     drops: [ { name: '뱀고기', chance: 50 } ],
   },
   rattlesnake: {
     id: 'rattlesnake', name: '방울뱀', icon: '🐍', grade: 'epic', level: 9,
-    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '뱀고기', chance: 50 },
       { name: '독 플라스크', chance: 10, artifactId: 'poisonflask' },
@@ -1883,17 +1933,17 @@ const MONSTERS = {
   },
   blue_deer: {
     id: 'blue_deer', name: '청록수', icon: '🦌', grade: 'normal', level: 10,
-    hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
+    defense: 0, hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
     drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
   red_deer: {
     id: 'red_deer', name: '적록수', icon: '🦌', grade: 'normal', level: 10,
-    hpMult: 1.0, atkMult: 0.5, speedMult: 2.0,
+    defense: 0, hpMult: 1.0, atkMult: 0.5, speedMult: 2.0,
     drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
   bluehorn_deer: {
     id: 'bluehorn_deer', name: '청각수', icon: '🦌', grade: 'epic', level: 15,
-    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '사슴고기', chance: 50 },
       { name: '녹용', chance: 20 },
@@ -1902,7 +1952,7 @@ const MONSTERS = {
   },
   red_bear: {
     id: 'red_bear', name: '적웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
-    hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '곰 가죽', chance: 25 },
       { name: '웅담', chance: 10 },
@@ -1911,7 +1961,7 @@ const MONSTERS = {
   },
   fierce_bear: {
     id: 'fierce_bear', name: '사웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
-    hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
+    defense: 0, hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [
       { name: '곰 가죽', chance: 30 },
       { name: '웅담', chance: 5 },
@@ -1920,7 +1970,7 @@ const MONSTERS = {
   },
   black_bear: {
     id: 'black_bear', name: '흑웅', icon: '🐻', grade: 'epic', level: 20, image: 'bear',
-    hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
     drops: [
       { name: '곰 가죽', chance: 50 },
       { name: '웅담', chance: 20 },
@@ -1931,17 +1981,17 @@ const MONSTERS = {
   },
   forest_boar: {
     id: 'forest_boar', name: '숲돼지', icon: '🐗', grade: 'normal', level: 20, image: 'boar',
-    hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '숲돼지고기', chance: 15 } ],
   },
   mountain_boar: {
     id: 'mountain_boar', name: '산돼지', icon: '🐗', grade: 'normal', level: 20, image: 'boar',
-    hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
+    defense: 0, hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [ { name: '산돼지고기', chance: 20 } ],
   },
   red_boar: {
     id: 'red_boar', name: '홍돼지', icon: '🐗', grade: 'epic', level: 25, image: 'redboar',
-    hpMult: 1.0, atkMult: 1.1, speedMult: 1.1,
+    defense: 0, hpMult: 1.0, atkMult: 1.1, speedMult: 1.1,
     drops: [
       { name: '숲돼지고기', chance: 25 },
       { name: '반월대도', chance: 5, weaponId: 'moongreatsword' },
@@ -1949,17 +1999,17 @@ const MONSTERS = {
   },
   fox: {
     id: 'fox', name: '여우', icon: '🦊', grade: 'normal', level: 25, image: 'fox',
-    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '여우 모피', chance: 20 } ],
   },
   greenfox: {
     id: 'greenfox', name: '사여우', icon: '🦊', grade: 'normal', level: 25, image: 'greenfox',
-    hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
+    defense: 0, hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [ { name: '여우 모피', chance: 25 } ],
   },
   blackfox: {
     id: 'blackfox', name: '흑여우', icon: '🦊', grade: 'epic', level: 30, image: 'blackfox',
-    hpMult: 1.0, atkMult: 1.25, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.25, speedMult: 1.0,
     epicSpawnWeight: 85, // 여우굴 전용 — 구미호와 합쳐 100%(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '여우 모피', chance: 40 },
@@ -1971,7 +2021,7 @@ const MONSTERS = {
   // 'ninetail.png'라 실제 업로드 파일명 기준으로 image를 등록함(다른 신규 이미지와 동일 처리 원칙).
   ninetailfox: {
     id: 'ninetailfox', name: '구미호', icon: '🦊', grade: 'epic', level: 33, image: 'ninetail',
-    hpMult: 1.0, atkMult: 1.4, speedMult: 1.1,
+    defense: -10, hpMult: 1.0, atkMult: 1.4, speedMult: 1.1,
     epicSpawnWeight: 15, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '여우 모피', chance: 90 },
@@ -1982,12 +2032,12 @@ const MONSTERS = {
   },
   tiger1: {
     id: 'tiger1', name: '자호', icon: '🐅', grade: 'normal', level: 30, image: 'tiger1',
-    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    defense: -10, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '자호의 가죽', chance: 20 } ],
   },
   tiger2: {
     id: 'tiger2', name: '친자호', icon: '🐅', grade: 'normal', level: 30, image: 'tiger2',
-    hpMult: 0.9, atkMult: 2.0, speedMult: 0.6,
+    defense: -10, hpMult: 0.9, atkMult: 2.0, speedMult: 0.6,
     drops: [
       { name: '자호의 가죽', chance: 20 },
       { name: '강철 갑옷', chance: 5, weaponId: 'steelarmor' },
@@ -1995,7 +2045,7 @@ const MONSTERS = {
   },
   tiger3: {
     id: 'tiger3', name: '구자호', icon: '🐅', grade: 'epic', level: 37, image: 'tiger3',
-    hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    defense: -10, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
     epicSpawnWeight: 50, // 자호굴 전용 — 적호와 합쳐 100%(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '자호의 가죽', chance: 20 },
@@ -2005,7 +2055,7 @@ const MONSTERS = {
   },
   tiger4: {
     id: 'tiger4', name: '적호', icon: '🐅', grade: 'epic', level: 40, image: 'tiger4',
-    hpMult: 1.0, atkMult: 1.3, speedMult: 1.1,
+    defense: -10, hpMult: 1.0, atkMult: 1.3, speedMult: 1.1,
     epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '자호의 가죽', chance: 70 },
@@ -2019,17 +2069,17 @@ const MONSTERS = {
   },
   mantis: {
     id: 'mantis', name: '사마귀', icon: '🦗', grade: 'normal', level: 37, image: 'mantis',
-    hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    defense: -10, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '호박', chance: 15 } ],
   },
   mantis2: {
     id: 'mantis2', name: '사마귀랑', icon: '🦗', grade: 'normal', level: 37, image: 'mantis2',
-    hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
+    defense: -10, hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
     drops: [ { name: '호박', chance: 20 } ],
   },
   epicmantis1: {
     id: 'epicmantis1', name: '현랑귀랑', icon: '🦗', grade: 'epic', level: 45, image: 'epicmantis1',
-    hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    defense: -10, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
     epicSpawnWeight: 70, // 사마귀굴 전용 — 현랑귀와 합쳐 100%(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 20 },
@@ -2038,7 +2088,7 @@ const MONSTERS = {
   },
   epicmantis2: {
     id: 'epicmantis2', name: '현랑귀', icon: '🦗', grade: 'epic', level: 48, image: 'epicmantis2',
-    hpMult: 1.0, atkMult: 1.4, speedMult: 1.1,
+    defense: -10, hpMult: 1.0, atkMult: 1.4, speedMult: 1.1,
     epicSpawnWeight: 30, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 30 },
