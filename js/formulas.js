@@ -1044,6 +1044,26 @@ function rollStoneDrop(level, monsterGrade){
   return { itemId: item.id, qty };
 }
 
+// 플라스크 단계(tier) 선택(전역 공식). FLASK_TIER_RULES(data.js)를 위에서부터 순서대로 검사해 몬스터
+// 레벨이 속하는 첫 구간의 tier를 반환함 — pickStoneGrade와 완전히 동일한 구간 조회 패턴을 재사용함.
+function pickFlaskTier(level){
+  const rule = FLASK_TIER_RULES.find(r => level >= r.minLevel && (r.maxLevel == null || level <= r.maxLevel));
+  return rule ? rule.tier : FLASK_TIER_RULES[FLASK_TIER_RULES.length - 1].tier;
+}
+// 플라스크 드랍 판정(전역 공식, rollStoneDrop과 동일한 구조). 1) FLASK_DROP_CHANCE 확률로 드랍 판정 →
+// 2) 성공 시 FLASK_TYPE_CHANCE로 체력/마나 중 종류 결정 → 3) pickFlaskTier로 레벨 기준 단계 결정 →
+// 4) 종류+단계로 CONSUMABLES id(hpFlask{tier}/mpFlask{tier})를 조합해 기본 수량(FLASK_DROP_BASE_QTY) 지급.
+// 마석 드랍(rollStoneDrop)과 완전히 독립적으로 호출·판정되며, 몬스터 등급에 따른 수량 보정은 없음
+// (요청사항: 기본 드랍 수량은 등급 무관 전부 동일). 실패하면 null을 반환.
+function rollFlaskDrop(level){
+  if(Math.random() * 100 >= FLASK_DROP_CHANCE) return null;
+  const type = Math.random() * 100 < FLASK_TYPE_CHANCE.hp ? 'hp' : 'mp';
+  const tier = pickFlaskTier(level);
+  const itemId = (type === 'hp' ? 'hpFlask' : 'mpFlask') + tier;
+  if(!CONSUMABLES[itemId]) return null;
+  return { itemId, qty: FLASK_DROP_BASE_QTY };
+}
+
 // ---- 몬스터 체력/공격력 ----
 // 일반: Lv1=150, 이후 (이전 레벨 HP + 50) x 1.07 / 에픽: 같은 레벨 일반 몬스터의 3배(수정 없음)
 function normalMonsterHP(level){
@@ -1295,6 +1315,7 @@ function resolveDrops(monsterDef, dungeon, level){
   let weaponDrop = resolveWeaponRelicDrop(level); // { type, level } 또는 null
 
   const stoneDrop = rollStoneDrop(level, grade); // { itemId, qty } 또는 null(전역 공식, 던전/등급별 개별 설정 없음)
+  const flaskDrop = rollFlaskDrop(level); // { itemId, qty } 또는 null(전역 공식, 마석 드랍과 완전히 독립적으로 판정)
 
   // drops 중 artifactId가 있는 항목은 각 항목마다 독립적으로 확률을 판정함(재료류 미스크 드랍과 동일한
   // 원칙). 과거엔 몬스터마다 아티팩트 드랍 항목이 최대 1개뿐이라 첫 성공에서 멈춰도 차이가 없었지만,
@@ -1358,7 +1379,7 @@ function resolveDrops(monsterDef, dungeon, level){
     }
   }
 
-  return { gold, weaponDrop, weaponIdDrops, stoneDrop, artifactDropIds, miscDrops };
+  return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, artifactDropIds, miscDrops };
 }
 
 // ---- 한국어 조사 처리 ----

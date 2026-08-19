@@ -1128,6 +1128,24 @@ function dungeonStoneGrades(d){
   });
   return grades;
 }
+// 이 던전의 몬스터들이 실제로 등장 가능한 레벨(dungeonStoneGrades와 동일한 레벨 수집 방식)에서 나올 수
+// 있는 플라스크 아이템 id(hpFlask{tier}/mpFlask{tier})를 전부 모아 중복없이 반환. 종류(체력/마나)는
+// 레벨과 무관하게 항상 둘 다 나올 수 있으므로, 각 레벨에서 계산된 tier마다 hp/mp 두 id를 모두 후보로 넣음.
+function dungeonFlaskItems(d){
+  const itemIds = new Set();
+  d.monsters.forEach(id => {
+    const m = MONSTERS[id];
+    const levels = m.grade === 'normal'
+      ? Array.from({ length: (d.levelRange || 0) + 1 }, (_, i) => m.level + i)
+      : [m.level];
+    levels.forEach(lv => {
+      const tier = pickFlaskTier(lv);
+      itemIds.add('hpFlask' + tier);
+      itemIds.add('mpFlask' + tier);
+    });
+  });
+  return itemIds;
+}
 // 던전 입구 카드의 "획득 가능 아이템 안내" 아이콘 목록 생성.
 // - 골드/경험치/모험가의 유해는 하드코딩된 고정 안내(요구사항)이며 던전 데이터와 무관하게 항상 표시됨.
 // - 마석/장비/기타/아티팩트는 이 던전의 몬스터 드랍 테이블(MONSTERS[id].drops)과 레벨 구간을 기준으로
@@ -1206,6 +1224,14 @@ function buildDungeonDropIcons(d){
     if(!item || seenStoneIds.has(item.id)) return;
     seenStoneIds.add(item.id);
     icons.push({ icon: item.icon, borderColor: stoneNameColor(item.id), tooltip: buildStoneTooltipHtml(item.id) });
+  });
+
+  // 8. 플라스크 — 마석(7번)과 완전히 동일한 방식으로, 이 던전 몬스터들의 레벨 구간에서 실제로 나올 수
+  //    있는 체력/마나 포션만 자동 선별해 기존 소비 아이템 툴팁 공식(buildConsumableTooltipHtml)으로 표시.
+  dungeonFlaskItems(d).forEach(itemId => {
+    const item = CONSUMABLES[itemId];
+    if(!item) return;
+    icons.push({ iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltip: buildConsumableTooltipHtml(itemId) });
   });
 
   return icons.map(it => `

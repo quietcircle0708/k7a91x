@@ -1916,6 +1916,23 @@ const STONE_GRADE_RULES = [
   { minLevel: 10, maxLevel: null, grade: 'rare' },
 ];
 
+// 플라스크 드랍 — 전역 설정값. 마석 전역 드랍(STONE_*)과 완전히 동일한 구조를 그대로 재사용해 던전/
+// 몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함. 마석 드랍(STONE_*)과는 독립적으로
+// 별도 판정됨(한쪽 결과가 다른 쪽에 영향을 주지 않음).
+const FLASK_DROP_CHANCE = 10;   // 몬스터 처치 시 플라스크 드랍 판정 확률(%)
+const FLASK_DROP_BASE_QTY = 1;  // 기본 드랍 수량(등급 무관 전부 동일)
+// 플라스크 종류 선택 확률(%, 합계 100) — 드랍이 확정된 뒤 체력 회복/마나 회복 중 하나를 고름. 레벨과 무관.
+const FLASK_TYPE_CHANCE = { hp: 60, mp: 40 };
+// 플라스크 단계(포션 등급) 선택 공식(몬스터 레벨 기준). STONE_GRADE_RULES와 동일한 구간 조회 패턴 —
+// 위에서부터 순서대로 검사해 조건에 맞는 첫 구간의 tier를 사용함. maxLevel이 null이면 상한 없음.
+// tier 값은 CONSUMABLES의 hpFlask{tier}/mpFlask{tier} id와 그대로 연결됨(예: tier 2 → hpFlask2/mpFlask2).
+const FLASK_TIER_RULES = [
+  { minLevel: 1, maxLevel: 19, tier: 1 },
+  { minLevel: 20, maxLevel: 54, tier: 2 },
+  { minLevel: 55, maxLevel: 74, tier: 3 },
+  { minLevel: 75, maxLevel: null, tier: 4 },
+];
+
 // 개별 몬스터 테이블.
 // defense: 몬스터 방어도(몬스터 방어도 시스템). 플레이어 방어도와 동일한 공식(defenseDamageMultiplier,
 // formulas.js)을 그대로 사용해 이 몬스터가 입는 최종 피해량에 적용됨. 음수/양수 모두 가능(양수면 피해
@@ -2338,7 +2355,7 @@ const TREASURE_GOLD_VARIANCE = 0.25;  // 골드 보상 랜덤 편차 ±25%(일�
 
 // 모든 몬스터 공통 규칙
 const MONSTER_BASE_GOLD = 100;       // 1레벨 몬스터의 기본 드랍 골드
-const MONSTER_GOLD_GROWTH = 0.06;    // 레벨당 골드 가중치 (+6%)
+const MONSTER_GOLD_GROWTH = 0.04;    // 레벨당 골드 가중치 (+4%)
 const MONSTER_GOLD_VARIANCE = 0.15;  // 최종 드랍 골드 랜덤 편차 (±15%)
 const MONSTER_ATTACK_SPEED = 1.0;    // 몬스터 공격속도(초당 공격 횟수) = 1초에 1번
 

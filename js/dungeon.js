@@ -58,7 +58,7 @@ function spawnMonsters(){
   // 이번 전투(그룹 전멸까지)에서 처치한 모든 몬스터의 보상을 합산해 담아둘 그릇
   hunt.pendingRewards = {
     gold: 0, expGained: 0, levelsGained: 0, newPlayerLevel: state.playerLevel,
-    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, artifactDrops: [], miscDrops: {}, killedMonsters: [],
+    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, flaskDrops: {}, artifactDrops: [], miscDrops: {}, killedMonsters: [],
   };
 
   renderHunt();
@@ -445,6 +445,14 @@ function killMonsterInstance(instanceId){
     hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] = (hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] || 0) + result.stoneDrop.qty;
     dropVisualItems.push({ kind: 'item', itemId: result.stoneDrop.itemId });
   }
+  if(result.flaskDrop){
+    // 플라스크는 마석(state[item.stateKey])과 달리 소비 아이템 전용 보유 수량 저장소(state.consumables)를
+    // 사용함 — 상점 구매/사용(actions.js) 등 기존 플라스크 지급 로직과 완전히 동일한 방식으로 지급.
+    if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
+    state.consumables[result.flaskDrop.itemId] = (state.consumables[result.flaskDrop.itemId] || 0) + result.flaskDrop.qty;
+    hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] = (hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] || 0) + result.flaskDrop.qty;
+    dropVisualItems.push({ kind: 'consumable', itemId: result.flaskDrop.itemId });
+  }
   if(result.artifactDropIds && result.artifactDropIds.length){
     for(const id of result.artifactDropIds){
       grantArtifactSafe(id);
@@ -519,6 +527,10 @@ function openKillResultModal(rewards){
   Object.keys(rewards.stoneDrops).forEach(itemId => {
     const item = MISC_ITEMS[itemId];
     rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${rewards.stoneDrops[itemId]} 획득</div>`;
+  });
+  Object.keys(rewards.flaskDrops).forEach(itemId => {
+    const item = CONSUMABLES[itemId];
+    rewardsHtml += `<div><span class="txt-shard">${itemIconHtml(item)} ${item.name}</span> +${rewards.flaskDrops[itemId]} 획득</div>`;
   });
   rewards.artifactDrops.forEach(artId => {
     const art = ARTIFACTS[artId];

@@ -276,6 +276,12 @@ function dropItemVisualInner(item){
     const a = ARTIFACTS[item.id];
     return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(a.grade)}">${itemIconHtml(a)}</span>`;
   }
+  if(item.kind === 'consumable'){
+    // 플라스크(CONSUMABLES) 드랍 연출 — 마석/재료(MISC_ITEMS)와는 다른 데이터 테이블이라 별도 분기.
+    // CONSUMABLES 항목엔 grade 필드가 없어 dropEffectGlowFilter가 자동으로 기본(무광) 처리함.
+    const it = CONSUMABLES[item.itemId];
+    return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(it.grade)}">${itemIconHtml(it)}</span>`;
+  }
   // item.kind === 'item' — 마석/재료 등 MISC_ITEMS
   const it = MISC_ITEMS[item.itemId];
   return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(it.grade)}">${itemIconHtml(it)}</span>`;
