@@ -20,6 +20,8 @@ let state = {
   nextItemId: 1,
   armorInventory: [],                          // 보유 방어구 목록({id,type,level}, 무기 인벤토리와 동일한 형태)
   equippedArmor: { helmet: null, armor: null }, // 착용 중인 방어구(종류당 1개) — 강화 대상(forgeTargetId)과는 별개 개념
+  subInventory: [],                             // 보유 보조(방패/보조 무기) 목록({id,type,level} — level은 강화가 없어 항상 0)
+  equippedSubId: null,                          // 착용 중인 보조 아이템 id(동시에 1개만, 양손 검 장착 중이면 착용 불가)
   accessoryInventory: [],                       // 보유 장신구 목록({id,type,level})
   equippedAccessories: [null, null],            // 착용 중인 장신구(장신구1/장신구2 슬롯, 최대 ACCESSORY_SLOT_MAX개) — 같은 아이템 2개 착용 가능
   traceInventory: [],                           // 보유 흔적 목록({id,forType} — forType은 복구할 장비의 WEAPON_TYPES/
@@ -64,14 +66,18 @@ let invUI = { tab: 'weapon', equipTab: 'weapon' };
 let pageState = {
   invWeapon: 1,
   invArmor: 1,
+  invSub: 1,
   invAccessory: 1,
   forgeSelect: 1,
-  shopWeapon: 1, shopArmor: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
+  shopWeapon: 1, shopArmor: 1, shopSub: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
   charStats: 1,
   charMenuInfo: 1,
   skillPage: 1,
   huntCharStats: 1,
+  // dungeonDrop 페이지는 던전마다 따로 관리해야 해서 고정 키 하나가 아니라, 던전 카드를 그릴 때
+  // `dungeonDrop:<던전id>` 형태의 동적 키를 이 오브젝트에 필요할 때마다 추가해서 씀(goPage의 범용
+  // "pageState[target] = ..." 로직을 그대로 재사용하기 위함, render.js buildDungeonDropIcons 참고).
 };
 let shopFilterMenuOpen = false;
 
@@ -291,6 +297,12 @@ function applyLoadedRaw(raw){
   // 장착 시스템 개편 이전 세이브 마이그레이션: 그때는 "보유 = 장착"이었으므로, 보유 중이던
   // 아티팩트를 장착 슬롯 최대치까지 그대로 장착 상태로 옮겨 기존 효과가 끊기지 않게 함.
   if(!Array.isArray(state.equippedArtifacts)) state.equippedArtifacts = state.artifacts.slice(0, ARTIFACT_SLOT_MAX);
+  // 이후 데이터에서 완전히 삭제된 아티팩트(예: 사각 방패/squareshield — 보조 아이템으로 재구성 예정이라
+  // ARTIFACTS에서 제거됨)를 예전에 보유·장착해둔 세이브가 있으면, ARTIFACTS[id]가 undefined인 채로
+  // 남아 인벤토리·강화 화면 렌더링이 전부 그 지점에서 예외로 멈춰버림(인벤토리 빈 화면, 던전 진입
+  // 실패 등 연쇄 증상). 더 이상 존재하지 않는 id는 보유·장착 목록 양쪽에서 조용히 제거해 정리함.
+  state.artifacts = state.artifacts.filter(id => ARTIFACTS[id]);
+  state.equippedArtifacts = state.equippedArtifacts.filter(id => ARTIFACTS[id]);
   // 구버전 인벤토리(type 필드 없음) 마이그레이션: 전부 롱소드였음
   if(Array.isArray(state.inventory)){
     state.inventory.forEach(it => { if(!it.type) it.type = 'longsword'; });
@@ -304,6 +316,9 @@ function applyLoadedRaw(raw){
   if(!Array.isArray(state.accessoryInventory)) state.accessoryInventory = [];
   if(!Array.isArray(state.equippedAccessories)) state.equippedAccessories = [null, null];
   while(state.equippedAccessories.length < ACCESSORY_SLOT_MAX) state.equippedAccessories.push(null);
+  // 보조(방패/보조 무기) 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
+  if(!Array.isArray(state.subInventory)) state.subInventory = [];
+  if(state.equippedSubId === undefined) state.equippedSubId = null;
   // 강화 파괴/흔적 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
   if(!Array.isArray(state.traceInventory)) state.traceInventory = [];
   // 대장간 강화 대상(forgeTargetId) 추가 이전 세이브 마이그레이션: 예전엔 equippedId 하나가 "착용
@@ -410,6 +425,7 @@ function resetGame(){
   state = {
     gold: 1000, inventory: [], equippedId: null, forgeTargetId: null, nextItemId: 1,
     armorInventory: [], equippedArmor: { helmet: null, armor: null },
+    subInventory: [], equippedSubId: null,
     accessoryInventory: [], equippedAccessories: [null, null],
     traceInventory: [],
     charmCount:0, charmPrice:1500, charmActive:false,

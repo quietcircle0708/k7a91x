@@ -405,6 +405,13 @@
   .drop-icon-wrap .tooltip{ width:200px; left:0; bottom:120%; line-height:1.6; }
   .drop-icon-wrap:hover .tooltip{ visibility:visible; opacity:1; }
   .drop-icon-img{ width:20px; height:20px; }
+  .drop-icon-page-btn{
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    height:28px; padding:0 8px; border-radius:7px; font-size:11px; white-space:nowrap;
+    background: var(--forge-panel); border:1px solid var(--forge-line); color: var(--forge-cream);
+    cursor:pointer; font-family:'JetBrains Mono', monospace;
+  }
+  .drop-icon-page-btn:hover{ border-color: var(--forge-gold); color: var(--forge-gold); }
   .dungeon-enter-btn{
     width:100%; border:none; border-radius:10px; padding:11px;
     font-weight:700; font-size:14px; cursor:pointer;
@@ -724,27 +731,40 @@
   .char-stats-left{ flex:1; min-width:0; }
   .char-stats-right{ flex:1; min-width:0; }
 
-  .equip-panel{ display:flex; gap:10px; margin-bottom:12px; }
+  .equip-panel{ display:flex; justify-content:center; gap:10px; margin-bottom:12px; }
   .equip-slots-grid{
-    flex:1; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(3, 58px);
-    grid-template-areas: ".      helmet" "weapon armor" ".      accessories";
+    display:grid; grid-template-columns:repeat(3, 58px); grid-template-rows:repeat(4, 58px);
+    grid-template-areas:
+      "art1   art2   art3"
+      ".      helmet ."
+      "weapon armor  sub"
+      "accessories accessories accessories";
     gap:8px;
   }
   .area-weapon{ grid-area:weapon; }
   .area-helmet{ grid-area:helmet; }
   .area-armor{ grid-area:armor; }
-  .area-accessories{ grid-area:accessories; display:flex; gap:6px; }
-  .area-accessories .eq-slot{ flex:1; }
-  .equip-artifact-col{ width:58px; display:flex; flex-direction:column; gap:8px; }
-  .equip-artifact-col .eq-slot{ flex:1; }
+  .area-sub{ grid-area:sub; }
+  /* 아티팩트 칸은 다른 슬롯과 같은 58px 그리드 칸 안에 있되, 슬롯 자체(.eq-slot-artifact)만 30% 작은
+     정사각형(41px)으로 만들고 칸 중앙에 배치함 — 그리드 칸 크기를 바꾸면 다른 행(투구/무기/갑옷/보조)
+     칸까지 함께 눌리므로, 칸 크기는 그대로 두고 그 안의 슬롯 크기만 줄이는 방식으로 처리.
+  */
+  .area-art1{ grid-area:art1; justify-self:center; align-self:center; }
+  .area-art2{ grid-area:art2; justify-self:center; align-self:center; }
+  .area-art3{ grid-area:art3; justify-self:center; align-self:center; }
+  .area-accessories{ grid-area:accessories; display:flex; gap:8px; justify-content:center; }
+  .area-accessories .eq-slot{ flex:0 0 58px; }
+  .eq-slot-artifact{ width:41px; height:41px; font-size:14px; }
   .eq-slot{
+    width:58px; height:58px;
     border-radius:10px; background: var(--forge-panel-2); border:1px dashed var(--forge-line);
     display:flex; align-items:center; justify-content:center; position:relative; cursor:help;
   }
   .eq-slot.filled{ border-style:solid; border-color: var(--forge-gold); background:#2c2415; }
   .eq-slot-empty-label{ font-size:10.5px; color: var(--forge-cream-dim); text-align:center; padding:0 2px; }
+  .eq-slot-artifact .eq-slot-empty-label{ font-size:8.5px; } /* 30% 축소된 슬롯 크기에 맞춰 라벨도 축소 */
   .eq-slot-icon-img{ width:34px; height:auto; max-height:44px; object-fit:contain; }
-  .eq-slot-artifact{ font-size:20px; }
+  .eq-slot-artifact .eq-slot-icon-img, .eq-slot-artifact .item-icon-img{ width:24px; max-height:31px; } /* 30% 축소 */
   .eq-slot .tooltip{ width:220px; left:50%; transform:translateX(-50%); bottom:112%; }
   .eq-slot:hover .tooltip{ visibility:visible; opacity:1; }
   .equipped-item-info{ margin-top:6px; }

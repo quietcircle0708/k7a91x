@@ -147,6 +147,7 @@
       <div class="shop-subtabs" id="shopEquipSubTabs">
         <button class="shop-subtab-btn active" data-tab="weapon">무기</button>
         <button class="shop-subtab-btn" data-tab="armor">방어구</button>
+        <button class="shop-subtab-btn" data-tab="sub">보조</button>
         <button class="shop-subtab-btn" data-tab="accessory">장신구</button>
         <button class="shop-subtab-btn" data-tab="artifact">아티팩트</button>
       </div>
@@ -168,6 +169,7 @@
       <div class="inv-subtabs" id="invEquipSubTabs">
         <button class="inv-subtab-btn active" data-tab="weapon">무기</button>
         <button class="inv-subtab-btn" data-tab="armor">방어구</button>
+        <button class="inv-subtab-btn" data-tab="sub">보조</button>
         <button class="inv-subtab-btn" data-tab="accessory">장신구</button>
         <button class="inv-subtab-btn" data-tab="artifact">아티팩트</button>
       </div>
@@ -185,6 +187,13 @@
           <div class="pager" id="invArmorPager"></div>
         </div>
         <div id="armorInventoryList"></div>
+      </div>
+      <div class="inv-tab-panel" id="invTabSub" style="display:none;">
+        <div class="inv-count-row">
+          <div class="inv-count" id="invCountSub">0 / 50</div>
+          <div class="pager" id="invSubPager"></div>
+        </div>
+        <div id="subInventoryList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabAccessory" style="display:none;">
         <div class="inv-count-row">

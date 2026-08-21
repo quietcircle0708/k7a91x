@@ -7,9 +7,8 @@
 const MAX_LEVEL = 9;
 const INV_MAX = 50; // 장비(무기/방어구/장신구) 공용 인벤토리 최대 슬롯 — 세 종류가 하나의 총량을 공유함(totalEquipInventoryCount 참고)
 
-// 장비 타입. 무기 / 방어구 / 장신구 / 아티팩트가 있으며, 방어구·장신구는 아직 실제 데이터가 없음(장비 탭
-// 구조만 먼저 준비된 상태 — 20번째 작업 "장비 탭 추가" 참고).
-const EQUIPMENT_TYPES = { weapon: '무기', armor: '방어구', accessory: '장신구', artifact: '아티팩트' };
+// 장비 타입. 무기 / 방어구 / 보조 / 장신구 / 아티팩트가 있음.
+const EQUIPMENT_TYPES = { weapon: '무기', armor: '방어구', sub: '보조', accessory: '장신구', artifact: '아티팩트' };
 
 // 무기 종류(카테고리) 구분: 양손 검 / 검 / 단검 / 지팡이. 무기 "이름"과는 별개의 개념.
 const WEAPON_KINDS = { two_handed_sword: '양손 검', sword: '검', dagger: '단검', staff: '지팡이' };
@@ -224,10 +223,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'rare', // 레어
-    attackPower: 28, attackSpeed: 1, critRate: 10,
+    attackPower: 28, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 1000, levelReq: 15,
     image: 'rare_combatknife2',
-    atk: [28], speed: [1], crit: [10], sell: [1000],
+    atk: [28], speed: [1.2], crit: [10], sell: [1000],
     cost: [], odds: [],
   },
   longsword3: {
@@ -257,10 +256,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검 (표기상 "양손 검"은 오타로 확인함)
     grade: 'normal', // 일반
-    attackPower: 30, attackSpeed: 1.0, critRate: 10,
+    attackPower: 30, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 1250, levelReq: 20,
     image: 'common_dagger2', // 기존 dagger2와 이미지 공유(재사용) — 신규 파일 없음
-    atk: [30], speed: [1.0], crit: [10], sell: [1250],
+    atk: [30], speed: [1.2], crit: [10], sell: [1250],
     cost: [], odds: [],
   },
   blacksword: {
@@ -391,10 +390,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
-    attackPower: 14, attackSpeed: 1.0, critRate: 9,
+    attackPower: 14, attackSpeed: 1.2, critRate: 9,
     purchasable: false, sellPrice: 195, levelReq: 4,
     image: 'common_dagger', // 기존 이미지 재사용
-    atk: [14], speed: [1.0], crit: [9], sell: [195],
+    atk: [14], speed: [1.2], crit: [9], sell: [195],
     cost: [], odds: [],
   },
   sharp_dagger: {
@@ -402,10 +401,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검 (사용자 확인 후 검→단검으로 수정함)
     grade: 'normal', // 일반
-    attackPower: 16, attackSpeed: 1.0, critRate: 9,
+    attackPower: 16, attackSpeed: 1.2, critRate: 9,
     purchasable: false, sellPrice: 340, levelReq: 7,
     image: 'common_dagger', // 기존 이미지 재사용
-    atk: [16], speed: [1.0], crit: [9], sell: [340],
+    atk: [16], speed: [1.2], crit: [9], sell: [340],
     cost: [], odds: [],
   },
   bastardsword: {
@@ -435,10 +434,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'rare', // 레어
-    attackPower: 47, attackSpeed: 1.0, critRate: 10,
+    attackPower: 47, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 1750, levelReq: 25,
     image: 'rare_silverdagger',
-    atk: [47], speed: [1.0], crit: [10], sell: [1750],
+    atk: [47], speed: [1.2], crit: [10], sell: [1750],
     cost: [], odds: [],
   },
   steelsword: {
@@ -468,10 +467,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
-    attackPower: 49, attackSpeed: 1.0, critRate: 10,
+    attackPower: 49, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 2250, levelReq: 30,
     image: 'common_dagger4',
-    atk: [49], speed: [1.0], crit: [10], sell: [2250],
+    atk: [49], speed: [1.2], crit: [10], sell: [2250],
     cost: [], odds: [],
   },
   ninetaildagger: {
@@ -479,10 +478,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'epic', // 에픽
-    attackPower: 86, attackSpeed: 0.8, critRate: 15,
+    attackPower: 86, attackSpeed: 1.2, critRate: 15,
     purchasable: false, sellPrice: 7000, levelReq: 33,
     image: 'epic_ninetaildagger',
-    atk: [86], speed: [0.8], crit: [15], sell: [7000],
+    atk: [86], speed: [1.2], crit: [15], sell: [7000],
     cost: [], odds: [],
     // ---- 고유 옵션(에픽/유니크 전용) ----
     // 반월대도(moongreatsword)와 동일한 "고정형" 옵션 스키마(opt.text+opt.statBonus) — 강화해도 수치가
@@ -522,10 +521,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'rare', // 레어
-    attackPower: 76, attackSpeed: 1.0, critRate: 10,
+    attackPower: 76, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 3500, levelReq: 35,
     image: 'rare_guards_dagger',
-    atk: [76], speed: [1.0], crit: [10], sell: [3500],
+    atk: [76], speed: [1.2], crit: [10], sell: [3500],
     cost: [], odds: [],
   },
   claymore: {
@@ -555,10 +554,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'rare', // 레어
-    attackPower: 124, attackSpeed: 1.0, critRate: 10,
+    attackPower: 124, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 10000, levelReq: 45,
     image: 'rare_mercenary_knife',
-    atk: [124], speed: [1.0], crit: [10], sell: [10000],
+    atk: [124], speed: [1.2], crit: [10], sell: [10000],
     cost: [], odds: [],
   },
   silvergreatsword: {
@@ -588,10 +587,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
-    attackPower: 80, attackSpeed: 1.0, critRate: 10,
+    attackPower: 80, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 5000, levelReq: 40,
     image: 'common_dagger4', // 기존 이미지 재사용
-    atk: [80], speed: [1.0], crit: [10], sell: [5000],
+    atk: [80], speed: [1.2], crit: [10], sell: [5000],
     cost: [], odds: [],
   },
   goldgreatsword: {
@@ -621,10 +620,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'normal', // 일반
-    attackPower: 131, attackSpeed: 1.0, critRate: 10,
+    attackPower: 131, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 12000, levelReq: 50,
     image: 'common_dagger2', // 기존 이미지 재사용
-    atk: [131], speed: [1.0], crit: [10], sell: [12000],
+    atk: [131], speed: [1.2], crit: [10], sell: [12000],
     cost: [], odds: [],
   },
   // 신규 아이템 2종 사전 추가(1번: 팔각비도) — 추후 던전/몬스터 드랍 시스템이 추가되면 드랍 데이터에
@@ -634,10 +633,10 @@ const WEAPON_TYPES = {
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
     grade: 'epic', // 에픽
-    attackPower: 155, attackSpeed: 1.0, critRate: 12,
+    attackPower: 155, attackSpeed: 1.2, critRate: 12,
     purchasable: false, sellPrice: 15000, levelReq: 45,
     image: 'epic_eight_knife',
-    atk: [155], speed: [1.0], crit: [12], sell: [15000],
+    atk: [155], speed: [1.2], crit: [12], sell: [15000],
     cost: [], odds: [],
     // 고유 옵션: "대상 상태 이상 조건부 피해 증가" 계열 — effectId(poison_target_damage_percent)로
     // targetStatusDamageMultiplier(formulas.js)가 인식해, 착용 중 공격 대상이 중독 상태일 때만 최종
@@ -951,6 +950,36 @@ Object.values(ACCESSORY_TYPES).forEach(a => {
   if(a.crit != null) a.crit = computeAccessoryCritArray(a.crit); // crit 필드를 배열로 덮어씀(critChanceFor가 wpn(type).crit[level]로 읽음)
 });
 
+// ============================================================
+// SUB_TYPES(보조 장비: 방패/보조 무기) — 방어구 데이터 스키마를 그대로 재사용하되, 강화 자체가 없는
+// 장비 타입이라 무기/방어구/장신구와 달리 cost/odds(강화 비용/확률)를 아예 채우지 않음. 이 cost 필드가
+// 없다는 사실 하나만으로 forgeSelectableItems(formulas.js)가 자동으로 강화 대상에서 제외해줌(무기/방어구/
+// 장신구가 "강화 데이터가 아직 없는 종류"를 거르는 것과 완전히 같은 기존 메커니즘 재사용 — 별도의
+// 예외 처리를 새로 만들지 않음).
+// ---- 항목 설명 ----
+// subKind: 보조 종류('shield'|'sub_weapon', SUB_KINDS 참고 — 툴팁 구분 표시 전용이며 능력치 공식과는
+// 무관함) / defense,hp,mana: 방어구와 동일한 의미(공란=옵션 없음) / uniqueOption: 방어구와 동일한 구조
+// 그대로 재사용(weaponUniqueOptionTooltipHtml 등 기존 범용 함수가 그대로 인식함).
+// defArr/hpArr/manaArr/sell: 강화 단계가 없으므로(항상 +0) 방어구처럼 단계별로 자라는 배열이 아니라,
+// "장신구의 방어도"(강화 대상에서 제외되는 옵션)와 동일한 방식으로 10칸 전부 같은 값을 채운 flat
+// 배열을 씀 — defenseFor/armorHpFor/armorManaFor/sellValueFor 등 기존 접근자 함수가 항상 [level]로
+// 인덱싱하므로, 아이템 인스턴스의 level이 항상 0이더라도(강화 불가) 이 함수들을 그대로 재사용하기 위함.
+// 아직 실제 아이템 데이터는 등록하지 않음(이번 작업 범위는 스키마/시스템 구현까지).
+// ============================================================
+const SUB_KINDS = { shield: '방패', sub_weapon: '보조 무기' }; // 새 보조 종류가 추가되면 항목만 추가하면 툴팁 등에 자동 반영됨(ARMOR_KINDS/ACCESSORY_KINDS와 동일한 확장 방식)
+const SUB_IMAGE_DIR = 'assets/sub/';
+const SUB_IMAGE_EXT = '.png';
+const SUB_DEFAULT_IMAGE = { shield: 'shieldbase', sub_weapon: 'subweaponbase' }; // image 필드가 비어있을 때 보조 종류별 기본 이미지(방어구/장신구와 동일한 방식). 실제 PNG 파일은 아직 없지만 onerror 폴백(weaponIconHtml)이 있어 안전하게 동작함.
+
+const SUB_TYPES = {
+};
+Object.values(SUB_TYPES).forEach(s => {
+  if(s.defense != null) s.defArr = new Array(10).fill(s.defense);
+  if(s.hp != null) s.hpArr = new Array(10).fill(s.hp);
+  if(s.mana != null) s.manaArr = new Array(10).fill(s.mana);
+  s.sell = new Array(10).fill(s.sellPrice || 0); // 강화가 없어 판매가도 항상 고정(성장 공식 미적용)
+});
+
 // ---- 대장간 "강화 장비 선택" 팝업이 훑는 장비 보유 풀 목록 ----
 // 각 항목은 { kind, items(): 보유 아이템 배열을 반환하는 함수, typesTable: 도감(공격력/등급 등 정의),
 // meetsReq(type): 착용 가능 여부 판정 함수 }. formulas.js의 forgeSelectableItems()가 이 배열을 순회해서
@@ -976,6 +1005,17 @@ const EQUIP_INVENTORY_POOLS = [
     kind: 'accessory',
     items: () => state.accessoryInventory || [],
     typesTable: ACCESSORY_TYPES,
+    meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats()),
+  },
+  // "보조"도 다른 세 종류와 동일하게 이 풀에 등록함(공용 인벤토리 슬롯 카운트에 정상적으로 포함되고,
+  // 모험가의 유해 등 확정 장비 드랍이 grantRelicEquipDrop에서 올바른 인벤토리로 들어가려면 이 풀이
+  // 필요함). 그런데도 강화 대상에서는 절대 뜨지 않음 — forgeSelectableItems(바로 아래)가 typeDef.cost
+  // 배열이 없는 아이템을 자동으로 걸러내는데, SUB_TYPES 항목은 애초에 cost/odds를 채우지 않으므로
+  // (위 SUB_TYPES 블록 참고) 이 풀에 있어도 강화 선택 목록에는 절대 나타나지 않음.
+  {
+    kind: 'sub',
+    items: () => state.subInventory || [],
+    typesTable: SUB_TYPES,
     meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats()),
   },
 ];
@@ -1322,17 +1362,6 @@ const ARTIFACTS = {
     effectText: '힘 +5<br>민첩 +3<br>치명타 확률 +8%',
     buyPrice: null,
   },
-  squareshield: {
-    id: 'squareshield', name: '사각 방패', icon: '🛡️',
-    desc: '견고한 사각형 철판 위에 오래된 수호 문양이 새겨진 방패',
-    equipType: 'artifact',
-    grade: 'epic',
-    // 방어도 -5는 playerTotalDefense(formulas.js)에서 artifactDefenseBonus로 합산, 힘 +3은 다른 힘
-    // 스탯과 동일하게 artifactStatBonus 경유, 체력 +300은 그와 별개로 effectiveMaxHp에 고정값으로 더해짐.
-    effect: '방어도 -5<br>힘 +3<br>최대 체력 +300',
-    effectText: '방어도 -5<br>힘 +3<br>체력 +300',
-    buyPrice: null,
-  },
   foxorb: {
     id: 'foxorb', name: '빛나는 여우 구슬', icon: '🔮',
     desc: '희미한 푸른빛을 머금은 신비로운 구슬<br>밤이 깊어질수록 더욱 강하게 빛난다',
@@ -1589,6 +1618,7 @@ const DESTROY_SHINYSTONE_ENHANCE_QTY = [
 const EQUIP_SUB_TABS = [
   { id: 'weapon', label: '무기' },
   { id: 'armor', label: '방어구' },
+  { id: 'sub', label: '보조' }, // 보조 아이템 데이터/기능은 아직 미구현 — 탭 UI만 우선 추가(강화 불가 아이템으로 기획됨, EQUIP_INVENTORY_POOLS 주석 참고)
   { id: 'accessory', label: '장신구' },
   { id: 'artifact', label: '아티팩트' },
 ];
@@ -1631,18 +1661,21 @@ const SHOP_SORT_FIELDS = [
 const PAGE_SIZE = {
   invWeapon: 6,        // 인벤토리 무기 탭
   invArmor: 6,          // 인벤토리 방어구 탭
+  invSub: 6,             // 인벤토리 보조 탭(아직 데이터 없음 — 항상 빈 목록으로 표시됨)
   invAccessory: 6,       // 인벤토리 장신구 탭
   forgeSelect: 6,       // 대장간 "강화 장비 선택" 팝업
   shopWeapon: 6,        // 상점 무기 탭
   shopArmor: 6,          // 상점 방어구 탭
+  shopSub: 6,             // 상점 보조 탭(아직 데이터 없음 — 항상 빈 목록으로 표시됨)
   shopAccessory: 6,      // 상점 장신구 탭
   shopConsumable: 6,     // 상점 소비 탭
   shopArtifact: 6,       // 상점 아티팩트 탭
   dungeonList: 3,        // 던전 입구
+  dungeonDrop: 11,       // 던전 카드 "획득 가능 아이템 안내" 아이콘 목록(13개 이상인 던전만 적용)
 };
 // 상점 탭 id → PAGE_SIZE/페이지 상태 키 매핑. 페이지네이션 미적용 탭(stone/misc)은 여기 없음.
 const SHOP_PAGE_KEY = {
-  weapon: 'shopWeapon', armor: 'shopArmor', accessory: 'shopAccessory', consumable: 'shopConsumable', artifact: 'shopArtifact',
+  weapon: 'shopWeapon', armor: 'shopArmor', sub: 'shopSub', accessory: 'shopAccessory', consumable: 'shopConsumable', artifact: 'shopArtifact',
 };
 // 캐릭터 정보창 페이지 수. 이 화면은 아이템 목록을 잘라서 보여주는 게 아니라 "1페이지(장비창+캐릭터 정보) /
 // 2페이지(적용 중인 아티팩트 효과)"처럼 완전히 다른 내용을 페이지로 나눈 것이라 PAGE_SIZE(개수 기반 분할)는
@@ -1836,6 +1869,7 @@ const EQUIPMENT_SLOTS = [
   { key: 'weapon', label: '무기', cellClass: 'area-weapon' },
   { key: 'helmet', label: '투구', cellClass: 'area-helmet' },
   { key: 'armor', label: '갑옷', cellClass: 'area-armor' },
+  { key: 'sub', label: '보조', cellClass: 'area-sub' },
   { key: 'accessory1', label: '장신구1', cellClass: '' },
   { key: 'accessory2', label: '장신구2', cellClass: '' },
 ];
@@ -1919,7 +1953,7 @@ const STONE_GRADE_RULES = [
 // 플라스크 드랍 — 전역 설정값. 마석 전역 드랍(STONE_*)과 완전히 동일한 구조를 그대로 재사용해 던전/
 // 몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함. 마석 드랍(STONE_*)과는 독립적으로
 // 별도 판정됨(한쪽 결과가 다른 쪽에 영향을 주지 않음).
-const FLASK_DROP_CHANCE = 10;   // 몬스터 처치 시 플라스크 드랍 판정 확률(%)
+const FLASK_DROP_CHANCE = 15;   // 몬스터 처치 시 플라스크 드랍 판정 확률(%)
 const FLASK_DROP_BASE_QTY = 1;  // 기본 드랍 수량(등급 무관 전부 동일)
 // 플라스크 종류 선택 확률(%, 합계 100) — 드랍이 확정된 뒤 체력 회복/마나 회복 중 하나를 고름. 레벨과 무관.
 const FLASK_TYPE_CHANCE = { hp: 60, mp: 40 };
@@ -2066,7 +2100,6 @@ const MONSTERS = {
     epicSpawnWeight: 85, // 여우굴 전용 — 구미호와 합쳐 100%(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '여우 모피', chance: 40 },
-      { name: '사각 방패', chance: 5, artifactId: 'squareshield' },
       { name: '제령도', chance: 2, weaponId: 'ninetaildagger' },
     ],
   },
@@ -2078,7 +2111,6 @@ const MONSTERS = {
     epicSpawnWeight: 15, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '여우 모피', chance: 90 },
-      { name: '사각 방패', chance: 12, artifactId: 'squareshield' },
       { name: '빛나는 여우 구슬', chance: 10, artifactId: 'foxorb' },
       { name: '제령도', chance: 8, weaponId: 'ninetaildagger' },
     ],
@@ -2133,16 +2165,16 @@ const MONSTERS = {
   epicmantis1: {
     id: 'epicmantis1', name: '현랑귀랑', icon: '🦗', grade: 'epic', level: 45, image: 'epicmantis1',
     defense: -10, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
-    epicSpawnWeight: 70, // 사마귀굴 전용 — 현랑귀와 합쳐 100%(pickEpicMonsterId, formulas.js)
+    epicSpawnWeight: 50, // 사마귀굴 전용 — 현랑귀와 합쳐 100%(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 20 },
-      { name: '현랑반지', chance: 0.1, weaponId: 'wolfmoonring' },
+      { name: '현랑반지', chance: 1, weaponId: 'wolfmoonring' },
     ],
   },
   epicmantis2: {
     id: 'epicmantis2', name: '현랑귀', icon: '🦗', grade: 'epic', level: 48, image: 'epicmantis2',
     defense: -10, hpMult: 1.0, atkMult: 1.4, speedMult: 1.1,
-    epicSpawnWeight: 30, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 30 },
       { name: '현랑반지', chance: 2, weaponId: 'wolfmoonring' },
@@ -2310,9 +2342,10 @@ const MONSTER_COUNT_MAX = 3; // 전투 중 동시에 등장 가능한 최대 몬
 // 전투 시작 시 동시에 등장하는 몬스터 수 확률(전역 설정, 합계 100). 언제든 쉽게 바꿀 수 있도록 별도 상수로 관리함.
 const MONSTER_COUNT_CHANCE = { 1: 60, 2: 30, 3: 10 };
 
-// 에픽 몬스터가 확정 스폰되는 스테이지(5, 10)는 예외적으로 항상 1마리만 등장함.
-// 11스테이지(숨겨진 장소)는 몬스터가 아예 등장하지 않으므로 이 표와 무관함(별도 처리).
-const MONSTER_COUNT_FORCED_SINGLE_STAGES = [5, 10];
+// 5·10 스테이지의 "에픽 몬스터 1마리 확정 출현"은 STAGE_GRADE_CHANCE(위 표)가 이 두 스테이지에서
+// epic:100으로 설정되어 있는 것만으로 보장됨(pickStageMonsterGrades, formulas.js) — 몬스터 수 자체는
+// 다른 스테이지와 동일하게 아래 MONSTER_COUNT_CHANCE 확률을 그대로 따르므로, 5·10 스테이지도 에픽 1마리
+// 확정 + 남은 슬롯은 이 확률표로 추가 추첨되는 방식(1마리만 나오면 에픽 단독, 2~3마리면 에픽+일반 혼합).
 
 // ---- 전투 화면 개편: 플레이어 중앙 고정 + 몬스터 상/좌/우 배치 ----
 // 몬스터가 배치될 수 있는 3개 고정 슬롯(하단 슬롯 제거). MONSTER_COUNT_MAX(3)와 슬롯 개수가 같아야 함.

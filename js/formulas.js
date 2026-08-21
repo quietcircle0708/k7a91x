@@ -27,7 +27,7 @@
 // 검사됨). 이렇게 하면 이름/등급색상/아이콘/툴팁 등 "장비 전역 설정"에 해당하는 함수들을 방어구에도
 // 그대로 재사용할 수 있음 — 단, atk/speed/crit 등 무기 전용 필드를 쓰는 함수(atkFor 등)는 방어구
 // id로 호출하면 안 됨(호출부에서 equipType으로 구분해서 사용).
-function wpn(type){ return WEAPON_TYPES[type] || ARMOR_TYPES[type] || ACCESSORY_TYPES[type] || WEAPON_TYPES.longsword; }
+function wpn(type){ return WEAPON_TYPES[type] || ARMOR_TYPES[type] || ACCESSORY_TYPES[type] || SUB_TYPES[type] || WEAPON_TYPES.longsword; }
 function weaponKindLabel(type){ return WEAPON_KINDS[wpn(type).weaponKind] || ''; }
 function weaponGradeLabel(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.label : ''; }
 function weaponGradeColor(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.color : '#ffffff'; }
@@ -60,6 +60,10 @@ function weaponImagePath(type){
   if(w.equipType === 'accessory'){
     const file = w.image || ACCESSORY_DEFAULT_IMAGE[w.accessoryKind] || 'ringbase';
     return ACCESSORY_IMAGE_DIR + file + ACCESSORY_IMAGE_EXT;
+  }
+  if(w.equipType === 'sub'){
+    const file = w.image || SUB_DEFAULT_IMAGE[w.subKind] || 'shieldbase';
+    return SUB_IMAGE_DIR + file + SUB_IMAGE_EXT;
   }
   return WEAPON_IMAGE_DIR + w.image + WEAPON_IMAGE_EXT;
 }
@@ -122,11 +126,12 @@ function itemImgError(img){
 function weaponIconHtml(type, className){
   const w = wpn(type);
   const kindCls = w.weaponKind === 'dagger' ? ' weapon-icon-dagger' : '';
-  const equipSmallCls = (w.equipType === 'armor' || w.equipType === 'accessory') ? ' weapon-icon-equip-small' : '';
+  const isEquipKind = (w.equipType === 'armor' || w.equipType === 'accessory' || w.equipType === 'sub');
+  const equipSmallCls = isEquipKind ? ' weapon-icon-equip-small' : '';
   const cls = 'weapon-icon-img' + (className ? ' ' + className : '') + kindCls + equipSmallCls;
-  // 방어구/장신구는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
+  // 방어구/장신구/보조는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
   // 자기 경로를 유지함(이미지가 없으면 빈 아이콘으로 보임 — 해당 종류 PNG 에셋 추가 시 자동 해결됨).
-  const fallback = (w.equipType === 'armor' || w.equipType === 'accessory') ? weaponImagePath(type) : weaponImageFallbackPath();
+  const fallback = isEquipKind ? weaponImagePath(type) : weaponImageFallbackPath();
   return `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${fallback}';">`;
 }
 
@@ -294,9 +299,29 @@ function wornAccessoryItems(){
     .map(id => (state.accessoryInventory || []).find(i => i.id === id))
     .filter(Boolean);
 }
-// 방어도/체력/마나/치명타 보너스에 실제로 기여하는 "착용 중인 모든 방어형 장비"(방어구+장신구) 목록.
+// 현재 착용 중인 보조 아이템(방패/보조 무기, 최대 1개) — 있으면 배열에 담아 반환(없으면 빈 배열).
+// 방어구/장신구와 동일한 "배열로 통일해서 반환" 규칙을 따름(wornEquipmentItems에서 그대로 합쳐 쓰기 위함).
+function wornSubItems(){
+  if(state.equippedSubId == null) return [];
+  const item = (state.subInventory || []).find(i => i.id === state.equippedSubId);
+  return item ? [item] : [];
+}
+// ---- 양손 검 ↔ 보조 아이템 상호 배타 조건 ----
+// "양손 검을 장착한 경우에만" 보조 아이템 착용이 막히므로, 현재 착용 무기(실제 전투에 쓰이는 무기,
+// state.equippedId)의 weaponKind만 확인함(강화 대상 선택 상태인 forgeTargetId와는 무관).
+function isTwoHandedWeaponEquipped(){
+  const equipped = getEquippedWeapon();
+  return !!(equipped && wpn(equipped.type).weaponKind === 'two_handed_sword');
+}
+// 보조 아이템을 새로 착용할 수 있는지 — 양손 검을 장착하지 않은 경우에만 가능.
+function canEquipSubItem(){ return !isTwoHandedWeaponEquipped(); }
+// 양손 검을 장착(강화 선택 = equipItem)할 수 있는지 — 보조 아이템을 착용하지 않은 경우에만 가능.
+// 양손 검이 아닌 무기(검/단검/지팡이)는 이 조건과 무관하게 항상 착용 가능함(equipItem에서 무기 종류를
+// 먼저 확인한 뒤에만 이 함수를 호출).
+function canEquipTwoHandedWeapon(){ return state.equippedSubId == null; }
+// 방어도/체력/마나/치명타 보너스에 실제로 기여하는 "착용 중인 모든 방어형 장비"(방어구+보조+장신구) 목록.
 // 무기는 포함하지 않음(무기는 별도의 effectiveAtk 등으로 처리됨).
-function wornEquipmentItems(){ return wornArmorItems().concat(wornAccessoryItems()); }
+function wornEquipmentItems(){ return wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()); }
 // 착용 중인 방어구+장신구+아티팩트 전체의 방어도 합산.
 function playerTotalDefense(){
   return wornEquipmentItems().reduce((sum, item) => sum + (defenseFor(item.type, item.level) || 0), 0)
@@ -348,11 +373,44 @@ function buildAccessoryTooltipHtml(type, level){
   html += `</div>`;
   return html;
 }
+// ---- 보조(방패/보조 무기) 이름/종류 · 툴팁 ----
+function subKindLabel(type){ return SUB_KINDS[wpn(type).subKind] || ''; }
+// 보조 툴팁: 장신구 툴팁(buildAccessoryTooltipHtml)과 서식은 동일("장비 전역 설정" 공용)하되, 치명타
+// 확률 항목은 보조 아이템 스키마에 없으므로 표시하지 않음. 출력 순서(문서 4번 규칙): 이름/등급/장비
+// 설명/보조 종류/방어도/체력/마나/(고유 옵션)/착용 제한.
+function buildSubTooltipHtml(type, level){
+  const a = wpn(type);
+  const grade = WEAPON_GRADES[a.grade];
+  const lvl = level != null ? level : 0;
+  let html = `<div style="text-align:center;">`;
+
+  const nameLine = a.name + levelSuffix(lvl);
+  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
+
+  const kindLabel = subKindLabel(type);
+  if(kindLabel) html += wtipRow('', kindLabel);
+
+  const def = defenseFor(type, lvl);
+  if(def != null) html += wtipRow('방어도', def);
+  const hp = armorHpFor(type, lvl);
+  if(hp != null) html += wtipRow('체력', hp);
+  const mana = armorManaFor(type, lvl);
+  if(mana != null) html += wtipRow('마나', mana);
+
+  html += weaponUniqueOptionTooltipHtml(type, lvl);
+
+  if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
+
+  html += `</div>`;
+  return html;
+}
 // ---- 아티팩트 이름 색상 · 툴팁 ----
 // 등급 가치 시스템(WEAPON_GRADES)을 그대로 재사용. 아티팩트는 강화 단계가 없으므로 무기처럼
 // "강화 단계 색상과 비교해 더 높은 쪽" 로직 없이 등급 색상을 그대로 이름에 적용함.
-function artifactGradeLabel(id){ const g = WEAPON_GRADES[ARTIFACTS[id].grade]; return g ? g.label : ''; }
-function artifactGradeColor(id){ const g = WEAPON_GRADES[ARTIFACTS[id].grade]; return g ? g.color : '#ffffff'; }
+function artifactGradeLabel(id){ const a = ARTIFACTS[id]; const g = a && WEAPON_GRADES[a.grade]; return g ? g.label : ''; }
+function artifactGradeColor(id){ const a = ARTIFACTS[id]; const g = a && WEAPON_GRADES[a.grade]; return g ? g.color : '#ffffff'; }
 function artifactNameColor(id){ return artifactGradeColor(id); }
 // 아티팩트 툴팁: 레이아웃/줄바꿈/서식(라벨-값 구성 등)은 buildWeaponTooltipHtml과 동일하게 유지하고,
 // 표시 항목은 이름 / 장비 설명 / 장비 타입(값만, 라벨 없음) / 효과 설명(값만, 라벨 없음) / 상점 구매 가격으로 구성함.
@@ -494,12 +552,13 @@ function activeEffectChance(effectId){
   }
   return total;
 }
-// 착용 중인 방어구(투구/갑옷)의 고유 옵션 중 특정 효과(effectId)를 가진 "현재 활성 상태인" 소스의 발동
-// 확률을 합산. activeEffectChance(무기 고유 옵션 전용, 공격 적중 시 발동)와 트리거 시점이 달라
-// 별도 함수로 둠 — 이 함수는 "피격 시 발동"하는 방어구 계열 효과(백현갑 등)를 대상으로 함. 투구+갑옷
-// 양쪽에 같은 effectId가 있어도(현재는 사례 없음) 정상적으로 합산됨.
+// 착용 중인 방어구(투구/갑옷)+보조 아이템의 고유 옵션 중 특정 효과(effectId)를 가진 "현재 활성 상태인"
+// 소스의 발동 확률을 합산. activeEffectChance(무기 고유 옵션 전용, 공격 적중 시 발동)와 트리거 시점이 달라
+// 별도 함수로 둠 — 이 함수는 "피격 시 발동"하는 방어형 장비 계열 효과(백현갑 등)를 대상으로 함. 보조
+// 아이템도 방어구와 함께 착용하는 방어형 장비라 동일하게 이 함수의 대상에 포함됨. 여러 부위에 같은
+// effectId가 있어도(현재는 사례 없음) 정상적으로 합산됨.
 function armorUniqueOptionChance(effectId){
-  return wornArmorItems().reduce((sum, item) => {
+  return wornArmorItems().concat(wornSubItems()).reduce((sum, item) => {
     const opt = wpn(item.type).uniqueOption;
     if(opt && opt.effectId === effectId && weaponUniqueOptionActive(item.type, item.level)){
       return sum + (weaponUniqueOptionChance(item.type, item.level) || 0);
@@ -635,6 +694,7 @@ function shopMiscEntries(){
 function shopEntriesForTab(tabId){
   if(tabId === 'weapon') return shopEquipmentEntries(WEAPON_TYPES);
   if(tabId === 'armor') return shopEquipmentEntries(ARMOR_TYPES);
+  if(tabId === 'sub') return shopEquipmentEntries(SUB_TYPES);
   if(tabId === 'accessory') return shopEquipmentEntries(ACCESSORY_TYPES);
   if(tabId === 'consumable') return shopConsumableEntries();
   if(tabId === 'artifact') return shopArtifactEntries();
@@ -897,7 +957,7 @@ function effectiveAtkSpeed(type, level){
   let s = atkSpeedFor(type, level);
   if(isArtifactEquipped('batwing')) s *= 1.05;
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  s *= 1 + agi * 0.003; // 민첩 1당 공격속도 +0.3%
+  s *= 1 + agi * 0.0015; // 민첩 1당 공격속도 +0.15%
   s *= 1 + activeBuffBonus('atkSpeedPercent') / 100; // 활성화된 버프 스킬(예: 선공)의 공격속도% 보너스
   s *= 1 + weaponUniqueOptionStatBonus('atkSpeedPercent') / 100; // 착용 무기의 고유 옵션 중 공격속도% 보너스(예: 척호검) 합산
   return s;
@@ -905,8 +965,8 @@ function effectiveAtkSpeed(type, level){
 function effectiveAtk(type, level){
   const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  // 힘 1당 공격력 +4, 민첩 1당 공격력 +2, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함
-  return atkFor(type, level) + str * 4 + agi * 2 + activeBuffBonus('atkFlat');
+  // 힘 1당 공격력 +4, 민첩 1당 공격력 +1, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함
+  return atkFor(type, level) + str * 4 + agi * 1 + activeBuffBonus('atkFlat');
 }
 // 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
 // 미리보기에서 그대로 쓰이고(무기 하나만의 값을 보여줘야 하므로), 실제 전투 판정과 캐릭터 정보창의
@@ -916,7 +976,7 @@ function effectiveCritChance(type, level){
   if(isArtifactEquipped('oldarmguard')) bonus += 3;
   if(isArtifactEquipped('blackarmguard')) bonus += 8;
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  bonus += agi * 0.2; // 민첩 1당 치명타 확률 +0.2%(합연산)
+  bonus += agi * 0.1; // 민첩 1당 치명타 확률 +0.1%(합연산)
   bonus += armorStatBonus('crit'); // 착용 중인 방어구/장신구의 치명타 확률 보너스 합산
   // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
   // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
@@ -964,6 +1024,7 @@ function shopBuyItemDisplay(action, typeId){
     const w = wpn(typeId);
     const tooltipHtml = w.equipType === 'armor' ? buildArmorTooltipHtml(typeId, 0)
       : w.equipType === 'accessory' ? buildAccessoryTooltipHtml(typeId, 0)
+      : w.equipType === 'sub' ? buildSubTooltipHtml(typeId, 0)
       : buildWeaponTooltipHtml(typeId, 0);
     return { iconHtml: weaponIconHtml(typeId, 'shop-icon-img'), tooltipHtml, borderColor: weaponNameColor(typeId, 0) };
   }
@@ -1418,9 +1479,12 @@ function pickStageGrade(stageNum){
   return Math.random() * 100 < chance.epic ? 'epic' : 'normal';
 }
 // 전투 시작 시 등장할 몬스터 수(1~MONSTER_COUNT_MAX)를 스테이지 기준으로 추첨.
-// 에픽 몬스터가 확정 스폰되는 스테이지(MONSTER_COUNT_FORCED_SINGLE_STAGES)는 항상 1마리만 반환함.
+// 5·10 스테이지도 이 확률표(MONSTER_COUNT_CHANCE)를 동일하게 그대로 사용함 — 예전에는 이 스테이지에서
+// 무조건 1마리만 반환하도록 별도 처리했지만, "에픽 몬스터 1마리 확정 출현 + 남은 슬롯은 기존 몬스터 수
+// 확률로 추가 추첨"으로 방식이 바뀌면서, 그 "확정 출현 1마리"는 여기가 아니라 pickStageMonsterGrades
+// 쪽에서 이미 보장하고 있어(STAGE_GRADE_CHANCE가 5·10에서 epic:100이라 첫 마리는 항상 에픽으로 뽑히고,
+// 이후 마리는 epicUsed 플래그로 강제 일반 처리됨) 이 함수는 그냥 매 스테이지 동일한 로직만 타면 됨.
 function pickMonsterCount(stageNum){
-  if(MONSTER_COUNT_FORCED_SINGLE_STAGES.includes(stageNum)) return 1;
   const pairs = Object.entries(MONSTER_COUNT_CHANCE).map(([count, chance]) => [Number(count), chance]);
   return pickWeighted(pairs);
 }

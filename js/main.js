@@ -241,6 +241,14 @@ el('dungeonListPager').addEventListener('click', (e)=>{
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
 el('dungeonList').addEventListener('click', (e)=>{
+  // 던전 카드 내부의 "획득 가능 아이템 안내" 페이지 전환 버튼(다음/이전) — 입장하기 버튼과 같은
+  // 컨테이너 안에 있어서 같은 리스너에서 data-action으로 구분해 처리함.
+  const pageBtn = e.target.closest('button[data-action]');
+  if(pageBtn){
+    if(pageBtn.dataset.action === 'page-prev') goPage(pageBtn.dataset.pageTarget, -1);
+    else if(pageBtn.dataset.action === 'page-next') goPage(pageBtn.dataset.pageTarget, 1);
+    return;
+  }
   const btn = e.target.closest('button[data-id]');
   if(!btn || btn.disabled) return;
   enterDungeon(btn.dataset.id);
@@ -258,6 +266,12 @@ el('invArmorPager').addEventListener('click', (e)=>{
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
 el('invAccessoryPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
+el('invSubPager').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
@@ -287,6 +301,15 @@ el('accessoryInventoryList').addEventListener('click', (e)=>{
   else if(btn.dataset.action === 'unwear-accessory') unequipAccessoryPiece(id);
   else if(btn.dataset.action === 'equip') equipItem(id);
   else if(btn.dataset.action === 'sell-accessory') sellAccessoryItem(id);
+});
+el('subInventoryList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn || btn.disabled) return;
+  const id = Number(btn.dataset.id);
+  // 보조 아이템은 "강화 선택" 버튼 자체가 없음(문서 2번 규칙) — wear-sub/unwear-sub/sell-sub만 처리.
+  if(btn.dataset.action === 'wear-sub') equipSubPiece(id);
+  else if(btn.dataset.action === 'unwear-sub') unequipSubPiece(id);
+  else if(btn.dataset.action === 'sell-sub') sellSubItem(id);
 });
 el('artifactList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');

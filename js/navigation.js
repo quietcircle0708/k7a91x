@@ -133,9 +133,10 @@ function toggleShopSortDir(){
 const PAGE_RENDER_FN = {
   invWeapon: renderInventoryList,
   invArmor: renderArmorInventoryList,
+  invSub: renderSubInventoryList,
   invAccessory: renderAccessoryInventoryList,
   forgeSelect: renderForgeSelectList,
-  shopWeapon: renderShopTab, shopArmor: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
+  shopWeapon: renderShopTab, shopArmor: renderShopTab, shopSub: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
   charStats: renderCharStats,
   charMenuInfo: renderCharacterMenu,
@@ -144,9 +145,11 @@ const PAGE_RENDER_FN = {
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
+// dungeonDrop:<던전id> 형태의 동적 타겟(던전 카드별 "획득 가능 아이템 안내" 페이지)은 던전마다 키가
+// 달라 PAGE_RENDER_FN에 미리 등록해둘 수 없으므로, prefix로 감지해 renderDungeonList로 보냄.
 function goPage(target, delta){
   pageState[target] = (pageState[target] || 1) + delta;
-  const renderFn = PAGE_RENDER_FN[target];
+  const renderFn = PAGE_RENDER_FN[target] || (target.startsWith('dungeonDrop:') ? renderDungeonList : null);
   if(renderFn) renderFn();
 }
 function toggleShopFilterMenu(){

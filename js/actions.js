@@ -282,6 +282,14 @@ function recheckEquipRequirements(){
       return id;
     });
   }
+  if(state.equippedSubId != null){
+    const item = (state.subInventory || []).find(i => i.id === state.equippedSubId);
+    // 레벨 조건 재검사(방어구/장신구와 동일)에 더해, 이 시점에 양손 검이 장착돼 있으면(이론상 불가능한
+    // 상태지만 방어적으로) 보조 아이템도 함께 해제함 — 문서 3번 상호 배타 조건을 항상 보장하기 위함.
+    if(item && (!meetsWeaponEquipRequirements(item.type, state.playerLevel, stats) || isTwoHandedWeaponEquipped())){
+      state.equippedSubId = null;
+    }
+  }
   clampPlayerVitals();
 }
 // 강화 대상 선택. 무기를 선택하면 "착용 무기"(equippedId, 전투에 실제 사용)와 "대장간 표시 대상"
@@ -293,6 +301,9 @@ function equipItem(id){
   const weaponItem = state.inventory.find(i => i.id === id);
   if(weaponItem){
     if(!meetsWeaponEquipRequirements(weaponItem.type, state.playerLevel, effectiveStats())) return;
+    // 양손 검은 보조 아이템을 착용 중이면 장착할 수 없음(문서 3번 상호 배타 조건). 양손 검이 아닌
+    // 무기는 이 조건과 무관하게 항상 장착 가능.
+    if(wpn(weaponItem.type).weaponKind === 'two_handed_sword' && !canEquipTwoHandedWeapon()) return;
     state.equippedId = id;
     state.forgeTargetId = id;
     recheckEquipRequirements(); // 무기 교체로 무기 고유 옵션의 스탯 보너스가 바뀌었을 수 있어 재검사
@@ -422,6 +433,19 @@ function buyWeapon(typeId, btn, silent){
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
   }
+  // 상점 "장비 > 보조" 탭도 동일한 data-action="buy-weapon"을 공유해서 호출함(buildWeaponShopCardHtml
+  // 참고) — 방어구/장신구와 같은 방식이나, 보조는 강화가 없어 level은 항상 0 그대로 유지됨.
+  const sub = SUB_TYPES[typeId];
+  if(sub){
+    if(!sub.purchasable) return false;
+    const price = (sub.sellPrice || 0) * 2;
+    if(!state.subInventory) state.subInventory = [];
+    if(state.gold < price || equipInventoryFull()) return false;
+    state.gold -= price;
+    state.subInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
+    if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
+    return true;
+  }
   const acc = ACCESSORY_TYPES[typeId];
   if(!acc || !acc.purchasable) return false;
   const accPrice = (acc.sellPrice || 0) * 2;
@@ -531,6 +555,50 @@ function unequipArmorPiece(id){
   const def = ARMOR_TYPES[item.type];
   if(!def) return;
   if(state.equippedArmor[def.armorKind] === id) state.equippedArmor[def.armorKind] = null;
+  recheckEquipRequirements();
+  render(); saveState();
+}
+
+// ---- 보조(방패/보조 무기): 판매/착용/해제 ----
+// 강화는 아예 없음(문서 2번 규칙) — startEnhance/resolveEnhance 어느 쪽도 호출할 일이 없고, 인벤토리
+// 카드에도 "강화 선택" 버튼 자체가 없음(renderSubInventoryList 참고).
+function sellSubItem(id){
+  if(isEnhancing) return;
+  const item = (state.subInventory || []).find(i => i.id === id);
+  if(!item) return;
+  const value = sellValueFor(item.type, item.level);
+  const label = `${SUB_TYPES[item.type].name}${levelSuffix(item.level)}`;
+  openSellConfirm(label, value, () => performSellSubItem(id));
+}
+function performSellSubItem(id){
+  const idx = (state.subInventory || []).findIndex(i => i.id === id);
+  if(idx === -1) return;
+  const item = state.subInventory[idx];
+  const def = SUB_TYPES[item.type];
+  const value = sellValueFor(item.type, item.level);
+  state.gold += value;
+  state.totalSold += value;
+  showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
+  state.subInventory.splice(idx, 1);
+  if(state.equippedSubId === id) state.equippedSubId = null;
+  clampPlayerVitals();
+  render(); saveState();
+}
+// 보조 아이템 착용 — 동시에 1개만 착용 가능(같은 종류 구분 없이 슬롯 1개, 방어구의 투구/갑옷과 달리
+// 종류별 슬롯이 아니라 통째로 1개). 레벨 조건과, 양손 검을 장착하지 않은 경우에만 착용 가능하다는
+// 상호 배타 조건(canEquipSubItem, 문서 3번)을 함께 확인함.
+function equipSubPiece(id){
+  const item = (state.subInventory || []).find(i => i.id === id);
+  if(!item) return;
+  if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
+  if(!canEquipSubItem()) return; // 양손 검 장착 중에는 착용 불가
+  state.equippedSubId = id;
+  recheckEquipRequirements();
+  render(); saveState();
+}
+function unequipSubPiece(id){
+  if(state.equippedSubId !== id) return;
+  state.equippedSubId = null;
   recheckEquipRequirements();
   render(); saveState();
 }
