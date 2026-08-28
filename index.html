@@ -18,6 +18,7 @@
   <div class="main-nav" id="mainNav">
     <button class="nav-btn" id="openCharacterBtn"><svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="7.5" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg> 캐릭터</button>
     <button class="nav-btn" id="openDungeonBtn">⚔️ 던전</button>
+    <button class="nav-btn" id="openCraftBtn">🛠️ 제작소</button>
     <button class="nav-btn" id="openInventoryBtn"><svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14"><path d="M9.5 3h5l1.2 3.2H8.3L9.5 3z"/><path d="M6.2 8.4c0-1 .6-1.9 1.5-2.3l.6-.3h7.4l.6.3c.9.4 1.5 1.3 1.5 2.3 0 6.2-2.4 11.6-5.8 11.6s-5.8-5.4-5.8-11.6z"/></svg> 인벤토리</button>
     <button class="nav-btn" id="openShopBtn">🛒 상점</button>
   </div>
@@ -214,6 +215,47 @@
       </div>
       <div class="inv-tab-panel" id="invTabMisc" style="display:none;">
         <div id="miscList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="craftView" style="display:none;">
+    <button class="back-btn back-from-craft">← 대장간으로 돌아가기</button>
+    <div class="inv-card-wrap">
+      <div class="shop-title">제작소</div>
+      <div class="inv-tabs craft-tabs" id="craftTabs">
+        <button class="craft-tab-btn active" data-tab="craft">제작</button>
+      </div>
+      <div class="inv-subtabs craft-subtabs" id="craftSubTabs">
+        <button class="craft-subtab-btn active" data-tab="weapon">무기</button>
+        <button class="craft-subtab-btn" data-tab="armor">방어구</button>
+        <button class="craft-subtab-btn" data-tab="sub">보조</button>
+        <button class="craft-subtab-btn" data-tab="accessory">장신구</button>
+      </div>
+
+      <div class="inv-tab-panel" id="craftTabWeapon">
+        <div class="inv-count-row">
+          <div class="pager" id="craftWeaponPager"></div>
+        </div>
+        <div id="craftTabWeaponList"></div>
+      </div>
+      <div class="inv-tab-panel" id="craftTabArmor" style="display:none;">
+        <div class="inv-count-row">
+          <div class="pager" id="craftArmorPager"></div>
+        </div>
+        <div id="craftTabArmorList"></div>
+      </div>
+      <div class="inv-tab-panel" id="craftTabSub" style="display:none;">
+        <div class="inv-count-row">
+          <div class="pager" id="craftSubPager"></div>
+        </div>
+        <div id="craftTabSubList"></div>
+      </div>
+      <div class="inv-tab-panel" id="craftTabAccessory" style="display:none;">
+        <div class="inv-count-row">
+          <div class="pager" id="craftAccessoryPager"></div>
+        </div>
+        <div id="craftTabAccessoryList"></div>
       </div>
     </div>
   </div>
@@ -526,6 +568,143 @@
       <div id="forgeSelectList"></div>
       <div class="modal-actions">
         <button class="nav-btn" id="closeForgeSelectBtn">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 제작소 제작 진행 팝업(요청사항 3~10번). 상점 개수구매 팝업(buyQtyModal)의 레이아웃을 재사용/개조함. -->
+  <div id="craftPopupModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-popup-box">
+      <div class="modal-title">제작</div>
+      <div class="buy-qty-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box" id="craftPopupIconBox"></span>
+      </div>
+      <!-- 이름 아래 툴팁 정상 출력(요청사항 3-2) — 인벤토리와 동일한 weapon-name-wrap+.tooltip 패턴 -->
+      <div class="craft-popup-name weapon-name-wrap" id="craftPopupNameWrap"></div>
+
+      <div class="craft-section-label">재료 등록</div>
+      <div class="craft-slots-row" id="craftPopupSlots"></div>
+
+      <div class="craft-section-label">촉매 추가</div>
+      <div class="craft-slots-row">
+        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
+        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
+        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
+      </div>
+
+      <div class="craft-success-rate" id="craftPopupSuccessRate"></div>
+
+      <div class="buy-qty-gold-row">
+        <span>🪙 현재 보유 골드</span>
+        <span id="craftPopupCurrentGold"></span>
+      </div>
+      <div class="buy-qty-divider"></div>
+      <div class="buy-qty-gold-row total">
+        <span>🪙 제작 비용</span>
+        <span id="craftPopupCost"></span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="nav-btn" id="craftPopupCancelBtn">취소</button>
+        <button class="btn btn-main" id="craftPopupMakeBtn" style="width:auto; padding:10px 18px;" disabled>제작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 촉매 선택창(요청사항 4번) — 출력까지만 구현, 실제 촉매 등록/효과는 미구현 -->
+  <div id="craftCatalystModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">촉매 선택</div>
+      <div class="inv-empty">촉매 시스템은 추후 업데이트를 통해 추가될 예정입니다.</div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="closeCraftCatalystBtn">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 제작 최종 확인 UI(제작 최종 확인 UI 작업 요청) — 모든 요소를 중앙 정렬, 아이콘/이름을
+       하나의 슬롯으로 묶지 않고 각각 별도 요소로 구성함. -->
+  <div id="craftConfirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-confirm-box">
+      <div class="modal-title">제작 확인</div>
+
+      <div class="craft-confirm-section-label">제작 성공</div>
+      <div class="craft-confirm-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box" id="craftConfirmSuccessIconBox"></span>
+      </div>
+      <div class="craft-confirm-item-name weapon-name-wrap" id="craftConfirmSuccessName"></div>
+
+      <div id="craftConfirmFailWrap" style="display:none;">
+        <div class="craft-confirm-section-label">제작 실패</div>
+        <div id="craftConfirmFailArea"></div>
+      </div>
+
+      <div class="craft-confirm-warning">제작 실패 시, 일부 재료 아이템을 돌려받지 못할 수 있습니다.</div>
+
+      <div class="buy-qty-gold-row">
+        <span>🪙 제작 비용</span>
+        <span id="craftConfirmCost"></span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="nav-btn" id="craftConfirmCancelBtn">취소</button>
+        <button class="btn btn-main" id="craftConfirmProceedBtn" style="width:auto; padding:10px 18px;">진행</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 제작 연출 UI + 결과 확인 UI(제작 연출 UI 및 제작 결과 확인 기능 작업 요청) — 하나의 모달 안에서
+       phase(애니메이션 중/클릭 대기/결과 공개)에 따라 요소 표시만 바뀜. 모든 요소 중앙 정렬. -->
+  <div id="craftAnimModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-anim-box">
+      <div class="modal-title" id="craftAnimHeader"></div>
+
+      <div class="craft-anim-stage" id="craftAnimIconStage">
+        <span class="inv-icon craft-anim-icon-box" id="craftAnimIconBox"></span>
+        <div class="craft-anim-result-icons" id="craftAnimResultIcons" style="display:none;"></div>
+      </div>
+      <div class="craft-confirm-item-name" id="craftAnimName"></div>
+
+      <div class="craft-anim-stage-text" id="craftAnimStageText"></div>
+      <div class="hp-bar-wrap craft-anim-bar-wrap" id="craftAnimBarWrap">
+        <div class="hp-bar-fill craft-anim-bar-fill" id="craftAnimBarFill" style="width:0%;"></div>
+        <div class="hp-text" id="craftAnimBarText">0.00%</div>
+      </div>
+      <div class="craft-anim-click-hint" id="craftAnimClickHint" style="display:none;">아이템을 클릭하여 결과 확인</div>
+      <div class="craft-anim-result-headline" id="craftAnimResultHeadline" style="display:none;"></div>
+      <div class="craft-anim-result-text" id="craftAnimResultText" style="display:none;"></div>
+
+      <div class="modal-actions" id="craftAnimConfirmWrap" style="display:none;">
+        <button class="btn btn-main" id="craftAnimConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 재료 투입 개수 선택 팝업. 상점 개수구매 팝업(buyQtyModal)의 스테퍼 UI를 재사용/개조함. -->
+  <div id="craftMaterialQtyModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">투입 개수 설정</div>
+      <div class="buy-qty-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box" id="craftMaterialQtyIconBox"></span>
+      </div>
+      <div class="craft-popup-name" id="craftMaterialQtyName"></div>
+      <div class="buy-qty-field-row">
+        <span class="settings-item-label">투입 개수</span>
+        <div class="settings-stepper">
+          <input type="number" id="craftMaterialQtyInput" class="buy-qty-input" min="0" value="0" inputmode="numeric" />
+          <div class="settings-stepper-arrows">
+            <button class="settings-stepper-btn" id="craftMaterialQtyUpBtn">▲</button>
+            <button class="settings-stepper-btn" id="craftMaterialQtyDownBtn">▼</button>
+          </div>
+        </div>
+      </div>
+      <div class="buy-qty-gold-row">
+        <span>보유 개수</span>
+        <span id="craftMaterialQtyOwned"></span>
+      </div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="craftMaterialQtyCancelBtn">취소</button>
+        <button class="btn btn-main" id="craftMaterialQtyConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
       </div>
     </div>
   </div>

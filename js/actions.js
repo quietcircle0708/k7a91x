@@ -784,7 +784,7 @@ function resolveSkillEffect(id){
   const equipped = getEquippedWeapon();
   if(!equipped) return;
   const type = equipped.type || 'longsword';
-  const atk = effectiveAtk(type, equipped.level);
+  const atk = effectiveAtk(type, equipped.level, equipped.damaged);
   const perHit = Math.max(1, Math.round(atk * (s.damagePercent || 0) / 100));
   const hits = s.hits || 1;
   // 스킬 피해에도 기본 공격(dungeon.js attackTick)과 동일한 치명타 확률/배율을 적용함(요청사항) — 단,

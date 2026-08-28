@@ -20,6 +20,59 @@ el('invEquipSubTabs').addEventListener('click', (e)=>{
   if(!btn) return;
   switchInvTab(btn.dataset.tab);
 });
+// ---- 제작소 탭 ----
+el('craftTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  switchCraftTab(btn.dataset.tab);
+});
+el('craftSubTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  switchCraftTab(btn.dataset.tab);
+});
+['craftWeaponPager', 'craftArmorPager', 'craftSubPager', 'craftAccessoryPager'].forEach(pagerId => {
+  el(pagerId).addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+    else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+  });
+});
+// 제작 아이템 목록(4개 탭 패널) 공통 클릭 위임 — [제작 재료] 토글 / [제작] 버튼
+['craftTabWeaponList', 'craftTabArmorList', 'craftTabSubList', 'craftTabAccessoryList'].forEach(listId => {
+  el(listId).addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    if(btn.dataset.action === 'toggle-craft-mat-info') toggleCraftMaterialInfo(btn.dataset.category, btn.dataset.id);
+    else if(btn.dataset.action === 'open-craft-popup') openCraftPopup(btn.dataset.category, btn.dataset.id);
+  });
+});
+// ---- 제작 진행 팝업 ----
+el('craftPopupCancelBtn').addEventListener('click', closeCraftPopup);
+el('craftPopupSlots').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="open-craft-material-qty"]');
+  if(!btn) return;
+  openCraftMaterialQty(btn.dataset.name);
+});
+// ---- 촉매 선택창(요청사항 4번) ----
+el('craftPopupModal').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="open-craft-catalyst"]');
+  if(!btn) return;
+  openCraftCatalystSelect();
+});
+el('closeCraftCatalystBtn').addEventListener('click', closeCraftCatalystSelect);
+// ---- 제작 최종 확인 UI ----
+el('craftPopupMakeBtn').addEventListener('click', openCraftConfirm);
+el('craftConfirmCancelBtn').addEventListener('click', closeCraftConfirm);
+el('craftConfirmProceedBtn').addEventListener('click', proceedCraftConfirm);
+el('craftAnimConfirmBtn').addEventListener('click', closeCraftAnim);
+// ---- 투입 개수 선택 팝업 ----
+el('craftMaterialQtyCancelBtn').addEventListener('click', closeCraftMaterialQty);
+el('craftMaterialQtyConfirmBtn').addEventListener('click', confirmCraftMaterialQty);
+el('craftMaterialQtyUpBtn').addEventListener('click', ()=> stepCraftMaterialQty('up'));
+el('craftMaterialQtyDownBtn').addEventListener('click', ()=> stepCraftMaterialQty('down'));
+el('craftMaterialQtyInput').addEventListener('input', (e)=> setCraftMaterialQty(e.target.value));
 // ---- 상점 탭 / 정렬 ----
 el('shopTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-tab]');
@@ -83,11 +136,13 @@ el('openShopBtn').addEventListener('click', openShop);
 el('openInventoryBtn').addEventListener('click', openInventory);
 el('openDungeonBtn').addEventListener('click', openDungeonList);
 el('openCharacterBtn').addEventListener('click', openCharacterMenu);
+el('openCraftBtn').addEventListener('click', openCraft);
 el('goInventoryBtn').addEventListener('click', openInventory);
 el('quickBuySwordBtn').addEventListener('click', (e)=> buyWeapon('longsword', e.currentTarget));
 el('resetLink').addEventListener('click', resetGame);
 document.querySelector('.back-from-shop').addEventListener('click', closeToForge);
 document.querySelector('.back-from-inv').addEventListener('click', closeToForge);
+document.querySelector('.back-from-craft').addEventListener('click', closeToForge);
 document.querySelector('.back-from-character').addEventListener('click', closeToForge);
 document.querySelector('.back-from-dlist').addEventListener('click', closeToForge);
 el('exitHuntBtn').addEventListener('click', ()=> guardedNav('dungeonlist'));

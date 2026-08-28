@@ -23,15 +23,35 @@ function showView(name){
     draftStatPoints = null;
     statAllocActive = { str: false, agi: false, int: false };
   }
+  if(currentView === 'craft' && name !== 'craft'){
+    // 제작소를 벗어나면 [제작 재료] 토글 안내를 전부 닫고(요청사항 1번), 제작 진행 팝업 관련 상태도
+    // 함께 정리함(팝업이 열린 채로 화면을 벗어나는 경로는 없지만, 혹시 모를 상태 잔류를 방지).
+    craftUI.openMaterialIds = new Set();
+    craftPopup = null;
+    craftMaterialQtyState = null;
+    if(craftAnim){
+      restoreHeldCraftEquip(); // 이탈로 중단되는 경우 홀딩 장비를 잃지 않도록 되돌림
+      clearInterval(craftAnim.tickInterval);
+      clearInterval(craftAnim.orbInterval);
+      craftAnim = null;
+    }
+    el('craftPopupModal').style.display = 'none';
+    el('craftMaterialQtyModal').style.display = 'none';
+    el('craftCatalystModal').style.display = 'none';
+    el('craftConfirmModal').style.display = 'none';
+    el('craftAnimModal').style.display = 'none';
+  }
   el('forgeView').style.display = name === 'forge' ? 'block' : 'none';
   el('shopView').style.display = name === 'shop' ? 'block' : 'none';
   el('inventoryView').style.display = name === 'inventory' ? 'block' : 'none';
+  el('craftView').style.display = name === 'craft' ? 'block' : 'none';
   el('dungeonListView').style.display = name === 'dungeonlist' ? 'block' : 'none';
   el('characterView').style.display = name === 'character' ? 'block' : 'none';
   el('huntView').style.display = name === 'hunt' ? 'block' : 'none';
   currentView = name;
   if(name === 'dungeonlist') renderDungeonList();
   if(name === 'hunt') renderHunt();
+  if(name === 'craft'){ renderCraftTabs(); renderCraftList(craftUI.tab); }
   if(name === 'character'){
     // 캐릭터 정보 모달을 열 때(openCharStats)와 동일한 초기화 규칙: 매번 진입할 때마다
     // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·1페이지부터 보여줌.
@@ -77,6 +97,7 @@ function openShop(){ if(isEnhancing) return; guardedNav('shop'); }
 function openInventory(){ if(isEnhancing) return; guardedNav('inventory'); }
 function openDungeonList(){ if(isEnhancing) return; guardedNav('dungeonlist'); }
 function openCharacterMenu(){ if(isEnhancing) return; guardedNav('character'); }
+function openCraft(){ if(isEnhancing) return; guardedNav('craft'); }
 function closeToForge(){ showView('forge'); }
 
 // ---- 인벤토리 탭 ----
@@ -94,6 +115,259 @@ function switchInvTab(tabId){
     if(equipTop && equipTop.subTabs.some(st => st.id === tabId)) invUI.equipTab = tabId;
   }
   renderInvTabs();
+}
+
+// ---- 제작소 "제작" 탭 소분류 전환 ----
+// switchInvTab/switchShopTab과 동일한 구조. 지금은 최상위 탭이 "제작" 하나뿐이라 top.subTabs 분기
+// (최상위 탭 클릭)은 항상 첫 하위탭으로 이동하지만, 나중에 CRAFT_TABS에 최상위 탭이 늘어나면
+// invUI.equipTab과 동일한 "마지막 하위탭 기억" 패턴을 그대로 추가하면 됨.
+function switchCraftTab(tabId){
+  const top = CRAFT_TABS.find(t => t.id === tabId);
+  craftUI.tab = (top && top.subTabs) ? top.subTabs[0].id : tabId;
+  renderCraftTabs();
+  renderCraftList(craftUI.tab);
+}
+
+// ---- 제작소: [제작 재료] 안내 토글(요청사항 1~2번) ----
+// 아이템별로 독립적으로 켜고 끌 수 있게 "category:id" 키의 Set으로 관리. 다시 클릭하면 숨김(토글).
+function toggleCraftMaterialInfo(category, itemId){
+  const key = category + ':' + itemId;
+  if(craftUI.openMaterialIds.has(key)) craftUI.openMaterialIds.delete(key);
+  else craftUI.openMaterialIds.add(key);
+  renderCraftList(category);
+}
+
+// ---- 제작소: 제작 진행 팝업(요청사항 3번) ----
+function openCraftPopup(category, itemId){
+  const item = findCraftItem(category, itemId);
+  if(!item) return;
+  // 재료를 직접 고르지 않고, 제작 아이템 데이터에 등록된 재료를 자동으로 전부 배정한 채로 팝업을 염
+  // (투입 개수만 0부터 직접 설정). 슬롯은 이름(name) 기준으로 관리 — findCraftResource가 이름으로
+  // 무기/방어구/장신구/보조/MISC_ITEMS 어디에 있는지 자동으로 찾아줌.
+  craftPopup = {
+    category, itemId,
+    slots: item.materials.map(m => ({ name: m.name, qty: 0 })),
+  };
+  renderCraftPopup();
+  el('craftPopupModal').style.display = 'flex';
+}
+function closeCraftPopup(){
+  el('craftPopupModal').style.display = 'none';
+  craftPopup = null;
+}
+
+// ---- 제작소: 투입 개수 선택 팝업(상점 "개수 지정 구매" buyQtyModal 재사용/개조) ----
+// 재료가 이미 데이터로 정해져 있으므로 슬롯을 누르면 바로 그 재료의 투입 개수 팝업으로 감.
+function openCraftMaterialQty(name){
+  const item = findCraftItem(craftPopup.category, craftPopup.itemId);
+  const slot = craftPopup.slots.find(s => s.name === name);
+  const material = item.materials.find(m => m.name === name);
+  const resource = findCraftResource(name);
+  // 버그 수정: 이전엔 maxQty를 "필요 개수"로만 잡아서, 실제로 보유하지 않은 개수까지도 투입 개수를
+  // 계속 올릴 수 있었음(보유량 검증 없이 슬롯 숫자만 늘어남). 이제 "필요 개수"와 "실제 보유량" 중
+  // 더 작은 값으로 제한해서, 가진 만큼만 투입할 수 있도록 함.
+  const owned = resource ? craftResourceOwnedCount(resource) : 0;
+  const maxQty = Math.min(material.need, owned);
+  craftMaterialQtyState = { name, qty: Math.min(slot.qty, maxQty), maxQty };
+  el('craftPopupModal').style.display = 'none';
+  renderCraftMaterialQtyModal();
+  el('craftMaterialQtyModal').style.display = 'flex';
+}
+// [취소] → 제작 진행 팝업으로 복귀(재료 선택 단계가 없어졌으므로 곧바로 팝업으로 돌아감)
+function closeCraftMaterialQty(){
+  el('craftMaterialQtyModal').style.display = 'none';
+  craftMaterialQtyState = null;
+  renderCraftPopup();
+  el('craftPopupModal').style.display = 'flex';
+}
+function setCraftMaterialQty(val){
+  if(!craftMaterialQtyState) return;
+  const num = parseInt(val, 10);
+  const clamped = Number.isFinite(num) ? Math.max(0, Math.min(craftMaterialQtyState.maxQty, num)) : 0;
+  craftMaterialQtyState.qty = clamped;
+  renderCraftMaterialQtyModal();
+}
+function stepCraftMaterialQty(dir){
+  if(!craftMaterialQtyState) return;
+  setCraftMaterialQty(craftMaterialQtyState.qty + (dir === 'up' ? 1 : -1));
+}
+// 투입 개수 확정 → 제작 진행 팝업으로 복귀
+function confirmCraftMaterialQty(){
+  if(!craftMaterialQtyState || !craftPopup) return;
+  const slot = craftPopup.slots.find(s => s.name === craftMaterialQtyState.name);
+  if(slot) slot.qty = craftMaterialQtyState.qty;
+  el('craftMaterialQtyModal').style.display = 'none';
+  craftMaterialQtyState = null;
+  renderCraftPopup();
+  el('craftPopupModal').style.display = 'flex';
+}
+
+// ---- 제작소: 촉매 선택창(출력만 구현, 실제 촉매 등록/효과는 미구현) ----
+function openCraftCatalystSelect(){
+  el('craftCatalystModal').style.display = 'flex';
+}
+function closeCraftCatalystSelect(){
+  el('craftCatalystModal').style.display = 'none';
+}
+
+// ---- 제작소: 제작 최종 확인 UI ----
+// 활성화된 [제작] 버튼을 눌렀을 때만 열림(비활성 상태에선 버튼 자체가 클릭 안 되므로 별도 방어 불필요하나,
+// 혹시 모를 직접 호출에 대비해 craftPopupCanCraft로 한 번 더 확인).
+function openCraftConfirm(){
+  if(!craftPopup || !craftPopupCanCraft(craftPopup)) return;
+  el('craftPopupModal').style.display = 'none';
+  renderCraftConfirmModal();
+  el('craftConfirmModal').style.display = 'flex';
+}
+// [취소] → 기존 제작 진행 UI로 복귀. craftPopup 상태를 전혀 건드리지 않으므로 재료 등록 상태가
+// 그대로 유지된 채(요청사항 7번) 제작 진행 팝업이 다시 표시됨.
+function closeCraftConfirm(){
+  el('craftConfirmModal').style.display = 'none';
+  el('craftPopupModal').style.display = 'flex';
+}
+// [진행] → 제작 최종 확인 UI를 닫고 제작 연출 화면으로 이동(요청사항: "제작 연출 UI 및 결과 확인
+// 기능" 작업에서 실제로 구현됨). 재료차감/성공-실패 최종 반영 등은 여전히 연출이 끝나는 시점에 처리됨.
+function proceedCraftConfirm(){
+  el('craftConfirmModal').style.display = 'none';
+  el('craftPopupModal').style.display = 'none';
+  openCraftAnim();
+}
+
+// ---- 제작소: 제작 연출 UI ----
+// 요청사항 1~11번 전체 흐름: 7초 연출(실루엣+빛 구체+흔들림+로딩바+연출 텍스트) → 100% 완료 →
+// "아이템을 클릭하여 결과 확인" → 클릭 시 1초 화이트 플래시와 함께 결과 아이콘 공개 → 결과 텍스트 +
+// 인벤토리 지급 → [확인]으로 제작소 복귀.
+function openCraftAnim(){
+  if(!craftPopup) return;
+  const item = findCraftItem(craftPopup.category, craftPopup.itemId);
+  if(!item) return;
+  // 버그 수정: 제작 비용이 실제로는 전혀 차감되지 않고 있었음(craftPopupCanCraft는 "충분한지 확인"만
+  // 하고, 정작 차감하는 코드가 어디에도 없었음) — 재료가 소모되는 시점(연출 시작)과 동일하게 이 시점에
+  // 골드를 차감하도록 추가.
+  state.gold -= (item.craftCost || 0);
+  // 버그 수정: 제작 플로우 전체에 saveState() 호출이 한 곳도 없어서, 골드/재료를 이미 차감한 뒤에도
+  // 저장이 전혀 안 된 상태였음 — 연출 도중(7초 사이) 새로고침하면 방금 차감된 골드/재료가 저장 시점의
+  // 값으로 되돌아가 버림(사실상 무료로 재시도 가능한 허점이기도 했음). 차감이 확정되는 이 시점에
+  // 곧바로 저장해 새로고침해도 차감 상태가 유지되도록 함.
+  // 요청사항 6번: 연출이 시작되는 순간부터 투입된 재료가 사용되는 것으로 처리함.
+  // - 일반 재료(MISC_ITEMS)는 이 시점에 영구 소모.
+  // - 장비 재료는 즉시 삭제하지 않고 "홀딩"만 함(인벤토리에서 빼내되 아직 완전히 버리지 않음) —
+  //   결과가 확정될 때(성공→소모 완료/실패→반환 시 손상 변환)까지 craftAnim.heldEquip에 보관.
+  const heldEquip = [];
+  item.materials.forEach(m => {
+    const resource = findCraftResource(m.name);
+    if(!resource) return;
+    if(resource.kind === 'misc'){
+      state[resource.def.stateKey] = Math.max(0, (state[resource.def.stateKey] || 0) - m.need);
+    } else {
+      const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
+      const arr = pool.items();
+      for(let i = 0; i < m.need; i++){
+        const idx = arr.findIndex(it => it.type === resource.typeId && !it.damaged && !isEquipInstanceWorn(resource.equipType, it.id));
+        if(idx === -1) break; // craftPopupCanCraft가 이미 보유량을 검증했으므로 이론상 발생하지 않음
+        const [inst] = arr.splice(idx, 1); // 홀딩: 인벤토리에서 제거
+        heldEquip.push({ equipType: resource.equipType, typeId: inst.type, level: inst.level });
+      }
+    }
+  });
+  craftAnim = {
+    category: craftPopup.category, itemId: craftPopup.itemId,
+    phase: 'animating', progress: 0, startTime: Date.now(),
+    resultSuccess: null, resultReturn: null, heldEquip,
+    tickInterval: null, orbInterval: null,
+  };
+  saveState(); // 골드/재료 차감 확정 직후 저장(위 주석 참고)
+  renderCraftAnimModal();
+  el('craftAnimModal').style.display = 'flex';
+  spawnCraftAnimOrb(); // 연출 시작과 동시에 첫 빛 구체 생성(이후 1초마다 반복, 요청사항 3번)
+  craftAnim.orbInterval = setInterval(spawnCraftAnimOrb, 1000);
+  craftAnim.tickInterval = setInterval(tickCraftAnimProgress, 500);
+}
+// 0.5초마다 호출 — 7초(=elapsed 7000ms)가 되기 전까지는 최소 0.01%씩 증가하며 99.99%를 넘지 않고,
+// 7초가 되는 순간에만 finishCraftAnimProgress()가 정확히 100%로 확정함(요청사항 1·5번).
+function tickCraftAnimProgress(){
+  if(!craftAnim) return;
+  const elapsed = Date.now() - craftAnim.startTime;
+  if(elapsed >= 7000){
+    finishCraftAnimProgress();
+    return;
+  }
+  const target = (elapsed / 7000) * 99.99;
+  const jitter = Math.random() * 1.5;
+  const next = Math.min(99.99, Math.max(craftAnim.progress + 0.01, target + jitter));
+  craftAnim.progress = Math.round(next * 100) / 100;
+  renderCraftAnimProgress();
+}
+// 7초 완료 시점: 로딩바/빛구체 정지, 제작 성공확률로 성공·실패를 이 시점에 확정(요청사항 5·11번 —
+// "결과는 연출 완료 시점에 결정하고, 결과 확인 단계에서는 이미 결정된 결과만 보여줌"), 클릭 대기 상태로 전환.
+function finishCraftAnimProgress(){
+  clearInterval(craftAnim.tickInterval);
+  clearInterval(craftAnim.orbInterval);
+  craftAnim.tickInterval = null;
+  craftAnim.orbInterval = null;
+  craftAnim.progress = 100;
+  const item = findCraftItem(craftAnim.category, craftAnim.itemId);
+  // 기존 제작 데이터에 등록된 성공 확률(item.successChance)을 그대로 사용 — 새 판정 공식을 만들지 않음.
+  craftAnim.resultSuccess = Math.random() * 100 < (item.successChance || 0);
+  // 실패라면 반환 결과도 이 시점에 함께 확정(요청사항 — 결과는 연출 완료 시점에 결정하고, 결과 확인
+  // 단계에서는 이미 결정된 결과만 보여줌). 성공이면 반환 추첨 자체가 필요 없음(반환은 실패 전용).
+  craftAnim.resultReturn = craftAnim.resultSuccess ? null : craftRollFailReturn(item);
+  craftAnim.phase = 'awaitClick';
+  renderCraftAnimModal();
+}
+// 실루엣 아이템 이미지를 클릭하면(클릭 대기 단계에서만 유효) 결과를 공개하고 인벤토리 지급까지 즉시 처리함.
+function clickCraftAnimIcon(){
+  if(!craftAnim || craftAnim.phase !== 'awaitClick') return;
+  const item = findCraftItem(craftAnim.category, craftAnim.itemId);
+  // craftGrantResultItems가 매칭된 홀딩 항목을 heldEquip에서 즉시 제거(splice)하므로, "이번 반환이
+  // 투입했던 장비와 같은 종류라 손상으로 돌아오는가" 여부는 지급 처리 전에 미리 판정해서 저장해둬야
+  // 함(그렇지 않으면 이후 결과 화면(craftAnimResultIconsHtml)이 항상 "손상 아님"으로 잘못 표시됨).
+  if(craftAnim.resultReturn){
+    const resource = findCraftResource(craftAnim.resultReturn.name);
+    craftAnim.resultReturnDamaged = !!(resource && resource.kind === 'equip'
+      && craftAnim.heldEquip.some(h => h.equipType === resource.equipType && h.typeId === resource.typeId));
+  } else {
+    craftAnim.resultReturnDamaged = false;
+  }
+  craftGrantResultItems(item); // 기존 인벤토리 지급 로직 재사용, craftAnim.resultSuccess/resultReturn을 그대로 적용
+  craftAnim.phase = 'revealed';
+  // 버그 수정: 제작 성공(또는 실패 반환) 아이템이 인벤토리에 지급된 뒤에도 저장이 안 되고 있었음
+  // → 결과 공개 직후 새로고침하면 지급된 아이템이 그대로 증발했던 원인. 지급이 확정되는 이 시점에
+  // 곧바로 저장해 새로고침해도 결과 아이템이 유지되도록 함.
+  saveState();
+  renderCraftAnimModal();
+  triggerCraftAnimFlash(); // 1초 화이트 플래시(요청사항 7번) — 표시 전환 자체는 위 렌더에서 이미 완료됨
+}
+function triggerCraftAnimFlash(){
+  const stage = el('craftAnimIconStage');
+  if(!stage) return;
+  const flash = document.createElement('div');
+  flash.className = 'craft-anim-flash';
+  stage.appendChild(flash);
+  flash.addEventListener('animationend', () => flash.remove());
+}
+// [확인] → 제작 연출/결과 UI를 닫고 제작소 화면으로 복귀(요청사항 11번). 제작 진행 팝업은 이미
+// proceedCraftConfirm에서 닫혔으므로 다시 열지 않음(제작소 목록이 그대로 뒤에 있음).
+function closeCraftAnim(){
+  if(craftAnim){
+    restoreHeldCraftEquip(); // 정상 흐름에선 이미 비어있지만, 혹시 모를 잔여 홀딩분 방어적으로 복구
+    clearInterval(craftAnim.tickInterval);
+    clearInterval(craftAnim.orbInterval);
+  }
+  craftAnim = null;
+  el('craftAnimModal').style.display = 'none';
+}
+
+// 연출 도중 제작소를 벗어나는 등 비정상적으로 중단되는 경우, 홀딩해뒀던 장비 재료가 그대로 사라지지
+// 않도록 원래 인벤토리로 되돌려줌(이번 문서에 명시된 케이스는 아니지만, 아이템이 허공으로 사라지는
+// 버그를 막기 위한 최소한의 방어 처리 — 정상 흐름의 성공/실패 지급 로직과는 무관).
+function restoreHeldCraftEquip(){
+  if(!craftAnim || !craftAnim.heldEquip || craftAnim.heldEquip.length === 0) return;
+  craftAnim.heldEquip.forEach(h => {
+    const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === h.equipType);
+    if(pool) pool.items().push({ id: state.nextItemId++, type: h.typeId, level: h.level });
+  });
+  craftAnim.heldEquip = [];
 }
 
 // ---- 상점 탭/정렬 ----
@@ -142,6 +416,10 @@ const PAGE_RENDER_FN = {
   charMenuInfo: renderCharacterMenu,
   skillPage: renderCharacterMenu,
   huntCharStats: renderHuntCharStatsToggle,
+  craftWeapon: () => renderCraftList('weapon'),
+  craftArmor: () => renderCraftList('armor'),
+  craftSub: () => renderCraftList('sub'),
+  craftAccessory: () => renderCraftList('accessory'),
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.

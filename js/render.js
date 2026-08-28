@@ -181,11 +181,13 @@ function render(){
     el('openInventoryBtn').disabled = true;
     el('openDungeonBtn').disabled = true;
     el('openCharacterBtn').disabled = true;
+    el('openCraftBtn').disabled = true;
   } else {
     el('openShopBtn').disabled = false;
     el('openInventoryBtn').disabled = false;
     el('openDungeonBtn').disabled = false;
     el('openCharacterBtn').disabled = false;
+    el('openCraftBtn').disabled = false;
   }
 }
 
@@ -213,7 +215,7 @@ function renderForgeSelectList(){
     const itemColor = weaponNameColor(entry.type, entry.level);
     return `
       <button class="forge-select-item ${isCurrent ? 'active' : ''}" data-action="select-forge-target" data-id="${entry.id}">
-        <span class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img')}</span>
+        <span class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img', entry.level)}</span>
         <span class="forge-select-info">
           <span class="forge-select-name" style="color:${itemColor};">${weaponName(entry.type)}${levelSuffix(entry.level)}</span>
           ${isCurrent ? '<span class="inv-badge">선택됨</span>' : ''}
@@ -255,11 +257,11 @@ function renderInventoryList(){
         : equipBtnHtml);
     return `
       <div class="inv-card ${isEquipped?'equipped':''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${weaponName(type)}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
-            <span class="tooltip">${buildWeaponTooltipHtml(type, item.level)}</span>
+            <span class="inv-name" style="color:${itemColor};">${weaponName(type)}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
+            <span class="tooltip">${buildWeaponTooltipHtml(type, item.level, item.damaged)}</span>
           </span>
           <div class="inv-sub">${meta.label}</div>
         </div>
@@ -314,11 +316,11 @@ function renderArmorInventoryList(){
     const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk) ? 'disabled' : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
     return `
       <div class="inv-card ${isWorn ? 'equipped' : ''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${def.name}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
-            <span class="tooltip">${buildArmorTooltipHtml(type, item.level)}</span>
+            <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="tooltip">${buildArmorTooltipHtml(type, item.level, item.damaged)}</span>
           </span>
           <div class="inv-sub">${ARMOR_KINDS[def.armorKind] || ''}</div>
         </div>
@@ -372,11 +374,11 @@ function renderSubInventoryList(){
       : wearBtnHtml;
     return `
       <div class="inv-card ${isWorn ? 'equipped' : ''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${def.name}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
-            <span class="tooltip">${buildSubTooltipHtml(type, item.level)}</span>
+            <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="tooltip">${buildSubTooltipHtml(type, item.level, item.damaged)}</span>
           </span>
           <div class="inv-sub">${SUB_KINDS[def.subKind] || ''}</div>
         </div>
@@ -428,11 +430,11 @@ function renderAccessoryInventoryList(){
     const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk) ? 'disabled' : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
     return `
       <div class="inv-card ${isWorn ? 'equipped' : ''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img')}</div>
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${def.name}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
-            <span class="tooltip">${buildAccessoryTooltipHtml(type, item.level)}</span>
+            <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="tooltip">${buildAccessoryTooltipHtml(type, item.level, item.damaged)}</span>
           </span>
           <div class="inv-sub">${ACCESSORY_KINDS[def.accessoryKind] || ''}</div>
         </div>
@@ -473,6 +475,269 @@ function renderInvTabs(){
   el('invTabConsumable').style.display = invUI.tab === 'consumable' ? 'block' : 'none';
   el('invTabStone').style.display = invUI.tab === 'stone' ? 'block' : 'none';
   el('invTabMisc').style.display = invUI.tab === 'misc' ? 'block' : 'none';
+}
+
+// ---- 제작소: 탭(제작 최상위+하위탭) 표시 상태 갱신 ----
+// renderInvTabs()와 동일한 구조. 지금은 최상위 탭이 "제작" 하나뿐이라 항상 active로 표시됨.
+function renderCraftTabs(){
+  if(!el('craftTabWeapon')) return; // 제작소 화면 DOM이 아직 없는 초기 타이밍 방어
+  const topId = topTabIdFor(CRAFT_TABS, craftUI.tab);
+  CRAFT_TABS.forEach(t => {
+    const btn = document.querySelector(`.craft-tab-btn[data-tab="${t.id}"]`);
+    if(btn) btn.classList.toggle('active', topId === t.id);
+  });
+  const craftTop = CRAFT_TABS.find(t => t.id === 'craft');
+  if(craftTop && craftTop.subTabs){
+    craftTop.subTabs.forEach(st => {
+      const btn = document.querySelector(`.craft-subtab-btn[data-tab="${st.id}"]`);
+      if(btn) btn.classList.toggle('active', craftUI.tab === st.id);
+    });
+  }
+  CRAFT_SUB_TABS.forEach(st => {
+    const panel = el('craftTab' + st.id.charAt(0).toUpperCase() + st.id.slice(1));
+    if(panel) panel.style.display = craftUI.tab === st.id ? 'block' : 'none';
+  });
+}
+// ---- 제작소: 소분류(무기/방어구/보조/장신구) 탭별 아이템 목록 ----
+// 이번 작업 범위는 UI 골격까지라 CRAFTABLE_ITEMS[kind]가 항상 빈 배열이므로 매번 빈 안내문만 표시됨.
+// 페이지네이션 자체는 인벤토리와 완전히 동일한 공용 시스템(pageCount/clampPage/pagerHtml/pageSlice)을
+// 그대로 사용해서 미리 붙여둠 — 나중에 CRAFTABLE_ITEMS에 실제 아이템이 채워지면(별도 작업) 이 함수의
+// 목록 렌더 부분만 채우면 되고, 탭 전환/페이지 이동 로직은 전혀 손댈 필요가 없음.
+function renderCraftList(kind){
+  const panelId = 'craftTab' + kind.charAt(0).toUpperCase() + kind.slice(1);
+  const wrap = el(panelId + 'List');
+  if(!wrap) return;
+  const pagerWrap = el('craft' + kind.charAt(0).toUpperCase() + kind.slice(1) + 'Pager');
+  const items = CRAFTABLE_ITEMS[kind] || [];
+  if(items.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">제작 가능한 아이템이 없습니다.<br>추후 업데이트를 통해 추가될 예정입니다.</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
+    return;
+  }
+  const pageKey = CRAFT_PAGE_KEY[kind];
+  const pageSize = PAGE_SIZE[pageKey];
+  const totalPageCount = pageCount(items.length, pageSize);
+  pageState[pageKey] = clampPage(pageState[pageKey], totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml(pageKey, pageState[pageKey], totalPageCount);
+  const pageItems = pageSlice(items, pageState[pageKey], pageSize);
+  // 목록 행 자체는 인벤토리 장비 탭 카드(renderInventoryList)와 동일한 클래스(inv-card/inv-icon/
+  // inv-info/inv-name/inv-sub/inv-actions/inv-btn)를 그대로 재사용함 — 아이콘 크기, 등급 색상, 툴팁,
+  // 이름 표시 방식이 자동으로 인벤토리와 완전히 동일해짐(요청사항 1번). 버튼만 기존 장비 탭의 착용/판매
+  // 대신 제작소 전용 두 버튼(제작 재료/제작)으로 교체하되, 동일한 .inv-btn 크기·스타일을 그대로 씀.
+  wrap.innerHTML = pageItems.map(item => {
+    const color = craftItemNameColor(item);
+    const infoKey = kind + ':' + item.id;
+    const infoOpen = craftUI.openMaterialIds.has(infoKey);
+    const materialsHtml = item.materials.map(m => {
+      const resource = findCraftResource(m.name);
+      if(!resource) return '';
+      const owned = craftResourceOwnedCount(resource);
+      const shortCls = owned < m.need ? 'craft-mat-short' : 'craft-mat-ok';
+      const matColor = craftResourceColor(resource);
+      return `
+        <div class="craft-mat-info-item">
+          <div class="craft-mat-info-icon-col">
+            <span class="inv-icon craft-mat-info-icon weapon-name-wrap" style="border-color:${matColor};">
+              ${craftResourceIconHtml(resource, 'inv-icon-img')}
+              <span class="tooltip">${craftResourceTooltipHtml(resource)}</span>
+            </span>
+            <div class="craft-mat-info-name" style="color:${matColor};">${resource.def.name}</div>
+          </div>
+          <span class="${shortCls} craft-mat-info-count">${owned}/${m.need}</span>
+        </div>`;
+    }).join('');
+    return `
+      <div class="craft-item-row">
+        <div class="inv-card">
+          <div class="inv-icon" style="border-color:${color};">${craftItemIconHtml(item, 'inv-icon-img')}</div>
+          <div class="inv-info">
+            <span class="weapon-name-wrap">
+              <span class="inv-name" style="color:${color};">${item.name}</span>
+              <span class="tooltip">${craftItemTooltipHtml(item)}</span>
+            </span>
+          </div>
+          <div class="inv-actions">
+            <button class="inv-btn" data-action="toggle-craft-mat-info" data-category="${kind}" data-id="${item.id}">제작 재료</button>
+            <button class="inv-btn" data-action="open-craft-popup" data-category="${kind}" data-id="${item.id}">제작</button>
+          </div>
+        </div>
+        <div class="craft-mat-info-panel" style="display:${infoOpen ? 'flex' : 'none'};">${materialsHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+// ---- 제작소: 제작 진행 팝업(요청사항 3~10번) ----
+function renderCraftPopup(){
+  if(!craftPopup) return;
+  const item = findCraftItem(craftPopup.category, craftPopup.itemId);
+  if(!item) return;
+  const color = craftItemNameColor(item);
+
+  el('craftPopupIconBox').innerHTML = craftItemIconHtml(item, 'inv-icon-img');
+  el('craftPopupIconBox').style.borderColor = color;
+  // 제작 아이템 이름 아래에 툴팁을 정상 출력(요청사항 3-2) — weapon-name-wrap+.tooltip 패턴을
+  // 그대로 재사용해서 이름에 마우스를 올리면 기존 아이템 툴팁 규칙 그대로 표시됨.
+  el('craftPopupNameWrap').innerHTML =
+    `<span class="inv-name" style="color:${color};">${item.name}</span>` +
+    `<span class="tooltip">${craftItemTooltipHtml(item)}</span>`;
+
+  // 재료 슬롯: 더 이상 플레이어가 재료를 직접 고르지 않고, 제작 아이템 데이터에 등록된 재료를
+  // 등급 높은 순으로 자동 배치함(요청사항 3-1). 슬롯 클릭 시 바로 그 재료의 투입 개수 팝업으로 감.
+  const sortedMaterials = craftMaterialsSortedByGradeDesc(item.materials);
+  el('craftPopupSlots').innerHTML = sortedMaterials.map(material => {
+    const slot = craftPopup.slots.find(s => s.name === material.name);
+    const resource = findCraftResource(material.name);
+    if(!resource) return '';
+    const matColor = craftResourceColor(resource);
+    const qtyCls = slot.qty < material.need ? 'craft-slot-qty-short' : 'craft-slot-qty-ok';
+    // 요청사항 3-3: 아이콘 / 투입개수 / 이름을 하나의 슬롯에 뭉치지 않고 각각 분리된 줄로 표시.
+    // 투입 개수가 0(아직 손대지 않음)일 때는 "+" 아이콘, 1 이상 투입했으면 실제 재료 아이콘으로 전환.
+    const iconInner = slot.qty > 0
+      ? `${craftResourceIconHtml(resource, 'inv-icon-img')}<span class="tooltip">${craftResourceTooltipHtml(resource)}</span>`
+      : `<span class="craft-slot-plus">+</span>`;
+    return `
+      <button class="craft-slot" data-action="open-craft-material-qty" data-name="${material.name}">
+        <span class="inv-icon craft-slot-icon-box weapon-name-wrap" style="border-color:${slot.qty > 0 ? matColor : ''};">${iconInner}</span>
+        <span class="${qtyCls}">${slot.qty}/${material.need}</span>
+        <span class="craft-slot-name" style="color:${matColor};">${resource.def.name}</span>
+      </button>`;
+  }).join('');
+
+  el('craftPopupSuccessRate').textContent = `성공 확률 ${item.successChance}%`;
+  el('craftPopupCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
+  el('craftPopupCost').textContent = '🪙 ' + (item.craftCost || 0).toLocaleString();
+
+  el('craftPopupMakeBtn').disabled = !craftPopupCanCraft(craftPopup);
+}
+
+// ---- 제작소: 제작 최종 확인 UI ----
+// 성공/실패 영역 모두 "아이콘/이름을 하나의 슬롯으로 묶지 않는다"(요청사항)는 원칙에 따라,
+// 아이콘과 이름을 각각 별도의 줄(craft-confirm-icon-row / craft-confirm-item-name)로 렌더링함.
+function renderCraftConfirmModal(){
+  if(!craftPopup) return;
+  const item = findCraftItem(craftPopup.category, craftPopup.itemId);
+  if(!item) return;
+  const color = craftItemNameColor(item);
+
+  // 제작 성공 영역: 제작 아이템 본인이 곧 성공 시 지급되는 아이템이므로 craftItem* 헬퍼를 그대로 재사용.
+  el('craftConfirmSuccessIconBox').innerHTML = craftItemIconHtml(item, 'inv-icon-img');
+  el('craftConfirmSuccessIconBox').style.borderColor = color;
+  el('craftConfirmSuccessName').innerHTML =
+    `<span style="color:${color};">${item.name}</span>` +
+    `<span class="tooltip">${craftItemTooltipHtml(item)}</span>`;
+
+  // 제작 실패 영역: 데이터에 failReturns가 없으면(요청사항 4번) 영역 전체를 숨김.
+  const failHtml = craftItemFailReturnHtml(item);
+  el('craftConfirmFailWrap').style.display = failHtml ? 'block' : 'none';
+  el('craftConfirmFailArea').innerHTML = failHtml;
+
+  el('craftConfirmCost').textContent = '🪙 ' + (item.craftCost || 0).toLocaleString();
+}
+
+// ---- 제작소: 제작 연출 UI(요청사항 1~11번) ----
+// phase별로 같은 모달 안의 요소 표시/숨김만 전환함(모달을 여러 개로 쪼개지 않음) — animating과
+// awaitClick은 실루엣 아이콘을 그대로 쓰고, revealed에서만 결과 전용 아이콘 영역으로 바뀜.
+function renderCraftAnimModal(){
+  if(!craftAnim) return;
+  const item = findCraftItem(craftAnim.category, craftAnim.itemId);
+  if(!item) return;
+  const color = craftItemNameColor(item);
+
+  el('craftAnimHeader').textContent = craftAnim.phase === 'animating' ? '' : '제작 결과';
+
+  if(craftAnim.phase === 'revealed'){
+    el('craftAnimIconBox').style.display = 'none';
+    el('craftAnimName').style.display = 'none';
+    el('craftAnimStageText').textContent = '';
+    el('craftAnimBarWrap').style.display = 'none';
+    el('craftAnimClickHint').style.display = 'none';
+    const resultIcons = el('craftAnimResultIcons');
+    resultIcons.style.display = 'flex';
+    resultIcons.innerHTML = craftAnimResultIconsHtml(item, craftAnim.resultSuccess, craftAnim.resultReturn);
+    // 아이템 이름과 결과 문구 사이의 빈 공간에 "제작 성공!"/"제작 실패.." 한 줄을 추가로 표시(요청사항).
+    el('craftAnimResultHeadline').style.display = 'block';
+    el('craftAnimResultHeadline').textContent = craftAnim.resultSuccess ? '제작 성공!' : '제작 실패..';
+    el('craftAnimResultHeadline').classList.toggle('success', craftAnim.resultSuccess);
+    el('craftAnimResultHeadline').classList.toggle('fail', !craftAnim.resultSuccess);
+    el('craftAnimResultText').style.display = 'block';
+    el('craftAnimResultText').textContent = craftAnim.resultSuccess
+      ? `${item.name}이 인벤토리로 지급되었습니다!`
+      : '제작에 실패하였습니다.';
+    el('craftAnimConfirmWrap').style.display = 'flex';
+    return;
+  }
+
+  // animating / awaitClick 공통: 실루엣 아이콘 + 이름
+  el('craftAnimIconBox').style.display = 'flex';
+  el('craftAnimIconBox').innerHTML = craftItemIconHtml(item, 'inv-icon-img');
+  el('craftAnimIconBox').style.borderColor = color;
+  el('craftAnimIconBox').classList.add('craft-anim-silhouette');
+  el('craftAnimName').style.display = 'block';
+  el('craftAnimName').textContent = item.name;
+  el('craftAnimName').style.color = color;
+  el('craftAnimResultIcons').style.display = 'none';
+  el('craftAnimResultHeadline').style.display = 'none';
+  el('craftAnimResultText').style.display = 'none';
+  el('craftAnimConfirmWrap').style.display = 'none';
+
+  if(craftAnim.phase === 'animating'){
+    el('craftAnimBarWrap').style.display = 'block';
+    el('craftAnimClickHint').style.display = 'none';
+    el('craftAnimIconBox').classList.remove('craft-anim-clickable');
+    el('craftAnimIconBox').onclick = null;
+    el('craftAnimStageText').textContent = craftAnimStageText(craftAnim.progress);
+    renderCraftAnimProgress();
+  } else { // awaitClick
+    el('craftAnimBarWrap').style.display = 'none';
+    el('craftAnimStageText').textContent = '';
+    el('craftAnimClickHint').style.display = 'block';
+    el('craftAnimIconBox').classList.add('craft-anim-clickable');
+    el('craftAnimIconBox').onclick = clickCraftAnimIcon;
+  }
+}
+function renderCraftAnimProgress(){
+  if(!craftAnim) return;
+  el('craftAnimBarFill').style.width = craftAnim.progress + '%';
+  el('craftAnimBarText').textContent = craftAnim.progress.toFixed(2) + '%';
+  // 버그 수정: 이전엔 연출 시작 시 renderCraftAnimModal()에서 딱 한 번만 문구를 세팅해서, 이후
+  // 0.5초마다 진행률이 바뀌어도 문구가 갱신되지 않고 "재료를 가공하는 중..."에 고정되어 있었음.
+  // tick마다 호출되는 이 함수에서 진행률에 맞는 문구를 매번 다시 계산해서 갱신하도록 수정.
+  el('craftAnimStageText').textContent = craftAnimStageText(craftAnim.progress);
+}
+// 1초마다 빛 구체 하나를 생성(요청사항 3번) — CSS 애니메이션(craftOrbSpiral)이 바깥에서 중앙으로
+// 소용돌이치며 빨려들어가는 이동을 전부 처리하고, 애니메이션이 끝나는 순간(animationend)에만 이
+// 함수가 개입해 구체를 제거하고 아이템 아이콘에 0.2초 흔들림 클래스를 붙였다 뗌.
+function spawnCraftAnimOrb(){
+  const field = el('craftAnimIconStage');
+  if(!field) return;
+  const orb = document.createElement('div');
+  orb.className = 'craft-anim-orb';
+  orb.style.setProperty('--angle', Math.floor(Math.random() * 360) + 'deg');
+  field.appendChild(orb);
+  orb.addEventListener('animationend', () => {
+    orb.remove();
+    const iconBox = el('craftAnimIconBox');
+    if(!iconBox) return;
+    iconBox.classList.add('craft-anim-icon-shake');
+    setTimeout(() => iconBox.classList.remove('craft-anim-icon-shake'), 200);
+  });
+}
+
+// ---- 제작소: 투입 개수 선택 팝업(상점 buyQtyModal 재사용/개조) ----
+function renderCraftMaterialQtyModal(){
+  if(!craftMaterialQtyState) return;
+  const { name, qty, maxQty } = craftMaterialQtyState;
+  const resource = findCraftResource(name);
+  if(!resource) return;
+  const color = craftResourceColor(resource);
+  el('craftMaterialQtyIconBox').innerHTML = craftResourceIconHtml(resource, 'inv-icon-img');
+  el('craftMaterialQtyName').textContent = resource.def.name;
+  el('craftMaterialQtyName').style.color = color;
+  el('craftMaterialQtyInput').value = qty;
+  el('craftMaterialQtyInput').max = maxQty;
+  el('craftMaterialQtyOwned').textContent = craftResourceOwnedCount(resource).toLocaleString();
+  el('craftMaterialQtyUpBtn').disabled = qty >= maxQty;
+  el('craftMaterialQtyDownBtn').disabled = qty <= 0;
 }
 
 function renderArtifactList(){
@@ -792,7 +1057,7 @@ function equippedItemForSlot(slotKey){
     return {
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
-      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img'),
+      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
       tooltipHtml: buildWeaponTooltipHtml(type, level),
     };
   }
@@ -806,7 +1071,7 @@ function equippedItemForSlot(slotKey){
     return {
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
-      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img'),
+      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
       tooltipHtml: buildArmorTooltipHtml(type, level),
     };
   }
@@ -819,7 +1084,7 @@ function equippedItemForSlot(slotKey){
     return {
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
-      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img'),
+      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
       tooltipHtml: buildSubTooltipHtml(type, level),
     };
   }
@@ -834,7 +1099,7 @@ function equippedItemForSlot(slotKey){
     return {
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
-      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img'),
+      iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
       tooltipHtml: buildAccessoryTooltipHtml(type, level),
     };
   }
@@ -957,14 +1222,14 @@ function buildCharStatsInfoHtml(){
   } else {
     const type = equipped.type || 'longsword';
     const level = equipped.level;
-    const totalAtk = effectiveAtk(type, level);
+    const totalAtk = effectiveAtk(type, level, equipped.damaged);
     const baseSpeed = atkSpeedFor(type, level);
     const totalSpeed = effectiveAtkSpeed(type, level);
     const totalCrit = effectiveCritChance(type, level);
     const hasSpeedBonus = isArtifactEquipped('batwing');
 
     rightHtml += `
-      <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)}${levelSuffix(level)}</span></div>
+      <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)}${equipped.damaged ? '(손상)' : ''}${levelSuffix(level)}</span></div>
       <div class="char-stat-divider"></div>
       <div class="char-stat-row big"><span>총 공격력</span><span class="v">${totalAtk}</span></div>
       <div class="char-stat-row big"><span>공격속도</span><span class="v">${totalSpeed.toFixed(2)}회/초</span></div>
@@ -1526,7 +1791,7 @@ function buildInvPeekHtml(){
   }
   const lines = state.inventory.map(it => {
     const eq = it.id === state.equippedId ? ' <b style="color:var(--forge-gold);">(장착 중)</b>' : '';
-    return `${weaponIconHtml(it.type || 'longsword', 'inv-peek-icon-img')} ${weaponName(it.type || 'longsword')}${levelSuffix(it.level)}${eq}`;
+    return `${weaponIconHtml(it.type || 'longsword', 'inv-peek-icon-img', it.level)} ${weaponName(it.type || 'longsword')}${levelSuffix(it.level)}${eq}`;
   }).join('<br>');
   return `인벤토리 (${totalEquipInventoryCount()}/${INV_MAX})<br>${lines}`;
 }

@@ -972,6 +972,59 @@ const SUB_IMAGE_EXT = '.png';
 const SUB_DEFAULT_IMAGE = { shield: 'shieldbase', sub_weapon: 'subweaponbase' }; // image 필드가 비어있을 때 보조 종류별 기본 이미지(방어구/장신구와 동일한 방식). 실제 PNG 파일은 아직 없지만 onerror 폴백(weaponIconHtml)이 있어 안전하게 동작함.
 
 const SUB_TYPES = {
+  woodshield: {
+    id: 'woodshield', name: '나무방패', desc: '나무로 만들어진 단순한 방패',
+    equipType: 'sub',
+    subKind: 'shield', // 방패
+    grade: 'normal', // 일반
+    defense: -1,
+    purchasable: true, sellPrice: 500, levelReq: 5,
+    image: 'wood_shield',
+  },
+  // 사각방패: 과거 아티팩트(ARTIFACTS.squareshield, zip117에서 삭제)와 이름이 같지만 완전히 별개의
+  // 테이블(SUB_TYPES)에 새로 등록하는 아이템이라 id 충돌은 없음. formulas.js에 남아있는
+  // isArtifactEquipped('squareshield') 관련 코드(아티팩트 전용 방어도/체력/힘 보너스)는 이제 존재하지
+  // 않는 아티팩트를 가리켜 항상 false로만 평가되므로 이 보조 아이템과는 서로 무관하게 동작함.
+  squareshield: {
+    id: 'squareshield', name: '사각방패', desc: '크기를 키웠지만 두께가 얇은 방패',
+    equipType: 'sub',
+    subKind: 'shield', // 방패
+    grade: 'rare', // 레어
+    defense: -3, hp: 200,
+    purchasable: false, sellPrice: 1500, levelReq: 26,
+    image: 'square_shield',
+  },
+  ironshield: {
+    id: 'ironshield', name: '철방패', desc: '크기를 키웠지만 두께가 얇은 방패',
+    equipType: 'sub',
+    subKind: 'shield', // 방패
+    grade: 'rare', // 레어
+    defense: -5, hp: 300,
+    purchasable: false, sellPrice: 3000, levelReq: 32,
+    image: 'iron_shield',
+    // 고유 옵션: 반월대도 등과 동일한 "고정형"(opt.text+opt.statBonus) 스키마 재사용 — 강화 자체가
+    // 없는 보조 아이템이라 activateLevel:0으로 항상 활성화됨. statBonus.str은 armorUniqueOptionStatBonus
+    // (formulas.js, 이번에 신설)가 읽어 artifactStatBonus('str')에 합산됨.
+    uniqueOption: {
+      text: '힘 +1',
+      activateLevel: 0,
+      statBonus: { str: 1 },
+    },
+  },
+  purpleshield: {
+    id: 'purpleshield', name: '보라방패', desc: '보라색으로 빛나는 단단한 방패',
+    equipType: 'sub',
+    subKind: 'shield', // 방패
+    grade: 'epic', // 에픽
+    defense: -4, hp: 100, mana: 300,
+    purchasable: false, sellPrice: 9000, levelReq: 42,
+    image: 'purple_shield',
+    uniqueOption: {
+      text: '힘 +1, 지능 +1',
+      activateLevel: 0,
+      statBonus: { str: 1, int: 1 },
+    },
+  },
 };
 Object.values(SUB_TYPES).forEach(s => {
   if(s.defense != null) s.defArr = new Array(10).fill(s.defense);
@@ -1574,6 +1627,33 @@ const MISC_ITEMS = {
     desc: '태고의 수액이 굳어 만들어진 신비로운 호박',
     sellPrice: 800, stateKey: 'purpleAmbers',
   },
+  snakeFang: {
+    id: 'snakeFang', name: '독사의 송곳니', icon: '🦷', image: 'monster_teeth', itemClass: 'misc', grade: 'rare',
+    desc: '치명적인 독을 품고 있는 독사의 송곳니',
+    sellPrice: 200, stateKey: 'snakeFangs',
+  },
+  tigerFang: {
+    id: 'tigerFang', name: '자호의 송곳니', icon: '🦷', image: 'monster_teeth', itemClass: 'misc', grade: 'epic',
+    desc: '단단하고 날카로워<br>무기 제작에도 쓰인다',
+    sellPrice: 300, stateKey: 'tigerFangs',
+  },
+  spiderFang: {
+    id: 'spiderFang', name: '거미의 송곳니', icon: '🦷', image: 'monster_teeth', itemClass: 'misc', grade: 'epic',
+    desc: '맹독을 품은 거미의 송곳니',
+    sellPrice: 400, stateKey: 'spiderFangs',
+  },
+  // 획득 방식을 구상 중이라 이번 작업에서는 어떤 몬스터 드랍 테이블에도 연결하지 않음(요청사항) —
+  // 데이터만 등록해두고, 추후 획득처가 정해지면 그때 드랍 테이블(또는 다른 획득 경로)에 연결할 예정.
+  remnant: {
+    id: 'remnant', name: '부서진 검', icon: '🗡️', image: 'remnant', itemClass: 'misc', grade: 'rare',
+    desc: '방치되어 마력이 흡수된 검 조각',
+    sellPrice: 100, stateKey: 'remnants',
+  },
+  blackIron: {
+    id: 'blackIron', name: '흑철', icon: '⚫', image: 'black_iron', itemClass: 'misc', grade: 'epic',
+    desc: '무기와 검 제작에 쓰이는 고급 재료',
+    sellPrice: 300, stateKey: 'blackIrons',
+  },
 };
 
 // ---- 강화 파괴 및 흔적 시스템 ----
@@ -1611,6 +1691,159 @@ const DESTROY_SHINYSTONE_LEVEL_QTY = [
 const DESTROY_SHINYSTONE_ENHANCE_QTY = [
   { min: 0, max: 6, qty: 0 }, { min: 7, max: 7, qty: 1 }, { min: 8, max: 8, qty: 2 },
 ];
+
+// ---- 제작소 "제작" 탭 소분류 ----
+// 상점/인벤토리의 EQUIP_SUB_TABS와 동일한 방식(배열에 항목만 추가하면 자동으로 탭이 늘어남)으로 관리.
+// 사용자 요청 4종(무기/방어구/보조/장신구)만 우선 등록 — 이번 작업은 UI 골격만 구현하는 범위라 실제
+// 제작 가능 아이템 데이터(CRAFTABLE_ITEMS)는 전부 빈 배열임.
+const CRAFT_SUB_TABS = [
+  { id: 'weapon', label: '무기' },
+  { id: 'armor', label: '방어구' },
+  { id: 'sub', label: '보조' },
+  { id: 'accessory', label: '장신구' },
+];
+// 상점(SHOP_TABS)/인벤토리(INVENTORY_TABS)와 동일한 구조(최상위 탭 배열 + "제작" 탭만 하위탭을 가짐).
+// 지금은 최상위 탭이 "제작" 하나뿐이지만, 추후 다른 최상위 메뉴(예: 분해 등)가 필요해지면 이 배열에
+// 항목만 추가하면 상점/인벤토리와 동일한 방식으로 자동 확장됨.
+const CRAFT_TABS = [
+  { id: 'craft', label: '제작', subTabs: CRAFT_SUB_TABS },
+];
+// 제작소 각 소분류 탭에 표시할 "제작 가능한 아이템" 목록. 이번 작업 범위는 UI 골격까지만이라 전부
+// 빈 배열로 시작함 — 이후 별도 작업에서 각 배열에 { id, name, ... , materials: [...] } 형태의 실제
+// 제작 아이템 데이터를 채우면, renderCraftList(render.js)가 이 배열들을 그대로 읽어 자동으로 표시함
+// (탭 UI 쪽은 추가 수정 불필요). 새 제작 분류가 추가되면 CRAFT_SUB_TABS에 탭을 추가하고 여기에 같은
+// id로 빈 배열을 하나 더 추가하기만 하면 됨.
+const CRAFTABLE_ITEMS = {
+  weapon: [],
+  armor: [],
+  sub: [],
+  accessory: [],
+};
+// 제작 가능한 아이템 하나의 스키마:
+// {
+//   id, name,
+//   grade,              // WEAPON_GRADES 색상 공식 재사용 — 아이콘 테두리/이름 색상에 사용
+//   iconType, iconRef,  // 기존 등록된 아이템 아이콘을 그대로 재사용하기 위한 참조
+//                        // ('weapon'이면 iconRef는 WEAPON_TYPES 키를 그대로 넣어 weaponIconHtml(iconRef)로 렌더)
+//   successChance,      // 제작 성공 확률(%)
+//   craftCost,          // 제작 비용(골드)
+//   materials: [ { name, need } ],  // name은 기존 아이템의 표시 이름 그대로 — findCraftResource
+//                                   // (formulas.js)가 무기/방어구/장신구/보조/MISC_ITEMS를 통틀어
+//                                   // 이름으로 찾아 아이콘/등급/색상/툴팁/보유량을 자동 연결함.
+//                                   // 장비 이름을 등록하면 그 장비 자체가 재료가 되어(보유 인스턴스
+//                                   // 개수만큼 need 충족) 연출 시작 시 홀딩된다(craftGrantResultItems 참고).
+//   failReturns: [ { name, need?, chance } | { none: true, chance } ],  // 제작 실패 시 반환 후보 —
+//                                 // 등록된 확률에 따라 하나만 추첨(craftRollFailReturn). need는 반환
+//                                 // 개수(생략 시 1개, 일반 재료에만 의미 있음 — 장비 재료는 항상 1개
+//                                 // 단위로, 투입했던 그 개체가 손상 상태로 돌아옴). "없음"은 { none:true }.
+// }
+
+// ==================== 제작소 실제 제작 아이템 데이터 ====================
+// 5종 전부 몬스터 드랍으로만 얻을 수 있던 기존 에픽 무기를 그대로 제작으로도 얻을 수 있게 등록한
+// 것 — iconRef가 실제 WEAPON_TYPES 항목을 그대로 가리키므로 아이콘/등급/색상/툴팁이 완전히 동일함.
+CRAFTABLE_ITEMS.weapon.push(
+  {
+    id: 'craft_poisonfang', name: '독 송곳니', grade: 'epic',
+    iconType: 'weapon', iconRef: 'poisonfang',
+    successChance: 60, craftCost: 4000,
+    materials: [
+      { name: '독사의 송곳니', need: 3 },
+      { name: '쇠조각', need: 3 },
+      { name: '마석 파편', need: 3 },
+    ],
+    failReturns: [
+      { name: '독사의 송곳니', chance: 50 },
+      { name: '쇠조각', chance: 50 },
+    ],
+  },
+  {
+    id: 'craft_blacksword', name: '흑색 검', grade: 'epic',
+    iconType: 'weapon', iconRef: 'blacksword',
+    successChance: 40, craftCost: 8000,
+    materials: [
+      { name: '흑철', need: 3 },
+      { name: '쇠조각', need: 3 },
+      { name: '마석 조각', need: 3 },
+    ],
+    failReturns: [
+      { name: '흑철', chance: 30 },
+      { name: '쇠조각', need: 2, chance: 50 },
+      { none: true, chance: 20 },
+    ],
+  },
+  {
+    id: 'craft_tigersword', name: '척호검', grade: 'epic',
+    iconType: 'weapon', iconRef: 'tigersword',
+    successChance: 40, craftCost: 8000,
+    materials: [
+      { name: '자호의 송곳니', need: 2 },
+      { name: '흑철', need: 4 },
+      { name: '쇠조각', need: 3 },
+      { name: '마석 조각', need: 5 },
+    ],
+    failReturns: [
+      { name: '자호의 송곳니', chance: 30 },
+      { name: '흑철', chance: 30 },
+      { none: true, chance: 20 },
+    ],
+  },
+  {
+    id: 'craft_bloodtigerlongsword', name: '혈호대검', grade: 'epic',
+    iconType: 'weapon', iconRef: 'bloodtigerlongsword',
+    successChance: 35, craftCost: 18000,
+    materials: [
+      { name: '자호의 송곳니', need: 5 },
+      { name: '흑철', need: 5 },
+      { name: '쇠조각', need: 6 },
+      { name: '마석 조각', need: 8 },
+    ],
+    failReturns: [
+      { name: '자호의 송곳니', need: 2, chance: 30 },
+      { name: '흑철', need: 2, chance: 30 },
+      { none: true, chance: 20 },
+    ],
+  },
+  {
+    id: 'craft_eight_knife', name: '팔각비도', grade: 'epic',
+    iconType: 'weapon', iconRef: 'eight_knife',
+    successChance: 30, craftCost: 28000,
+    // 재료 중 "독 송곳니"는 MISC_ITEMS가 아니라 실제 무기(poisonfang) 이름 — findCraftResource가
+    // 장비로 인식해서 보유한 개체를 홀딩하고, 아래 failReturns에 같은 이름이 등록되어 있어 실패 시
+    // 투입했던 그 개체가 강화 단계 그대로 손상 상태로 반환됨(요청사항 "독 송곳니(손상)").
+    materials: [
+      { name: '거미의 송곳니', need: 3 },
+      { name: '독 송곳니', need: 1 },
+      { name: '반짝이는 돌', need: 1 },
+      { name: '쇠조각', need: 5 },
+      { name: '진호박', need: 1 },
+    ],
+    failReturns: [
+      { name: '독 송곳니', chance: 100 },
+    ],
+  },
+);
+
+
+// 제작소 탭 id → PAGE_SIZE/페이지 상태 키 매핑(SHOP_PAGE_KEY와 동일한 역할).
+// 제작 연출 UI(요청사항 4번) 진행률 구간별 안내 문구. 진행률(%) 오름차순으로 max값만 넣어두면
+// craftAnimStageText(formulas.js)가 "이 값 이하인 첫 구간"을 찾아 반환함 — 구간을 더 세분화하거나
+// 문구만 바꾸고 싶으면 이 배열만 수정하면 됨(로직 변경 불필요).
+const CRAFT_ANIM_STAGE_TEXT = [
+  { max: 9, text: '재료를 가공하는 중...' },
+  { max: 19, text: '망치로 쇠를 두들기는 중...' },
+  { max: 29, text: '미세 조정 중...' },
+  { max: 39, text: '최적의 구조를 계산하는 중...' },
+  { max: 49, text: '재료를 재구성하는 중...' },
+  { max: 59, text: '설계 최적화 중...' },
+  { max: 69, text: '출력 공정을 시작하는 중...' },
+  { max: 79, text: '부품을 결합하는 중...' },
+  { max: 89, text: '성능을 검증하는 중...' },
+  { max: 100, text: '마지막 공정을 준비 중...' },
+];
+
+const CRAFT_PAGE_KEY = {
+  weapon: 'craftWeapon', armor: 'craftArmor', sub: 'craftSub', accessory: 'craftAccessory',
+};
 
 // ---- 상점/인벤토리 "장비" 탭 공용 하위 분류 ----
 // 무기/방어구/장신구/아티팩트 4종. 인벤토리·상점 양쪽의 "장비" 최상위 탭이 이 배열을 그대로 공유해서
@@ -1661,17 +1894,21 @@ const SHOP_SORT_FIELDS = [
 const PAGE_SIZE = {
   invWeapon: 6,        // 인벤토리 무기 탭
   invArmor: 6,          // 인벤토리 방어구 탭
-  invSub: 6,             // 인벤토리 보조 탭(아직 데이터 없음 — 항상 빈 목록으로 표시됨)
+  invSub: 6,             // 인벤토리 보조 탭
   invAccessory: 6,       // 인벤토리 장신구 탭
   forgeSelect: 6,       // 대장간 "강화 장비 선택" 팝업
   shopWeapon: 6,        // 상점 무기 탭
   shopArmor: 6,          // 상점 방어구 탭
-  shopSub: 6,             // 상점 보조 탭(아직 데이터 없음 — 항상 빈 목록으로 표시됨)
+  shopSub: 6,             // 상점 보조 탭
   shopAccessory: 6,      // 상점 장신구 탭
   shopConsumable: 6,     // 상점 소비 탭
   shopArtifact: 6,       // 상점 아티팩트 탭
   dungeonList: 3,        // 던전 입구
   dungeonDrop: 11,       // 던전 카드 "획득 가능 아이템 안내" 아이콘 목록(13개 이상인 던전만 적용)
+  craftWeapon: 12,       // 제작소 "제작 > 무기" 탭(요청사항: 페이지당 12개)
+  craftArmor: 12,        // 제작소 "제작 > 방어구" 탭
+  craftSub: 12,          // 제작소 "제작 > 보조" 탭
+  craftAccessory: 12,    // 제작소 "제작 > 장신구" 탭
 };
 // 상점 탭 id → PAGE_SIZE/페이지 상태 키 매핑. 페이지네이션 미적용 탭(stone/misc)은 여기 없음.
 const SHOP_PAGE_KEY = {
@@ -1732,10 +1969,10 @@ const SKILLS = {
     damagePercent: 130, hits: 1,
   },
   rage: {
-    name: '분노', desc: '[버프] 5초 동안 자신의 공격력을 30 증가시킨다.',
+    name: '분노', desc: '[버프] 60초 동안 자신의 공격력을 30 증가시킨다.',
     grade: 'normal', category: 'common', target: 'buff', levelReq: 5,
-    cooldown: 10, resourceType: 'mp', resourceAmount: 50, castTime: 0.1,
-    buffEffect: { atkFlat: 30, durationMs: 5000 },
+    cooldown: 120, resourceType: 'mp', resourceAmount: 50, castTime: 0.1,
+    buffEffect: { atkFlat: 30, durationMs: 60000 },
   },
   double_strike: {
     name: '이연격', desc: '빠르게 무기를 휘둘러 75%의 데미지로 적을 2번 공격한다.',
@@ -1745,10 +1982,10 @@ const SKILLS = {
     hitDelayMs: 0.1, // 1타는 즉시, 2타는 이 시간(초) 뒤에 순차 적용(resolveSkillEffect의 hitDelayMs 분기 참고)
   },
   preemptive_strike: {
-    name: '선공', desc: '[버프] 8초 동안 자신의 공격 속도를 20% 증가시킨다.',
+    name: '선공', desc: '[버프] 15초 동안 자신의 공격 속도를 20% 증가시킨다.',
     grade: 'rare', category: 'common', target: 'buff', levelReq: 10,
-    cooldown: 15, resourceType: 'mp', resourceAmount: 70, castTime: 0.1,
-    buffEffect: { atkSpeedPercent: 20, durationMs: 8000 }, icon: 'lv10buff',
+    cooldown: 30, resourceType: 'mp', resourceAmount: 70, castTime: 0.1,
+    buffEffect: { atkSpeedPercent: 20, durationMs: 15000 }, icon: 'lv10buff',
   },
   guardian_will: {
     name: '수호자의 의지', desc: '[패시브] 체력 +500',
@@ -1822,7 +2059,7 @@ const SKILLS = {
   },
   quad_strike: {
     name: '사연격', desc: '맹렬하게 움직여 <br>62.5%의 데미지로 네 번 공격한다',
-    grade: 'epic', category: 'common', target: 'single', levelReq: 50,
+    grade: 'rare', category: 'common', target: 'single', levelReq: 50,
     cooldown: 5.1, resourceType: 'mp', resourceAmount: 200, castTime: 0,
     damagePercent: 62.5, hits: 4, icon: 'lv50atk',
     // 이연격/삼연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
@@ -1967,6 +2204,39 @@ const FLASK_TIER_RULES = [
   { minLevel: 75, maxLevel: null, tier: 4 },
 ];
 
+// 숨겨진 장소(11스테이지) 보상 상자 전용 기타 아이템 드랍표. 골드/모험가의 유해/마석 등 기존 전역
+// 드랍 공식과 완전히 별개의 독립 로직(rollTreasureMiscDrop, formulas.js)에서만 사용됨. 던전의 최소
+// 몬스터 레벨이 속한 구간의 확률·개수만 적용되며, 한 번의 보상 상자에서 이 목록 중 최대 1종류만 지급됨
+// (확률이 낮은 아이템부터 순서대로 추첨, 처음 성공한 아이템 하나만 지급하고 즉시 종료 — 합산 방식 아님).
+// itemId는 MISC_ITEMS의 키와 그대로 연결됨. 새 기타 아이템을 추가/제거하고 싶으면 이 배열에 항목만
+// 추가/삭제하면 되고 추첨 로직은 수정할 필요 없음. 구간이 없거나 chance가 0인 레벨대는 자동으로
+// 추첨 대상에서 제외됨(rollTreasureMiscDrop이 처리).
+const TREASURE_MISC_DROP_TABLE = [
+  { itemId: 'rareScrapmetal', tiers: [ // 쇠조각
+    { minLevel: 1,  maxLevel: 29, chance: 10, qtyOptions: [1] },
+    { minLevel: 30, maxLevel: 49, chance: 12, qtyOptions: [1] },
+    { minLevel: 50, maxLevel: 89, chance: 15, qtyOptions: [1] },
+    { minLevel: 90, maxLevel: 99, chance: 20, qtyOptions: [1, 2] },
+  ]},
+  { itemId: 'epicShinystone', tiers: [ // 반짝이는 돌 (1~29구간은 chance 0 → 추첨 대상 제외)
+    { minLevel: 1,  maxLevel: 29, chance: 0,  qtyOptions: [1] },
+    { minLevel: 30, maxLevel: 49, chance: 2,  qtyOptions: [1] },
+    { minLevel: 50, maxLevel: 89, chance: 5,  qtyOptions: [1] },
+    { minLevel: 90, maxLevel: 99, chance: 7,  qtyOptions: [1, 2] },
+  ]},
+  { itemId: 'blackIron', tiers: [ // 흑철 (90~99구간은 chance 0 → 추첨 대상 제외)
+    { minLevel: 1,  maxLevel: 29, chance: 5,  qtyOptions: [1] },
+    { minLevel: 30, maxLevel: 49, chance: 7,  qtyOptions: [1] },
+    { minLevel: 50, maxLevel: 89, chance: 10, qtyOptions: [1] },
+    { minLevel: 90, maxLevel: 99, chance: 0,  qtyOptions: [1] },
+  ]},
+  { itemId: 'remnant', tiers: [ // 부서진 검 (1~49구간은 chance 0 → 추첨 대상 제외)
+    { minLevel: 1,  maxLevel: 49, chance: 0, qtyOptions: [1] },
+    { minLevel: 50, maxLevel: 89, chance: 6, qtyOptions: [1] },
+    { minLevel: 90, maxLevel: 99, chance: 8, qtyOptions: [1] },
+  ]},
+];
+
 // 개별 몬스터 테이블.
 // defense: 몬스터 방어도(몬스터 방어도 시스템). 플레이어 방어도와 동일한 공식(defenseDamageMultiplier,
 // formulas.js)을 그대로 사용해 이 몬스터가 입는 최종 피해량에 적용됨. 음수/양수 모두 가능(양수면 피해
@@ -2016,6 +2286,7 @@ const MONSTERS = {
       { name: '뱀고기', chance: 50 },
       { name: '독 플라스크', chance: 10, artifactId: 'poisonflask' },
       { name: '독 송곳니', chance: 10, weaponId: 'poisonfang' },
+      { name: '독사의 송곳니', chance: 10 },
     ],
   },
   blue_deer: {
@@ -2064,6 +2335,7 @@ const MONSTERS = {
       { name: '낡은 팔 보호대', chance: 20, artifactId: 'oldarmguard' },
       { name: '흑색 팔 보호대', chance: 7, artifactId: 'blackarmguard' },
       { name: '흑색 검', chance: 5, weaponId: 'blacksword' },
+      { name: '흑철', chance: 7 },
     ],
   },
   forest_boar: {
@@ -2082,6 +2354,7 @@ const MONSTERS = {
     drops: [
       { name: '숲돼지고기', chance: 25 },
       { name: '반월대도', chance: 5, weaponId: 'moongreatsword' },
+      { name: '흑철', chance: 7 },
     ],
   },
   fox: {
@@ -2101,6 +2374,7 @@ const MONSTERS = {
     drops: [
       { name: '여우 모피', chance: 40 },
       { name: '제령도', chance: 2, weaponId: 'ninetaildagger' },
+      { name: '흑철', chance: 7 },
     ],
   },
   // 이미지 파일명 참고: 기획서상 image 필드는 'ninetailfox'였으나 실제 업로드된 파일명은
@@ -2113,6 +2387,8 @@ const MONSTERS = {
       { name: '여우 모피', chance: 90 },
       { name: '빛나는 여우 구슬', chance: 10, artifactId: 'foxorb' },
       { name: '제령도', chance: 8, weaponId: 'ninetaildagger' },
+      { name: '사각방패', chance: 10, weaponId: 'squareshield' },
+      { name: '흑철', chance: 10 },
     ],
   },
   tiger1: {
@@ -2136,6 +2412,7 @@ const MONSTERS = {
       { name: '자호의 가죽', chance: 20 },
       { name: '강철 투구', chance: 5, weaponId: 'steelhelmet' },
       { name: '척호검', chance: 5, weaponId: 'tigersword' },
+      { name: '자호의 송곳니', chance: 7 },
     ],
   },
   tiger4: {
@@ -2150,6 +2427,7 @@ const MONSTERS = {
       // 원본 요청 표엔 드랍명이 "적랑대검"으로 적혀 있었으나, 같은 요청의 무기 목록에는 "적랑대검"이
       // 없고 "혈호대검"만 정의되어 있어 동일 아이템으로 간주해 반영함(확인 필요 — 응답에 플래그함).
       { name: '혈호대검', chance: 5, weaponId: 'bloodtigerlongsword' },
+      { name: '자호의 송곳니', chance: 10 },
     ],
   },
   mantis: {
@@ -2169,6 +2447,7 @@ const MONSTERS = {
     drops: [
       { name: '진호박', chance: 20 },
       { name: '현랑반지', chance: 1, weaponId: 'wolfmoonring' },
+      { name: '철방패', chance: 5, weaponId: 'ironshield' },
     ],
   },
   epicmantis2: {
@@ -2178,6 +2457,7 @@ const MONSTERS = {
     drops: [
       { name: '진호박', chance: 30 },
       { name: '현랑반지', chance: 2, weaponId: 'wolfmoonring' },
+      { name: '철방패', chance: 7, weaponId: 'ironshield' },
     ],
   },
   // 거미굴 신규 몬스터 4종. 서현거미/백현귀는 이번 던전에 처음 등록되는 2종째 에픽 몬스터쌍이라
@@ -2200,6 +2480,7 @@ const MONSTERS = {
     drops: [
       { name: '진호박', chance: 20 },
       { name: '팔각비도', chance: 5, weaponId: 'eight_knife' },
+      { name: '거미의 송곳니', chance: 7 },
     ],
   },
   epicspider2: {
@@ -2209,6 +2490,39 @@ const MONSTERS = {
     drops: [
       { name: '진호박', chance: 30 },
       { name: '백현갑', chance: 2, weaponId: 'spiderarmor' },
+      { name: '보라방패', chance: 5, weaponId: 'purpleshield' },
+      { name: '거미의 송곳니', chance: 10 },
+    ],
+  },
+  // 전갈굴 신규 몬스터 4종. 현랑전갈/현랑장은 자호굴·사마귀굴·거미굴과 동일한 방식으로 pickEpicMonsterId가
+  // 굴 내 개별 확률을 적용함. 현랑장은 이 던전의 스테이지10(가장 깊은 스테이지)에서만 등장(epicSpawnStages:[10]).
+  scorpion: {
+    id: 'scorpion', name: '전갈', icon: '🦂', grade: 'normal', level: 45, image: 'scorpion',
+    defense: -10, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '호박', chance: 15 } ],
+  },
+  scorpion2: {
+    id: 'scorpion2', name: '전갈장', icon: '🦂', grade: 'normal', level: 46, image: 'scorpion2',
+    defense: -10, hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
+    drops: [ { name: '호박', chance: 20 } ],
+  },
+  epicscorpion: {
+    id: 'epicscorpion', name: '현랑전갈', icon: '🦂', grade: 'epic', level: 53, image: 'epicscorpion',
+    defense: -10, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
+    epicSpawnWeight: 50, // 전갈굴 전용 — 현랑장과 합쳐 100%(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '현랑반지', chance: 1.5, weaponId: 'wolfmoonring' },
+    ],
+  },
+  epicscorpion2: {
+    id: 'epicscorpion2', name: '현랑장', icon: '🦂', grade: 'epic', level: 55, image: 'epicscorpion2',
+    defense: -10, hpMult: 1.0, atkMult: 1.3, speedMult: 1.15,
+    epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '보라방패', chance: 7, weaponId: 'purpleshield' },
+      { name: '현랑반지', chance: 2.5, weaponId: 'wolfmoonring' },
     ],
   },
 };
@@ -2303,6 +2617,14 @@ const DUNGEONS = [
     desc: '어둠 속에 끝없이 이어진 거미들의 소굴',
     monsters: ['spider', 'spider2', 'epicspider1', 'epicspider2'],
     levelRange: 6,
+  },
+  {
+    id: 'scorpion_den',
+    name: '전갈굴',
+    icon: '',
+    desc: '전갈들이 지배하는 거대한 지하 동굴',
+    monsters: ['scorpion', 'scorpion2', 'epicscorpion', 'epicscorpion2'],
+    levelRange: 7,
   },
 ];
 

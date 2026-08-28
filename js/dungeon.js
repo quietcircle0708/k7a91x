@@ -238,7 +238,7 @@ function attackTick(){
     updateTargetHighlight();
   }
   const type = equipped.type || 'longsword';
-  const atk = effectiveAtk(type, equipped.level);
+  const atk = effectiveAtk(type, equipped.level, equipped.damaged);
   const critChance = effectiveCritChance(type, equipped.level);
   const isCrit = Math.random() * 100 < critChance;
   const baseDmg = isCrit ? Math.round(atk * 1.5) : atk;
@@ -625,10 +625,17 @@ function grantTreasureRewards(){
     const item = MISC_ITEMS[stoneDrop.itemId];
     state[item.stateKey] = (state[item.stateKey] || 0) + stoneDrop.qty;
   }
+  // 숨겨진 장소 전용 기타 아이템 추첨 — 위 골드/모험가의 유해/마석과 완전히 독립적인 별도 판정
+  // (rollTreasureMiscDrop 자체가 기존 전역 드랍 공식과 무관한 로직이라 서로 영향을 주지 않음).
+  const miscDrop = rollTreasureMiscDrop(minLevel);
+  if(miscDrop){
+    const item = MISC_ITEMS[miscDrop.itemId];
+    state[item.stateKey] = (state[item.stateKey] || 0) + miscDrop.qty;
+  }
 
   render();
   saveState();
-  return { gold, weaponDrop, stoneDrop };
+  return { gold, weaponDrop, stoneDrop, miscDrop };
 }
 function openTreasureResultModal(result){
   el('krIcon').textContent = '🎁';
@@ -644,6 +651,10 @@ function openTreasureResultModal(result){
   if(result.stoneDrop){
     const item = MISC_ITEMS[result.stoneDrop.itemId];
     rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${result.stoneDrop.qty} 획득</div>`;
+  }
+  if(result.miscDrop){
+    const item = MISC_ITEMS[result.miscDrop.itemId];
+    rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${result.miscDrop.qty} 획득</div>`;
   }
   if(anyEquipInventoryFull() && !result.weaponDrop){
     rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;

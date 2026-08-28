@@ -342,6 +342,123 @@
     border-radius:6px; padding:5px 4px; font-size:11px; font-weight:600; cursor:pointer;
   }
   .inv-subtab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+  /* 제작소 탭 버튼 — 인벤토리 탭(.inv-tab-btn/.inv-subtab-btn)과 완전히 동일한 스타일을 그대로 대응시키되,
+     클래스를 분리함(render.js의 renderInvTabs/renderCraftTabs가 각각 document.querySelector로 전역
+     조회하는데, 인벤토리·제작소 하위탭 id가 weapon/armor/sub/accessory로 겹치므로 같은 클래스를 쓰면
+     서로 다른 화면의 버튼을 잘못 짚을 수 있어 클래스 자체를 나눠 충돌을 피함). 시각적으로는 인벤토리와
+     동일하게 보이도록 스타일 값만 그대로 복사함. */
+  .craft-tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .craft-tab-btn{
+    flex:1; background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+    border-radius:8px; padding:8px 4px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .craft-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+  .craft-subtabs{ display:flex; gap:6px; margin:-6px 0 14px; flex-wrap:wrap; }
+  .craft-subtab-btn{
+    flex:1; background:transparent; border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+    border-radius:6px; padding:5px 4px; font-size:11px; font-weight:600; cursor:pointer;
+  }
+  .craft-subtab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+
+  /* ---- 제작소: 제작 아이템 목록 행(요청사항 1번) ----
+     목록 카드 자체(.inv-card/.inv-icon/.inv-info/.inv-name/.inv-actions/.inv-btn)는 인벤토리 장비 탭과
+     완전히 동일한 클래스를 그대로 재사용(render.js 참고) — 여기서는 그 아래 붙는 [제작 재료] 안내
+     패널만 이 화면 전용으로 스타일링함. */
+  .craft-item-row{ margin-bottom:10px; }
+  .craft-item-row .inv-card{ margin-bottom:0; }
+  /* 숨김 상태에서는 높이에 전혀 영향을 주지 않다가([제작 재료] 안 눌렀을 때 기존 슬롯과 동일 높이 유지),
+     펼쳤을 때만 아래로 확장됨(요청사항 "UI 크기" 항목) — display:none/flex 전환만으로 처리. */
+  .craft-mat-info-panel{
+    flex-wrap:wrap; gap:16px; margin-top:0; padding:10px 14px; background: var(--forge-panel-2);
+    border:1px solid var(--forge-line); border-top:none; border-radius:0 0 12px 12px;
+    justify-content:center; /* 요청사항 4: 재료 안내 UI 내용을 패널 중앙으로 출력 */
+  }
+  /* 아이콘 컬럼(아이콘+이름)을 먼저 중앙정렬로 묶고, 개수는 그 옆에 별도로 붙여서
+     "이름이 개수 폭까지 포함한 전체 폭"이 아니라 "아이콘 폭"에 정확히 맞춰 중앙정렬되게 함
+     (요청사항 4: 아이템 이름이 아이콘 중앙으로 오도록). */
+  .craft-mat-info-item{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+  .craft-mat-info-icon-col{ display:flex; flex-direction:column; align-items:center; gap:4px; width:56px; }
+  .craft-mat-info-count{ font-family:'JetBrains Mono', monospace; font-size:12px; }
+  .craft-mat-info-icon{ width:30px; height:30px; }
+  .craft-mat-info-name{ font-size:11px; font-weight:700; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .craft-mat-short{ color:#ff6a6a; font-weight:700; }
+  .craft-mat-ok{ color: var(--forge-cream-dim); font-weight:700; }
+
+  /* ---- 제작소: 제작 진행 팝업(요청사항 3~10번) ---- */
+  .craft-popup-box{ width:340px; }
+  .craft-popup-name{ text-align:center; margin-bottom:14px; position:relative; }
+  .craft-popup-name .inv-name{ justify-content:center; } /* 요청사항 1: .inv-name이 flex라 text-align만으론 중앙정렬 안 되던 것 보정 */
+  .craft-section-label{ font-size:12px; color: var(--forge-cream-dim); font-weight:700; margin:12px 0 8px; }
+  .craft-success-rate{ text-align:center; color: var(--forge-gold); font-weight:700; font-size:13px; margin:14px 0; }
+  .craft-slots-row{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; } /* 요청사항 2·3: 재료/촉매 슬롯 행 중앙정렬 */
+  /* 요청사항 3-3: 아이콘 / 투입개수 / 이름을 각각 분리된 줄로 표시하고, 아이콘 슬롯은 인벤토리
+     아이템 아이콘 슬롯(.inv-icon, 42px)과 동일한 크기를 그대로 씀 — 버튼 자체는 그 크기에 맞춘
+     최소 크기로만 감싸서, 예전처럼 지나치게 큰 버튼이 되지 않도록 함. */
+  .craft-slot{
+    background:transparent; border:none; padding:0; cursor:pointer; color: var(--forge-cream-dim);
+    display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; width:64px;
+  }
+  .craft-slot-icon-box{ cursor:pointer; }
+  .craft-slot-icon-box:hover{ border-color: var(--forge-gold); }
+  .craft-slot-plus{ font-size:20px; font-weight:700; color: var(--forge-cream-dim); }
+  .craft-slot-name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .craft-slot-qty-short{ color:#ff6a6a; font-weight:700; font-family:'JetBrains Mono', monospace; }
+  .craft-slot-qty-ok{ color: var(--forge-gold); font-weight:700; font-family:'JetBrains Mono', monospace; }
+
+  /* ---- 제작소: 제작 최종 확인 UI ----
+     요청사항: 모든 텍스트/아이콘/버튼을 중앙 정렬하고, 아이콘과 이름을 하나의 슬롯으로 묶지 않고
+     각각 별도 요소로 구성함(아이콘 줄과 이름 줄을 분리). */
+  .craft-confirm-box{ width:300px; text-align:center; }
+  .craft-confirm-section-label{ font-size:12px; color: var(--forge-cream-dim); font-weight:700; margin:14px 0 8px; text-align:center; }
+  .craft-confirm-icon-row{ display:flex; justify-content:center; }
+  .craft-confirm-icon{ width:42px; height:42px; }
+  .craft-confirm-item-name{ font-weight:700; font-size:13px; margin-top:6px; display:flex; justify-content:center; position:relative; }
+  .craft-confirm-warning{ color:#ff6a6a; font-weight:700; font-size:12px; text-align:center; margin:16px 0; line-height:1.5; }
+
+  /* ---- 제작소: 제작 연출 UI(요청사항 1~11번) ---- */
+  .craft-anim-box{ width:300px; text-align:center; }
+  /* 아이콘 주변에 빛 구체가 나타났다 사라지는 영역 + 화이트 플래시를 올릴 기준점(position:relative) */
+  .craft-anim-stage{ position:relative; display:flex; justify-content:center; align-items:center; height:60px; margin-bottom:4px; }
+  .craft-anim-icon-box{ width:54px; height:54px; position:relative; z-index:2; }
+  /* 검은색 실루엣: 실제 이미지 색상과 무관하게 필터로 강제 검게(투명 배경은 그대로 유지됨) */
+  .craft-anim-silhouette img{ filter: brightness(0); }
+  .craft-anim-clickable{ cursor:pointer; }
+  .craft-anim-icon-shake{ animation: craftIconShake 0.2s ease-in-out; }
+  @keyframes craftIconShake{
+    0%{ transform:translateX(0); } 25%{ transform:translateX(-4px); }
+    50%{ transform:translateX(4px); } 75%{ transform:translateX(-2px); } 100%{ transform:translateX(0); }
+  }
+  /* 빛 구체: 바깥(60px 반경)에서 생성돼 중앙으로 회전하며 빨려들어감(소용돌이) */
+  .craft-anim-orb{
+    position:absolute; top:50%; left:50%; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%;
+    background: radial-gradient(circle, #fff6c8, #ffb84d 60%, transparent 100%);
+    box-shadow: 0 0 8px 2px rgba(255,184,77,.8); z-index:1; pointer-events:none;
+    animation: craftOrbSpiral 0.9s ease-in forwards;
+  }
+  @keyframes craftOrbSpiral{
+    0%{ transform: rotate(var(--angle)) translateX(60px) rotate(calc(var(--angle) * -1)); opacity:0; }
+    15%{ opacity:1; }
+    100%{ transform: rotate(calc(var(--angle) + 220deg)) translateX(0px) rotate(calc((var(--angle) + 220deg) * -1)); opacity:.15; }
+  }
+  /* 결과 공개 시 1초간 하얗게 번쩍이는 효과 */
+  .craft-anim-flash{ position:absolute; inset:0; background:#fff; z-index:3; pointer-events:none; animation: craftFlashFade 1s ease-out forwards; }
+  @keyframes craftFlashFade{ from{ opacity:1; } to{ opacity:0; } }
+
+  .craft-anim-stage-text{ font-size:12px; color: var(--forge-cream-dim); min-height:16px; margin:10px 0 8px; }
+  .craft-anim-click-hint{ font-size:12.5px; font-weight:700; color: var(--forge-gold); margin:10px 0 4px; }
+  .craft-anim-bar-wrap{ margin-top:4px; }
+  .craft-anim-bar-fill{ background: linear-gradient(90deg, #ffb84d, #e08a1e); } /* 요청사항 5: 로딩바는 주황색 */
+  .craft-anim-result-text{ font-size:13px; font-weight:700; margin:14px 0; }
+  .craft-anim-result-headline{ font-size:15px; font-weight:800; margin:12px 0 2px; }
+  .craft-anim-result-headline.success{ color: var(--forge-gold); }
+  .craft-anim-result-headline.fail{ color:#ff6a6a; }
+  /* 지급 아이템 여러 종류일 때 한 줄에 3개까지, 초과분은 다음 줄(요청사항 8번) — 카드 폭(64px)×3+간격
+     기준으로 컨테이너 최대폭을 고정해 flex-wrap이 정확히 3개 단위로 줄바꿈되게 함 */
+  .craft-anim-result-icons{ display:flex; flex-wrap:wrap; justify-content:center; gap:14px; max-width:226px; margin:0 auto; }
+  .craft-anim-result-item{ display:flex; flex-direction:column; align-items:center; gap:4px; width:64px; }
+  .craft-anim-result-icon{ width:42px; height:42px; }
+  .craft-anim-result-name{ font-size:11px; font-weight:700; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+
   .inv-count{ font-size:12px; color: var(--forge-cream-dim); margin-bottom:16px; font-family:'JetBrains Mono', monospace; }
   /* 인벤토리 무기 탭: "보유 아이템 / 최대 슬롯"과 페이지 이동 UI를 같은 줄, 우측 정렬로 배치 */
   .inv-count-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:0; }
@@ -937,3 +1054,35 @@
   .weapon-name-wrap, .equip-req-wrap{ position:relative; cursor:default; }
   .weapon-name-wrap .tooltip, .equip-req-wrap .tooltip{ width:210px; left:50%; transform:translateX(-50%); bottom:135%; text-align:center; line-height:1.6; }
   .weapon-name-wrap:hover .tooltip, .equip-req-wrap:hover .tooltip{ visibility:visible; opacity:1; }
+
+  /* ============================================================
+     아이템 등급별 아이콘 슬롯 배경색(공통 시스템)
+     PNG 이미지 파일 자체는 전혀 건드리지 않음(필터·색상 보정 없음) — 아이콘 슬롯 "뒤쪽"에만
+     등급별 배경색을 깔아줌. 기존 등급별 "텍스트" 색상(WEAPON_GRADES.color 등, weaponNameColor 등)과는
+     완전히 별개 시스템이며 새 색상을 만들지 않고 그 값을 그대로 옮겨 씀(반투명 처리만 추가 — 원본
+     PNG가 배경에 완전히 묻히지 않도록): normal(#ffffff) / rare(#8fd0ff) / epic(#a066d6) / unique(#ff8a3d).
+     formulas.js의 gradeIconBgClass()가 아이템 등급을 보고 weaponIconHtml/itemIconHtml 안에서
+     자동으로 이 클래스를 붙여주므로, 화면(인벤토리/상점/제작소/장비창 등)마다 개별적으로
+     "if epic → 보라색" 같은 등급 분기를 작성할 필요가 없음 — 새 아이템도 등급만 등록되어 있으면 자동 적용됨. */
+  .icon-grade-bg{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:100%; height:100%; border-radius:inherit;
+  }
+  .icon-grade-bg.grade-normal{ background: rgba(255,255,255,0.10); }
+  .icon-grade-bg.grade-rare{   background: rgba(143,208,255,0.20); }
+  .icon-grade-bg.grade-epic{   background: rgba(160,102,214,0.24); }
+  .icon-grade-bg.grade-unique{ background: rgba(255,138,61,0.24); }
+  /* 강화 단계별 아이콘 효과(신규) — 등급 배경과 완전히 독립적인 세 번째 레이어. 강화 화면(applySwordGlow)이
+     쓰는 ENHANCE_LEVEL_EFFECTS[level].glow 값을 formulas.js의 weaponIconHtml이 그대로 가져와 이 span의
+     인라인 style.filter로 넘겨줌(색상/판정 기준을 CSS에서 새로 정의하지 않고 기존 규칙을 그대로 재사용) —
+     PNG 파일 자체에는 필터가 합성되지 않고, PNG를 감싸는 이 별도 레이어에만 적용됨. */
+  .icon-enhance-glow{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:100%; height:100%;
+  }
+  /* 제작 연출(실루엣) 화면은 PNG를 검게 실루엣 처리하는 별도 연출 화면이라 이번 작업 대상에서 제외함
+     (기획서 6·7번 항목) — craftItemIconHtml이 내부적으로 weaponIconHtml을 그대로 호출하므로 등급
+     배경 span 자체는 똑같이 생성되지만, 실루엣 상태를 나타내는 기존 .craft-anim-silhouette 클래스가
+     붙어있는 동안에는 이 규칙으로 배경을 다시 투명하게 되돌려 시각적으로 기존과 동일하게 유지함
+     (자바스크립트 쪽은 전혀 수정하지 않고 CSS 우선순위만으로 예외 처리).*/
+  .craft-anim-silhouette .icon-grade-bg{ background: transparent; }

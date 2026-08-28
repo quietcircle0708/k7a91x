@@ -38,7 +38,7 @@ let state = {
   manaShards: 0,       // 마석 조각 보유 개수
   manaCrystals: 0,     // 마석 결정 보유 개수
   manaStones: 0,       // 마석 보유 개수
-  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, // 기타(재료) 아이템 보유 개수
+  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
   autoRebuy: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
@@ -61,6 +61,27 @@ let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, sta
 let shopUI = { tab: 'weapon', equipTab: 'weapon', filter: 'price', dir: 'asc' };
 // 인벤토리 탭 UI 상태. shopUI와 동일한 이유로 equipTab을 따로 기억함(저장 대상 아님).
 let invUI = { tab: 'weapon', equipTab: 'weapon' };
+// 제작소 탭 UI 상태. invUI/shopUI와 동일한 이유(화면 상태일 뿐 저장 대상 아님)로 별도 관리.
+// 지금은 최상위 탭이 "제작" 하나뿐이라 equipTab과 같은 "최상위 복귀용 기억" 필드는 아직 불필요하지만,
+// 추후 최상위 탭이 늘어나면 invUI/shopUI와 동일한 패턴(예: craftTopTab)을 그대로 추가하면 됨.
+let craftUI = { tab: 'weapon', openMaterialIds: new Set() }; // openMaterialIds: 목록의 [제작 재료] 토글이 열려있는 "category:id" 집합
+// 제작 진행 팝업 상태. null이면 팝업이 닫혀있음.
+// { category, itemId, slots: [ { name, qty }, ... ] } — slots 길이는 해당 제작 아이템의 materials
+// 개수와 동일하게 시작. 재료는 이름(name)으로 findCraftResource(formulas.js)를 거쳐 자동 연동됨.
+let craftPopup = null;
+// "투입 개수 선택" 팝업 상태. null이면 닫혀있음.
+// { name, qty, maxQty(=해당 재료의 need) } — 재료는 자동 배정되므로 슬롯 인덱스가 아니라 재료
+// 이름(name) 자체로 어느 슬롯인지 찾음(craftPopup.slots.find(s=>s.name===name)).
+let craftMaterialQtyState = null;
+// 제작 연출 UI 상태. null이면 닫혀있음.
+// { category, itemId, phase: 'animating'|'awaitClick'|'revealed', progress(0~100, 소수2자리),
+//   startTime(연출 시작 시각, Date.now()), resultSuccess(연출 완료 시점에 결정된 성공/실패, 그 전까진 null),
+//   resultReturn(실패일 때 연출 완료 시점에 함께 추첨된 반환 결과 — { name, need?, chance } 또는 null(반환 없음),
+//   craftRollFailReturn이 확정), resultReturnDamaged(그 반환이 홀딩 장비와 같은 종류라 손상으로
+//   돌아오는지 여부 — 지급 처리로 heldEquip이 변형되기 전에 미리 판정해서 저장해둠, 결과 화면 표시용), heldEquip(연출 시작 시 홀딩해둔 장비 재료 목록 — [{equipType,typeId,level}],
+//   결과 확정 후 소모/반환 처리되면서 비워짐), tickInterval/orbInterval(setInterval id, 정리용) }
+// — 저장 대상 아님(craftPopup 등과 동일한 화면 상태).
+let craftAnim = null;
 // 페이지네이션: 화면(또는 탭)별 "현재 페이지" 번호(1부터 시작). PAGE_SIZE(data.js)와 키를 공유함 —
 // 새 화면을 추가할 때 여기 초기값 1과 PAGE_SIZE에 같은 키만 추가하면 동일한 페이지 시스템을 그대로 재사용함.
 let pageState = {
@@ -75,6 +96,7 @@ let pageState = {
   charMenuInfo: 1,
   skillPage: 1,
   huntCharStats: 1,
+  craftWeapon: 1, craftArmor: 1, craftSub: 1, craftAccessory: 1,
   // dungeonDrop 페이지는 던전마다 따로 관리해야 해서 고정 키 하나가 아니라, 던전 카드를 그릴 때
   // `dungeonDrop:<던전id>` 형태의 동적 키를 이 오브젝트에 필요할 때마다 추가해서 씀(goPage의 범용
   // "pageState[target] = ..." 로직을 그대로 재사용하기 위함, render.js buildDungeonDropIcons 참고).
@@ -431,7 +453,7 @@ function resetGame(){
     charmCount:0, charmPrice:1500, charmActive:false,
     blessingCount:0, blessingPrice:15000, blessingActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
-    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0,
+    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0,
     skipEffects:false, autoRebuy:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },

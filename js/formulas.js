@@ -31,6 +31,16 @@ function wpn(type){ return WEAPON_TYPES[type] || ARMOR_TYPES[type] || ACCESSORY_
 function weaponKindLabel(type){ return WEAPON_KINDS[wpn(type).weaponKind] || ''; }
 function weaponGradeLabel(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.label : ''; }
 function weaponGradeColor(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.color : '#ffffff'; }
+// ---- 아이템 등급별 아이콘 슬롯 배경색(공통) ----
+// PNG 이미지 자체는 절대 건드리지 않고, PNG가 담기는 "슬롯" 영역에만 등급별 배경색을 적용하기 위한
+// 공용 클래스 계산 함수. 새로운 색상 값을 만들지 않고 기존 등급 텍스트 색상 시스템(WEAPON_GRADES.color)이
+// 쓰는 것과 동일한 등급 키만 그대로 재사용함 — 실제 배경 색상값 자체는 css/style.css의
+// .icon-grade-bg.grade-* 규칙에서 관리(텍스트 색상 로직인 weaponNameColor 등과는 완전히 별개 시스템).
+// grade가 없거나(플라스크 등 등급 없는 소비 아이템) WEAPON_GRADES에 없는 값이면 빈 문자열을 반환해
+// 슬롯의 기존 기본 배경을 그대로 둠(강제로 등급을 만들어 씌우지 않음).
+function gradeIconBgClass(grade){
+  return (grade && WEAPON_GRADES[grade]) ? ('icon-grade-bg grade-' + grade) : '';
+}
 // 무기 이름 색상: 등급 색상이 기본, 강화 단계 색상의 가치가 더 높으면 그 색으로 대체.
 // 하드코딩 없이 GRADE_NAME_COLOR_KEY/ENHANCE_NAME_COLOR_KEY 표만 보고 계산 — 새 무기/등급 추가해도 그대로 동작.
 function weaponNameColor(type, level){
@@ -107,7 +117,9 @@ function itemIconHtml(itemDefLike, className){
   if(!itemDefLike || !itemDefLike.image) return itemDefLike ? itemDefLike.icon : '';
   const cls = 'item-icon-img' + (className ? ' ' + className : '');
   const path = ITEM_IMAGE_DIR + itemDefLike.image + ITEM_IMAGE_EXT;
-  return `<img src="${path}" class="${cls}" alt="" data-fallback-emoji="${itemDefLike.icon}" onerror="itemImgError(this)">`;
+  const img = `<img src="${path}" class="${cls}" alt="" data-fallback-emoji="${itemDefLike.icon}" onerror="itemImgError(this)">`;
+  const bgCls = gradeIconBgClass(itemDefLike.grade);
+  return bgCls ? `<span class="${bgCls}">${img}</span>` : img;
 }
 // itemIconHtml의 <img onerror>에서 호출됨: PNG 로드 실패 시 오류 없이 이모지 텍스트로 즉시 대체.
 function itemImgError(img){
@@ -123,7 +135,12 @@ function itemImgError(img){
 // 방어구/장신구(equipType이 armor 또는 accessory)는 종류 구분 없이 전부 20% 작게 출력함(weapon-icon-equip-small,
 // dagger와 동일한 CSS transform:scale 패턴) — equipType 판정만으로 자동 적용되므로 새로 추가되는 방어구/장신구
 // 종류(투구/갑옷/반지 외 새 종류 포함)에도 데이터 등록만으로 자동 반영됨.
-function weaponIconHtml(type, className){
+// level(선택): 실제 보유 중인 개별 인스턴스의 강화 단계를 넘기면, 강화 화면(applySwordGlow)이 쓰는 것과
+// 동일한 ENHANCE_LEVEL_EFFECTS 규칙을 그대로 재사용해 PNG 위에 별도 레이어(icon-enhance-glow)로 발광 효과를
+// 출력함 — PNG 파일이나 등급 배경(icon-grade-bg)과는 완전히 독립적인 세 번째 레이어. level을 넘기지 않거나
+// (카탈로그/미리보기 등 특정 인스턴스가 없는 화면) +0이거나 해당 단계에 효과가 없으면(glow==='none')
+// 이 레이어 자체를 아예 만들지 않음(빈 span조차 남기지 않음).
+function weaponIconHtml(type, className, level){
   const w = wpn(type);
   const kindCls = w.weaponKind === 'dagger' ? ' weapon-icon-dagger' : '';
   const isEquipKind = (w.equipType === 'armor' || w.equipType === 'accessory' || w.equipType === 'sub');
@@ -132,7 +149,12 @@ function weaponIconHtml(type, className){
   // 방어구/장신구/보조는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
   // 자기 경로를 유지함(이미지가 없으면 빈 아이콘으로 보임 — 해당 종류 PNG 에셋 추가 시 자동 해결됨).
   const fallback = isEquipKind ? weaponImagePath(type) : weaponImageFallbackPath();
-  return `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${fallback}';">`;
+  const img = `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${fallback}';">`;
+  const levelEffect = (level != null) ? (ENHANCE_LEVEL_EFFECTS[level] || null) : null;
+  const hasGlow = !!(levelEffect && levelEffect.glow && levelEffect.glow !== 'none');
+  const withGlow = hasGlow ? `<span class="icon-enhance-glow" style="filter:${levelEffect.glow};">${img}</span>` : img;
+  const bgCls = gradeIconBgClass(w.grade);
+  return bgCls ? `<span class="${bgCls}">${withGlow}</span>` : withGlow;
 }
 
 // ---- 착용 제한(레벨 + 무기 종류별 요구 스탯) ----
@@ -170,14 +192,15 @@ function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
 function wtipRow(label, value){
   return `<div>${label ? `<span style="color:var(--forge-cream-dim);">${label}</span> ` : ''}<span style="color:var(--forge-gold);">${value}</span></div>`;
 }
-function buildWeaponTooltipHtml(type, level){
+function buildWeaponTooltipHtml(type, level, damaged){
   const w = wpn(type);
   const grade = WEAPON_GRADES[w.grade];
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  // 1. 이름 (+강화단계, +0이면 숨김) — 무기 이름 색상 효과 적용
-  const nameLine = w.name + levelSuffix(lvl);
+  // 1. 이름 (+강화단계, +0이면 숨김) — 무기 이름 색상 효과 적용. 손상된 아이템은 이름 바로 뒤,
+  // 강화단계 앞에 "(손상)"을 붙임(요청사항 11번 — 띄어쓰기 없이, 강화단계 표기보다 앞).
+  const nameLine = w.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
   html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
 
   // 1-2. 등급 — 이름과 별도 줄, 등급 색상 효과 적용
@@ -190,8 +213,9 @@ function buildWeaponTooltipHtml(type, level){
   const kindLabel = weaponKindLabel(type);
   if(kindLabel) html += wtipRow('무기 종류', kindLabel);
 
-  // 4. 공격력
-  const atk = atkFor(type, lvl);
+  // 4. 공격력 — 손상된 아이템은 해당 강화단계 공격력의 80%로 표시(요청사항 12번, 다른 수치는 그대로 유지)
+  const rawAtk = atkFor(type, lvl);
+  const atk = rawAtk != null && damaged ? Math.round(rawAtk * 0.8) : rawAtk;
   if(atk != null) html += wtipRow('공격력', atk);
 
   // 5. 공격 속도
@@ -220,13 +244,13 @@ function armorManaFor(type, level){ const w = wpn(type); return w.manaArr ? w.ma
 // 방어구 툴팁: 무기 툴팁(buildWeaponTooltipHtml)과 동일한 레이아웃/서식(이름·등급 색상 효과, wtipRow
 // 구조)을 그대로 재사용하되("장비 전역 설정" — 등급 색상/이름 색상/중앙 정렬 서식 공용), 표시 항목만
 // 방어구 데이터 스키마에 맞게 구성함: 이름/등급/장비 설명/방어구 종류/방어도/체력/마나/(고유 옵션)/레벨 제한.
-function buildArmorTooltipHtml(type, level){
+function buildArmorTooltipHtml(type, level, damaged){
   const a = wpn(type);
   const grade = WEAPON_GRADES[a.grade];
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  const nameLine = a.name + levelSuffix(lvl);
+  const nameLine = a.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
   html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
   if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
   if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
@@ -343,13 +367,13 @@ function accessoryKindLabel(type){ return ACCESSORY_KINDS[wpn(type).accessoryKin
 // 장신구 툴팁: 방어구 툴팁(buildArmorTooltipHtml)과 서식은 동일("장비 전역 설정" 공용)하되, 표시
 // 항목만 장신구 데이터 스키마에 맞게 구성함: 이름/등급/장비 설명/장신구 종류/방어도/체력/마나/치명타
 // 확률/(고유 옵션)/착용 제한(문서에 명시된 그대로 "착용 제한 : 레벨 N 이상" 형식 사용).
-function buildAccessoryTooltipHtml(type, level){
+function buildAccessoryTooltipHtml(type, level, damaged){
   const a = wpn(type);
   const grade = WEAPON_GRADES[a.grade];
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  const nameLine = a.name + levelSuffix(lvl);
+  const nameLine = a.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
   html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
   if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
   if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
@@ -378,13 +402,13 @@ function subKindLabel(type){ return SUB_KINDS[wpn(type).subKind] || ''; }
 // 보조 툴팁: 장신구 툴팁(buildAccessoryTooltipHtml)과 서식은 동일("장비 전역 설정" 공용)하되, 치명타
 // 확률 항목은 보조 아이템 스키마에 없으므로 표시하지 않음. 출력 순서(문서 4번 규칙): 이름/등급/장비
 // 설명/보조 종류/방어도/체력/마나/(고유 옵션)/착용 제한.
-function buildSubTooltipHtml(type, level){
+function buildSubTooltipHtml(type, level, damaged){
   const a = wpn(type);
   const grade = WEAPON_GRADES[a.grade];
   const lvl = level != null ? level : 0;
   let html = `<div style="text-align:center;">`;
 
-  const nameLine = a.name + levelSuffix(lvl);
+  const nameLine = a.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
   html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
   if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
   if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
@@ -399,7 +423,7 @@ function buildSubTooltipHtml(type, level){
   const mana = armorManaFor(type, lvl);
   if(mana != null) html += wtipRow('마나', mana);
 
-  html += weaponUniqueOptionTooltipHtml(type, lvl);
+  html += subUniqueOptionTooltipHtml(type, lvl); // 보조 아이템 전용: 고정 옵션 여러 개는 쉼표 기준 한 줄씩 출력(요청사항)
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
 
@@ -536,6 +560,25 @@ function weaponUniqueOptionTooltipHtml(type, level){
   const text = simplifyUniqueOptionTooltipText(rawText);
   if(active) return wtipRow('', text);
   return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${text}<br>(+${opt.activateLevel} 활성화)</div>`;
+}
+// 보조 아이템 전용 고유 옵션 툴팁: weaponUniqueOptionTooltipHtml과 완전히 동일한 로직이되, opt.text가
+// 쉼표(,)로 여러 옵션을 나열한 경우(예: "힘 +1, 지능 +1") 한 줄에 몰아 쓰지 않고 쉼표 기준으로 나눠
+// 한 줄씩 출력함(요청사항 — 보조 아이템 툴팁에만 적용, 무기/방어구/장신구는 원래 함수를 그대로 씀).
+// 옵션이 1개뿐이면(쉼표 없음) split 결과가 1개짜리 배열이라 기존과 동일하게 한 줄로 출력됨.
+// 실제 능력치 적용(statBonus 등)이나 활성화 조건(activateLevel)에는 전혀 관여하지 않음 — 표시 문구만 가공.
+function subUniqueOptionTooltipHtml(type, level){
+  const opt = wpn(type).uniqueOption;
+  if(!opt) return '';
+  const active = weaponUniqueOptionActive(type, level);
+  const rawText = opt.text != null ? opt.text : (() => {
+    const chance = weaponUniqueOptionChance(type, level);
+    return chance != null ? opt.textTemplate.replace('{chance}', chance) : null;
+  })();
+  if(rawText == null) return '';
+  const text = simplifyUniqueOptionTooltipText(rawText);
+  const lines = text.split(',').map(s => s.trim()).filter(Boolean);
+  if(active) return lines.map(line => wtipRow('', line)).join('');
+  return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${lines.join('<br>')}<br>(+${opt.activateLevel} 활성화)</div>`;
 }
 // 같은 효과(effectId)를 가진 모든 "현재 활성 상태인" 소스(아티팩트 + 장착 무기의 고유 옵션)의 발동 확률을 합산.
 // 동일 효과는 소스마다 따로 판정하지 않고, 이렇게 합산된 확률로 단 1회만 판정함.
@@ -888,6 +931,21 @@ function weaponUniqueOptionStatBonus(stat){
   if(!weaponUniqueOptionActive(equipped.type, equipped.level)) return 0;
   return opt.statBonus[stat] || 0;
 }
+// 착용 중인 방어구(투구/갑옷)+보조 아이템의 고유 옵션 중 "고정 스탯 보너스"(statBonus)를 갖고 있으면
+// 해당 스탯 보너스를 전부 합산. weaponUniqueOptionStatBonus(무기 전용)와 armorUniqueOptionChance
+// (effectId 발동 확률 전용, 방어구+보조 그룹핑 동일)를 참고해 만든 대응 함수 — 철방패(힘+1)/보라방패
+// (힘+1,지능+1)처럼 강화 없이 항상 활성화되는 고정형 고유 옵션을 가진 방어구/보조 아이템이 처음
+// 등장해 신설함. 이후 방어구/보조 아이템이 statBonus를 갖는 고유 옵션을 추가로 등록해도 이 함수
+// 하나로 자동 반영됨(개별 아이템 코드 없음).
+function armorUniqueOptionStatBonus(stat){
+  return wornArmorItems().concat(wornSubItems()).reduce((sum, item) => {
+    const opt = wpn(item.type).uniqueOption;
+    if(opt && opt.statBonus && weaponUniqueOptionActive(item.type, item.level)){
+      return sum + (opt.statBonus[stat] || 0);
+    }
+    return sum;
+  }, 0);
+}
 // 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
 // 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
 // 착용 무기의 고유 옵션 statBonus(예: 반월대도의 힘+5)도 여기서 함께 합산됨 — 이름은 그대로 두지만
@@ -907,6 +965,7 @@ function artifactStatBonus(stat){
     if(isArtifactEquipped('foxorb')) bonus += 10;
   }
   bonus += weaponUniqueOptionStatBonus(stat);
+  bonus += armorUniqueOptionStatBonus(stat); // 방어구/보조 아이템의 고정 스탯 보너스(예: 철방패 힘+1) 합산
   return bonus;
 }
 // 레벨업으로 투자한 기본 스탯 + 현재 장착 중인 무기/방어구/장신구/아티팩트의 스탯 보너스(artifactStatBonus,
@@ -962,11 +1021,15 @@ function effectiveAtkSpeed(type, level){
   s *= 1 + weaponUniqueOptionStatBonus('atkSpeedPercent') / 100; // 착용 무기의 고유 옵션 중 공격속도% 보너스(예: 척호검) 합산
   return s;
 }
-function effectiveAtk(type, level){
+function effectiveAtk(type, level, damaged){
   const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  // 힘 1당 공격력 +4, 민첩 1당 공격력 +1, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함
-  return atkFor(type, level) + str * 4 + agi * 1 + activeBuffBonus('atkFlat');
+  // 힘 1당 공격력 +4, 민첩 1당 공격력 +1, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함.
+  // 손상된 아이템(요청사항 12번)은 "아이템 자체"의 공격력만 80%로 줄어들고, 힘/민첩/버프 등 플레이어
+  // 쪽 보너스는 전혀 영향받지 않음 — atkFor(type,level) 부분에만 0.8을 곱함.
+  const baseAtk = atkFor(type, level);
+  const itemAtk = damaged ? Math.round(baseAtk * 0.8) : baseAtk;
+  return itemAtk + str * 4 + agi * 1 + activeBuffBonus('atkFlat');
 }
 // 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
 // 미리보기에서 그대로 쓰이고(무기 하나만의 값을 보여줘야 하므로), 실제 전투 판정과 캐릭터 정보창의
@@ -1071,6 +1134,7 @@ function forgeSelectableItems(){
       if(!typeDef) return;                          // 도감에 없는 타입은 제외
       if(item.id !== state.forgeTargetId && !pool.meetsReq(type)) return; // 착용 가능 조건
       if(!typeDef.cost || typeDef.cost.length === 0) return; // 강화 가능 조건(강화단계 비용 데이터가 있어야 함) — 무기/방어구 공용
+      if(item.damaged) return; // 손상된 아이템은 강화 대상으로 선택할 수 없음(요청사항 13번)
       list.push({ kind: pool.kind, id: item.id, type, level: item.level });
     });
   });
@@ -1123,6 +1187,31 @@ function rollFlaskDrop(level){
   const itemId = (type === 'hp' ? 'hpFlask' : 'mpFlask') + tier;
   if(!CONSUMABLES[itemId]) return null;
   return { itemId, qty: FLASK_DROP_BASE_QTY };
+}
+
+// 숨겨진 장소(11스테이지) 보상 상자 전용 기타 아이템 추첨(TREASURE_MISC_DROP_TABLE, data.js 참고).
+// 기존 마석/플라스크 전역 드랍(rollStoneDrop/rollFlaskDrop)과 완전히 독립적인 별도 로직 — 이 함수가
+// 호출되지 않으면 기존 드랍 판정에는 전혀 영향이 없음.
+// 1) 던전 최소 몬스터 레벨(minLevel)이 속한 구간을 아이템마다 조회해 확률>0인 것만 후보로 모음.
+// 2) 후보를 확률이 낮은 순으로 정렬해 하나씩 순서대로 추첨.
+// 3) 처음 성공한 아이템 하나만(개수는 qtyOptions 중 균등 확률로 하나 선택) 반환하고 즉시 종료(한 번의
+//    상자에서 최대 1종류만 지급 — 여러 아이템을 동시에 판정해 합산 지급하지 않음).
+// 4) 전부 실패하면 null(기타 아이템 없음).
+function rollTreasureMiscDrop(minLevel){
+  const candidates = [];
+  TREASURE_MISC_DROP_TABLE.forEach(entry => {
+    const tier = entry.tiers.find(t => minLevel >= t.minLevel && (t.maxLevel == null || minLevel <= t.maxLevel));
+    if(!tier || !tier.chance) return; // 구간 없음 또는 확률 0% → 추첨 대상에서 제외
+    candidates.push({ itemId: entry.itemId, chance: tier.chance, qtyOptions: tier.qtyOptions });
+  });
+  candidates.sort((a, b) => a.chance - b.chance); // 확률 낮은 아이템부터 추첨
+  for(const c of candidates){
+    if(Math.random() * 100 < c.chance){
+      const qty = c.qtyOptions[Math.floor(Math.random() * c.qtyOptions.length)];
+      return { itemId: c.itemId, qty };
+    }
+  }
+  return null;
 }
 
 // ---- 몬스터 체력/공격력 ----
@@ -1563,4 +1652,247 @@ function weightedOutcome(odds){
   if(r < odds[0]+odds[1]) return 'stay';
   if(r < odds[0]+odds[1]+odds[2]) return 'down';
   return 'destroy';
+}
+
+// ---- 제작소: 제작 아이템/재료 공용 헬퍼 ----
+// iconType/iconRef로 등록된 기존 아이템 아이콘을 그대로 재사용해서 렌더링함(신규 제작 전용 이미지 없음).
+function craftItemIconHtml(item, className){
+  if(item.iconType === 'weapon') return weaponIconHtml(item.iconRef, className);
+  return ''; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
+}
+// 제작 아이템 이름/아이콘 테두리 색상 — 기존 무기 등급 색상 공식(WEAPON_GRADES)을 그대로 재사용.
+function craftItemNameColor(item){
+  const g = WEAPON_GRADES[item.grade];
+  return g ? g.color : '#ffffff';
+}
+// 제작 아이템의 툴팁 — iconType에 맞는 기존 툴팁 빌더를 그대로 재사용(신규 제작 전용 툴팁 없음).
+// iconType이 'weapon'이면 강화 단계 0으로 간주해 무기 툴팁을 그대로 출력함(기존 아이템 표시 규칙 재사용).
+function craftItemTooltipHtml(item){
+  if(item.iconType === 'weapon') return buildWeaponTooltipHtml(item.iconRef, 0);
+  return ''; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
+}
+function findCraftItem(category, id){
+  return (CRAFTABLE_ITEMS[category] || []).find(it => it.id === id);
+}
+
+// ---- 제작소: 이름 기반 자원(재료/반환 아이템) 조회(요청사항 1·2번) ----
+// 제작 데이터(materials/failReturns)에는 아이템 정보를 중복 등록하지 않고 "이름"만 적어두면, 여기서
+// 기존 장비 도감(무기/방어구/장신구/보조) 또는 MISC_ITEMS 중 이름이 일치하는 데이터를 찾아 자동으로
+// 연동함. 장비 쪽은 { kind:'equip', equipType, typeId, def }, 일반 재료는 { kind:'misc', itemId, def }
+// 형태로 반환 — 이후 아이콘/색상/툴팁/보유량/소모·홀딩 로직이 전부 이 결과 하나로 분기됨.
+const CRAFT_EQUIP_TABLES = [
+  { equipType: 'weapon', table: WEAPON_TYPES },
+  { equipType: 'armor', table: ARMOR_TYPES },
+  { equipType: 'accessory', table: ACCESSORY_TYPES },
+  { equipType: 'sub', table: SUB_TYPES },
+];
+function findCraftResource(name){
+  for(const { equipType, table } of CRAFT_EQUIP_TABLES){
+    const found = Object.values(table).find(d => d.name === name);
+    if(found) return { kind: 'equip', equipType, typeId: found.id, def: found };
+  }
+  const misc = Object.values(MISC_ITEMS).find(d => d.name === name);
+  if(misc) return { kind: 'misc', itemId: misc.id, def: misc };
+  return null;
+}
+function craftResourceIconHtml(resource, className){
+  if(!resource) return '';
+  return resource.kind === 'equip' ? weaponIconHtml(resource.typeId, className) : itemIconHtml(resource.def, className);
+}
+function craftResourceColor(resource){
+  if(!resource) return '#ffffff';
+  if(resource.kind === 'equip') return weaponNameColor(resource.typeId, 0);
+  return resource.def.itemClass === 'stone' ? stoneNameColor(resource.itemId) : miscNameColor(resource.itemId);
+}
+function craftResourceTooltipHtml(resource){
+  if(!resource) return '';
+  if(resource.kind === 'equip'){
+    if(resource.equipType === 'weapon') return buildWeaponTooltipHtml(resource.typeId, 0);
+    if(resource.equipType === 'armor') return buildArmorTooltipHtml(resource.typeId, 0);
+    if(resource.equipType === 'accessory') return buildAccessoryTooltipHtml(resource.typeId, 0);
+    if(resource.equipType === 'sub') return buildSubTooltipHtml(resource.typeId, 0);
+  }
+  return resource.def.itemClass === 'stone' ? buildStoneTooltipHtml(resource.itemId) : buildMiscTooltipHtml(resource.itemId);
+}
+// 특정 장비 인벤토리 항목(id)이 현재 착용 중인지 — 착용 중인 아이템은 재료로 선택할 수 없음(요청사항 8번).
+function isEquipInstanceWorn(equipType, id){
+  if(equipType === 'weapon') return state.equippedId === id;
+  if(equipType === 'armor') return Object.values(state.equippedArmor || {}).includes(id);
+  if(equipType === 'sub') return state.equippedSubId === id;
+  if(equipType === 'accessory') return (state.equippedAccessories || []).includes(id);
+  return false;
+}
+// 재료로 쓸 수 있는 장비 인벤토리 항목만(착용 중 제외·손상된 아이템 제외 — 요청사항 8·13번) 반환.
+function craftEligibleEquipInstances(resource){
+  const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
+  if(!pool) return [];
+  const items = (typeof pool.items === 'function' ? pool.items() : pool.items) || [];
+  return items.filter(it => it.type === resource.typeId && !it.damaged && !isEquipInstanceWorn(resource.equipType, it.id));
+}
+// 재료 하나(이름 기준)의 "현재 보유량" — 장비면 재료로 쓸 수 있는 인스턴스 개수, 일반 재료면 기존
+// state[stateKey] 수량 그대로.
+function craftResourceOwnedCount(resource){
+  if(!resource) return 0;
+  if(resource.kind === 'equip') return craftEligibleEquipInstances(resource).length;
+  return state[resource.def.stateKey] || 0;
+}
+
+// 제작 최종 확인 UI의 "제작 실패" 영역용 HTML — item.failReturns가 없거나 빈 배열이면 빈 문자열을
+// 반환해 그 영역이 통째로 표시되지 않게 함. 등록된 반환 후보를 전부(확률 미리보기 목적) 나열하며,
+// "없음" 항목(none:true)은 보여줄 아이콘이 없으므로 건너뜀.
+// 제작 최종 확인 UI의 "제작 실패" 영역용 HTML — item.failReturns가 없거나 빈 배열이면 빈 문자열을
+// 반환해 그 영역이 통째로 표시되지 않게 함. 등록된 반환 후보를 전부(확률 미리보기 목적) 등급 높은
+// 순으로 정렬해 한 줄에 최대 3개씩 나열함(요청사항 — 세로로 한 줄씩 쌓이지 않도록, 3개 초과분은 다음
+// 줄에). 카드 구성(아이콘 위/이름 아래)은 제작 연출 결과 화면(craftAnimResultIconsHtml)과 동일한
+// 클래스를 그대로 재사용해서 3열 그리드가 자동으로 맞춰지고 별도 CSS를 새로 만들지 않아도 됨.
+// "없음" 항목(none:true)은 보여줄 아이콘이 없으므로 건너뜀.
+// 반환 항목 표시용 이름 — 반환 개수(need)가 2개 이상으로 등록된 경우에만 "×N"을 붙임(1개면 기존과
+// 동일하게 이름만 표시).
+function craftFailReturnLabel(entry, resource){
+  return resource.def.name + (entry.need > 1 ? ` ×${entry.need}` : '');
+}
+function craftItemFailReturnHtml(item){
+  const returns = (item.failReturns || []).filter(r => !r.none);
+  if(returns.length === 0) return '';
+  const sorted = [...returns].sort((a, b) => {
+    const ra = findCraftResource(a.name), rb = findCraftResource(b.name);
+    return craftGradeRank(rb && rb.def.grade) - craftGradeRank(ra && ra.def.grade);
+  });
+  const cards = sorted.map(r => {
+    const resource = findCraftResource(r.name);
+    if(!resource) return '';
+    const color = craftResourceColor(resource);
+    return `
+      <div class="craft-anim-result-item">
+        <span class="inv-icon craft-anim-result-icon weapon-name-wrap" style="border-color:${color};">
+          ${craftResourceIconHtml(resource, 'inv-icon-img')}
+          <span class="tooltip">${craftResourceTooltipHtml(resource)}</span>
+        </span>
+        <div class="craft-anim-result-name" style="color:${color};">${craftFailReturnLabel(r, resource)}</div>
+      </div>`;
+  }).join('');
+  return `<div class="craft-anim-result-icons">${cards}</div>`;
+}
+// 제작 연출 UI의 진행률 구간별 안내 문구(요청사항 4번) — CRAFT_ANIM_STAGE_TEXT(data.js)에서 현재
+// 진행률 이하인 첫 구간을 찾아 반환. 0%도 첫 구간(1~9%) 문구를 그대로 써서 시작하자마자 빈 문구가
+// 보이는 어색함을 피함(실제 판정/확률과는 무관, 표시 문구만의 문제).
+function craftAnimStageText(progress){
+  const p = Math.max(1, Math.min(100, Math.ceil(progress)));
+  const found = CRAFT_ANIM_STAGE_TEXT.find(s => p <= s.max);
+  return found ? found.text : CRAFT_ANIM_STAGE_TEXT[CRAFT_ANIM_STAGE_TEXT.length - 1].text;
+}
+// 등록된 확률에 따라 반환 결과를 "하나만" 추첨(요청사항 4번). 0~100 절대 구간으로 굴려서, 등록된
+// 확률 합이 100 미만이면 남는 구간은 명시적 "없음"과 동일하게 처리됨(추첨 결과 없음 = 반환 없음).
+function craftRollFailReturn(item){
+  const entries = item.failReturns || [];
+  if(entries.length === 0) return null;
+  const roll = Math.random() * 100;
+  let cumulative = 0;
+  for(const e of entries){
+    cumulative += (e.chance || 0);
+    if(roll < cumulative) return e.none ? null : e;
+  }
+  return null;
+}
+// 제작 결과 UI(요청사항 8번)에 표시할 아이콘+이름 HTML — 아이콘과 이름을 별도 요소로 구성. 성공이면
+// 제작 아이템 본인, 실패면 실제로 추첨된 반환 결과(resultReturn, null이면 반환 없음 → 빈 문자열)만
+// 보여줌(연출 완료 시점에 이미 확정된 결과를 그대로 보여주는 것 — 새로 굴리지 않음).
+function craftAnimResultIconsHtml(item, success, resultReturn){
+  if(success){
+    const color = craftItemNameColor(item);
+    return `
+      <div class="craft-anim-result-item">
+        <span class="inv-icon craft-anim-result-icon weapon-name-wrap" style="border-color:${color};">
+          ${craftItemIconHtml(item, 'inv-icon-img')}
+          <span class="tooltip">${craftItemTooltipHtml(item)}</span>
+        </span>
+        <div class="craft-anim-result-name" style="color:${color};">${item.name}</div>
+      </div>`;
+  }
+  if(!resultReturn) return '';
+  const resource = findCraftResource(resultReturn.name);
+  if(!resource) return '';
+  // 반환 대상이 이번에 실제로 투입했던 장비 재료와 같은 종류라면 "손상" 상태로 돌아옴을 미리 보여줌
+  // (요청사항 6·11·12번) — craftGrantResultItems가 같은 조건으로 실제 지급을 처리함. 이 값은
+  // clickCraftAnimIcon이 지급 처리(heldEquip 변형) 전에 미리 판정해 craftAnim.resultReturnDamaged에
+  // 저장해둔 것을 그대로 씀(지급 후에는 heldEquip에서 이미 빠져 있어 여기서 다시 판정할 수 없음).
+  const isDamagedReturn = craftAnim && craftAnim.resultReturnDamaged;
+  const name = craftFailReturnLabel(resultReturn, resource) + (isDamagedReturn ? '(손상)' : '');
+  const color = craftResourceColor(resource);
+  const tooltip = (isDamagedReturn && resource.equipType === 'weapon')
+    ? buildWeaponTooltipHtml(resource.typeId, 0, true)
+    : craftResourceTooltipHtml(resource);
+  return `
+    <div class="craft-anim-result-item">
+      <span class="inv-icon craft-anim-result-icon weapon-name-wrap" style="border-color:${color};">
+        ${craftResourceIconHtml(resource, 'inv-icon-img')}
+        <span class="tooltip">${tooltip}</span>
+      </span>
+      <div class="craft-anim-result-name" style="color:${color};">${name}</div>
+    </div>`;
+}
+// 제작 결과 지급(요청사항 6·7·9·10번) — 새 지급 로직을 만들지 않고 기존 인벤토리 지급 함수를 그대로
+// 재사용함. craftAnim.resultSuccess/resultReturn은 연출 완료 시점(finishCraftAnimProgress)에 이미
+// 확정되어 있으므로 여기서는 그 결과를 "적용"만 함(다시 굴리지 않음).
+// 성공: 제작 아이템을 +0으로 지급(grantRelicEquipDrop, dungeon.js — 모험가의 유해 드랍이 쓰는 바로 그
+// 함수). 홀딩해뒀던 장비 재료는 연출 시작 시점에 이미 인벤토리에서 빠진 상태라 별도 처리 없이 그대로
+// 소모 완료(요청사항 6번). 실패: 추첨된 반환 결과가 없으면 홀딩 재료도 그대로 소실. 일반 재료가
+// 반환되면 기존 재료 보유 수량 갱신 방식(state[stateKey]+=1)을 그대로 재사용. 반환 결과가 이번에 투입한
+// 장비 재료와 같은 종류면, 새 장비가 아니라 홀딩해뒀던 "그 개체"를 손상 상태로 되돌려줌(강화 단계 유지).
+function craftGrantResultItems(item){
+  if(!craftAnim) return;
+  if(craftAnim.resultSuccess){
+    if(item.iconType === 'weapon'){
+      const wdef = wpn(item.iconRef);
+      grantRelicEquipDrop({ type: item.iconRef, level: 0, equipType: wdef.equipType });
+    }
+    craftAnim.heldEquip = [];
+    return;
+  }
+  const picked = craftAnim.resultReturn;
+  if(!picked){ craftAnim.heldEquip = []; return; }
+  const resource = findCraftResource(picked.name);
+  if(!resource){ craftAnim.heldEquip = []; return; }
+  if(resource.kind === 'misc'){
+    state[resource.def.stateKey] = (state[resource.def.stateKey] || 0) + (picked.need || 1); // 반환 개수(need 생략 시 1개)
+    craftAnim.heldEquip = [];
+    return;
+  }
+  const heldIdx = craftAnim.heldEquip.findIndex(h => h.equipType === resource.equipType && h.typeId === resource.typeId);
+  const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
+  if(heldIdx !== -1){
+    const held = craftAnim.heldEquip.splice(heldIdx, 1)[0];
+    pool.items().push({ id: state.nextItemId++, type: held.typeId, level: held.level, damaged: true }); // 손상 지급(요청사항 10·11번)
+  } else {
+    // 문서에 명시되지 않은 경우(반환 아이템이 이번에 투입한 재료와 다른 종류의 장비인 경우) — 홀딩해둔
+    // "그 개체"가 없으므로 새 +0 장비로 지급(성공 지급과 동일한 방식).
+    grantRelicEquipDrop({ type: resource.typeId, level: 0, equipType: resource.equipType });
+  }
+  craftAnim.heldEquip = []; // 반환 대상이 아니었던 나머지 홀딩 재료는 그대로 소실(요청사항)
+}
+// WEAPON_GRADES 키 순서(normal<rare<epic<unique)를 그대로 등급 서열로 재사용 — 별도 순위 데이터 불필요.
+function craftGradeRank(grade){
+  const idx = Object.keys(WEAPON_GRADES).indexOf(grade);
+  return idx === -1 ? 0 : idx;
+}
+// 제작 진행 팝업의 재료 슬롯 배치 순서(요청사항 3-1): 아이템 등급이 높은 순서대로 왼쪽부터 배치.
+// 원본 materials 배열은 건드리지 않고 정렬된 새 배열만 반환함.
+function craftMaterialsSortedByGradeDesc(materials){
+  return [...materials].sort((a, b) => {
+    const ra = findCraftResource(a.name), rb = findCraftResource(b.name);
+    return craftGradeRank(rb && rb.def.grade) - craftGradeRank(ra && ra.def.grade);
+  });
+}
+// 제작 팝업의 [제작] 버튼 활성화 조건: 모든 슬롯에 재료가 필요 개수만큼 채워지고, 보유 골드가 제작
+// 비용 이상일 때만 활성화. 촉매는 조건에 포함하지 않음.
+function craftPopupCanCraft(popup){
+  if(!popup) return false;
+  const item = findCraftItem(popup.category, popup.itemId);
+  if(!item) return false;
+  const materialsOk = item.materials.every(m => {
+    const slot = popup.slots.find(s => s.name === m.name);
+    return slot && slot.qty === m.need;
+  });
+  const goldOk = state.gold >= (item.craftCost || 0);
+  return materialsOk && goldOk;
 }
