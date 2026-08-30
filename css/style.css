@@ -1090,3 +1090,10 @@
      붙어있는 동안에는 이 규칙으로 배경을 다시 투명하게 되돌려 시각적으로 기존과 동일하게 유지함
      (자바스크립트 쪽은 전혀 수정하지 않고 CSS 우선순위만으로 예외 처리).*/
   .craft-anim-silhouette .icon-grade-bg{ background: transparent; }
+  /* 던전 몬스터 처치 후 드랍 아이템 연출(.drop-item-visual-inner, effects.js dropItemVisualInner)도
+     제작 연출 실루엣 화면과 동일한 이유로 제외함 — weaponIconHtml/itemIconHtml이 내부적으로 등급 배경
+     span을 자동으로 씌우는 공통 함수라서, 이 연출에서도 의도치 않게 PNG 뒤에 사각형 등급 배경색이
+     함께 나타나고 있었음(발광 필터를 제거한 이전 작업과는 별개 원인). 인벤토리/상점/제작소 등 다른
+     화면은 이 선택자 범위 밖이라 전혀 영향받지 않고, 여기서도 자바스크립트는 손대지 않고 CSS
+     우선순위만으로 이 화면에서만 배경을 투명하게 되돌림 — PNG의 원래 투명 영역이 그대로 투명하게 보임. */
+  .drop-item-visual-inner .icon-grade-bg{ background: transparent; }
