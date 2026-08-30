@@ -656,17 +656,17 @@
   /* 전투 영역(플레이어 중앙 고정 + 몬스터 상/좌/우, 하단 슬롯 제거) — 출현한 몬스터 수와 무관하게
      항상 동일한 고정 크기를 갖도록 행/열 트랙 크기를 전부 고정 px로 지정함(auto를 쓰면 특정 위치가
      비었을 때 그 방향의 트랙이 줄어들어 버림). 몬스터가 없는 슬롯도 자리만 비워둘 뿐 트랙 크기 자체는
-     그대로 유지됨. 플레이어 정보 UI는 combat-arena 밖(huntCard 기준)으로 옮겨졌으므로 1행은 [상] 몬스터
-     슬롯만 고려해 2행과 동일한 높이(140px)로 둠. */
+     그대로 유지됨. 가운데 컬럼/행 크기는 실제 화면에서 직접 테스트해 확정한 값(플레이어와 상/좌/우
+     몬스터 사이 불필요한 간격을 줄임) — 임의로 다른 값을 쓰지 않음. */
   .combat-arena{
     position:relative; display:grid;
-    grid-template-columns: 96px 1fr 96px;
-    grid-template-rows: 140px 140px;
+    grid-template-columns: 96px 100px 96px;
+    grid-template-rows: 90px 130px;
     grid-template-areas:
       ".    top    ."
       "left player right";
-    align-items:center; justify-items:center;
-    gap:2px 6px; margin-bottom:6px;
+    align-items:center; justify-content:center; justify-items:center;
+    gap:2px 4px; margin-bottom:6px;
   }
   /* 상단 UI 접기/펼치기 버튼 — [상] 몬스터 슬롯과 같은 첫 행이면서, 그 옆(3번째 컬럼)은
      grid-template-areas상 빈 칸(".")이라 몬스터/플레이어와 절대 겹치지 않음. */
@@ -688,15 +688,19 @@
   .monster-slot.pos-top{ width:106px; grid-area: top; }
   .monster-slot.pos-left{ grid-area: left; }
   .monster-slot.pos-right{ grid-area: right; }
-  .player-slot{ grid-area: player; display:flex; flex-direction:column; align-items:center; width:150px; position:relative; z-index:1; }
-  /* 전투 영역 안에서는 몬스터/플레이어 아이콘을 공통으로 조금 더 작게(기본 72px → 46px) 표시해
-     상/좌/우 슬롯이 좁은 화면 폭에도 한 번에 들어오도록 함. */
+  .player-slot{ grid-area: player; display:flex; flex-direction:column; align-items:center; width:100px; position:relative; z-index:1; }
+  /* 전투 영역 안에서는 몬스터 아이콘을 기본 72px → 46px로 조금 더 작게 표시해 상/좌/우 슬롯이 좁은
+     화면 폭에도 한 번에 들어오도록 함. 플레이어 아이콘은 이 규칙과 분리된 전용 크기(.player-icon,
+     100px)를 따로 가짐 — 이 값만 바꾸면 몬스터 크기에 영향 없이 플레이어 이미지 크기만 조절됨.
+     (참고: .monster-icon-img가 부모 font-size를 1em 기준으로 그대로 물려받는 방식이라, 여기서도
+     font-size로 크기를 조절함 — 몬스터와 동일한 방식.) */
   .combat-arena .monster-icon{ font-size:46px; }
-  .player-slot .hp-bar-wrap{ width:100%; }
-  .player-slot .mp-bar-wrap{ margin-top:-2px; }
+  .combat-arena .player-icon{ font-size:100px; }
+  .player-slot .hp-bar-wrap{ width:100%; margin-bottom:1px; }
+  .player-slot .mp-bar-wrap{ margin-top:-2px; margin-bottom:-20px; }
   .player-lv-text{
-    margin-top:4px; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:12px;
-    color: var(--forge-gold);
+    margin-top:-10px; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:12px;
+    color: var(--forge-gold); line-height:1;
   }
   .hp-bar-fill.mp{ background: linear-gradient(90deg, #4fa3d1, #2f6f96); }
   .hp-bar-fill.exp{ background: linear-gradient(90deg, #ffe9a8, #e0b13c); }

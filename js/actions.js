@@ -765,6 +765,10 @@ function resolveSkillEffect(id){
   const s = SKILLS[id];
   if(!s) return;
   if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return;
+  // 버프 모션(요구사항 6번): target이 'buff'인 스킬은 회복형(healFlat)이어도 skillKindOf가 그대로 'buff'를
+  // 반환하므로 여기서 한 번에 처리함(아래 healFlat 조기 반환보다 먼저 판정) — 현재 바라보고 있는 방향
+  // 그대로 버프 이미지를 잠깐 보여주고 자동으로 기본 자세로 복귀함(effects.js triggerPlayerBuffMotion).
+  if(skillKindOf(s) === 'buff') triggerPlayerBuffMotion();
   if(s.healFlat){
     // 회복형 스킬(예: 대지의 기운) — 데미지 계산 없이 시전 완료 시점에 고정량 회복, 최대체력 초과 회복 안 함
     state.playerHp = Math.min(effectiveMaxHp(state.playerLevel), (state.playerHp || 0) + s.healFlat);
@@ -795,6 +799,10 @@ function resolveSkillEffect(id){
   const targets = s.target === 'aoe'
     ? hunt.monsters.slice()
     : [hunt.monsters.find(m => m.instanceId === hunt.targetId) || hunt.monsters[0]];
+  // 공격 모션(요구사항 5번): 스킬의 타겟이 단일(single)/광역(aoe)인 경우 등급과 무관하게 공격 모션으로
+  // 처리함 — 현재 타겟 방향의 공격 이미지를 잠깐 보여주고 자동으로 기본 자세로 복귀함(기본 공격과 동일한
+  // effects.js triggerPlayerAttackMotion 재사용, 새 로직 아님).
+  triggerPlayerAttackMotion();
   // hitDelayMs가 지정된 스킬(예: 이연격)은 타수 사이에 지연을 두는 별도 경로로 처리하고 여기서 끝냄 —
   // 지정되지 않은 스킬은 아래 기존 동기 루프를 그대로 타므로 다른 스킬은 전혀 영향받지 않음.
   if(s.hitDelayMs){
@@ -806,7 +814,7 @@ function resolveSkillEffect(id){
     for(let i = 0; i < hits; i++){
       if(t.hp <= 0) break;
       const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
-      const hitDmg = isCrit ? Math.round(perHit * 1.5) : perHit;
+      const hitDmg = isCrit ? Math.round(perHit * critMultiplierFor(t)) : perHit;
       const levelDiff = state.playerLevel - t.level;
       let dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
       // 대상 몬스터의 방어도를 최종 피해 감소/증가 공식에 적용(몬스터 방어도 시스템).
@@ -837,7 +845,7 @@ function applyDelayedSkillHits(target, s, perHit, critChance){
     const t = hunt.monsters.find(m => m.instanceId === instanceId);
     if(!t || t.hp <= 0) return;
     const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
-    const hitDmg = isCrit ? Math.round(perHit * 1.5) : perHit;
+    const hitDmg = isCrit ? Math.round(perHit * critMultiplierFor(t)) : perHit;
     const levelDiff = state.playerLevel - t.level;
     let dmg = Math.max(1, Math.round(hitDmg * playerDamageMultiplier(levelDiff)));
     // 대상 몬스터의 방어도를 최종 피해 감소/증가 공식에 적용(몬스터 방어도 시스템).

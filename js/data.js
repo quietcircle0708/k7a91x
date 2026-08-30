@@ -325,6 +325,30 @@ const WEAPON_TYPES = {
       statBonus: { str: 3, atkSpeedPercent: 10 },
     },
   },
+  firesword: {
+    id: 'firesword', name: '백화검', desc: '불타는 검신을 가진 명검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'epic', // 에픽
+    attackPower: 870, attackSpeed: 0.8, critRate: 9,
+    purchasable: false, sellPrice: 49900, levelReq: 70,
+    image: 'epic_firesword',
+    atk: [870], speed: [0.8], crit: [9], sell: [49900],
+    cost: [], odds: [],
+    // 고유 옵션: poison_on_hit(독 송곳니)와 동일한 "적중 시 확률 발동형" 스키마 — activateLevel:0이라
+    // +0부터 바로 활성화되고, chanceByLevel에 0~9 전 구간 값을 직접 등록함(poisonfang처럼 activateLevel
+    // 이후 구간만 채우는 방식과 달리, 여기선 +0부터 활성화되므로 0번 인덱스부터 필요).
+    // ⚠ 데이터만 우선 등록 — effectId 'burn_on_hit'을 실제로 판정해 화상(STATUS_EFFECTS.burn, zip137)을
+    // 부여하는 전투 코드(activeEffectChance 호출부, dungeon.js의 poison_on_hit 처리와 동일한 자리)는
+    // 아직 연결하지 않음(사용자 확인: 화상을 부여하는 아이템/스킬 로직은 추후 별도 작업 예정). 지금은
+    // 무기 자체의 스탯/툴팁 문구만 정상 동작하고, 실제 전투에서 화상을 걸지는 못함.
+    uniqueOption: {
+      effectId: 'burn_on_hit',
+      activateLevel: 0,
+      chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 5, 4: 5, 5: 7, 6: 7, 7: 9, 8: 10, 9: 15 },
+      textTemplate: '공격 적중 시 {chance}% 확률로 화상 부여',
+    },
+  },
   bloodtigerlongsword: {
     id: 'bloodtigerlongsword', name: '혈호대검', desc: '붉은 호랑이의 피와 살의를<br>머금은 거대한 양손 검',
     equipType: 'weapon',
@@ -2115,7 +2139,10 @@ const EQUIPMENT_SLOTS = [
 // 앞으로 종류가 계속 추가될 예정. 새 상태 이상은 이 객체에 항목만 추가하면 됨.
 // type으로 상태 이상의 처리 방식을 구분함(state.js의 applyStatusEffect/tickStatusEffects/pruneExpiredStatusEffects,
 // dungeon.js의 전투 행동 가드가 이 값을 보고 분기함):
-//  - 'dot' (중독): 매 틱 최대체력 비례 피해 + maxTicks로 지속시간이 고정됨(기존 로직 그대로 유지, 변경 없음)
+//  - 'dot' (중독/화상): 매 틱 최대체력 비례 피해 + maxTicks로 지속시간이 고정됨. 이미 같은 dot 상태 이상이
+//    적용되어 있으면 재부여하지 않고 남은 지속시간도 초기화하지 않음(applyStatusEffect 참고). 선택 필드
+//    critDamageBonusPercent가 있으면(화상=20) 이 상태 이상이 걸린 대상은 받는 치명타 피해 배율에 그
+//    값을 %p 단위로 합연산 가산함(critMultiplierFor, formulas.js) — 없으면(중독 등) 영향 없음.
 //  - 'disable' (기절): 지속시간 동안 전투 행동(기본공격/스킬/회복 등)을 전부 정지시킴
 //  - 'atkSpeedMult' (둔화): 지속시간 동안 공격속도(초당 공격 횟수) 값에 atkSpeedMultiplier를 곱해서 적용
 // 'disable'/'atkSpeedMult'류는 데이터에 고정 지속시간을 두지 않음 — 상태 이상을 부여하는 스킬/아이템 등
@@ -2145,6 +2172,17 @@ const STATUS_EFFECTS = {
     color: '#fff5ae',
     type: 'atkSpeedMult',
     atkSpeedMultiplier: 0.65, // 공격속도(초당 공격 횟수) x 0.65
+  },
+  burn: {
+    id: 4,
+    name: '화상',
+    icon: '🔥',
+    color: '#db353c',
+    type: 'dot',
+    tickIntervalMs: 600,        // 0.6초마다
+    maxTicks: 5,                // 최대 5틱(=0.6초×5=3초) 지속
+    damagePercentOfMaxHp: 3,    // 매 틱 최대 체력의 3% 피해
+    critDamageBonusPercent: 20, // 화상이 걸린 대상이 받는 치명타 피해 배율에 +20%p 합연산(critMultiplierFor, formulas.js)
   },
 };
 
@@ -2525,6 +2563,35 @@ const MONSTERS = {
       { name: '현랑반지', chance: 2.5, weaponId: 'wolfmoonring' },
     ],
   },
+  woodpuppet: {
+    id: 'woodpuppet', name: '목각인형', icon: '🪆', grade: 'normal', level: 52, image: 'wood_puppet',
+    defense: -13, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [ { name: '호박', chance: 15 } ],
+  },
+  ironpuppet: {
+    id: 'ironpuppet', name: '양철인형', icon: '🪆', grade: 'normal', level: 53, image: 'iron_puppet',
+    defense: -15, hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
+    drops: [ { name: '호박', chance: 20 } ],
+  },
+  emeraldpuppet: {
+    id: 'emeraldpuppet', name: '에메랄드 인형', icon: '🪆', grade: 'epic', level: 61, image: 'emerald_puppet',
+    defense: -20, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    epicSpawnWeight: 50, // 인형굴 전용 — 인형술사와 합쳐 100%(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '쇠조각', chance: 10 },
+    ],
+  },
+  puppeteer: {
+    id: 'puppeteer', name: '인형술사', icon: '🪆', grade: 'epic', level: 62, image: 'epic_puppeteer',
+    defense: -30, hpMult: 1.0, atkMult: 1.15, speedMult: 1.0,
+    epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '쇠조각', chance: 20 },
+      { name: '백화검', chance: 5, weaponId: 'firesword' },
+    ],
+  },
 };
 
 
@@ -2626,6 +2693,14 @@ const DUNGEONS = [
     monsters: ['scorpion', 'scorpion2', 'epicscorpion', 'epicscorpion2'],
     levelRange: 7,
   },
+  {
+    id: 'puppet_den',
+    name: '인형굴',
+    icon: '',
+    desc: '버려진 인형들이 저주받은 채 살아 움직이는 동굴',
+    monsters: ['woodpuppet', 'ironpuppet', 'emeraldpuppet', 'puppeteer'],
+    levelRange: 7,
+  },
 ];
 
 // ============================================================
@@ -2678,6 +2753,24 @@ const PLAYER_IMAGE_DIR = 'assets/ui/';
 const PLAYER_IMAGE_EXT = '.png';
 const PLAYER_IMAGE_FILE = 'player';
 const PLAYER_IMAGE_FALLBACK_EMOJI = '🧑'; // PNG 로드 실패 시 대체(몬스터 아이콘과 동일한 폴백 방식)
+
+// ---- 플레이어 전투 모션 이미지(신규) ----
+// 던전 전투 화면 플레이어를 "방향(direction) + 모션(motion)" 두 축으로만 표현함(요구사항 7번) — 화면
+// 코드에서 개별 조합을 하드코딩하지 않고, 이 두 상태값으로 파일명을 조립해서 고르기만 함. 파일명 규칙:
+// {motion}_{direction}.png (예: idle_up.png, attack_left.png, buff_right.png), 원본 256×256 그대로 사용
+// (표시 크기는 기존 .monster-icon-img CSS가 그대로 처리 — 새 CSS 불필요).
+// 이후 피격/사망 등 새 모션을 추가하려면 PLAYER_POSE_MOTIONS에 이름만 추가하고 해당 방향×모션 이미지
+// 9장(3방향)만 에셋으로 준비하면 됨 — 선택 로직(renderPlayerPose, effects.js)은 수정할 필요 없음.
+const PLAYER_POSE_IMAGE_DIR = 'assets/ui/player/';
+const PLAYER_POSE_MOTIONS = ['idle', 'attack', 'buff'];
+const PLAYER_POSE_DIRECTIONS = ['up', 'left', 'right'];
+// 몬스터 출현 슬롯(MONSTER_COMBAT_POSITIONS) → 그 몬스터를 타겟팅했을 때 플레이어가 바라볼 방향(요구사항
+// 3번 방향 결정 규칙 그대로 1:1 대응). 새 슬롯이 추가되는 일은 없지만, 안전하게 매핑 테이블로 분리해둠.
+const MONSTER_POS_TO_PLAYER_DIRECTION = { top: 'up', left: 'left', right: 'right' };
+// 공격/버프 모션을 보여준 뒤 자동으로 idle로 되돌리기까지의 시간 — 몬스터 피격 애니메이션(.hit, 0.2초)과
+// 비슬한 체감이 되도록 공격은 조금 더 짧게, 버프는 시전 동작이 느껴지도록 약간 더 길게 잡음.
+const PLAYER_ATTACK_MOTION_MS = 250;
+const PLAYER_BUFF_MOTION_MS = 400;
 
 // 스테이지 입장 메시지. {name}은 던전 이름으로 치환됨(1스테이지 전용).
 const STAGE_ENTER_MSG = {

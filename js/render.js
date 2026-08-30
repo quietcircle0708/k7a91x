@@ -233,10 +233,11 @@ function renderInventoryList(){
     return;
   }
   const pageSize = PAGE_SIZE.invWeapon;
-  const totalPageCount = pageCount(state.inventory.length, pageSize);
+  const sorted = sortEquippedFirst(state.inventory, item => item.id === state.equippedId);
+  const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invWeapon = clampPage(pageState.invWeapon, totalPageCount);
   if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invWeapon', pageState.invWeapon, totalPageCount);
-  const pageItems = pageSlice(state.inventory, pageState.invWeapon, pageSize);
+  const pageItems = pageSlice(sorted, pageState.invWeapon, pageSize);
   wrap.innerHTML = pageItems.map(item=>{
     const type = item.type || 'longsword';
     const tier = tierOf(item.level);
@@ -292,10 +293,14 @@ function renderArmorInventoryList(){
     return;
   }
   const pageSize = PAGE_SIZE.invArmor;
-  const totalPageCount = pageCount(items.length, pageSize);
+  const sorted = sortEquippedFirst(items, item => {
+    const def = ARMOR_TYPES[item.type];
+    return !!(def && state.equippedArmor && state.equippedArmor[def.armorKind] === item.id);
+  });
+  const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invArmor = clampPage(pageState.invArmor, totalPageCount);
   if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invArmor', pageState.invArmor, totalPageCount);
-  const pageItems = pageSlice(items, pageState.invArmor, pageSize);
+  const pageItems = pageSlice(sorted, pageState.invArmor, pageSize);
   wrap.innerHTML = pageItems.map(item => {
     const type = item.type;
     const def = ARMOR_TYPES[type];
@@ -350,10 +355,11 @@ function renderSubInventoryList(){
     return;
   }
   const pageSize = PAGE_SIZE.invSub;
-  const totalPageCount = pageCount(items.length, pageSize);
+  const sorted = sortEquippedFirst(items, item => state.equippedSubId === item.id);
+  const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invSub = clampPage(pageState.invSub, totalPageCount);
   if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invSub', pageState.invSub, totalPageCount);
-  const pageItems = pageSlice(items, pageState.invSub, pageSize);
+  const pageItems = pageSlice(sorted, pageState.invSub, pageSize);
   wrap.innerHTML = pageItems.map(item => {
     const type = item.type;
     const def = SUB_TYPES[type];
@@ -404,11 +410,12 @@ function renderAccessoryInventoryList(){
     return;
   }
   const pageSize = PAGE_SIZE.invAccessory;
-  const totalPageCount = pageCount(items.length, pageSize);
+  const wornList = Array.isArray(state.equippedAccessories) ? state.equippedAccessories : [];
+  const sorted = sortEquippedFirst(items, item => wornList.includes(item.id));
+  const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invAccessory = clampPage(pageState.invAccessory, totalPageCount);
   if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invAccessory', pageState.invAccessory, totalPageCount);
-  const pageItems = pageSlice(items, pageState.invAccessory, pageSize);
-  const wornList = Array.isArray(state.equippedAccessories) ? state.equippedAccessories : [];
+  const pageItems = pageSlice(sorted, pageState.invAccessory, pageSize);
   const slotsFull = wornList.filter(id => id != null).length >= ACCESSORY_SLOT_MAX;
   wrap.innerHTML = pageItems.map(item => {
     const type = item.type;
@@ -790,7 +797,7 @@ function renderMiscList(){
   }
   wrap.innerHTML = entries.map(({ item, count }) => `
     <div class="inv-card">
-      <div class="inv-icon" style="border-color: var(--forge-line);">${itemIconHtml(item)}</div>
+      <div class="inv-icon" style="border-color:${stoneNameColor(item.id)};">${itemIconHtml(item)}</div>
       <div class="inv-info">
         <div class="inv-name weapon-name-wrap">
           <span class="txt-shard">${item.name}</span> ×${count}
@@ -1688,9 +1695,10 @@ function renderHunt(){
 
   // 전투 화면 중앙 플레이어 아이콘 — 매번 새로 그려도 무방하지만(정적 요소라 애니메이션 진행 중에는
   // 굳이 다시 그릴 필요가 없으므로) 비어있을 때만 채워 넣어 진행 중인 hit/dead 애니메이션이 끊기지 않게 함.
+  // 방향/모션(hunt.playerDirection/playerMotion)은 renderPlayerPose(effects.js)가 그 이후로 계속 갱신함.
   const playerIcon = el('combatPlayerIcon');
   if(playerIcon && !playerIcon.dataset.filled){
-    playerIcon.innerHTML = playerCombatIconHtml();
+    playerIcon.innerHTML = playerCombatIconHtml(hunt.playerDirection, hunt.playerMotion);
     playerIcon.dataset.filled = '1';
   }
 
@@ -1758,6 +1766,9 @@ function updateTargetHighlight(){
   document.querySelectorAll('#monsterRow .monster-slot').forEach(slot => {
     slot.classList.toggle('targeted', Number(slot.dataset.instanceId) === hunt.targetId);
   });
+  // 타겟이 바뀔 때마다 플레이어가 바라보는 방향도 함께 갱신(요구사항 3·4번, effects.js 참고) — 이 함수를
+  // 호출하는 모든 곳(공격 대상 클릭/자동 재대상 지정/처치 후 재대상 지정)에 공통 적용됨.
+  syncPlayerDirectionToTarget();
 }
 
 function renderStatusBadges(){

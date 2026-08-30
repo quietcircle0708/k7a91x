@@ -98,11 +98,13 @@ function monsterImgError(img){
 }
 
 // 던전 전투 화면 중앙에 표시되는 플레이어 아이콘 HTML(monsterIconHtml과 완전히 동일한 구조 재사용).
-// 이미지 파일명은 PLAYER_IMAGE_FILE 데이터 값 하나로만 결정되므로, 나중에 다른 이미지로 교체하려면
-// 이 상수만 바꾸면 되고 코드는 그대로 재사용됨. 로드 실패 시에도 기존 몬스터 아이콘과 동일하게
-// monsterImgError로 이모지로 즉시 대체되어 화면이 깨지지 않음.
-function playerCombatIconHtml(){
-  const path = PLAYER_IMAGE_DIR + PLAYER_IMAGE_FILE + PLAYER_IMAGE_EXT;
+// direction('up'/'left'/'right')+motion('idle'/'attack'/'buff') 두 값으로 파일을 고름(요구사항 7번,
+// PLAYER_POSE_* 데이터 참고) — 인자를 생략하거나 잘못된 값이 들어오면 기본값(상 방향, 기본 자세)으로
+// 안전하게 대체됨. 로드 실패 시에도 기존 몬스터 아이콘과 동일하게 monsterImgError로 이모지로 즉시 대체됨.
+function playerCombatIconHtml(direction, motion){
+  const dir = PLAYER_POSE_DIRECTIONS.includes(direction) ? direction : 'up';
+  const mo = PLAYER_POSE_MOTIONS.includes(motion) ? motion : 'idle';
+  const path = PLAYER_POSE_IMAGE_DIR + mo + '_' + dir + PLAYER_IMAGE_EXT;
   return `<img src="${path}" class="monster-icon-img" alt="" data-fallback-emoji="${PLAYER_IMAGE_FALLBACK_EMOJI}" onerror="monsterImgError(this)">`;
 }
 
@@ -624,6 +626,21 @@ function targetStatusDamageMultiplier(target){
   if(!hasPoison) return 1;
   const percent = weaponUniqueOptionChance(equipped.type, equipped.level) || 0;
   return 1 + percent / 100;
+}
+// 치명타 피해 배율(기존 로직의 1.5배 고정값을 그대로 가져와 하나로 통합) — 화상처럼 데이터에
+// critDamageBonusPercent가 설정된 dot 상태 이상이 대상에게 걸려있으면 해당 값을 합연산(%p)으로
+// 가산함(요구사항 4번: 150%+20%p=170%, 곱연산 아님). 화상이 없는 대상은 기존과 완전히 동일하게 150%.
+// 다른 상태 이상(중독/기절/둔화)은 이 필드가 없으므로 치명타 배율에 전혀 영향을 주지 않음.
+const BASE_CRIT_MULTIPLIER = 1.5;
+function critMultiplierFor(target){
+  let bonusPercent = 0;
+  if(target && target.statusEffects){
+    target.statusEffects.forEach(s => {
+      const def = STATUS_EFFECTS[s.key];
+      if(def && def.critDamageBonusPercent) bonusPercent += def.critDamageBonusPercent;
+    });
+  }
+  return BASE_CRIT_MULTIPLIER + bonusPercent / 100;
 }
 function atkFor(type, level){ return wpn(type).atk[level]; }
 
@@ -1312,6 +1329,17 @@ function clampPage(page, totalPages){
 function pageSlice(items, page, pageSize){
   const start = (page - 1) * pageSize;
   return items.slice(start, start + pageSize);
+}
+// 인벤토리 정렬(신규): 현재 필터(=각 탭이 이미 걸러놓은 items 배열)에 해당하는 목록 안에서, 장착/착용
+// 중인 아이템을 최우선으로 앞에 오도록 안정 정렬함. 장착 아이템끼리, 미장착 아이템끼리는 각각 원래
+// 배열 순서(=기존 정렬 기준)를 그대로 유지함 — 장착 여부 외의 새로운 정렬 기준은 추가하지 않음.
+// 원본 배열(items)은 건드리지 않고 정렬된 새 배열만 반환하므로, pageSlice로 페이지를 나누기 직전에만
+// 이 함수를 거치면 필터·페이지네이션·판매/사용 등 다른 로직은 원본 배열 순서 그대로 영향받지 않음.
+function sortEquippedFirst(items, isEquippedFn){
+  const equipped = [];
+  const rest = [];
+  items.forEach(item => { (isEquippedFn(item) ? equipped : rest).push(item); });
+  return equipped.concat(rest);
 }
 // 페이지 이동 UI 공통 HTML: "현재 페이지 / 전체 페이지 [이전] [다음]". 첫 페이지는 [이전] 생략,
 // 마지막 페이지는 [다음] 생략. target은 어떤 화면의 페이지인지 구분하는 키(pageState의 키와 동일) —

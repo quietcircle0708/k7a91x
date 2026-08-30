@@ -29,6 +29,8 @@ function enterStage(stageNum){
   hunt.chestOpened = false;
   hunt.paused = true;
   hunt.started = false;
+  hunt.playerMotion = 'idle'; // 새 스테이지 시작 시 이전 스테이지의 공격/버프 모션이 남아있지 않도록 초기화
+  if(playerMotionRevertTimeout){ clearTimeout(playerMotionRevertTimeout); playerMotionRevertTimeout = null; }
   renderHunt();
   const row = el('monsterRow');
   if(row) row.innerHTML = ''; // 이전 스테이지의 몬스터 슬롯 잔재 제거 — 입장 메시지가 끝나기 전엔 아무것도 안 보임
@@ -55,6 +57,7 @@ function spawnMonsters(){
   hunt.monsters = grades.map(grade => createMonsterInstance(d, grade));
   assignMonsterPositions(hunt.monsters); // 각 개체에 상/하/좌/우 중 겹치지 않는 위치를 무작위 배정(instance.pos)
   hunt.targetId = hunt.monsters.length ? hunt.monsters[0].instanceId : null;
+  syncPlayerDirectionToTarget(); // 스테이지 시작 시 초기 타겟 기준으로 플레이어 방향을 바로 맞춤(요구사항 3·4번)
   // 이번 전투(그룹 전멸까지)에서 처치한 모든 몬스터의 보상을 합산해 담아둘 그릇
   hunt.pendingRewards = {
     gold: 0, expGained: 0, levelsGained: 0, newPlayerLevel: state.playerLevel,
@@ -204,6 +207,7 @@ function applyStatusEffectToMonster(instance, key, durationMs){
 function stopHuntLoop(flaskEndMode = 'flush'){
   if(hunt.timerId){ clearInterval(hunt.timerId); hunt.timerId = null; }
   if(hunt.playerFirstAttackTimeout){ clearTimeout(hunt.playerFirstAttackTimeout); hunt.playerFirstAttackTimeout = null; }
+  if(playerMotionRevertTimeout){ clearTimeout(playerMotionRevertTimeout); playerMotionRevertTimeout = null; } // 전투 중단 시 남은 공격/버프 모션 타이머 정리
   hunt.monsters.forEach(m => {
     if(m.atkIntervalId){ clearInterval(m.atkIntervalId); m.atkIntervalId = null; }
     if(m.atkFirstTimeout){ clearTimeout(m.atkFirstTimeout); m.atkFirstTimeout = null; }
@@ -241,7 +245,7 @@ function attackTick(){
   const atk = effectiveAtk(type, equipped.level, equipped.damaged);
   const critChance = effectiveCritChance(type, equipped.level);
   const isCrit = Math.random() * 100 < critChance;
-  const baseDmg = isCrit ? Math.round(atk * 1.5) : atk;
+  const baseDmg = isCrit ? Math.round(atk * critMultiplierFor(target)) : atk;
   // 기본 공격 전용 피해량 증가 버프(예: 야수의 심장 +25%). effectiveAtk가 아니라 여기서만 곱하는 이유는
   // effectiveAtk를 스킬 데미지 계산(actions.js resolveSkillEffect)도 그대로 쓰기 때문 — 여기서 곱해야
   // 기본 공격에만 적용되고 스킬 데미지에는 전혀 영향을 주지 않음(야수의 심장 요구사항).
@@ -256,12 +260,20 @@ function attackTick(){
   dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(target)));
   target.hp -= dmg;
   monsterHitEffect(target.instanceId, dmg, isCrit);
+  triggerPlayerAttackMotion(); // 기본 공격 적중 시 현재 타겟 방향의 공격 모션 표시(요구사항 5번)
   if(target.hp > 0){
-    // 독 플라스크(아티팩트)와 무기 고유 옵션 등 "중독 부여" 효과를 가진 모든 활성 소스의 확률을
-    // 합산해 1회만 판정(activeEffectChance, formulas.js). 소스가 하나도 없으면 0%로 판정 안 됨.
+    // 독 플라스크(아티팩트)와 무기 고유 옵션 등 "중독/화상 부여" 효과를 가진 모든 활성 소스의 확률을
+    // 각각 합산해 1회만 판정(activeEffectChance, formulas.js). 소스가 하나도 없으면 0%로 판정 안 됨.
     const poisonChance = activeEffectChance('poison_on_hit');
     if(poisonChance > 0 && Math.random() * 100 < poisonChance){
       applyStatusEffect(target, 'poison');
+      renderStatusBadges();
+    }
+    // 화상 부여(백화검 고유 옵션, effectId 'burn_on_hit') — 중독과 완전히 동일한 판정 방식(합산확률 1회
+    // 판정)이되 별도의 독립적인 판정으로 처리함(요구사항 5번: 서로 다른 상태 이상은 동시 적용 가능).
+    const burnChance = activeEffectChance('burn_on_hit');
+    if(burnChance > 0 && Math.random() * 100 < burnChance){
+      applyStatusEffect(target, 'burn');
       renderStatusBadges();
     }
   }

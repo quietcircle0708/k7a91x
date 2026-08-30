@@ -54,7 +54,7 @@ let state = {
 };
 let isEnhancing = false;
 let currentView = 'forge';
-let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false };
+let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle' };
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
 // equipTab: "장비" 최상위 탭 안에서 마지막으로 보고 있던 하위탭(weapon/armor/accessory/artifact)을
 // 기억해뒀다가, "장비" 최상위 버튼을 다시 눌렀을 때 그 탭으로 돌아가기 위한 값.
@@ -229,9 +229,12 @@ function applyStatusEffect(target, key, durationMs){
   const existing = target.statusEffects.find(s => s.key === key);
   if(def.type === 'dot'){
     // lastTickAt: 이 상태 이상 자신의 tickIntervalMs 간격을 실시간으로 재는 기준 시각.
-    // 틱 판정 자체는 tickStatusEffects가 담당(아래 참고) — 여기서는 갱신/신규 부여 시 기준 시각만 초기화.
-    if(existing){ existing.ticksRemaining = def.maxTicks; existing.lastTickAt = Date.now(); }
-    else target.statusEffects.push({ key, ticksRemaining: def.maxTicks, lastTickAt: Date.now() });
+    // 틱 판정 자체는 tickStatusEffects가 담당(아래 참고) — 여기서는 신규 부여 시에만 기준 시각을 초기화.
+    // 요구사항(중독·화상 재부여 방지): 이미 같은 dot 상태 이상이 적용되어 있으면 재부여하지 않고, 남은
+    // 지속시간(ticksRemaining)이나 다음 틱까지 남은 시간(lastTickAt)도 초기화하지 않음 — 완전히 종료되어
+    // 배열에서 빠진 뒤에만 다시 새로 부여될 수 있음.
+    if(existing) return;
+    target.statusEffects.push({ key, ticksRemaining: def.maxTicks, lastTickAt: Date.now() });
     return;
   }
   const expiresAt = Date.now() + Math.max(0, durationMs || 0);
@@ -442,7 +445,7 @@ function resetGame(){
   el('resetLink').style.opacity = '';
   stopHuntLoop();
   stopDeathCurseTicker();
-  hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null };
+  hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, playerDirection: 'up', playerMotion: 'idle' };
 
   state = {
     gold: 1000, inventory: [], equippedId: null, forgeTargetId: null, nextItemId: 1,

@@ -215,6 +215,62 @@ function playerDeathEffect(){
   combatIcon.classList.add('dead');
 }
 
+// ---- 플레이어 전투 포즈(방향+모션) 상태 관리(신규) ----
+// hunt.playerDirection('up'/'left'/'right')과 hunt.playerMotion('idle'/'attack'/'buff') 두 값만으로
+// 표시할 이미지가 정해짐(요구사항 7번) — 화면마다 개별 분기를 만들지 않고 이 두 상태를 갱신하기만 하면
+// renderPlayerPose가 알아서 올바른 파일을 그림.
+let playerMotionRevertTimeout = null;
+
+// 몬스터 타겟팅이 바뀔 때마다 호출(render.js의 updateTargetHighlight, dungeon.js의 spawnMonsters에서
+// 호출됨) — 기존 타겟팅 로직(selectTarget 등)은 전혀 건드리지 않고, 이미 결정된 hunt.targetId를 읽어서
+// 그 몬스터의 출현 슬롯(pos: top/left/right)을 플레이어가 바라볼 방향으로 변환해 즉시 반영함(요구사항
+// 3·4번: 타겟 변경 시 방향도 즉시 변경).
+function syncPlayerDirectionToTarget(){
+  const target = hunt.monsters && hunt.monsters.find(m => m.instanceId === hunt.targetId);
+  if(!target || !target.pos) return;
+  const dir = MONSTER_POS_TO_PLAYER_DIRECTION[target.pos];
+  if(dir && dir !== hunt.playerDirection){
+    hunt.playerDirection = dir;
+    renderPlayerPose();
+  }
+}
+
+// 공격/버프 모션을 잠깐 보여준 뒤 자동으로 idle로 되돌림(요구사항 5·6번: 모션 종료 시 해당 방향의 기본
+// 자세로 복귀). 재생 도중 같은 모션이 다시 발생하면(예: 공격속도가 빨라 연타) 타이머를 새로 잡아 매번
+// 처음부터 재생되게 함.
+function triggerPlayerMotion(motion, durationMs){
+  hunt.playerMotion = motion;
+  renderPlayerPose();
+  if(playerMotionRevertTimeout) clearTimeout(playerMotionRevertTimeout);
+  playerMotionRevertTimeout = setTimeout(() => {
+    hunt.playerMotion = 'idle';
+    playerMotionRevertTimeout = null;
+    renderPlayerPose();
+  }, durationMs);
+}
+// 공격 모션 트리거(요구사항 5번) — 기본 공격(dungeon.js attackTick)과 단일/광역 타겟 스킬(actions.js
+// resolveSkillEffect, 등급과 무관) 양쪽에서 호출됨.
+function triggerPlayerAttackMotion(){ triggerPlayerMotion('attack', PLAYER_ATTACK_MOTION_MS); }
+// 버프 모션 트리거(요구사항 6번) — 스킬의 target이 'buff'인 경우(actions.js resolveSkillEffect) 호출됨.
+function triggerPlayerBuffMotion(){ triggerPlayerMotion('buff', PLAYER_BUFF_MOTION_MS); }
+
+// 현재 hunt.playerDirection/playerMotion 값을 그대로 화면에 반영. 이미 <img>가 있으면 새로 만들지 않고
+// src만 바꿔서(요소 자체를 재사용) #combatPlayerIcon에 붙는 피격/사망 애니메이션 클래스(.hit/.dead,
+// playerHitEffect·playerDeathEffect 참고)를 건드리지 않음 — 애니메이션 도중에 포즈가 바뀌어도 끊기지 않음.
+function renderPlayerPose(){
+  const box = el('combatPlayerIcon');
+  if(!box) return;
+  const direction = hunt.playerDirection || 'up';
+  const motion = hunt.playerMotion || 'idle';
+  const img = box.querySelector('img');
+  if(img){
+    img.src = PLAYER_POSE_IMAGE_DIR + motion + '_' + direction + PLAYER_IMAGE_EXT;
+  } else {
+    box.innerHTML = playerCombatIconHtml(direction, motion);
+    box.dataset.filled = '1';
+  }
+}
+
 // 피해량 숫자를 특정 컨테이너(위치 기준 요소, position:relative 필요) 안에 띄우는 공용 로직.
 // 실제 피해 계산(hp -= dmg)과 화면 표시값은 완전히 분리되어 있음 — 여기서 받는 dmg는 이미 양수이므로
 // 그대로 숫자만 표시함('-' 기호·'치명타!' 문구 없이). monsterHitEffect·playerHitEffect가 공통으로 사용.
@@ -254,37 +310,29 @@ function statusTickEffect(instanceId, dmg, color){
 // 연출 전체 재생 시간(등장→위로 튀어오름→낙하→착지 튕김→잠시 유지→페이드아웃)을 이 값 하나로 관리함.
 // 특정 아이템/몬스터에 하드코딩하지 않으므로, 이 값만 바꾸면 모든 드랍 연출에 자동으로 반영됨.
 const DROP_EFFECT_DURATION_MS = 1000;
-// 드랍 등급별 이펙트는 새로 만들지 않고 강화 화면에서 쓰는 강화 단계별 발광 효과(ENHANCE_LEVEL_EFFECTS,
-// data.js)를 그대로 재사용함 — 실제 강화 단계를 표시하는 게 아니라 "해당 단계의 이펙트"만 빌려 쓰는
-// 것이므로, 등급마다 구별이 잘 되는 단계를 하나씩 골라 매핑함(일반=효과없음, 레어=+3, 에픽=+5, 유니크=+7).
-const DROP_EFFECT_GLOW_LEVEL = { normal: 0, rare: 3, epic: 5, unique: 7 };
-function dropEffectGlowFilter(grade){
-  const lvl = DROP_EFFECT_GLOW_LEVEL[grade] != null ? DROP_EFFECT_GLOW_LEVEL[grade] : 0;
-  const effect = ENHANCE_LEVEL_EFFECTS[lvl] || ENHANCE_LEVEL_EFFECTS[0];
-  return effect.glow === 'none' ? '' : effect.glow;
-}
 // 연출 한 항목의 이미지/등급을 결정 — 무기·방어구·장신구는 기존 weaponIconHtml(장비 전역 설정)을 그대로
 // 재사용해 PNG 이미지를 그리고, 아티팩트·마석·재료처럼 이미지가 없는 아이템은 기존 UI에서 쓰는 이모지
 // 아이콘을 그대로 사용함. 새 아이템이 추가되어도 이 함수를 손댈 필요 없이 기존 데이터(WEAPON_TYPES 계열/
 // ARTIFACTS/MISC_ITEMS)에 등록만 되어 있으면 자동으로 반영됨.
+// 등급별 발광 필터(dropEffectGlowFilter)는 더 이상 적용하지 않음 — 이미지 파일 자체에는 어떤 필터 효과도
+// 없이 원본 그대로 등장→낙하→튕김→소멸 연출만 재생되도록 함(요청: 드랍 연출에서 발광 효과 제거, 연출
+// 자체와 등급 판정·아이콘 선택 로직은 그대로 유지).
 function dropItemVisualInner(item){
   if(item.kind === 'equip'){
-    const grade = wpn(item.type).grade;
-    return `<span class="drop-item-visual-inner" style="filter:${dropEffectGlowFilter(grade)}">${weaponIconHtml(item.type, 'drop-item-visual-img')}</span>`;
+    return `<span class="drop-item-visual-inner">${weaponIconHtml(item.type, 'drop-item-visual-img')}</span>`;
   }
   if(item.kind === 'artifact'){
     const a = ARTIFACTS[item.id];
-    return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(a.grade)}">${itemIconHtml(a)}</span>`;
+    return `<span class="drop-item-visual-inner drop-item-visual-emoji">${itemIconHtml(a)}</span>`;
   }
   if(item.kind === 'consumable'){
     // 플라스크(CONSUMABLES) 드랍 연출 — 마석/재료(MISC_ITEMS)와는 다른 데이터 테이블이라 별도 분기.
-    // CONSUMABLES 항목엔 grade 필드가 없어 dropEffectGlowFilter가 자동으로 기본(무광) 처리함.
     const it = CONSUMABLES[item.itemId];
-    return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(it.grade)}">${itemIconHtml(it)}</span>`;
+    return `<span class="drop-item-visual-inner drop-item-visual-emoji">${itemIconHtml(it)}</span>`;
   }
   // item.kind === 'item' — 마석/재료 등 MISC_ITEMS
   const it = MISC_ITEMS[item.itemId];
-  return `<span class="drop-item-visual-inner drop-item-visual-emoji" style="filter:${dropEffectGlowFilter(it.grade)}">${itemIconHtml(it)}</span>`;
+  return `<span class="drop-item-visual-inner drop-item-visual-emoji">${itemIconHtml(it)}</span>`;
 }
 // 실제로 이 이미지 하나를 등장→낙하→튕김→유지→소멸 애니메이션으로 재생함.
 // container는 실제 좌표 기준(position:relative)이 되는 .combat-arena를 받음(아래 playMonsterDropEffect
