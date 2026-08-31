@@ -761,10 +761,17 @@
     background: var(--forge-blood); border:1px solid #7a1f1f; color:#fff; font-size:10px; line-height:1;
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
   }
-  /* 스킬 퀵슬롯 줄(왼쪽 5칸) + 기존 플라스크 퀵슬롯 + 초기화 버튼을 한 줄에 담되, 좁은 화면에서는
-     자연스럽게 줄바꿈되도록 함(요구사항: 스킬 탭 상단 배치, 던전 화면에도 동일하게 출력). */
+  /* 스킬 퀵슬롯 줄(왼쪽, 2줄×5칸) + 기존 플라스크 퀵슬롯 + 초기화 버튼을 한 줄에 담되, 좁은 화면에서는
+     자연스럽게 줄바꿈되도록 함(요구사항: 스킬 탭 상단 배치, 던전 화면에도 동일하게 출력).
+     align-items:center가 핵심 — 스킬 퀵슬롯이 2줄로 늘어나 더 높아진 만큼, 옆의 플라스크 퀵슬롯(1줄)이
+     자동으로 그 가운데(두 스킬 줄 사이) 높이에 오도록 정렬해준다(요구사항: "플라스크가 두 스킬 줄의
+     가운데 영역에 걸쳐 보이는 형태"). 플라스크 쪽 마크업/기능은 전혀 손대지 않음 — 위치만 이 정렬로 바뀜. */
   .skill-quickslot-row{ display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
   .skill-quickslot-row .quickslot-row{ margin-bottom:0; }
+  /* 스킬 퀵슬롯 전용 컨테이너 — 정확히 5칸마다 줄바꿈되도록 grid로 폭을 고정(칸 너비=버튼 너비 46px와
+     동일해서, 스킬 이름 길이와 무관하게 항상 5개씩 정확히 끊어짐). 기존 .quickslot-row(플라스크가 계속
+     쓰는 flex 10px gap)와는 별개 클래스라 플라스크 쪽 스타일에는 전혀 영향 없음. */
+  .skill-quickslot-grid{ display:grid; grid-template-columns:repeat(5, 46px); gap:10px; justify-content:center; }
   /* 스킬 퀵슬롯은 아이콘 버튼 아래에 스킬 이름(등급 색상)을 함께 표시함(요구사항 6번) */
   .skill-quickslot-wrap{ display:flex; flex-direction:column; align-items:center; gap:3px; }
   .skill-quickslot-name{

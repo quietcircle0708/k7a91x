@@ -1360,7 +1360,7 @@ function buildSkillTabHtml(){
   return `
     <div class="inv-tab-panel">
       <div class="skill-quickslot-row">
-        <div class="quickslot-row" id="skillTabQuickSlotRow"></div>
+        <div class="quickslot-row skill-quickslot-grid" id="skillTabQuickSlotRow"></div>
         <div class="quickslot-row" id="skillTabFlaskRow"></div>
         <button class="nav-btn" data-action="reset-skill-quickslots">초기화</button>
       </div>
@@ -1461,7 +1461,11 @@ function buildSkillLevelRowHtml(categoryId, level){
 // "이미 하나를 습득한 경우 나머지 스킬은 습득 버튼을 비활성화합니다").
 function buildSkillIconBtnHtml(id){
   const s = SKILLS[id];
-  const learned = isSkillLearned(id);
+  // 스킬 업그레이드 요구사항 3번 괄호: 상위 스킬로 교체되어 사라진 하위 스킬도 이 화면에서는 "습득됨"으로
+  // 표시(isSkillDisplayedAsLearned). 실제 습득 가능 여부 판정(canLearnSkill)은 내부에서 isSkillLearned(진짜
+  // 소유 여부)를 그대로 쓰므로, 하위 스킬 아이콘을 다시 눌러도 재습득되지 않음(클릭해도 조용히 무시됨 —
+  // 이미 습득된 스킬 아이콘을 눌렀을 때와 동일한 동작).
+  const learned = isSkillDisplayedAsLearned(id);
   const grade = WEAPON_GRADES[s.grade];
   return `
     <button class="skill-icon-btn${learned ? '' : ' locked'}" data-learn-skill="${id}" ${(!learned && !canLearnSkill(id)) ? 'disabled' : ''} style="border-color:${grade ? grade.color : '#fff'};">

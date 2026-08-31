@@ -45,7 +45,7 @@ let state = {
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
   skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
   learnedSkills: [], learnedAwakeningSkills: [], // 습득한 스킬 id 목록(공용·특화 공용 / 기연 별도)
-  skillQuickSlots: [null, null, null, null, null], // 스킬 퀵슬롯(왼쪽 5칸)에 등록된 스킬 id
+  skillQuickSlots: [null, null, null, null, null, null, null, null, null, null], // 스킬 퀵슬롯(2줄×5칸)에 등록된 스킬 id
   consumables: { hpFlask6: 0, mpFlask6: 0 }, // 보유 플라스크 개수
   quickSlots: [null, null], // 사냥 화면 퀵슬롯에 등록된 소비 아이템 id
   settings: {}, // 설정값 저장 (키: SETTINGS_SCHEMA의 항목 id). ensureSettingsDefaults()가 누락된 키를 기본값으로 채움
@@ -461,7 +461,7 @@ function resetGame(){
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
     skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [],
-    skillQuickSlots: [null, null, null, null, null],
+    skillQuickSlots: [null, null, null, null, null, null, null, null, null, null],
     consumables: { hpFlask6: 0, mpFlask6: 0 },
     quickSlots: [null, null],
     settings: {},

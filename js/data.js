@@ -1979,6 +1979,13 @@ const CHAR_MENU_INFO_PAGE_COUNT = 3;
 //     두고 싶을 때만 지정(예: 이연격 — 1타 즉시 + 2타는 0.1초 뒤). 지정하면 resolveSkillEffect가
 //     applyDelayedSkillHits(actions.js)로 처리를 넘기고, 지정하지 않으면 기존처럼 모든 타수가 동기적으로
 //     즉시 적용됨(회귀 없음) — 새로 추가되는 다타수 스킬도 이 필드 유무로 동일하게 선택 가능.
+//   upgradeFrom: 선택 필드(스킬 업그레이드 시스템, 신규). 이 스킬을 습득하려면 upgradeFrom에 적힌 스킬 id를
+//     이미 보유하고 있어야 하며(기존 levelReq 조건에 추가로 적용, formulas.js canLearnSkill), 습득하는 순간
+//     그 하위 스킬은 목록에서 제거되고 이 스킬로 교체됨(동시 보유 불가, navigation.js learnSkill). 하위 스킬이
+//     퀵슬롯에 등록돼 있었다면 같은 위치가 그대로 이 스킬로 교체되고, 등록 안 돼 있었다면 새로 등록되지
+//     않음. 여러 단계로 체이닝 가능(예: A→B→C, formulas.js isSkillSupersededByUpgrade가 while로 체인을 끝까지
+//     따라감). 지정하지 않으면(대부분의 기존 스킬) 기존 방식 그대로 독립적으로 습득 가능 — 지금은 구조만
+//     마련해둔 상태이고 실제로 upgradeFrom이 지정된 스킬은 아직 없음(적용 대상은 추후 개별 지정 예정).
 // }
 const SKILLS = {
   adventurer_will: {
@@ -1989,8 +1996,8 @@ const SKILLS = {
   slash: {
     name: '내려베기', desc: '무기를 휘둘러 {dp}%의 데미지로 적을 공격한다.',
     grade: 'normal', category: 'common', target: 'single', levelReq: 5,
-    cooldown: 6, resourceType: 'mp', resourceAmount: 30, castTime: 0,
-    damagePercent: 130, hits: 1,
+    cooldown: 4, resourceType: 'mp', resourceAmount: 30, castTime: 0,
+    damagePercent: 150, hits: 1,
   },
   rage: {
     name: '분노', desc: '{duration}초 동안 자신의 공격력을 {atkFlat} 증가.',
@@ -2002,7 +2009,7 @@ const SKILLS = {
     name: '이연격', desc: '빠르게 무기를 휘둘러 {dp}% 데미지로 적을 {hits}번 공격.',
     grade: 'normal', category: 'common', target: 'single', levelReq: 10,
     cooldown: 5.5, resourceType: 'mp', resourceAmount: 50, castTime: 0,
-    damagePercent: 75, hits: 2, icon: 'lv10atk',
+    damagePercent: 90, hits: 2, icon: 'lv10atk',
     hitDelayMs: 0.1, // 1타는 즉시, 2타는 이 시간(초) 뒤에 순차 적용(resolveSkillEffect의 hitDelayMs 분기 참고)
   },
   preemptive_strike: {
@@ -2047,7 +2054,8 @@ const SKILLS = {
     name: '삼연격', desc: '물 흐르듯 움직여 {dp}%의 데미지로 {hits}번 공격',
     grade: 'rare', category: 'common', target: 'single', levelReq: 30,
     cooldown: 5.4, resourceType: 'mp', resourceAmount: 125, castTime: 0,
-    damagePercent: 70, hits: 3, icon: 'lv30atk',
+    damagePercent: 100, hits: 3, icon: 'lv30atk',
+    upgradeFrom: 'double_strike', // 스킬 업그레이드: 이연격 보유해야 습득 가능, 습득시 이연격→삼연격으로 교체
     // 이연격(double_strike)과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용.
     // applyDelayedSkillHits(actions.js)가 hits 값에 따라 자동으로 반복하므로 3타도 별도 처리 없이
     // 1타(즉시)→2타(0.1초 뒤)→3타(0.2초 뒤) 순으로 그대로 동작함.
@@ -2061,12 +2069,11 @@ const SKILLS = {
     onHitStatus: { key: 'slow', durationMs: 3000 }, // 적중(=피해를 입혀 대상이 생존)한 경우에만 부여
   },
   cleave2: {
-    // 원본 요청 표에 설명(200%)과 데미지%(190) 값이 서로 다르게 적혀있어, 실제 데미지 계산에 쓰이는
-    // 명시적 수치 필드(데미지% 190)를 기준으로 반영함(응답 참고, 확인 필요).
     name: '참격 2성', desc: '{dp}%의 데미지로 모든 적을 공격.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 35,
     cooldown: 7, resourceType: 'mp', resourceAmount: 200, castTime: 0.1,
-    damagePercent: 190, hits: 1, icon: 'lv35atk',
+    damagePercent: 250, hits: 1, icon: 'lv35atk',
+    upgradeFrom: 'cleave', // 스킬 업그레이드: 참격 1성 보유해야 습득 가능, 습득시 참격1성→2성으로 교체
   },
   sea_vigor: {
     // 대지의 기운(earth_vigor)과 완전히 동일한 스킴(target:'buff'+healFlat)의 회복 스킬 — 이름/수치/아이콘만 다름.
@@ -2079,16 +2086,49 @@ const SKILLS = {
     name: '참격 3성', desc: '{dp}%의 데미지로 모든 적을 공격.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 45,
     cooldown: 7, resourceType: 'mp', resourceAmount: 250, castTime: 0.1,
-    damagePercent: 250, hits: 1, icon: 'lv35atk', // 요청대로 참격 1·2성과 동일한 lv35atk 아이콘 재사용
+    damagePercent: 350, hits: 1, icon: 'lv35atk', // 요청대로 참격 1·2성과 동일한 lv35atk 아이콘 재사용
+    upgradeFrom: 'cleave2', // 스킬 업그레이드: 참격 2성 보유해야 습득 가능, 습득시 참격2성→3성으로 교체
   },
   quad_strike: {
     name: '사연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 {hits}번 공격.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 50,
     cooldown: 5.1, resourceType: 'mp', resourceAmount: 200, castTime: 0,
-    damagePercent: 62.5, hits: 4, icon: 'lv50atk',
+    damagePercent: 120, hits: 4, icon: 'lv50atk',
     // 이연격/삼연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
     // hits 값에 따라 자동 반복하므로 4타도 별도 처리 없이 1타(즉시)→2타(0.1초)→3타(0.2초)→4타(0.3초) 순으로 동작).
     hitDelayMs: 0.1,
+    upgradeFrom: 'triple_strike', // 스킬 업그레이드: 삼연격 보유해야 습득 가능, 습득시 삼연격→사연격으로 교체
+  },
+  cleave4: {
+    name: '참격 4성', desc: '{dp}%의 데미지로 모든 적을 공격.',
+    grade: 'rare', category: 'common', target: 'aoe', levelReq: 55,
+    cooldown: 7, resourceType: 'mp', resourceAmount: 300, castTime: 0.1,
+    damagePercent: 600, hits: 1, icon: 'lv35atk', // 요청대로 참격 1~3성과 동일한 lv35atk 아이콘 재사용
+    upgradeFrom: 'cleave3', // 스킬 업그레이드: 참격 3성 보유해야 습득 가능, 습득시 참격3성→4성으로 교체
+  },
+  jin_cleave: {
+    name: "진'참격", desc: '{dp}%의 데미지로 모든 적을 공격.', // 이름에 아포스트로피(')가 포함된 것은 오타가 아니라 요청 그대로임
+    grade: 'rare', category: 'common', target: 'aoe', levelReq: 65,
+    cooldown: 6.7, resourceType: 'mp', resourceAmount: 400, castTime: 0.1,
+    damagePercent: 900, hits: 1, icon: 'lv35atk', // 요청대로 참격 1~4성과 동일한 lv35atk 아이콘 재사용
+    upgradeFrom: 'cleave4', // 스킬 업그레이드: 참격 4성 보유해야 습득 가능, 습득시 참격4성→진'참격으로 교체
+  },
+  five_strike: {
+    name: '오연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 다섯 번 공격.',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 60,
+    cooldown: 5, resourceType: 'mp', resourceAmount: 250, castTime: 0,
+    damagePercent: 180, hits: 5, icon: 'lv50atk', // 요청대로 사연격과 동일한 lv50atk 아이콘 재사용
+    // 이연격/삼연격/사연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
+    // hits 값에 따라 자동 반복하므로 5타도 별도 처리 없이 1타(즉시)→2타(0.1초)→3타(0.2초)→4타(0.3초)→5타(0.4초) 순으로 동작).
+    hitDelayMs: 0.1,
+    upgradeFrom: 'quad_strike', // 스킬 업그레이드: 사연격 보유해야 습득 가능, 습득시 사연격→오연격으로 교체
+  },
+  sky_vigor: {
+    // 대지의 기운(earth_vigor)/바다의 기운(sea_vigor)과 완전히 동일한 스킴(target:'buff'+healFlat)의 회복 스킬.
+    name: '하늘의 기운', desc: '체력 1000을 회복',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 60,
+    cooldown: 12, resourceType: 'mp', resourceAmount: 700, castTime: 0.5, icon: 'lv40buff', // 요청대로 바다의 기운과 동일한 lv40buff 아이콘 재사용
+    healFlat: 1000,
   },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
@@ -2135,7 +2175,7 @@ const SKILL_PAGES = [
   { min: 99, max: 99 },
 ];
 // 스킬 퀵슬롯 칸 수(왼쪽 5칸). 오른쪽에는 기존 플라스크 퀵슬롯(QUICK_SLOT_COUNT)을 그대로 이어붙여 사용함.
-const SKILL_QUICK_SLOT_COUNT = 5;
+const SKILL_QUICK_SLOT_COUNT = 10; // 2줄 × 5칸(요구사항: 기존 1줄 5칸 유지 + 아래에 5칸 추가)
 
 
 // ---- 캐릭터 정보창 — 장비창 슬롯 구성 (데이터 기반) ----

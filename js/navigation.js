@@ -625,6 +625,11 @@ function switchSkillCategory(catId){
 // 이 함수까지 도달해도 아무 일도 일어나지 않음 — 실제 해금 로직이 추가되면 이 함수만 손보면 됨.
 // 실제 데이터 변경(포인트 차감+습득)은 이 함수만 담당하고, 화면에서는 아래 스킬 습득 확인 모달을 거친 뒤에만
 // 호출됨(확인을 누르기 전까지는 데이터가 바뀌지 않아야 하므로).
+// 스킬 업그레이드 요구사항 3·4번: upgradeFrom이 지정된 스킬을 습득하면 그 하위 스킬을 목록에서 제거하고
+// 새 스킬로 교체. 하위 스킬이 등록돼 있던 퀵슬롯이 있으면 그 위치(인덱스)를 그대로 유지한 채 스킬 id만
+// 교체하고, 등록돼 있지 않았다면 새로 등록하지 않음(요구사항 4번 "중요한 규칙" 그대로). 기연(awakening)은
+// 이 요구사항 대상이 아니므로(업그레이드 체인은 현재 공용/특화 스킬에만 적용) 건드리지 않음 — upgradeFrom을
+// 쓰는 기연 스킬이 생기면 이 분기도 필요해질 수 있으나 지금은 범위 밖.
 function learnSkill(id){
   if(!canLearnSkill(id)) return;
   const s = SKILLS[id];
@@ -634,9 +639,15 @@ function learnSkill(id){
     state.learnedAwakeningSkills.push(id);
   } else {
     state.skillPoints -= cost;
+    if(s.upgradeFrom){
+      const oldId = s.upgradeFrom;
+      state.learnedSkills = state.learnedSkills.filter(existingId => existingId !== oldId);
+      state.skillQuickSlots = state.skillQuickSlots.map(slotId => slotId === oldId ? id : slotId);
+    }
     state.learnedSkills.push(id);
   }
   renderCharacterMenu();
+  renderSkillQuickSlots(); // 퀵슬롯이 교체됐을 수 있으므로 명시적으로 다시 갱신(다른 퀵슬롯 변경 함수들과 동일한 패턴)
   saveState();
 }
 // 스킬 퀵슬롯 초기화 — 등록된 스킬을 전부 제거함(캐릭터 메뉴 스킬 탭에서만 노출되는 버튼).
@@ -747,16 +758,33 @@ function closeTraceRestoreResult(){
 // 습득에 사용한 스킬 포인트 총합을 계산해 확인창에 보여주고, 확인 시 각 분류가 쓰던 풀(공용·특화는
 // skillPoints, 기연은 awakeningPoints — 기존 포인트 구조를 그대로 유지하고 새 습득 조건은 만들지 않음)에
 // 각각 정확히 되돌려줌. 확인창의 "현재 보유 SP"/"초기화 시 획득 SP"는 두 풀을 합산한 값으로 표시함.
+// 스킬 업그레이드로 교체된 스킬(예: 오연격)은 그 업그레이드 체인 전체(이연격→삼연격→사연격→오연격)에서
+// 소모한 포인트를 전부 합산해서 돌려줌(chainSkillCost) — 중간 단계에 썼던 포인트가 사라지지 않도록.
 function learnedSkillCost(id){
   const s = SKILLS[id];
   return (s && s.cost) || 1;
+}
+// 스킬 업그레이드(upgradeFrom) 체인 전체에서 실제로 소모한 포인트 총합 — 예: 오연격을 보유 중이면
+// 이연격→삼연격→사연격→오연격 4단계 모두 각각 습득할 때 포인트를 냈으므로 4단계 cost를 전부 합산해서
+// 반환함(초기화 시 그 포인트를 전부 돌려받기 위함). upgradeFrom이 없는 일반 스킬은 자기 자신의 cost만
+// 반환하므로 기존 방식과 동일(회귀 없음). visited로 순환 참조가 있어도 무한루프에 빠지지 않도록 방어.
+function chainSkillCost(id){
+  let sum = 0;
+  let curId = id;
+  const visited = new Set();
+  while(curId && SKILLS[curId] && !visited.has(curId)){
+    visited.add(curId);
+    sum += learnedSkillCost(curId);
+    curId = SKILLS[curId].upgradeFrom;
+  }
+  return sum;
 }
 function totalUnusedSkillPoints(){
   return (state.skillPoints || 0) + (state.awakeningPoints || 0);
 }
 function totalSpentSkillPoints(){
-  const normal = (state.learnedSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
-  const awaken = (state.learnedAwakeningSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
+  const normal = (state.learnedSkills || []).reduce((sum, id) => sum + chainSkillCost(id), 0);
+  const awaken = (state.learnedAwakeningSkills || []).reduce((sum, id) => sum + chainSkillCost(id), 0);
   return normal + awaken;
 }
 function openSkillResetConfirm(){
@@ -772,8 +800,8 @@ function cancelSkillReset(){
 }
 function confirmSkillReset(){
   closeSkillResetConfirm();
-  const normalRefund = (state.learnedSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
-  const awakenRefund = (state.learnedAwakeningSkills || []).reduce((sum, id) => sum + learnedSkillCost(id), 0);
+  const normalRefund = (state.learnedSkills || []).reduce((sum, id) => sum + chainSkillCost(id), 0);
+  const awakenRefund = (state.learnedAwakeningSkills || []).reduce((sum, id) => sum + chainSkillCost(id), 0);
   state.skillPoints = (state.skillPoints || 0) + normalRefund;
   state.awakeningPoints = (state.awakeningPoints || 0) + awakenRefund;
   state.learnedSkills = [];

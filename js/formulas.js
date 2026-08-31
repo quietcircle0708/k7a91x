@@ -846,11 +846,40 @@ function levelsForSkillPage(categoryId, pageIdx){
   return skillMilestoneLevels(categoryId).filter(lv => lv >= range.min && lv <= range.max);
 }
 // 습득 여부 조회 — 공용/특화는 learnedSkills, 기연은 learnedAwakeningSkills를 봄(분류별로 완전히 별도 목록).
+// 스킬 업그레이드(요구사항 3번)로 상위 스킬을 습득하면 하위 스킬은 이 목록에서 제거되므로, 하위 스킬은
+// 업그레이드 이후 여기서 false를 반환함(= 진짜 소유 여부). 목록 화면에 "습득된 것처럼" 보여주는 표시는
+// 아래 isSkillDisplayedAsLearned가 별도로 처리함 — 습득 가능 판정(canLearnSkill)·퀵슬롯 등록 후보 목록은
+// 전부 이 함수(실제 소유 여부)만 그대로 사용해야 하므로 손대지 않음.
 function isSkillLearned(id){
   const s = SKILLS[id];
   if(!s) return false;
   const list = s.category === 'awakening' ? state.learnedAwakeningSkills : state.learnedSkills;
   return Array.isArray(list) && list.includes(id);
+}
+// 이 스킬(id)이 이미 상위 스킬로 교체되어 사라진 상태인지 판정 — 지금 실제로 보유 중인 스킬들의
+// upgradeFrom 체인을 거슬러 올라가며 id가 그 체인 안에 있으면 true. 스킬 업그레이드 요구사항 3번(하위
+// 스킬 제거+상위 스킬 교체) 이후 하위 스킬 아이콘을 다시 클릭해 재습득하는 것을 막기 위한 용도(아래
+// canLearnSkill에서 사용) — 여러 단계 업그레이드(요구사항 5번)도 while로 체인을 끝까지 따라가 자동 처리됨.
+function isSkillSupersededByUpgrade(id){
+  const s = SKILLS[id];
+  const list = s && s.category === 'awakening' ? state.learnedAwakeningSkills : state.learnedSkills;
+  if(!Array.isArray(list)) return false;
+  return list.some(learnedId => {
+    let cur = SKILLS[learnedId];
+    while(cur && cur.upgradeFrom){
+      if(cur.upgradeFrom === id) return true;
+      cur = SKILLS[cur.upgradeFrom];
+    }
+    return false;
+  });
+}
+// 스킬 목록 화면에서 "습득된 것으로" 표시할지 판정(요구사항 3번 괄호: "스킬 레이아웃에는 하위 스킬도
+// 습득된 것으로 표시하나 퀵슬롯에 등록할 수는 없게") — 진짜 소유(isSkillLearned) 또는 상위 스킬로
+// 교체되어 사라진 하위 스킬(isSkillSupersededByUpgrade)이면 화면 표시용으로만 true. 퀵슬롯 등록 후보
+// 목록(openSkillQuickSlotPicker)은 state.learnedSkills를 직접 훑으므로 교체된 하위 스킬은 애초에
+// 목록에 없어 자동으로 등록 불가 상태가 유지됨 — 별도 처리 불필요.
+function isSkillDisplayedAsLearned(id){
+  return isSkillLearned(id) || isSkillSupersededByUpgrade(id);
 }
 // 스킬 종류(공격/버프/패시브) 자동 판정 — 요구사항 3번 규칙을 그대로 코드화:
 // 1) 소모 자원이 없으면 패시브, 2) target이 'buff'면 버프, 3) 그 외는 전부 공격.
@@ -861,12 +890,16 @@ function skillKindOf(skill){
   if(skill.target === 'buff') return 'buff';
   return 'attack';
 }
-// 공용/특화가 스킬 포인트를 공유하기 때문에 생기는 습득 제한(요구사항 4번): 같은 레벨 제한 + 같은 종류
-// (공격/버프/패시브)의 스킬은 하나만 습득 가능. 기연(awakening)은 별도 포인트를 쓰므로 이 제한을 적용하지 않음.
+// 공용/특화가 스킬 포인트를 공유하기 때문에 생기는 습득 제한(요구사항 4번, 기획문서 20-6 갱신):
+// 같은 레벨 제한 + 같은 종류(공격/버프/패시브)의 스킬은 하나만 습득 가능 — 단, 사용자 요청으로 이 제한은
+// 이제 패시브에만 적용됨(같은 레벨의 패시브 스킬끼리만 하나 선택). 공격/버프는 레벨이 같고 종류가 같아도
+// 전부 습득 가능하도록 완화됨(예: 사연격/발목 가르기처럼 같은 레벨의 공격 스킬 2종을 동시에 배울 수 있음).
+// 기연(awakening)은 별도 포인트를 쓰므로 애초에 이 제한 자체가 적용되지 않음(kind 무관하게 항상 false).
 function hasConflictingLearnedSkill(id){
   const s = SKILLS[id];
   if(!s || s.category === 'awakening') return false;
   const kind = skillKindOf(s);
+  if(kind !== 'passive') return false;
   return (state.learnedSkills || []).some(otherId => {
     if(otherId === id) return false;
     const other = SKILLS[otherId];
@@ -920,6 +953,13 @@ function buildSkillTooltipHtml(id){
     html += wtipRow('', `${resourceLabel} ${s.resourceAmount}`);
   }
   if(s.levelReq != null) html += wtipRow('', 'LV' + s.levelReq);
+  // 스킬 업그레이드 요구사항 5-1번: upgradeFrom이 지정된 스킬만 레벨 제한 행 아래에 선행 스킬 습득 조건을
+  // 한 줄 더 표시(레이아웃/서식은 위 행들과 동일한 wtipRow 재사용). upgradeFrom이 없는 스킬은 이 행이
+  // 아예 없으므로 기존 스킬들의 툴팁 출력은 그대로 유지됨(요구사항 6번).
+  if(s.upgradeFrom){
+    const prereq = SKILLS[s.upgradeFrom];
+    if(prereq) html += wtipRow('', `${prereq.name} 습득 상태`);
+  }
   html += `</div>`;
   return html;
 }
@@ -957,12 +997,18 @@ function activeBuffBonus(key){
 // 지금 습득할 수 있는지(레벨 조건 충족 + 포인트 충분 + 아직 미습득 + 습득 제한에 걸리지 않음). 에픽/유니크는
 // 해금 방식이 아직 구현되지 않아(비급/깨달음 소비 예정) 항상 불가로 처리 — SKILLS에 실제 항목이 등록되고
 // 해금 로직이 추가되면 이 부분만 손보면 됨.
+// 스킬 업그레이드(요구사항 2·7번): upgradeFrom이 지정된 스킬은 기존 레벨 조건에 더해 그 upgradeFrom
+// 스킬을 실제로 보유(isSkillLearned) 중이어야만 습득 가능. upgradeFrom이 없는 스킬은 기존 방식 그대로
+// 동작(요구사항 7번, 조건 추가 없음). isSkillSupersededByUpgrade 체크는 이미 상위 스킬로 교체되어 화면에만
+// "습득됨"으로 표시되는 하위 스킬을 다시 클릭해 재습득하는 것을 막음(교체된 하위 스킬 재습득 방지).
 function canLearnSkill(id){
   const s = SKILLS[id];
   if(!s || isSkillLearned(id)) return false;
   if(s.grade === 'epic' || s.grade === 'unique') return false;
   if(s.levelReq && (state.playerLevel || 1) < s.levelReq) return false;
   if(hasConflictingLearnedSkill(id)) return false;
+  if(s.upgradeFrom && !isSkillLearned(s.upgradeFrom)) return false;
+  if(isSkillSupersededByUpgrade(id)) return false;
   const pool = s.category === 'awakening' ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
   return pool >= (s.cost || 1);
 }
