@@ -314,9 +314,9 @@ const DROP_EFFECT_DURATION_MS = 1000;
 // 재사용해 PNG 이미지를 그리고, 아티팩트·마석·재료처럼 이미지가 없는 아이템은 기존 UI에서 쓰는 이모지
 // 아이콘을 그대로 사용함. 새 아이템이 추가되어도 이 함수를 손댈 필요 없이 기존 데이터(WEAPON_TYPES 계열/
 // ARTIFACTS/MISC_ITEMS)에 등록만 되어 있으면 자동으로 반영됨.
-// 등급별 발광 필터(dropEffectGlowFilter)는 더 이상 적용하지 않음 — 이미지 파일 자체에는 어떤 필터 효과도
-// 없이 원본 그대로 등장→낙하→튕김→소멸 연출만 재생되도록 함(요청: 드랍 연출에서 발광 효과 제거, 연출
-// 자체와 등급 판정·아이콘 선택 로직은 그대로 유지).
+// 등급별 발광 필터는 기본적으로 적용하지 않음(요청: 드랍 연출에서 발광 효과 제거, 연출 자체와 등급
+// 판정·아이콘 선택 로직은 그대로 유지) — 단, 이름에 "호박"이 포함된 기타 아이템(DROP_GLOW_ITEM_KEYWORD)만
+// 범위를 좁혀 등급별 발광을 재적용함(아래 'item' 분기 참고, 다른 종류는 전부 원본 그대로).
 function dropItemVisualInner(item){
   if(item.kind === 'equip'){
     return `<span class="drop-item-visual-inner">${weaponIconHtml(item.type, 'drop-item-visual-img')}</span>`;
@@ -332,7 +332,18 @@ function dropItemVisualInner(item){
   }
   // item.kind === 'item' — 마석/재료 등 MISC_ITEMS
   const it = MISC_ITEMS[item.itemId];
-  return `<span class="drop-item-visual-inner drop-item-visual-emoji">${itemIconHtml(it)}</span>`;
+  const iconHtml = itemIconHtml(it);
+  // 예외: 이름에 "호박"이 포함된 기타 아이템만 등급별 발광 효과를 재적용함(DROP_GLOW_ITEM_KEYWORD,
+  // data.js 참고). 그 외 기타아이템/장비/아티팩트/플라스크는 바로 위에서 전부 발광 없이 원본 그대로 반환됨 —
+  // 다른 분기는 건드리지 않음.
+  if(it && it.name && it.name.includes(DROP_GLOW_ITEM_KEYWORD)){
+    const glowLevel = DROP_GLOW_GRADE_LEVEL[it.grade];
+    const levelEffect = (glowLevel != null) ? ENHANCE_LEVEL_EFFECTS[glowLevel] : null;
+    const hasGlow = !!(levelEffect && levelEffect.glow && levelEffect.glow !== 'none');
+    const glowed = hasGlow ? `<span class="icon-enhance-glow" style="filter:${levelEffect.glow};">${iconHtml}</span>` : iconHtml;
+    return `<span class="drop-item-visual-inner drop-item-visual-emoji">${glowed}</span>`;
+  }
+  return `<span class="drop-item-visual-inner drop-item-visual-emoji">${iconHtml}</span>`;
 }
 // 실제로 이 이미지 하나를 등장→낙하→튕김→유지→소멸 애니메이션으로 재생함.
 // container는 실제 좌표 기준(position:relative)이 되는 .combat-arena를 받음(아래 playMonsterDropEffect

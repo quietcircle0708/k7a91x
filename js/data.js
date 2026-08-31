@@ -1987,26 +1987,26 @@ const SKILLS = {
     passiveEffect: { hpFlat: 100 },
   },
   slash: {
-    name: '내려베기', desc: '무기를 휘둘러 130%의 데미지로 적을 공격한다.',
+    name: '내려베기', desc: '무기를 휘둘러 {dp}%의 데미지로 적을 공격한다.',
     grade: 'normal', category: 'common', target: 'single', levelReq: 5,
     cooldown: 6, resourceType: 'mp', resourceAmount: 30, castTime: 0,
     damagePercent: 130, hits: 1,
   },
   rage: {
-    name: '분노', desc: '[버프] 60초 동안 자신의 공격력을 30 증가시킨다.',
+    name: '분노', desc: '{duration}초 동안 자신의 공격력을 {atkFlat} 증가.',
     grade: 'normal', category: 'common', target: 'buff', levelReq: 5,
     cooldown: 120, resourceType: 'mp', resourceAmount: 50, castTime: 0.1,
     buffEffect: { atkFlat: 30, durationMs: 60000 },
   },
   double_strike: {
-    name: '이연격', desc: '빠르게 무기를 휘둘러 75%의 데미지로 적을 2번 공격한다.',
+    name: '이연격', desc: '빠르게 무기를 휘둘러 {dp}% 데미지로 적을 {hits}번 공격.',
     grade: 'normal', category: 'common', target: 'single', levelReq: 10,
     cooldown: 5.5, resourceType: 'mp', resourceAmount: 50, castTime: 0,
     damagePercent: 75, hits: 2, icon: 'lv10atk',
     hitDelayMs: 0.1, // 1타는 즉시, 2타는 이 시간(초) 뒤에 순차 적용(resolveSkillEffect의 hitDelayMs 분기 참고)
   },
   preemptive_strike: {
-    name: '선공', desc: '[버프] 15초 동안 자신의 공격 속도를 20% 증가시킨다.',
+    name: '선공', desc: '{duration}초 동안 공격 속도 {atkSpeed}% 증가.',
     grade: 'rare', category: 'common', target: 'buff', levelReq: 10,
     cooldown: 30, resourceType: 'mp', resourceAmount: 70, castTime: 0.1,
     buffEffect: { atkSpeedPercent: 20, durationMs: 15000 }, icon: 'lv10buff',
@@ -2017,20 +2017,20 @@ const SKILLS = {
     passiveEffect: { hpFlat: 500 }, icon: 'lv10passive',
   },
   cleave: {
-    name: '참격 1성', desc: '140%의 데미지로 모든 적을 공격한다.',
+    name: '참격 1성', desc: '{dp}%의 데미지로 모든 적을 공격.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 15,
     cooldown: 8, resourceType: 'mp', resourceAmount: 110, castTime: 0.1,
     damagePercent: 140, hits: 1,
   },
   sword_strike: {
-    name: '지면 강타', desc: '120% 데미지로 적을 공격하고, 피해를 입은 적을 2초 동안 기절시킨다.',
+    name: '지면 강타', desc: '{dp}% 데미지로 적을 공격, 피해 입은 적은 {duration}초 동안 기절.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 20,
     cooldown: 10, resourceType: 'mp', resourceAmount: 120, castTime: 0.2,
     damagePercent: 120, hits: 1, icon: 'lv20atk',
     onHitStatus: { key: 'stun', durationMs: 2000 }, // 적중(=피해를 입혀 대상이 생존)한 경우에만 부여, 처치시엔 부여 안 함
   },
   beast_heart: {
-    name: '야수의 심장', desc: '[버프] 25초 동안 기본 공격 피해량이 25% 증가한다.',
+    name: '야수의 심장', desc: '{duration}초 동안 기본 공격 피해량 {atkdp}% 증가',
     grade: 'normal', category: 'common', target: 'buff', levelReq: 20,
     cooldown: 60, resourceType: 'mp', resourceAmount: 200, castTime: 0, icon: 'lv20buff',
     // basicAtkDamagePercent는 effectiveAtk(스킬 데미지 계산도 함께 쓰는 함수)가 아니라 dungeon.js
@@ -2038,13 +2038,13 @@ const SKILLS = {
     buffEffect: { basicAtkDamagePercent: 25, durationMs: 25000 },
   },
   earth_vigor: {
-    name: '대지의 기운', desc: '체력 500을 회복한다.',
+    name: '대지의 기운', desc: '체력 500 회복.',
     grade: 'rare', category: 'common', target: 'buff', levelReq: 25,
     cooldown: 20, resourceType: 'mp', resourceAmount: 300, castTime: 1.0, icon: 'lv25buff',
     healFlat: 500, // 시전 완료 시점에 체력 500 회복(최대체력 초과 회복 안 함) — actions.js resolveSkillEffect 참고
   },
   triple_strike: {
-    name: '삼연격', desc: '물 흐르듯 움직여 70%의 데미지로 세 번 공격한다',
+    name: '삼연격', desc: '물 흐르듯 움직여 {dp}%의 데미지로 {hits}번 공격',
     grade: 'rare', category: 'common', target: 'single', levelReq: 30,
     cooldown: 5.4, resourceType: 'mp', resourceAmount: 125, castTime: 0,
     damagePercent: 70, hits: 3, icon: 'lv30atk',
@@ -2054,7 +2054,7 @@ const SKILLS = {
     hitDelayMs: 0.1,
   },
   ankle_slash: {
-    name: '발목 가르기', desc: '150% 데미지로 공격한 후<br>피해를 입은 적을 3초 동안 둔화시킨다',
+    name: '발목 가르기', desc: '{dp}% 데미지로 공격한 후<br>피해 입은 적을 {duration}초 동안 둔화.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 30,
     cooldown: 10, resourceType: 'mp', resourceAmount: 150, castTime: 0.2,
     damagePercent: 150, hits: 1, icon: 'lv30atk2',
@@ -2063,7 +2063,7 @@ const SKILLS = {
   cleave2: {
     // 원본 요청 표에 설명(200%)과 데미지%(190) 값이 서로 다르게 적혀있어, 실제 데미지 계산에 쓰이는
     // 명시적 수치 필드(데미지% 190)를 기준으로 반영함(응답 참고, 확인 필요).
-    name: '참격 2성', desc: '190%의 데미지로 모든 적을 공격한다.',
+    name: '참격 2성', desc: '{dp}%의 데미지로 모든 적을 공격.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 35,
     cooldown: 7, resourceType: 'mp', resourceAmount: 200, castTime: 0.1,
     damagePercent: 190, hits: 1, icon: 'lv35atk',
@@ -2076,13 +2076,13 @@ const SKILLS = {
     healFlat: 500,
   },
   cleave3: {
-    name: '참격 3성', desc: '250%데미지로 모든 적을 공격한다',
+    name: '참격 3성', desc: '{dp}%의 데미지로 모든 적을 공격.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 45,
     cooldown: 7, resourceType: 'mp', resourceAmount: 250, castTime: 0.1,
     damagePercent: 250, hits: 1, icon: 'lv35atk', // 요청대로 참격 1·2성과 동일한 lv35atk 아이콘 재사용
   },
   quad_strike: {
-    name: '사연격', desc: '맹렬하게 움직여 <br>62.5%의 데미지로 네 번 공격한다',
+    name: '사연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 {hits}번 공격.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 50,
     cooldown: 5.1, resourceType: 'mp', resourceAmount: 200, castTime: 0,
     damagePercent: 62.5, hits: 4, icon: 'lv50atk',
@@ -2093,6 +2093,22 @@ const SKILLS = {
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
 // (일반/레어/에픽/유니크 라벨·색상이 이미 동일하므로 SKILLS[id].grade를 WEAPON_GRADES에 그대로 대입해 조회).
+
+// ---- 스킬 설명(desc) 변수 자동 치환 ----
+// desc 문자열 안의 {변수명}을 실제 스킬 데이터 값으로 바꿔주는 기능(formulas.js resolveSkillDescText)에서
+// 쓰는 별칭 표. 왼쪽(desc에 쓰는 축약 이름) → 오른쪽(SKILLS 데이터에 실제 등록된 필드명). 여기 없는
+// 변수명이 desc에 쓰이면 별칭 없이 그 이름 자체를 필드명으로 바로 찾아보므로(=하드코딩 없이 확장 가능),
+// 새 스킬에 새 수치 필드를 추가할 때 원래 필드명을 그대로 {필드명}으로 쓰면 이 표를 안 건드려도 동작함.
+const SKILL_DESC_VAR_ALIAS = {
+  dp: 'damagePercent',
+  hits: 'hits',
+  duration: 'durationMs', // ms 값을 그대로 쓰지 않고 초로 변환해서 표시(아래 SKILL_DESC_SECONDS_FIELDS 참고)
+  atkSpeed: 'atkSpeedPercent',
+  atkFlat: 'atkFlat',
+  atkdp: 'basicAtkDamagePercent',
+};
+// 치환값이 ms 단위라 초 단위로 변환해서 보여줘야 하는 필드 목록(예: durationMs 2500 → "2.5").
+const SKILL_DESC_SECONDS_FIELDS = ['durationMs'];
 
 // 스킬 아이콘 이미지 — weaponImagePath/monsterIconHtml과 동일한 방식(디렉토리+확장자 상수, <img> 태그로 출력).
 const SKILL_IMAGE_DIR = 'assets/skill/';
@@ -2834,6 +2850,17 @@ const ENHANCE_LEVEL_EFFECTS = [
   /* +8 */ { glowColor: "#ff6a3d", glow: "drop-shadow(0 0 18px #ff6a3dd0) brightness(1.08) saturate(1.15)", smoke: true },
   /* +9 */ { glowColor: "#c9950f", glow: "drop-shadow(0 0 22px #c9950fee) drop-shadow(0 0 10px #f2b90fcc) brightness(1.05) saturate(1.35)", smoke: true },
 ];
+
+// ---- 던전 드랍 연출 전용: 이름에 특정 키워드가 포함된 기타 아이템에만 등급별 발광 재적용 ----
+// 과거(zip141)엔 모든 드랍 연출에 등급별 발광을 씌웠다가 요청으로 전부 제거했었음. 이번엔 범위를 좁혀,
+// 이름에 DROP_GLOW_ITEM_KEYWORD("호박")가 포함된 MISC_ITEMS에 한해서만 재적용함 — 특정 아이템 id를
+// 하드코딩하지 않으므로 지금 등록된 호박/진호박은 물론, 앞으로 이름에 "호박"이 들어가는 기타 아이템이
+// 추가돼도 데이터 등록만으로 자동 적용됨. 그 외 장비/아티팩트/플라스크/다른 기타아이템 드랍 연출은
+// 계속 발광 없이 원본 그대로 재생됨(00번 문서 8-5 규칙).
+// 발광 강도는 새 색상을 만들지 않고 위 ENHANCE_LEVEL_EFFECTS(강화 단계별 발광)를 등급별로 매핑해
+// 재사용함(과거 dropEffectGlowFilter가 쓰던 것과 동일한 매핑값 유지).
+const DROP_GLOW_ITEM_KEYWORD = '호박';
+const DROP_GLOW_GRADE_LEVEL = { normal: 0, rare: 3, epic: 5, unique: 7 };
 
 // 저장소 키
 const STORAGE_KEY = 'forge-state-v5';

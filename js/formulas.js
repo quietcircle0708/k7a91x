@@ -873,6 +873,36 @@ function hasConflictingLearnedSkill(id){
     return other && other.levelReq === s.levelReq && skillKindOf(other) === kind;
   });
 }
+// ---- 스킬 설명(desc) 변수 자동 치환 ----
+// skill 객체 안에서 fieldName 값을 찾음. 최상위 필드(damagePercent, hits 등)를 먼저 보고, 없으면
+// buffEffect/passiveEffect/onHitStatus처럼 스킬 안에 중첩된 하위 객체(object 타입 필드) 전체를 뒤져서
+// 동일한 이름의 값을 찾음 — 어떤 하위 객체 이름을 쓰든(새 효과 객체가 추가되어도) 자동으로 동작함.
+function findSkillFieldValue(skill, fieldName){
+  if(!skill) return undefined;
+  if(skill[fieldName] !== undefined) return skill[fieldName];
+  for(const key in skill){
+    const val = skill[key];
+    if(val && typeof val === 'object' && !Array.isArray(val) && Object.prototype.hasOwnProperty.call(val, fieldName)){
+      return val[fieldName];
+    }
+  }
+  return undefined;
+}
+// desc 문자열 안의 {변수명}을 실제 데이터 값으로 치환. SKILL_DESC_VAR_ALIAS(data.js)에 등록된 축약 이름이면
+// 매핑된 필드명을 쓰고, 없으면 변수명 자체를 필드명으로 바로 찾아본다(특정 스킬 하드코딩 없이 모든 스킬에
+// 공통 적용). 데이터에 없는 변수는 에러 없이 원문 {변수명} 그대로 남겨둔다. durationMs처럼 ms 단위인 값은
+// SKILL_DESC_SECONDS_FIELDS 목록에 따라 초 단위(예: 2500 → "2.5")로 변환해서 보여준다.
+// 쿨타임·소모자원·요구레벨 등 기존 툴팁 항목(buildSkillTooltipHtml)에는 전혀 관여하지 않음 — desc 문자열만 대상.
+function resolveSkillDescText(skill){
+  if(!skill || !skill.desc) return skill ? skill.desc : '';
+  return skill.desc.replace(/\{(\w+)\}/g, (match, varName) => {
+    const fieldName = SKILL_DESC_VAR_ALIAS[varName] || varName;
+    const raw = findSkillFieldValue(skill, fieldName);
+    if(raw === undefined || raw === null) return match;
+    if(SKILL_DESC_SECONDS_FIELDS.includes(fieldName) && typeof raw === 'number') return String(raw / 1000);
+    return String(raw);
+  });
+}
 // ---- 스킬 툴팁 ----
 // 레이아웃/서식은 buildWeaponTooltipHtml·buildArtifactTooltipHtml과 동일한 규칙(wtipRow, 라벨 없는 값은
 // wtipRow('', 값))을 그대로 따름. 이름/설명/소모 자원/레벨 제한은 항목명을 생략하고 값만 출력하고,
@@ -883,7 +913,7 @@ function buildSkillTooltipHtml(id){
   const grade = WEAPON_GRADES[s.grade];
   let html = `<div style="text-align:center;">`;
   html += `<div style="color:${grade ? grade.color : '#ffffff'}; font-weight:700; margin-bottom:2px;">${s.name}</div>`;
-  if(s.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${s.desc}</div>`;
+  if(s.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${resolveSkillDescText(s)}</div>`;
   if(s.cooldown != null) html += wtipRow('쿨타임', s.cooldown + '초');
   if(s.resourceType != null){
     const resourceLabel = s.resourceType === 'hp' ? '체력' : '마나';
