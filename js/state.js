@@ -356,7 +356,13 @@ function applyLoadedRaw(raw){
   }
   // 구버전(스킬 시스템 이전) 마이그레이션: 스탯 포인트와 동일한 방식으로, 이미 도달한 레벨 기준
   // 공식(totalSkillPointsForLevel/totalAwakeningPointsForLevel)으로 포인트를 소급 지급함.
-  if(loaded.skillPoints === undefined) state.skillPoints = totalSkillPointsForLevel(state.playerLevel);
+  // 공용·특화(skillPoints)는 필드가 이미 있는 세이브라도 "현재 레벨 기준 총 지급량 - 실제 습득에 쓴
+  // 포인트"로 매번 다시 계산함 — 그래야 지급 공식 자체가 바뀌었을 때(zip155, 5레벨당 1개→2개)도
+  // 이미 진행 중이던 세이브의 미사용 포인트가 새 공식 기준으로 자동 보정됨(기존엔 필드가 아예 없을
+  // 때만 소급 지급해서, 공식이 바뀐 경우는 반영이 안 되는 문제가 있었음). 기연(awakeningPoints)은
+  // 이번 수정 범위가 아니라 기존 방식(필드 없을 때만 소급 지급) 그대로 유지함.
+  const spentSkillPoints = (state.learnedSkills || []).reduce((sum, id) => sum + chainSkillCost(id), 0);
+  state.skillPoints = totalSkillPointsForLevel(state.playerLevel) - spentSkillPoints;
   if(loaded.awakeningPoints === undefined) state.awakeningPoints = totalAwakeningPointsForLevel(state.playerLevel);
   if(!Array.isArray(state.learnedSkills)) state.learnedSkills = [];
   if(!Array.isArray(state.learnedAwakeningSkills)) state.learnedAwakeningSkills = [];

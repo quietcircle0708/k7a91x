@@ -808,10 +808,10 @@ function requiredExp(level){
 }
 
 // ---- 스킬 시스템 — 포인트 공식 ----
-// 공용/특화가 공유하는 스킬 포인트의 "레벨까지 누적 지급량"(레벨1 + 5레벨 단위마다 1개: LV1,5,10,15...).
+// 공용/특화가 공유하는 스킬 포인트의 "레벨까지 누적 지급량"(레벨1 + 5레벨 단위마다 2개: LV1,5,10,15...).
 function totalSkillPointsForLevel(lv){
   if(lv < 1) return 0;
-  return 1 + Math.floor(lv / 5);
+  return 1 + 2 * Math.floor(lv / 5);
 }
 // 기연(깨달음)의 "레벨까지 누적 지급량"(10레벨 단위 LV10~90마다 1개 + LV99 도달 시 예외적으로 2개 추가).
 function totalAwakeningPointsForLevel(lv){
@@ -844,6 +844,102 @@ function levelsForSkillPage(categoryId, pageIdx){
   const range = SKILL_PAGES[pageIdx - 1];
   if(!range) return [];
   return skillMilestoneLevels(categoryId).filter(lv => lv >= range.min && lv <= range.max);
+}
+// ---- 스킬 트리 UI 좌표 계산 ----
+// 스킬 목록 UI를 레벨별 세로 나열에서 "레벨을 가로축으로 + 선행/후속 스킬을 연결선으로 표시하는 트리"
+// 형태로 바꾸기 위한 좌표 계산 전용 함수(실제 습득/사용/전투 로직에는 전혀 관여하지 않음, render.js
+// buildSkillTreeHtml이 이 결과를 그대로 그림으로 옮겨 그림).
+// - columns: 이 페이지에 표시할 레벨 라벨 목록(levelsForSkillPage 그대로 재사용 — 페이지네이션 무수정).
+// - items: columns 첫~끝 레벨 사이에 levelReq가 있는 이 분류의 스킬들. col은 실수 열 위치로, 데이터의
+//   실제 levelReq를 두 라벨 사이에서 선형보간해 구함(예: LV14는 LV10·LV15 라벨 사이 0.8 지점) — 5단위가
+//   아닌 레벨이 등록돼도 하드코딩 없이 자동으로 그 사이 위치에 놓이도록 하기 위함.
+//   row는 정수 세로줄. computeSkillTreeRows가 "카테고리 전체(페이지 구분 없이)" 기준으로 한 번만 계산한
+//   값을 그대로 가져다 쓰므로, 같은 체인이 페이지가 바뀌어도 항상 같은 행을 유지함(요구사항 2번) — 페이지가
+//   바뀔 때마다 그 페이지에 보이는 스킬만으로 행을 새로 매기지 않음. 페이지에 이 체인의 이전 스킬들이
+//   하나도 없어 낮은 행 번호가 이 페이지엔 등장하지 않으면, 그만큼 위쪽이 빈 행으로 남는 것도 의도된 동작.
+// - 페이지 레벨 구간이 서로 겹치므로(요구사항 1번: 1~30/30~60/60~90/90~99), 경계 레벨(30·60·90) 스킬은
+//   filter 조건(levelReq가 minLv~maxLv 사이)에 의해 자연스럽게 인접한 두 페이지 모두에 포함됨 — 복제가
+//   아니라 완전히 같은 SKILLS[id] 데이터를 그대로 두 번 그리는 것뿐이라 습득/초기화/툴팁이 항상 연동됨
+//   (요구사항 3번).
+// - connections: ①이 페이지 안의 스킬이 갖는 upgradeFrom(선행 스킬) 방향, ②이 페이지 안의 스킬을
+//   upgradeFrom으로 삼는 다른 스킬(후속 스킬) 방향을 모두 확인해서 만듦. 상대 스킬이 이 페이지 범위 밖(다른
+//   페이지)에 있어도 connections에는 넣되, colOf가 범위 밖 레벨을 항상 0(왼쪽 끝) 또는 columns.length-1
+//   (오른쪽 끝)로 clamp하기 때문에 선이 그 페이지의 라벨 영역을 넘어가지 않는 "이어지는 중" 형태의 부분
+//   연결선으로 자연스럽게 그려짐(요구사항 4번, 별도의 stub 좌표 계산 불필요).
+// - kindId(신규, 세로 탭 요구사항): 지정하면 skillVerticalTabOf(SKILLS[id])가 이 값과 일치하는 스킬만
+//   골라서 columns/items/connections/rowOf 전부를 그 부분집합 기준으로 다시 계산함(행 번호도 kindId별로
+//   따로 촘촘하게 매겨짐 — 예: '버프' 탭엔 버프 스킬끼리만 있으므로 그 안에서 0,1,2...로 새로 매김. 세
+//   탭이 서로 다른 행 체계를 쓰는 건 의도된 동작이며, kindId를 생략하면(기존 호출부 호환) 기존처럼 분류
+//   전체를 대상으로 계산함 — 회귀 없음).
+function computeSkillTreeRows(categoryId, kindId){
+  const ids = Object.keys(SKILLS)
+    .filter(id => SKILLS[id].category === categoryId && (!kindId || skillVerticalTabOf(SKILLS[id]) === kindId))
+    .sort((a, b) => SKILLS[a].levelReq - SKILLS[b].levelReq);
+  const rowOf = {};
+  const occupiedRowsByLevel = {};
+  let nextRow = 0;
+  ids.forEach(id => {
+    const s = SKILLS[id];
+    let row = (s.upgradeFrom && rowOf[s.upgradeFrom] !== undefined) ? rowOf[s.upgradeFrom] : nextRow++;
+    occupiedRowsByLevel[s.levelReq] = occupiedRowsByLevel[s.levelReq] || new Set();
+    while(occupiedRowsByLevel[s.levelReq].has(row)) row = nextRow++;
+    occupiedRowsByLevel[s.levelReq].add(row);
+    rowOf[id] = row;
+  });
+  return rowOf;
+}
+function buildSkillTreeLayout(categoryId, pageIdx, kindId){
+  const columns = levelsForSkillPage(categoryId, pageIdx);
+  if(!columns.length) return { columns: [], items: [], connections: [], maxRow: 0 };
+
+  const minLv = columns[0], maxLv = columns[columns.length - 1];
+  const rowOf = computeSkillTreeRows(categoryId, kindId); // 페이지 무관, (분류+세로탭) 기준 고정 행(요구사항 2번)
+  const ids = Object.keys(SKILLS)
+    .filter(id => SKILLS[id].category === categoryId && (!kindId || skillVerticalTabOf(SKILLS[id]) === kindId)
+      && SKILLS[id].levelReq >= minLv && SKILLS[id].levelReq <= maxLv)
+    .sort((a, b) => SKILLS[a].levelReq - SKILLS[b].levelReq);
+
+  function colOf(level){
+    for(let i = 0; i < columns.length - 1; i++){
+      const a = columns[i], b = columns[i + 1];
+      if(level >= a && level <= b) return i + (b === a ? 0 : (level - a) / (b - a));
+    }
+    return level <= columns[0] ? 0 : columns.length - 1;
+  }
+
+  const items = ids.map(id => ({ id, col: colOf(SKILLS[id].levelReq), row: rowOf[id] }));
+
+  const onThisPage = new Set(ids);
+  const connections = [];
+  // ①선행 스킬 방향(이 페이지 스킬 → upgradeFrom). 상대가 다른 페이지에 있으면 colOf가 clamp해 부분선이 됨.
+  // (참고) 지금 데이터는 upgradeFrom 체인이 전부 같은 세로 탭 안에서만 이어지므로(예: 버프↔버프,
+  // 공격↔공격) kindId로 걸러도 연결선이 끊기지 않음 — 다른 탭으로 넘어가는 체인이 생기면 그 경우엔
+  // rowOf[s.upgradeFrom]가 이 kindId 집합에 없어 undefined가 되므로 아래 조건에서 자동으로 걸러짐.
+  ids.forEach(id => {
+    const s = SKILLS[id];
+    if(s.upgradeFrom && rowOf[s.upgradeFrom] !== undefined){
+      connections.push({
+        fromId: s.upgradeFrom, toId: id, row: rowOf[id],
+        fromCol: colOf(SKILLS[s.upgradeFrom].levelReq), toCol: colOf(s.levelReq),
+      });
+    }
+  });
+  // ②후속 스킬 방향(이 페이지 스킬 → 이 스킬을 upgradeFrom으로 삼는 다른 스킬). 그 후속 스킬이 이 페이지에도
+  // 있으면 위 ①에서 그 스킬 자신의 시점으로 이미 연결선이 추가되므로, 여기서는 "후속 스킬이 이 페이지에는
+  // 없는 경우"만 추가해 중복을 피함.
+  Object.keys(SKILLS).forEach(childId => {
+    const child = SKILLS[childId];
+    if(child.category === categoryId && (!kindId || skillVerticalTabOf(child) === kindId)
+      && child.upgradeFrom && onThisPage.has(child.upgradeFrom) && !onThisPage.has(childId)){
+      connections.push({
+        fromId: child.upgradeFrom, toId: childId, row: rowOf[childId],
+        fromCol: colOf(SKILLS[child.upgradeFrom].levelReq), toCol: colOf(child.levelReq),
+      });
+    }
+  });
+
+  const maxRow = items.reduce((m, it) => Math.max(m, it.row), 0);
+  return { columns, items, connections, maxRow };
 }
 // 습득 여부 조회 — 공용/특화는 learnedSkills, 기연은 learnedAwakeningSkills를 봄(분류별로 완전히 별도 목록).
 // 스킬 업그레이드(요구사항 3번)로 상위 스킬을 습득하면 하위 스킬은 이 목록에서 제거되므로, 하위 스킬은
@@ -884,9 +980,20 @@ function isSkillDisplayedAsLearned(id){
 // 스킬 종류(공격/버프/패시브) 자동 판정 — 요구사항 3번 규칙을 그대로 코드화:
 // 1) 소모 자원이 없으면 패시브, 2) target이 'buff'면 버프, 3) 그 외는 전부 공격.
 // 이 순서를 그대로 지켜야 하며(패시브 판정이 우선), 새 스킬을 추가해도 이 함수는 손댈 필요가 없음.
+// (주의) 이 함수는 hasConflictingLearnedSkill 전용 — 스킬 탭 세로 탭 분류는 아래 skillVerticalTabOf가
+// 별도로 담당함(요청 기준이 서로 다름: 이건 resourceType 유무 우선, 세로 탭은 target 값만 봄). 세로 탭
+// 기능이 이 판정 결과(=습득 제한 규칙)에 영향을 주면 안 되므로 일부러 완전히 분리해둠.
 function skillKindOf(skill){
   if(!skill) return 'attack';
   if(!skill.resourceType) return 'passive';
+  if(skill.target === 'buff') return 'buff';
+  return 'attack';
+}
+// 스킬 탭 세로 탭(공격/버프/패시브) 분류 — SKILLS[id].target 값만으로 판정(요구사항 1번 "스킬 분류 기준"
+// 그대로): target==='passive'면 패시브, target==='buff'면 버프, 그 외(single/aoe 등)는 전부 공격.
+function skillVerticalTabOf(skill){
+  if(!skill) return 'attack';
+  if(skill.target === 'passive') return 'passive';
   if(skill.target === 'buff') return 'buff';
   return 'attack';
 }
@@ -993,6 +1100,18 @@ function activeBuffBonus(key){
     if(b && b.until > now && typeof b[key] === 'number') total += b[key];
   });
   return total;
+}
+// 던전 전투화면 버프 UI(요구사항: 지속시간 남은 버프만, 남은시간 내림차순) 전용 — activeSkillBuffs를
+// 그대로 읽기만 할 뿐 별도의 지속시간 계산 공식을 새로 만들지 않음(요구사항 2번 "새로운 계산 공식을
+// 만들지 않는다"). 만료된 항목은 여기서 걸러지므로 종료된 버프는 자동으로 목록에서 빠짐.
+// { id, remainMs }[] 를 남은시간 내림차순(많이 남은 순)으로 반환.
+function activeBuffListForUi(){
+  if(typeof activeSkillBuffs !== 'object' || !activeSkillBuffs) return [];
+  const now = Date.now();
+  return Object.entries(activeSkillBuffs)
+    .filter(([id, b]) => b && b.until > now && SKILLS[id])
+    .map(([id, b]) => ({ id, remainMs: b.until - now }))
+    .sort((a, b) => b.remainMs - a.remainMs);
 }
 // 지금 습득할 수 있는지(레벨 조건 충족 + 포인트 충분 + 아직 미습득 + 습득 제한에 걸리지 않음). 에픽/유니크는
 // 해금 방식이 아직 구현되지 않아(비급/깨달음 소비 예정) 항상 불가로 처리 — SKILLS에 실제 항목이 등록되고

@@ -557,6 +557,42 @@
     100%{ box-shadow: 0 0 0 0 rgba(193,60,60,0); border-color: var(--forge-line); }
   }
   .dmg-popup.player-dmg{ top:-6px; color: var(--forge-blood); }
+  /* ---- 던전 전투화면 버프 지속시간 UI ---- 플레이어 정보 패널(.hunt-player-info) 오른쪽의 빈 공간에
+     떠 있는 완전히 독립된 절대좌표 오버레이라, 이 블록을 추가/삭제해도 다른 레이아웃(전투 영역 크기,
+     플레이어/몬스터 위치, 퀵슬롯 위치)에 전혀 영향을 주지 않음. 아이콘 크기/간격/투명도는 커스텀
+     속성(--hunt-buff-*) 3개로만 관리 — 요구사항대로 값만 바꾸면 전체가 한번에 조정됨.
+     top:0으로 hunt-player-info(플레이어 정보 패널)와 정확히 같은 높이에 맞춤(hunt-player-info 위쪽의
+     주석대로 이 top:0 자체가 "던전 이름 - 스테이지" 행과 같은 높이가 되도록 설계된 기준점이라, 캐릭터
+     정보 UI와 맞추면 자동으로 타이틀 행보다 아래로 내려가지 않는 조건도 함께 만족함).
+     한 줄 5개로 고정 줄바꿈되도록 width를 "아이콘 5개 + 간격 4개"의 정확한 합으로 고정폭 지정하고,
+     3줄(최대 15개)을 넘는 분량은 max-height+overflow:hidden으로 잘라 플레이어 정보 패널 높이를
+     넘지 않게 함(렌더링 쪽에서도 15개로 잘라 보내므로 이 overflow는 이중 안전장치). 각 슬롯은 이제
+     아이콘 크기 그대로의 정사각형 하나뿐이고(남은시간 표시로 인한 추가 높이 없음), 남은시간 텍스트는
+     그 위에 absolute+z-index로 겹쳐서 슬롯 정중앙에 표시됨(슬롯 바깥으로 나가지 않음). */
+  .hunt-buff-ui{
+    --hunt-buff-icon-size: 24px; --hunt-buff-gap: 8px; --hunt-buff-icon-opacity: .38;
+    position:absolute; top:55px; right:20px; z-index:2;
+    display:flex; flex-wrap:wrap; align-content:flex-start;
+    gap: var(--hunt-buff-gap);
+    width: calc(var(--hunt-buff-icon-size) * 5 + var(--hunt-buff-gap) * 4);
+    max-height: calc(var(--hunt-buff-icon-size) * 3 + var(--hunt-buff-gap) * 2);
+    overflow:hidden;
+  }
+  .hunt-buff-icon{
+    position:relative; width: var(--hunt-buff-icon-size); height: var(--hunt-buff-icon-size); cursor:default;
+  }
+  .hunt-buff-icon-img{
+    position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:contain; display:block;
+    opacity: var(--hunt-buff-icon-opacity);
+  }
+  .hunt-buff-time{
+    position:absolute; inset:0; z-index:1;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono', monospace; font-size:10.5px; font-weight:700; line-height:1;
+    color: var(--forge-gold); white-space:nowrap; pointer-events:none;
+  }
+  .hunt-buff-icon .tooltip{ left:auto; right:0; bottom:130%; }
+  .hunt-buff-icon:hover .tooltip{ visibility:visible; opacity:1; }
   /* 토글(`<`/`>`) 패널 — 기존 캐릭터 정보창(charStatsModal)과 동일한 콘텐츠를 그대로 재사용하되,
      combat-arena 위에 떠 있는 오버레이 카드로 표시하고 zoom으로 약 55% 크기로 축소해 전투 화면을
      최대한 덜 가리게 함(transform:scale과 달리 zoom은 실제 차지하는 레이아웃 공간도 함께 줄어듦).
@@ -781,9 +817,32 @@
   /* 스킬 탭 하위 내용 — 미사용 포인트(우측 정렬) + 레벨별 스킬 목록 */
   .skill-points-row{ display:flex; justify-content:flex-end; align-items:center; gap:6px; font-size:12.5px; color: var(--forge-cream-dim); margin-bottom:10px; }
   .skill-points-row .v{ color: var(--forge-gold); font-family:'JetBrains Mono', monospace; font-weight:700; }
-  .skill-level-row{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-  .skill-level-label{ flex:0 0 40px; font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--forge-cream-dim); text-align:left; }
-  .skill-level-icons{ flex:1; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; min-height:34px; }
+  /* 세로 탭(공격/버프/패시브) — 기존 스킬 트리(.skill-tree-wrap) 왼쪽에 세로로 나란히 붙는 사이드바.
+     .inv-tab-btn과 같은 색/보더 규칙을 세로 배치로만 바꿔 대응시킴(요구사항: 기존 탭 UI 톤 유지). */
+  .skill-kind-layout{ display:flex; gap:10px; align-items:flex-start; }
+  .skill-kind-tabs{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; width:56px; }
+  .skill-kind-tab-btn{
+    background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+    border-radius:8px; padding:8px 4px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .skill-kind-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+  .skill-kind-layout .skill-tree-wrap{ flex:1; min-width:0; }
+  /* ---- 스킬 트리 UI ---- 레벨을 가로축으로, 선행/후속 스킬을 연결선으로 표시(js/formulas.js
+     buildSkillTreeLayout이 계산한 열=레벨/행=체인 세로줄 좌표를 그대로 px로 옮김). 아이콘 자체는
+     .skill-icon-btn(아래)을 그대로 재사용해서 등급색/툴팁/잠금 표시는 기존과 완전히 동일함. */
+  .skill-tree-wrap{ overflow-x:auto; padding-bottom:4px; }
+  /* 트리 전체 폭(treeWidth, JS에서 인라인 width로 지정)이 패널 폭보다 좁을 때 왼쪽에 몰리지 않고
+     가운데로 오도록 함(레벨 라벨 줄 우측에 여백만 남던 문제 수정) — 라벨/노드 좌표 자체는 그대로,
+     이 두 요소를 감싼 블록만 좌우 여백을 균등하게 나눠 가운데 정렬. */
+  .skill-tree-levels{ position:relative; height:16px; margin:0 auto 8px; }
+  .skill-tree-level-label{ position:absolute; top:0; transform:translateX(-50%); font-family:'JetBrains Mono', monospace; font-size:11px; color: var(--forge-cream-dim); white-space:nowrap; }
+  .skill-tree-body{ position:relative; margin:0 auto; }
+  .skill-tree-node{ position:absolute; }
+  .skill-tree-node-inner{ display:flex; flex-direction:column; align-items:center; }
+  .skill-tree-node-name{ margin-top:3px; font-size:10px; color: var(--forge-cream-dim); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  /* 연결선은 항상 같은 row(가로선)이므로 높이 2px 막대로 표현 — 다른 스킬 아이콘보다 아래(뒤)에 깔리도록
+     z-index를 주지 않고 마크업 순서상 아이콘보다 먼저 그림. */
+  .skill-tree-line{ position:absolute; height:2px; background: var(--forge-cream-dim); opacity:.45; }
   .skill-icon-btn{
     position:relative; width:34px; height:34px; border-radius:8px; cursor:pointer; padding:0;
     display:flex; align-items:center; justify-content:center; font-size:17px; border-width:1px; border-style:solid;
@@ -1060,7 +1119,8 @@
   .curse-badge .curse-badge-icon{ font-size:13px; line-height:1; }
   .curse-badge .tooltip{ left:auto; right:0; bottom:130%; width:200px; }
   .curse-badge:hover .tooltip{ visibility:visible; opacity:1; }
-  #curseBadgeHunt{ right:16px; } /* huntCard에는 다른 상단 버튼이 없어 우측 끝에 바로 배치 */
+  /* curseBadgeForge(마을)는 기본 우측 끝 배치. 던전 화면 쪽 뱃지(curseBadgeHunt)는 이제 버프 UI에
+     통합돼 제거됨(renderHuntBuffUi 참고) — CSS 오버라이드도 함께 제거. */
   /* 무기 이름 공통 툴팁(인벤토리/상점/던전 등 어디서든 동일) — 가운데 정렬 */
   .weapon-name-wrap, .equip-req-wrap{ position:relative; cursor:default; }
   .weapon-name-wrap .tooltip, .equip-req-wrap .tooltip{ width:210px; left:50%; transform:translateX(-50%); bottom:135%; text-align:center; line-height:1.6; }

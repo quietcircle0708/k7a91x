@@ -62,6 +62,7 @@ function showView(name){
     activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
     // 스킬 탭 상태도 캐릭터 정보 탭과 동일하게 진입할 때마다 첫 하위탭·1페이지로 초기화
     activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
+    activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null; // 요구사항 3번: 진입할 때마다 항상 "공격" 탭부터
     pageState.skillPage = 1;
     renderCharacterMenu();
   }
@@ -618,6 +619,15 @@ function switchCharTab(tabId){
 let activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
 function switchSkillCategory(catId){
   activeSkillCategory = catId;
+  renderCharacterMenu();
+}
+// 스킬 탭 세로 탭(공격/버프/패시브) 전환 — 요구사항 3번: 공용/특화/기연 하위 탭을 바꾸거나 페이지를
+// 넘겨도 이 값은 별도로 건드리지 않으므로(위 switchSkillCategory와 goPage 어디에도 activeSkillKind를
+// 건드리는 코드가 없음) 선택 상태가 그대로 유지되고, 캐릭터 메뉴에 새로 진입할 때만(navigation.js
+// showView) 항상 '공격'으로 초기화됨.
+let activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null;
+function switchSkillKind(kindId){
+  activeSkillKind = kindId;
   renderCharacterMenu();
 }
 // 스킬 습득: 포인트를 소비하고 해당 분류의 습득 목록(learnedSkills/learnedAwakeningSkills)에 추가함.

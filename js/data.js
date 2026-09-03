@@ -674,6 +674,41 @@ const WEAPON_TYPES = {
       textTemplate: '중독 상태 적 피해 {chance}% 증가',
     },
   },
+  // 신규 무기 3종(요청사항 그대로 데이터만 등록) — 아직 던전/몬스터 드랍 테이블에 연결되지 않아
+  // 현재는 직접 획득 경로가 없음(정상 상태, 추후 던전 추가 시 드랍 데이터 연결 예정).
+  moonsword: {
+    id: 'moonsword', name: '월도', desc: '휘두를 때마다 달의 궤적을 그리는 검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    grade: 'rare', // 레어
+    attackPower: 352, attackSpeed: 0.8, critRate: 5,
+    purchasable: false, sellPrice: 33600, levelReq: 56,
+    image: 'rare_moonsword',
+    atk: [352], speed: [0.8], crit: [5], sell: [33600],
+    cost: [], odds: [],
+  },
+  heavysword: {
+    id: 'heavysword', name: '현철중검', desc: '현철로 만들어진 거대한 검',
+    equipType: 'weapon',
+    weaponKind: 'two_handed_sword', // 양손 검
+    grade: 'rare', // 레어
+    attackPower: 527, attackSpeed: 0.6, critRate: 10,
+    purchasable: false, sellPrice: 33600, levelReq: 56,
+    image: 'rare_heavysword',
+    atk: [527], speed: [0.6], crit: [10], sell: [33600],
+    cost: [], odds: [],
+  },
+  heavydagger: {
+    id: 'heavydagger', name: '현철단검', desc: '현철로 만들어진 예리한 단검',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    grade: 'rare', // 레어
+    attackPower: 211, attackSpeed: 1.2, critRate: 10,
+    purchasable: false, sellPrice: 33600, levelReq: 56,
+    image: 'rare_heavysword', // 현철중검과 동일 이미지 재사용(사용자 확인 완료)
+    atk: [211], speed: [1.2], crit: [10], sell: [33600],
+    cost: [], odds: [],
+  },
 };
 
 
@@ -1678,6 +1713,11 @@ const MISC_ITEMS = {
     desc: '무기와 검 제작에 쓰이는 고급 재료',
     sellPrice: 300, stateKey: 'blackIrons',
   },
+  oldIron: {
+    id: 'oldIron', name: '현철', icon: '⛰️', image: 'rare_oldiron', itemClass: 'misc', grade: 'rare',
+    desc: '오랜 세월을 견딘 주괴<br>장비 제작에 사용된다.',
+    sellPrice: 400, stateKey: 'oldIrons',
+  },
 };
 
 // ---- 강화 파괴 및 흔적 시스템 ----
@@ -2037,7 +2077,7 @@ const SKILLS = {
     onHitStatus: { key: 'stun', durationMs: 2000 }, // 적중(=피해를 입혀 대상이 생존)한 경우에만 부여, 처치시엔 부여 안 함
   },
   beast_heart: {
-    name: '야수의 심장', desc: '{duration}초 동안 기본 공격 피해량 {atkdp}% 증가',
+    name: '타력', desc: '{duration}초 동안 기본 공격 피해량 {atkdp}% 증가',
     grade: 'normal', category: 'common', target: 'buff', levelReq: 20,
     cooldown: 60, resourceType: 'mp', resourceAmount: 200, castTime: 0, icon: 'lv20buff',
     // basicAtkDamagePercent는 effectiveAtk(스킬 데미지 계산도 함께 쓰는 함수)가 아니라 dungeon.js
@@ -2081,6 +2121,7 @@ const SKILLS = {
     grade: 'rare', category: 'common', target: 'buff', levelReq: 40,
     cooldown: 15, resourceType: 'mp', resourceAmount: 300, castTime: 1.0, icon: 'lv40buff',
     healFlat: 500,
+    upgradeFrom: 'earth_vigor', // 스킬 업그레이드: 대지의 기운 보유해야 습득 가능, 습득시 대지의 기운→바다의 기운으로 교체
   },
   cleave3: {
     name: '참격 3성', desc: '{dp}%의 데미지로 모든 적을 공격.',
@@ -2129,6 +2170,36 @@ const SKILLS = {
     grade: 'rare', category: 'common', target: 'buff', levelReq: 60,
     cooldown: 12, resourceType: 'mp', resourceAmount: 700, castTime: 0.5, icon: 'lv40buff', // 요청대로 바다의 기운과 동일한 lv40buff 아이콘 재사용
     healFlat: 1000,
+    upgradeFrom: 'sea_vigor', // 스킬 업그레이드: 바다의 기운 보유해야 습득 가능, 습득시 바다의 기운→하늘의 기운으로 교체
+  },
+  // 타력(beast_heart)에서 이어지는 basicAtkDamagePercent 버프 업그레이드 체인: 타력→벽력→개벽→분신→무영.
+  byeoklyeok: {
+    name: '벽력', desc: '{duration}초 동안 기본 공격 피해량 {atkdp}% 증가',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 32,
+    cooldown: 80, resourceType: 'mp', resourceAmount: 250, castTime: 0, icon: 'lv32buff',
+    buffEffect: { basicAtkDamagePercent: 30, durationMs: 40000 },
+    upgradeFrom: 'beast_heart', // 스킬 업그레이드: 타력 보유해야 습득 가능, 습득시 타력→벽력으로 교체
+  },
+  gaebyeok: {
+    name: '개벽', desc: '{duration}초 동안 기본 공격 피해량 {atkdp}% 증가',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 44,
+    cooldown: 120, resourceType: 'mp', resourceAmount: 300, castTime: 0, icon: 'lv44buff',
+    buffEffect: { basicAtkDamagePercent: 50, durationMs: 80000 },
+    upgradeFrom: 'byeoklyeok', // 스킬 업그레이드: 벽력 보유해야 습득 가능, 습득시 벽력→개벽으로 교체
+  },
+  bunsin: {
+    name: '분신', desc: '{duration}초 동안 기본 공격 피해량 {atkdp}% 증가',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 56,
+    cooldown: 110, resourceType: 'mp', resourceAmount: 350, castTime: 0, icon: 'lv44buff', // 요청대로 개벽과 동일한 lv44buff 아이콘 재사용
+    buffEffect: { basicAtkDamagePercent: 80, durationMs: 80000 },
+    upgradeFrom: 'gaebyeok', // 스킬 업그레이드: 개벽 보유해야 습득 가능, 습득시 개벽→분신으로 교체
+  },
+  muyeong: {
+    name: '무영', desc: '{duration}초 동안 기본 공격 피해량 {atkdp}% 증가',
+    grade: 'rare', category: 'common', target: 'buff', levelReq: 70,
+    cooldown: 80, resourceType: 'mp', resourceAmount: 500, castTime: 0, icon: 'lv44buff', // 요청대로 개벽과 동일한 lv44buff 아이콘 재사용
+    buffEffect: { basicAtkDamagePercent: 100, durationMs: 80000 },
+    upgradeFrom: 'bunsin', // 스킬 업그레이드: 분신 보유해야 습득 가능, 습득시 분신→무영으로 교체
   },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
@@ -2163,16 +2234,28 @@ const SKILL_CATEGORIES = [
   { id: 'specialized', label: '특화' },
   { id: 'awakening', label: '기연' },
 ];
+// 공용/특화/기연 각 분류 내부에 공통으로 붙는 세로 탭(공격/버프/패시브) 목록. 데이터 기반이라 이 배열에
+// 항목을 추가하면 세로 탭도 그만큼 자동으로 늘어남(renderCharacterMenu의 스킬 탭 렌더링이 이 목록을 그대로
+// 순회). 실제 분류 판정은 skillVerticalTabOf(formulas.js)가 SKILLS[id].target 값만으로 하며, 이 배열은
+// 버튼 목록(순서·라벨)만 담당함.
+const SKILL_KIND_TABS = [
+  { id: 'attack', label: '공격' },
+  { id: 'buff', label: '버프' },
+  { id: 'passive', label: '패시브' },
+];
 // 스킬 탭 페이지 구성(레벨 구간). "8. 페이지" 요구사항 표를 그대로 데이터화한 것으로, 페이지네이션은
 // 기존 공용 시스템(pageState/pagerHtml/goPage/clampPage)을 그대로 재사용함(개수 기반 분할이 아니라
 // 레벨 구간 기준 분할이라는 점은 CHAR_STATS_PAGE_COUNT와 동일한 방식).
+// 스킬 탭 페이지 구간(요구사항: 1p 1~25 / 2p 30~55 / 3p 60~85 / 4p 90~99, 5p 삭제 — 페이지 경계가 전부
+// skillMilestoneLevels 값과 일치하므로 levelsForSkillPage의 min/max 필터링이 그대로 정확히 맞물림).
 const SKILL_PAGES = [
-
-  { min: 1, max: 20 },
-  { min: 25, max: 45 },
-  { min: 50, max: 70 },
-  { min: 75, max: 95 },
-  { min: 99, max: 99 },
+  // 요청사항: 페이지 구간을 서로 겹치게(1~30/30~60/60~90/90~99) 바꿔서, 경계 레벨(30·60·90)
+  // 스킬은 인접한 두 페이지 모두에 "같은 스킬 id"로 자연히 함께 표시됨(중복 데이터 없이 동일 스킬
+  // 공유 — buildSkillTreeLayout의 필터 조건 자체가 그대로 처리하므로 별도 로직 불필요).
+  { min: 1, max: 30 },
+  { min: 30, max: 60 },
+  { min: 60, max: 90 },
+  { min: 90, max: 99 },
 ];
 // 스킬 퀵슬롯 칸 수(왼쪽 5칸). 오른쪽에는 기존 플라스크 퀵슬롯(QUICK_SLOT_COUNT)을 그대로 이어붙여 사용함.
 const SKILL_QUICK_SLOT_COUNT = 10; // 2줄 × 5칸(요구사항: 기존 1줄 5칸 유지 + 아래에 5칸 추가)
@@ -2328,6 +2411,12 @@ const TREASURE_MISC_DROP_TABLE = [
     { minLevel: 1,  maxLevel: 49, chance: 0, qtyOptions: [1] },
     { minLevel: 50, maxLevel: 89, chance: 6, qtyOptions: [1] },
     { minLevel: 90, maxLevel: 99, chance: 8, qtyOptions: [1] },
+  ]},
+  { itemId: 'oldIron', tiers: [ // 현철 (60~79구간만 확률 존재, 그 외 구간은 chance 0 → 추첨 대상 제외)
+    { minLevel: 1,  maxLevel: 29, chance: 0, qtyOptions: [1] },
+    { minLevel: 30, maxLevel: 59, chance: 0, qtyOptions: [1] },
+    { minLevel: 60, maxLevel: 79, chance: 6, qtyOptions: [1] },
+    { minLevel: 80, maxLevel: 99, chance: 0, qtyOptions: [1] },
   ]},
 ];
 
@@ -2648,6 +2737,48 @@ const MONSTERS = {
       { name: '백화검', chance: 5, weaponId: 'firesword' },
     ],
   },
+  // 유령굴 신규 몬스터 4종. 고급유령/불연은 자호굴·사마귀굴·거미굴·전갈굴·인형굴과 동일한 방식으로
+  // pickEpicMonsterId가 굴 내 개별 확률을 적용함. 불연은 이 던전의 스테이지10(가장 깊은 스테이지)에서만
+  // 등장(epicSpawnStages:[10]).
+  ghost: {
+    id: 'ghost', name: '유령', icon: '👻', grade: 'normal', level: 60, image: 'monster_ghost',
+    defense: -15, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [
+      { name: '호박', chance: 15 },
+      { name: '현철', chance: 5 },
+    ],
+  },
+  ghost2: {
+    id: 'ghost2', name: '중급유령', icon: '👻', grade: 'normal', level: 60, image: 'monster_ghost',
+    defense: -15, hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
+    drops: [
+      { name: '호박', chance: 20 },
+      { name: '현철', chance: 6 },
+    ],
+  },
+  epicghost: {
+    id: 'epicghost', name: '고급유령', icon: '👻', grade: 'epic', level: 66, image: 'monster_epicghost',
+    defense: -15, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    epicSpawnWeight: 50, // 유령굴 전용 — 불연과 합쳐 100%(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '현철', chance: 10 },
+      { name: '흑철', chance: 10 },
+      { name: '월도', chance: 5, weaponId: 'moonsword' },
+    ],
+  },
+  epicghost2: {
+    id: 'epicghost2', name: '불연', icon: '👻', grade: 'epic', level: 67, image: 'monster_epicghost2',
+    defense: -20, hpMult: 1.0, atkMult: 1.15, speedMult: 1.0,
+    epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '현철', chance: 10 },
+      { name: '흑철', chance: 15 },
+      { name: '현철중검', chance: 10, weaponId: 'heavysword' },
+      { name: '현철단검', chance: 10, weaponId: 'heavydagger' },
+    ],
+  },
 };
 
 
@@ -2756,6 +2887,14 @@ const DUNGEONS = [
     desc: '버려진 인형들이 저주받은 채 살아 움직이는 동굴',
     monsters: ['woodpuppet', 'ironpuppet', 'emeraldpuppet', 'puppeteer'],
     levelRange: 7,
+  },
+  {
+    id: 'ghost_den',
+    name: '유령굴',
+    icon: '',
+    desc: '산 자의 발걸음을 기다리는 원혼들의 지하묘지',
+    monsters: ['ghost', 'ghost2', 'epicghost', 'epicghost2'],
+    levelRange: 5,
   },
 ];
 

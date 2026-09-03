@@ -232,6 +232,9 @@ el('charTabPanels').addEventListener('click', (e)=>{
   const skillCatBtn = e.target.closest('button[data-skill-cat]');
   if(skillCatBtn){ switchSkillCategory(skillCatBtn.dataset.skillCat); return; }
 
+  const skillKindBtn = e.target.closest('button[data-skill-kind]');
+  if(skillKindBtn){ switchSkillKind(skillKindBtn.dataset.skillKind); return; }
+
   const learnBtn = e.target.closest('button[data-learn-skill]');
   if(learnBtn){ openSkillLearnConfirm(learnBtn.dataset.learnSkill); return; }
 
@@ -447,6 +450,9 @@ el('closeQuickSlotPickerBtn').addEventListener('click', closeQuickSlotPicker);
 // updateQuickSlotCooldowns() 내부에서 el('quickSlotRow')가 조용히 무시하므로 항상 켜둬도 무방함.
 setInterval(updateQuickSlotCooldowns, 100);
 setInterval(updateSkillQuickSlotCooldowns, 100);
+// 던전 전투화면 버프 지속시간 UI(요구사항) 실시간 갱신 — renderHuntBuffUi 내부에서 el('huntBuffUi')가
+// 없으면(던전 화면이 아닐 때) 조용히 무시하므로 위 두 타이머와 동일하게 항상 켜둬도 무방함.
+setInterval(renderHuntBuffUi, 100);
 
 // ---- 툴팁 위치 자동 보정 ----
 // 모든 툴팁(class="tooltip")은 CSS(:hover)만으로 위치가 고정되어 있어서, 화면 위/아래/좌우 경계에
@@ -476,7 +482,7 @@ function resetTooltipPosition(tip){
   tip.style.transform = '';
 }
 function adjustTooltipPosition(host, tip){
-  // 인라인 오버라이드를 전부 지우고 기존 CSS 기본 위치부터 다시 측정(요구사항 1)
+  // 인라인 오버라이드를 전부 지우고 기존 CSS 기본 위치부터 다시 측정
   resetTooltipPosition(tip);
   const rect = tip.getBoundingClientRect();
   const vw = document.documentElement.clientWidth;
@@ -484,37 +490,35 @@ function adjustTooltipPosition(host, tip){
 
   let top = rect.top;
   let left = rect.left;
-  let needsOverride = false;
 
-  // 2. 위쪽 경계를 넘어가면 커서(호버 대상) 아래쪽으로 출력 전환
+  // 위쪽 경계를 넘어가면 커서(호버 대상) 아래쪽으로 출력 전환
   if(top < TOOLTIP_EDGE_MARGIN){
     const hostRect = host.getBoundingClientRect();
     top = hostRect.bottom + 6;
-    needsOverride = true;
   }
-  // 3. (전환 여부와 무관하게) 아래쪽 경계를 넘어가면 프레임 안에 들어오도록 세로 위치 보정
+  // 아래쪽 경계를 넘어가면 프레임 안에 들어오도록 세로 위치 보정
   if(top + rect.height > vh - TOOLTIP_EDGE_MARGIN){
     top = Math.max(TOOLTIP_EDGE_MARGIN, vh - TOOLTIP_EDGE_MARGIN - rect.height);
-    needsOverride = true;
   }
-  // 4. 좌우도 동일하게 프레임 밖으로 나가지 않도록 보정
+  // 좌우도 동일하게 프레임 밖으로 나가지 않도록 보정
   if(left < TOOLTIP_EDGE_MARGIN){
     left = TOOLTIP_EDGE_MARGIN;
-    needsOverride = true;
   } else if(left + rect.width > vw - TOOLTIP_EDGE_MARGIN){
     left = Math.max(TOOLTIP_EDGE_MARGIN, vw - TOOLTIP_EDGE_MARGIN - rect.width);
-    needsOverride = true;
   }
 
-  if(needsOverride){
-    tip.style.position = 'fixed';
-    tip.style.transform = 'none'; // left:50%+translateX(-50%) 등 CSS 좌우정렬용 transform과 겹치면 좌표가 이중으로 밀리므로 무효화
-    tip.style.top = top + 'px';
-    tip.style.bottom = 'auto'; // CSS 클래스가 지정한 bottom(예: .equip-slot .tooltip의 bottom:135%, .curse-badge .tooltip의 bottom:130%)이
-    tip.style.left = left + 'px'; // 빈 문자열로는 지워지지 않고 계속 살아있어 top과 충돌해 위치가 어긋나던 버그 수정 — 명시적으로 auto를 줘야 완전히 무효화됨
-    tip.style.right = 'auto'; // 마찬가지로 .curse-badge .tooltip의 right:0도 auto로 명시 무효화(안 그러면 left와 충돌해 화면 밖으로 밀려나 완전히 안 보이게 됨)
-  }
-  // needsOverride가 false면 방금 초기화한 기본 CSS 위치를 그대로 둔다(요구사항 1)
+  // 항상 position:fixed로 전환해서 화면 좌표에 그대로 고정한다 — 부모 요소의 overflow(예: 스킬 트리의
+  // 가로 스크롤 영역, 카드 테두리 등)에 더 이상 잘리지 않고 그 위로 떠서 출력됨(요구사항: 툴팁이 UI 경계선과
+  // 겹쳐도 잘리지 않고 그 위에 그대로 표시). getBoundingClientRect()가 반환하는 좌표는 조상의 overflow
+  // 클리핑과 무관하게 실제 레이아웃 위치를 정확히 담고 있으므로, 그 값을 그대로 fixed 좌표로 다시 꽂아주면
+  // 화면 경계를 넘지 않는 한 원래 CSS가 의도한 자리에 그대로 보이면서(경계를 넘는 경우에만 위에서 보정된
+  // 좌표), 어떤 조상의 overflow에도 클리핑되지 않는다.
+  tip.style.position = 'fixed';
+  tip.style.transform = 'none'; // left:50%+translateX(-50%) 등 CSS 좌우정렬용 transform과 겹치면 좌표가 이중으로 밀리므로 무효화
+  tip.style.top = top + 'px';
+  tip.style.bottom = 'auto'; // CSS 클래스가 지정한 bottom(예: .equip-slot .tooltip의 bottom:135%, .curse-badge .tooltip의 bottom:130%)이
+  tip.style.left = left + 'px'; // 빈 문자열로는 지워지지 않고 계속 살아있어 top과 충돌해 위치가 어긋나던 버그 수정 — 명시적으로 auto를 줘야 완전히 무효화됨
+  tip.style.right = 'auto'; // 마찬가지로 .curse-badge .tooltip의 right:0도 auto로 명시 무효화(안 그러면 left와 충돌해 화면 밖으로 밀려나 완전히 안 보이게 됨)
 }
 let activeTooltipTip = null;
 document.addEventListener('mouseover', (e) => {

@@ -1436,25 +1436,61 @@ function updateSkillQuickSlotCooldowns(){
     });
   });
 }
-// 하위 탭(공용/특화/기연) 한 개의 본문: 미사용 포인트 표시 + 레벨별 스킬 목록(현재 페이지 구간).
+// 하위 탭(공용/특화/기연) 한 개의 본문: 미사용 포인트 표시 + 세로 탭(공격/버프/패시브, 요구사항 1번) +
+// 레벨별 스킬 목록(현재 페이지 구간, 선택된 세로 탭 기준).
 function buildSkillCategoryBodyHtml(categoryId){
   const isAwakening = categoryId === 'awakening';
   const pointsLabel = isAwakening ? '미사용 깨달음' : '미사용 스킬 포인트';
   const pointsValue = isAwakening ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
-  const levels = levelsForSkillPage(categoryId, pageState.skillPage);
-  const rowsHtml = levels.map(lv => buildSkillLevelRowHtml(categoryId, lv)).join('');
+  const kindTabsHtml = SKILL_KIND_TABS.map(k =>
+    `<button class="skill-kind-tab-btn${k.id === activeSkillKind ? ' active' : ''}" data-skill-kind="${k.id}">${k.label}</button>`
+  ).join('');
   return `
     <div class="skill-points-row"><span>${pointsLabel}</span><span class="v">${pointsValue}</span></div>
-    <div class="skill-level-grid">${rowsHtml || `<div class="char-stat-empty">표시할 레벨이 없습니다.</div>`}</div>
+    <div class="skill-kind-layout">
+      <div class="skill-kind-tabs">${kindTabsHtml}</div>
+      ${buildSkillTreeHtml(categoryId, activeSkillKind)}
+    </div>
   `;
 }
-// 레벨 한 줄: 좌측에 레벨 라벨(고정 폭, 좌측 정렬), 우측에 그 레벨에 등록된 스킬 아이콘들(중앙 정렬 유지는
-// CSS에서 처리). SKILLS를 순회해 이 레벨·분류에 해당하는 항목만 자동으로 모으므로, 나중에 스킬을 추가해도
-// 이 함수는 손댈 필요가 없음(요구사항: "앞으로 스킬을 추가하면 자동으로 해당 레벨에 표시").
-function buildSkillLevelRowHtml(categoryId, level){
-  const ids = Object.keys(SKILLS).filter(id => SKILLS[id].category === categoryId && SKILLS[id].levelReq === level);
-  const iconsHtml = ids.map(id => buildSkillIconBtnHtml(id)).join('');
-  return `<div class="skill-level-row"><span class="skill-level-label">LV${level}</span><span class="skill-level-icons">${iconsHtml}</span></div>`;
+// 스킬 트리 렌더: buildSkillTreeLayout(formulas.js)이 계산한 열(레벨)·행(체인 세로줄) 좌표를 그대로
+// px 좌표로 옮겨서, 레벨 라벨 줄(상단, 가로) + 스킬 아이콘들(절대좌표) + 선행→후속 연결선(가로 막대 div)을
+// 그림. 아이콘 자체는 buildSkillIconBtnHtml을 그대로 재사용하므로 아이콘/등급색/툴팁/습득·잠금 표시는
+// 완전히 기존 그대로이고(요구사항 4번), 여기서 바뀌는 건 그 아이콘을 배치하는 좌표뿐임.
+const SKILL_TREE_COL_W = 56, SKILL_TREE_ROW_H = 62, SKILL_TREE_ICON = 34, SKILL_TREE_NODE_W = 52;
+function buildSkillTreeHtml(categoryId, kindId){
+  const layout = buildSkillTreeLayout(categoryId, pageState.skillPage, kindId);
+  if(!layout.columns.length){
+    return `<div class="char-stat-empty">표시할 레벨이 없습니다.</div>`;
+  }
+  const center = SKILL_TREE_ICON / 2;
+  // 노드(아이콘+이름표)가 아이콘보다 넓어서(이름표가 더 넓을 수 있음) 맨 왼쪽 노드가 컨테이너 밖으로
+  // 잘리지 않도록, 전체 좌표를 이 여백만큼 오른쪽으로 밀어줌(레벨 라벨/연결선/노드 전부 동일하게 적용해야
+  // 서로 어긋나지 않음).
+  const padX = (SKILL_TREE_NODE_W - SKILL_TREE_ICON) / 2;
+  const iconCenterX = (col) => padX + col * SKILL_TREE_COL_W + center;
+  const labelsHtml = layout.columns.map((lv, i) =>
+    `<span class="skill-tree-level-label" style="left:${iconCenterX(i)}px;">LV${lv}</span>`
+  ).join('');
+  const linesHtml = layout.connections.map(c => {
+    const fromX = padX + c.fromCol * SKILL_TREE_COL_W + SKILL_TREE_ICON;
+    const toX = padX + c.toCol * SKILL_TREE_COL_W;
+    const y = c.row * SKILL_TREE_ROW_H + center - 1;
+    return `<div class="skill-tree-line" style="left:${fromX}px; top:${y}px; width:${Math.max(0, toX - fromX)}px;"></div>`;
+  }).join('');
+  const nodesHtml = layout.items.map(it =>
+    `<div class="skill-tree-node" style="left:${iconCenterX(it.col) - SKILL_TREE_NODE_W / 2}px; top:${it.row * SKILL_TREE_ROW_H}px; width:${SKILL_TREE_NODE_W}px;">${buildSkillIconBtnHtml(it.id)}</div>`
+  ).join('');
+  const treeWidth = padX * 2 + (layout.columns.length - 1) * SKILL_TREE_COL_W + SKILL_TREE_ICON;
+  const treeHeight = (layout.maxRow + 1) * SKILL_TREE_ROW_H;
+  return `
+    <div class="skill-tree-wrap">
+      <div class="skill-tree-levels" style="width:${treeWidth}px;">${labelsHtml}</div>
+      <div class="skill-tree-body" style="width:${treeWidth}px; height:${treeHeight}px;">
+        ${linesHtml}${nodesHtml}
+      </div>
+    </div>
+  `;
 }
 // 스킬 한 칸: 습득 전이면 흑백(50% 밝기), 습득했으면 원본 그대로. 클릭하면 학습을 시도함(learnSkill).
 // 습득 불가(등급 미구현/레벨 미달/포인트 부족/공용·특화 습득 제한 충돌)면 버튼 자체를 비활성화함(요구사항 4번:
@@ -1468,10 +1504,13 @@ function buildSkillIconBtnHtml(id){
   const learned = isSkillDisplayedAsLearned(id);
   const grade = WEAPON_GRADES[s.grade];
   return `
-    <button class="skill-icon-btn${learned ? '' : ' locked'}" data-learn-skill="${id}" ${(!learned && !canLearnSkill(id)) ? 'disabled' : ''} style="border-color:${grade ? grade.color : '#fff'};">
-      <span class="skill-icon">${skillIconHtml(s)}</span>
-      <span class="tooltip">${buildSkillTooltipHtml(id)}</span>
-    </button>`;
+    <div class="skill-tree-node-inner">
+      <button class="skill-icon-btn${learned ? '' : ' locked'}" data-learn-skill="${id}" ${(!learned && !canLearnSkill(id)) ? 'disabled' : ''} style="border-color:${grade ? grade.color : '#fff'};">
+        <span class="skill-icon">${skillIconHtml(s)}</span>
+        <span class="tooltip">${buildSkillTooltipHtml(id)}</span>
+      </button>
+      <span class="skill-tree-node-name">${s.name}</span>
+    </div>`;
 }
 
 // ---- 던전 입구 목록 ----
@@ -1716,6 +1755,59 @@ function renderHunt(){
   // 몬스터 정보(이름/체력/능력치)는 몬스터가 실제로 존재할 때만 표시 — 입장 메시지 대기 중엔 숨겨져 있다가
   // 몬스터 이미지가 등장하는 순간(spawnMonsters) 함께 나타남
   if(combatPanel) combatPanel.style.display = (isTreasureStage || hunt.monsters.length === 0) ? 'none' : 'block';
+  renderHuntBuffUi(); // 던전 진입/스테이지 전환 시 즉시 1회 반영(그 이후 실시간 갱신은 main.js의 100ms 타이머)
+}
+// 던전 전투화면 버프 지속시간 UI(요구사항) — activeBuffListForUi(formulas.js)가 이미 "지속시간 남은
+// 것만 + 남은시간 내림차순"으로 정리해서 주므로 여기선 최대 개수(한 줄5개×3줄=15)로 자르고 그리기만 함.
+// 아이콘/툴팁은 기존 스킬 퀵슬롯과 동일하게 skillIconHtml/buildSkillTooltipHtml을 그대로 재사용(요구사항:
+// 새 툴팁 시스템을 만들지 않음). main.js에서 100ms마다 이 함수를 다시 부름.
+// 망자의 저주(사망 패널티)도 요청에 따라 이 UI 안에 같은 정렬 규칙(남은시간 내림차순)으로 함께 표시함 —
+// state.js의 DEATH_CURSE_DURATION_MS을 그대로 초 단위로 환산해서 보여줄 뿐 새 지속시간 계산은 없음.
+// 대장간 화면 뱃지(curseBadgeForge)는 이 UI와 무관하게 renderDeathCurseBadge가 그대로 담당함.
+// (요청 3번 버그수정) 100ms마다 wrap.innerHTML을 통째로 새로 그리면, 마우스가 올라가 있던 아이콘의
+// DOM 노드 자체가 매번 파괴·재생성되어 :hover 상태가 끊기고 그 사이 툴팁이 깜빡였음. 그래서 이제는
+// data-key(스킬id 또는 'curse')로 기존 노드를 찾아 재사용하고, 남은시간 텍스트만 갱신함 — 노드 자체는
+// 그 버프가 실제로 사라지거나 새로 생길 때만 추가/제거되므로, 마우스가 계속 같은 아이콘 위에 있으면
+// hover가 끊기지 않음. 순서가 바뀔 때만 insertBefore로 재배치(그때만 그 노드의 hover가 끊길 수 있는데,
+// 이는 실제로 순위가 바뀌었을 때뿐이라 정상적인 동작임).
+const HUNT_BUFF_UI_MAX = 15; // 한 줄 5개 × 최대 3줄(CSS .hunt-buff-ui의 고정폭/최대높이와 반드시 같이 맞춰야 함)
+function renderHuntBuffUi(){
+  const wrap = el('huntBuffUi');
+  if(!wrap) return;
+  const entries = activeBuffListForUi().map(b => ({ key: b.id, kind: 'skill', id: b.id, remainMs: b.remainMs }));
+  if(isDeathCurseActive()){
+    entries.push({ key: 'curse', kind: 'curse', remainMs: state.deathCurseUntil - Date.now() });
+  }
+  entries.sort((a, b) => b.remainMs - a.remainMs);
+  const capped = entries.slice(0, HUNT_BUFF_UI_MAX);
+
+  const existing = new Map();
+  Array.from(wrap.children).forEach(node => existing.set(node.dataset.key, node));
+
+  capped.forEach((e, idx) => {
+    let node = existing.get(e.key);
+    if(node){
+      existing.delete(e.key); // 계속 살아있는 노드로 확정 — 아래에서 제거 대상에서 빠짐
+    } else {
+      node = document.createElement('div');
+      node.className = 'hunt-buff-icon';
+      node.dataset.key = e.key;
+      node.innerHTML = e.kind === 'curse'
+        ? `<img src="assets/ui/DEATH_CURSE.svg" class="hunt-buff-icon-img" alt="">
+           <span class="hunt-buff-time"></span>
+           <span class="tooltip">망자의 저주<br><span class="hunt-buff-curse-desc"></span></span>`
+        : `${skillIconHtml(SKILLS[e.id], 'hunt-buff-icon-img')}
+           <span class="hunt-buff-time"></span>
+           <span class="tooltip">${buildSkillTooltipHtml(e.id)}</span>`;
+    }
+    node.querySelector('.hunt-buff-time').textContent = (e.remainMs / 1000).toFixed(1);
+    if(e.kind === 'curse'){
+      node.querySelector('.hunt-buff-curse-desc').textContent =
+        Math.max(0, Math.ceil(e.remainMs / 1000)) + '초 동안 획득 골드, 경험치량 50% 감소';
+    }
+    if(wrap.children[idx] !== node) wrap.insertBefore(node, wrap.children[idx] || null);
+  });
+  existing.forEach(node => node.remove()); // 이번에 더 이상 나오지 않은(만료된) 버프 노드만 제거
 }
 
 // 개체 하나의 몬스터 슬롯 HTML을 생성(이름/등급색/레벨·공격력/체력바/체력텍스트/상태배지 틀).
@@ -1877,24 +1969,21 @@ function renderSettings(){
 }
 
 // ---- 사망 패널티(망자의 저주) 뱃지 ----
-// 마을(대장간)/던전 화면 양쪽에 있는 뱃지(curseBadgeForge, curseBadgeHunt)를 동일한 값으로 갱신.
+// 마을(대장간) 화면의 뱃지(curseBadgeForge)만 갱신 — 던전 전투화면 쪽은 요청에 따라 이 뱃지 대신
+// renderHuntBuffUi(아래)가 버프 지속시간 UI 안에 같은 정렬 규칙으로 함께 표시함(중복 표시 방지).
 function renderDeathCurseBadge(){
   const active = isDeathCurseActive();
   const remainingSec = active ? Math.max(0, Math.ceil((state.deathCurseUntil - Date.now()) / 1000)) : 0;
   const timeText = Math.floor(remainingSec / 60) + ':' + String(remainingSec % 60).padStart(2, '0');
   const descText = remainingSec + '초 동안 획득 골드, 경험치량 50% 감소';
-  [
-    { badge: 'curseBadgeForge', time: 'curseBadgeForgeTime', desc: 'curseBadgeForgeDesc' },
-    { badge: 'curseBadgeHunt', time: 'curseBadgeHuntTime', desc: 'curseBadgeHuntDesc' },
-  ].forEach(ids => {
-    const badge = el(ids.badge);
-    if(!badge) return;
+  const badge = el('curseBadgeForge');
+  if(badge){
     badge.style.display = active ? 'flex' : 'none';
     if(active){
-      el(ids.time).textContent = timeText;
-      el(ids.desc).textContent = descText;
+      el('curseBadgeForgeTime').textContent = timeText;
+      el('curseBadgeForgeDesc').textContent = descText;
     }
-  });
+  }
 }
 
 // ============================================================
