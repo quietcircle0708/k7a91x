@@ -521,18 +521,95 @@ function adjustTooltipPosition(host, tip){
   tip.style.right = 'auto'; // 마찬가지로 .curse-badge .tooltip의 right:0도 auto로 명시 무효화(안 그러면 left와 충돌해 화면 밖으로 밀려나 완전히 안 보이게 됨)
 }
 let activeTooltipTip = null;
+// 툴팁 안에 클릭 가능한 용어(.glossary-term)가 있을 때만 쓰는 "닫힘 유예" 타이머. host 박스와
+// tooltip 박스 사이엔 CSS상 작은 시각적 간격(예: bottom:130%)이 있어서, 마우스가 host에서 tooltip
+// 쪽으로 이동하는 도중 그 간격을 지나는 짧은 순간 host도 tooltip도 아닌 지점을 지나며 mouseout이
+// 먼저 발생할 수 있음 — 이 타이머로 실제로 완전히 벗어난 경우에만 닫히도록 유예를 둠(요구사항 4번).
+let glossaryTooltipHideTimer = null;
 document.addEventListener('mouseover', (e) => {
   const found = findTooltipHost(e.target);
   if(!found) return;
   activeTooltipTip = found.tip;
   adjustTooltipPosition(found.host, found.tip);
+  // 요구사항 2~4번: 툴팁 안에 .glossary-term(용어)이 있으면, 일반 .tooltip의 pointer-events:none
+  // 때문에 마우스가 host를 벗어나 tooltip 쪽으로 이동하는 순간 host:hover가 풀려 CSS로 사라져버리는
+  // 문제를 막기 위해 "이 툴팁 하나에 한해서만" pointer-events를 허용하고 표시 상태를 JS로 직접
+  // 고정한다. .glossary-term이 없는 일반 툴팁은 이 분기를 타지 않으므로 기존 동작 그대로 유지됨
+  // (요구사항: pointer-events를 전체 .tooltip에 일괄 auto로 바꾸지 않음).
+  if(found.tip.querySelector('.glossary-term')){
+    clearTimeout(glossaryTooltipHideTimer);
+    found.tip.style.pointerEvents = 'auto';
+    found.tip.style.visibility = 'visible';
+    found.tip.style.opacity = '1';
+  }
 });
 document.addEventListener('mouseout', (e) => {
   const found = findTooltipHost(e.target);
   if(!found) return;
-  if(e.relatedTarget && found.host.contains(e.relatedTarget)) return; // 여전히 같은 호버 대상 내부
+  if(e.relatedTarget && found.host.contains(e.relatedTarget)) return; // 여전히 같은 호버 대상 내부(tooltip 포함, DOM상 host의 자손이므로)
   resetTooltipPosition(found.tip);
+  if(found.tip.style.pointerEvents === 'auto'){
+    const tip = found.tip;
+    clearTimeout(glossaryTooltipHideTimer);
+    glossaryTooltipHideTimer = setTimeout(() => {
+      tip.style.pointerEvents = '';
+      tip.style.visibility = '';
+      tip.style.opacity = '';
+    }, 200); // host→gap→tooltip 이동 중 발생하는 순간적 mouseout을 흡수하기 위한 짧은 유예(ms)
+  }
   if(activeTooltipTip === found.tip) activeTooltipTip = null;
 });
+
+// ---- 용어사전 팝업 ----
+// 스킬 설명/고유 옵션 텍스트 안의 {term:id}단어{/term}가 resolveGlossaryTermsHtml(formulas.js)에 의해
+// class="glossary-term" span으로 바뀌는데, 그 span을 클릭하면 이름+설명을 보여주는 작은 팝업(요구사항:
+// "해당 단어를 클릭하여 설명을 확인"). 위의 hover 전용 .tooltip 체계와는 별개의 클릭 전용 UI라 여기서
+// 새로 추가함 — 기존 hover 툴팁의 표시/위치조정 로직은 전혀 건드리지 않음. 팝업 엘리먼트는 최초 클릭
+// 시 1회만 body에 추가되고 이후 내용만 갈아끼워 재사용됨.
+let glossaryPopupEl = null;
+function ensureGlossaryPopup(){
+  if(glossaryPopupEl) return glossaryPopupEl;
+  glossaryPopupEl = document.createElement('div');
+  glossaryPopupEl.className = 'glossary-popup';
+  document.body.appendChild(glossaryPopupEl);
+  return glossaryPopupEl;
+}
+function showGlossaryPopup(termId, anchorRect){
+  const g = glossaryEntry(termId);
+  if(!g) return; // 용어사전에 등록 안 된 id면 아무것도 하지 않음(원문 태그는 이미 resolveGlossaryTermsHtml 단계에서 평문으로 정리됨)
+  const popup = ensureGlossaryPopup();
+  popup.innerHTML = `<div style="color:${g.color}; font-weight:700; margin-bottom:4px;">${g.name}</div><div>${g.desc}</div>`;
+  popup.style.display = 'block';
+  popup.style.position = 'fixed';
+  popup.style.transform = 'none';
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  const rect = popup.getBoundingClientRect();
+  let top = anchorRect.bottom + 6;
+  let left = anchorRect.left;
+  if(top + rect.height > vh - TOOLTIP_EDGE_MARGIN) top = Math.max(TOOLTIP_EDGE_MARGIN, anchorRect.top - rect.height - 6);
+  if(left + rect.width > vw - TOOLTIP_EDGE_MARGIN) left = Math.max(TOOLTIP_EDGE_MARGIN, vw - TOOLTIP_EDGE_MARGIN - rect.width);
+  if(left < TOOLTIP_EDGE_MARGIN) left = TOOLTIP_EDGE_MARGIN;
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+}
+function hideGlossaryPopup(){
+  if(glossaryPopupEl) glossaryPopupEl.style.display = 'none';
+}
+// 캡처 단계(capture:true)로 등록 — 버블 단계로 등록하면 이 리스너가 실행되기 "전에" 이미
+// #charTabPanels 등 하위 요소의 버블 리스너(예: 스킬 습득 확인창을 여는 data-learn-skill 버튼 클릭
+// 처리)가 먼저 실행되어 버려서, stopPropagation()을 호출해도 이미 실행된 하위 핸들러를 막을 수 없는
+// 문제가 있었음(스킬 아이콘 버튼 안의 용어를 클릭하면 팝업 대신 스킬 습득 확인창이 열리는 버그).
+// 캡처 단계는 document→...→target 방향으로 버블보다 먼저 실행되므로, 여기서 먼저 가로채
+// stopPropagation()하면 그 뒤의 모든 버블 리스너 실행 자체를 막을 수 있음.
+document.addEventListener('click', (e) => {
+  const term = e.target.closest('.glossary-term');
+  if(term){
+    e.stopPropagation();
+    showGlossaryPopup(term.dataset.term, term.getBoundingClientRect());
+    return;
+  }
+  if(glossaryPopupEl && glossaryPopupEl.style.display !== 'none' && !glossaryPopupEl.contains(e.target)) hideGlossaryPopup();
+}, true);
 
 loadState();

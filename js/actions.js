@@ -284,7 +284,7 @@ function recheckEquipRequirements(){
   }
   if(state.equippedSubId != null){
     const item = (state.subInventory || []).find(i => i.id === state.equippedSubId);
-    // 레벨 조건 재검사(방어구/장신구와 동일)에 더해, 이 시점에 양손 검이 장착돼 있으면(이론상 불가능한
+    // 레벨 조건 재검사(방어구/장신구와 동일)에 더해, 이 시점에 양손 무기가 장착돼 있으면(이론상 불가능한
     // 상태지만 방어적으로) 보조 아이템도 함께 해제함 — 문서 3번 상호 배타 조건을 항상 보장하기 위함.
     if(item && (!meetsWeaponEquipRequirements(item.type, state.playerLevel, stats) || isTwoHandedWeaponEquipped())){
       state.equippedSubId = null;
@@ -301,9 +301,10 @@ function equipItem(id){
   const weaponItem = state.inventory.find(i => i.id === id);
   if(weaponItem){
     if(!meetsWeaponEquipRequirements(weaponItem.type, state.playerLevel, effectiveStats())) return;
-    // 양손 검은 보조 아이템을 착용 중이면 장착할 수 없음(문서 3번 상호 배타 조건). 양손 검이 아닌
-    // 무기는 이 조건과 무관하게 항상 장착 가능.
-    if(wpn(weaponItem.type).weaponKind === 'two_handed_sword' && !canEquipTwoHandedWeapon()) return;
+    // 양손 무기는 보조 아이템을 착용 중이면 장착할 수 없음(문서 3번 상호 배타 조건). 양손이 아닌
+    // 무기는 이 조건과 무관하게 항상 장착 가능. handType 기준 판정(요청사항 10번) — weaponKind가
+    // 'two_handed_sword'라는 특정 종류였던 과거 하드코딩을 제거해, 향후 양손 도끼/창 등도 동일하게 적용됨.
+    if(wpn(weaponItem.type).handType === 'two_hand' && !canEquipTwoHandedWeapon()) return;
     state.equippedId = id;
     state.forgeTargetId = id;
     recheckEquipRequirements(); // 무기 교체로 무기 고유 옵션의 스탯 보너스가 바뀌었을 수 있어 재검사
@@ -585,13 +586,13 @@ function performSellSubItem(id){
   render(); saveState();
 }
 // 보조 아이템 착용 — 동시에 1개만 착용 가능(같은 종류 구분 없이 슬롯 1개, 방어구의 투구/갑옷과 달리
-// 종류별 슬롯이 아니라 통째로 1개). 레벨 조건과, 양손 검을 장착하지 않은 경우에만 착용 가능하다는
+// 종류별 슬롯이 아니라 통째로 1개). 레벨 조건과, 양손 무기를 장착하지 않은 경우에만 착용 가능하다는
 // 상호 배타 조건(canEquipSubItem, 문서 3번)을 함께 확인함.
 function equipSubPiece(id){
   const item = (state.subInventory || []).find(i => i.id === id);
   if(!item) return;
   if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
-  if(!canEquipSubItem()) return; // 양손 검 장착 중에는 착용 불가
+  if(!canEquipSubItem()) return; // 양손 무기 장착 중에는 착용 불가
   state.equippedSubId = id;
   recheckEquipRequirements();
   render(); saveState();

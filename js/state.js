@@ -21,7 +21,7 @@ let state = {
   armorInventory: [],                          // 보유 방어구 목록({id,type,level}, 무기 인벤토리와 동일한 형태)
   equippedArmor: { helmet: null, armor: null }, // 착용 중인 방어구(종류당 1개) — 강화 대상(forgeTargetId)과는 별개 개념
   subInventory: [],                             // 보유 보조(방패/보조 무기) 목록({id,type,level} — level은 강화가 없어 항상 0)
-  equippedSubId: null,                          // 착용 중인 보조 아이템 id(동시에 1개만, 양손 검 장착 중이면 착용 불가)
+  equippedSubId: null,                          // 착용 중인 보조 아이템 id(동시에 1개만, 양손 무기 장착 중이면 착용 불가)
   accessoryInventory: [],                       // 보유 장신구 목록({id,type,level})
   equippedAccessories: [null, null],            // 착용 중인 장신구(장신구1/장신구2 슬롯, 최대 ACCESSORY_SLOT_MAX개) — 같은 아이템 2개 착용 가능
   traceInventory: [],                           // 보유 흔적 목록({id,forType} — forType은 복구할 장비의 WEAPON_TYPES/
@@ -237,7 +237,16 @@ function applyStatusEffect(target, key, durationMs){
     target.statusEffects.push({ key, ticksRemaining: def.maxTicks, lastTickAt: Date.now() });
     return;
   }
-  const expiresAt = Date.now() + Math.max(0, durationMs || 0);
+  const addMs = Math.max(0, durationMs || 0);
+  // 파쇄 전용 규칙(요구사항 3번, def.stackDurationAdditive): 이미 적용 중인 대상에게 재부여되면 기존
+  // 남은 지속시간을 새 지속시간으로 덮어쓰지 않고 "기존 남은 시간 + 새로 부여된 시간"으로 더함. 이
+  // 플래그가 없는 기존 상태이상(기절/둔화)은 아래 기존 덮어쓰기 동작을 그대로 유지함(회귀 없음).
+  if(existing && def.stackDurationAdditive){
+    const remainingBase = Math.max(existing.expiresAt, Date.now()); // 이미 만료된 채 배열에 남아있는 경우 방어
+    existing.expiresAt = remainingBase + addMs;
+    return;
+  }
+  const expiresAt = Date.now() + addMs;
   if(existing) existing.expiresAt = expiresAt;
   else target.statusEffects.push({ key, expiresAt });
 }

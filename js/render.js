@@ -246,15 +246,15 @@ function renderInventoryList(){
     const isEquipped = item.id === state.equippedId;
     const sellVal = sellValueFor(type, item.level);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
-    // 양손 검은 보조 아이템을 착용 중이면 장착(강화 선택)할 수 없음(문서 3번 상호 배타 조건).
-    // 양손 검이 아닌 무기는 이 조건과 무관하게 항상 착용 가능.
-    const blockedByTwoHandedRule = !isEquipped && wpn(type).weaponKind === 'two_handed_sword' && !canEquipTwoHandedWeapon();
+    // 양손 무기는 보조 아이템을 착용 중이면 장착(강화 선택)할 수 없음(문서 3번 상호 배타 조건).
+    // 양손이 아닌 무기는 이 조건과 무관하게 항상 착용 가능. handType 기준 판정(요청사항 10번).
+    const blockedByTwoHandedRule = !isEquipped && wpn(type).handType === 'two_hand' && !canEquipTwoHandedWeapon();
     const equipDisabled = isEquipped || !reqOk || blockedByTwoHandedRule;
     const equipBtnHtml = `<button class="inv-btn equip ${isEquipped?'active':''}" data-action="equip" data-id="${item.id}" ${equipDisabled?'disabled':''}>${isEquipped?'장착 중':'강화 선택'}</button>`;
     const equipBtnFinal = (!isEquipped && !reqOk)
       ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">착용 조건을 만족해야 장착할 수 있습니다.${weaponRequirementText(type) ? `<br>(${weaponRequirementText(type)})` : ''}</span></span>`
       : (blockedByTwoHandedRule
-        ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">보조 아이템을 장착 중에는 양손 검을 장착할 수 없습니다.</span></span>`
+        ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">보조 아이템을 장착 중에는 양손 무기를 장착할 수 없습니다.</span></span>`
         : equipBtnHtml);
     return `
       <div class="inv-card ${isEquipped?'equipped':''}">
@@ -341,7 +341,7 @@ function renderArmorInventoryList(){
 // - "강화 선택" 버튼이 아예 없음(보조 아이템은 강화 대상으로 선택할 수 없음 — 문서 2번 규칙, EQUIP_
 //   INVENTORY_POOLS의 sub 항목에 cost가 없어 forgeSelectableItems에서도 자동으로 걸러짐과는 별개로,
 //   애초에 이 카드에 그 버튼 자체를 그리지 않음).
-// - "착용" 가능 여부는 레벨 조건(reqOk)뿐 아니라 양손 검 상호 배타 조건(canEquipSubItem, 문서 3번)도
+// - "착용" 가능 여부는 레벨 조건(reqOk)뿐 아니라 양손 무기 상호 배타 조건(canEquipSubItem, 문서 3번)도
 //   함께 검사함 — 이미 보조 아이템을 착용 중인 경우는 항상 "착용 해제" 버튼이 뜨므로 그 경우는 이
 //   조건과 무관(해제는 항상 가능).
 function renderSubInventoryList(){
@@ -374,7 +374,7 @@ function renderSubInventoryList(){
       : `<button class="inv-btn equip" data-action="wear-sub" data-id="${item.id}" ${canWear ? '' : 'disabled'}>착용</button>`;
     let wearTooltipText = null;
     if(!isWorn && !reqOk) wearTooltipText = `착용 조건을 만족해야 장착할 수 있습니다.${weaponRequirementText(type) ? `<br>(${weaponRequirementText(type)})` : ''}`;
-    else if(!isWorn && reqOk && !canEquipSubItem()) wearTooltipText = '양손 검을 장착 중에는 보조 아이템을 장착할 수 없습니다.';
+    else if(!isWorn && reqOk && !canEquipSubItem()) wearTooltipText = '양손 무기를 장착 중에는 보조 아이템을 장착할 수 없습니다.';
     const wearBtnFinal = wearTooltipText
       ? `<span class="equip-req-wrap">${wearBtnHtml}<span class="tooltip">${wearTooltipText}</span></span>`
       : wearBtnHtml;
@@ -864,7 +864,7 @@ function renderConsumableList(){
       <div class="inv-info">
         <div class="inv-name">${it.name} ×${it.count}</div>
         <div class="inv-sub">${it.desc}</div>
-        <div class="inv-sub">효과: ${it.effect}</div>
+        <div class="inv-sub">효과: ${resolveGlossaryTermsHtml(it.effect)}</div>
         <div class="inv-sub">${it.note}</div>
       </div>
     </div>`).join('');
@@ -1292,7 +1292,7 @@ function buildArtifactEffectsHtml(){
   let html = `<div class="char-stat-sub-title">적용 중인 아티팩트 효과</div>`;
   html += state.equippedArtifacts.map(id => {
     const a = ARTIFACTS[id];
-    return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${itemIconHtml(a)} ${a.name}</b><br>${a.effectText}</div>`;
+    return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${itemIconHtml(a)} ${a.name}</b><br>${resolveGlossaryTermsHtml(a.effectText)}</div>`;
   }).join('');
   return html;
 }
@@ -1503,9 +1503,17 @@ function buildSkillIconBtnHtml(id){
   // 이미 습득된 스킬 아이콘을 눌렀을 때와 동일한 동작).
   const learned = isSkillDisplayedAsLearned(id);
   const grade = WEAPON_GRADES[s.grade];
+  const cantLearn = !learned && !canLearnSkill(id);
+  // 요청 대응(버그 수정): 예전엔 여기서 실제 HTML `disabled` 속성을 썼는데, disabled 버튼은 그
+  // 내부에서 발생하는 click 이벤트 자체를 브라우저가 아예 발생시키지 않아서(캡처/버블 단계 리스너에도
+  // 전혀 도달하지 않음) 툴팁 안의 용어(.glossary-term)를 클릭해도 아무 반응이 없었음(습득 가능/이미
+  // 습득한 스킬은 disabled가 안 붙어서 문제 없었음). 이제 실제 "습득 가능 여부" 판정은
+  // openSkillLearnConfirm() 안의 canLearnSkill(id) 가드가 이미 방어적으로 처리하고 있으므로(원래도
+  // 있던 코드, 이번에 새로 추가한 게 아님), 여기서는 disabled 속성 대신 cant-learn 클래스로 시각적
+  // 상태만 표현함 — 버튼 자체는 여전히 클릭 가능해서 내부 용어도 정상적으로 클릭됨.
   return `
     <div class="skill-tree-node-inner">
-      <button class="skill-icon-btn${learned ? '' : ' locked'}" data-learn-skill="${id}" ${(!learned && !canLearnSkill(id)) ? 'disabled' : ''} style="border-color:${grade ? grade.color : '#fff'};">
+      <button class="skill-icon-btn${learned ? '' : ' locked'}${cantLearn ? ' cant-learn' : ''}" data-learn-skill="${id}" ${cantLearn ? 'aria-disabled="true"' : ''} style="border-color:${grade ? grade.color : '#fff'};">
         <span class="skill-icon">${skillIconHtml(s)}</span>
         <span class="tooltip">${buildSkillTooltipHtml(id)}</span>
       </button>
@@ -1822,6 +1830,7 @@ function buildMonsterSlotHtml(instance){
   return `
     <div class="monster-slot${targetedClass}${posClass}" id="monster-slot-${instance.instanceId}" data-instance-id="${instance.instanceId}">
       <div class="target-marker">▼</div>
+      <div class="monster-status-row" id="monster-status-${instance.instanceId}"></div>
       <div class="hp-bar-wrap">
         <div class="hp-bar-fill" id="monster-hpfill-${instance.instanceId}" style="width:${pct}%"></div>
         <div class="hp-text" id="monster-hptext-${instance.instanceId}">${Math.max(0, instance.hp)}</div>
@@ -1831,7 +1840,6 @@ function buildMonsterSlotHtml(instance){
         <span class="monster-name" style="color:${grade.color};">${monsterDef.name}</span>
         <span class="monster-lv" id="monster-lv-${instance.instanceId}">Lv.${instance.level} · 공격력 ${instance.atk}</span>
       </div>
-      <div class="status-badge-row" id="monster-status-${instance.instanceId}"></div>
     </div>`;
 }
 // 몬스터 그룹 전체를 새로 그림. 스폰 시(spawnMonsters) 1회만 호출 — 전투 중 체력 갱신 등은
@@ -1867,25 +1875,58 @@ function updateTargetHighlight(){
   syncPlayerDirectionToTarget();
 }
 
+// 몬스터별 상태이상 UI(요구사항: 던전 버프 안내 UI와 유사한 아이콘+지속시간 오버레이 방식, 몬스터
+// 체력바 바로 위에 독립적으로 표시). 남은시간 계산 공식은 기존 그대로(중독처럼 tickIntervalMs가
+// 1초가 아닌 dot형은 남은 틱수×틱간격, 기절/둔화 등은 expiresAt 기준 실시간 계산) — 표시 단위만
+// 버프 UI(소수점 1자리)와 달리 정수 초로 반올림 없이 올림(Math.ceil) 처리함(요구사항 5번).
+// STATUS_TICK_RESOLUTION_MS(100ms)마다 renderStatusBadges가 호출되므로, hunt-buff-ui(zip161)에서
+// 겪었던 것과 동일한 "매번 innerHTML을 통째로 새로 그리면 hover 중인 아이콘 노드가 파괴되어 툴팁이
+// 깜빡이는" 문제를 피하기 위해 같은 방식(data-key로 기존 노드 재사용, 시간 텍스트만 갱신, 순서가
+// 바뀔 때만 insertBefore)으로 그림.
 function renderStatusBadges(){
   hunt.monsters.forEach(instance => {
     const row = el('monster-status-' + instance.instanceId);
     if(!row) return;
-    if(!instance.statusEffects || instance.statusEffects.length === 0){
-      row.innerHTML = '';
-      return;
-    }
-    row.innerHTML = instance.statusEffects.map(s => {
+    const entries = (instance.statusEffects || []).map(s => {
       const def = STATUS_EFFECTS[s.key];
-      // 중독(틱 기반) 남은 시간 = 남은 틱 수 × 틱 간격(초). 예전엔 ticksRemaining(틱 개수)을 그대로
-      // "초"로 표시해서(중독처럼 tickIntervalMs가 1초가 아닌 경우) 실제 지속시간보다 길게 보이는 버그가
-      // 있었음(예: tickIntervalMs 500ms·maxTicks 10이면 실제 5초인데 화면엔 "10s"로 표시됨). 기절/둔화 등
-      // 지속시간형은 기존처럼 만료시각(expiresAt) 기준으로 남은 초를 실시간 계산해서 표시함.
+      if(!def) return null;
       const remainSec = def.type === 'dot'
         ? Math.max(0, Math.ceil(s.ticksRemaining * (def.tickIntervalMs / 1000)))
         : Math.max(0, Math.ceil((s.expiresAt - Date.now()) / 1000));
-      return `<span class="status-badge" style="color:${def.color}; border-color:${def.color};">${def.icon} ${def.name} ${remainSec}s</span>`;
-    }).join('');
+      return { key: s.key, def, remainSec };
+    }).filter(Boolean);
+    entries.sort((a, b) => b.remainSec - a.remainSec); // 요구사항 4번: 남은 시간이 긴 순으로 왼쪽부터
+
+    const existing = new Map();
+    Array.from(row.children).forEach(node => existing.set(node.dataset.key, node));
+
+    entries.forEach((e, idx) => {
+      let node = existing.get(e.key);
+      if(node){
+        existing.delete(e.key);
+      } else {
+        node = document.createElement('div');
+        node.className = 'monster-status-icon';
+        node.dataset.key = e.key;
+        // 요구사항 4번: 상태이상 이름은 그대로 유지하고(색상만 새로 적용, "색상 연동" 요구사항) 그 아래에
+        // 용어사전(GLOSSARY, data.js)의 설명을 추가. 용어사전에 없는 상태이상(현재는 없음)이면 이름만
+        // 기존처럼 표시 — 이름/색상 값 자체(e.def.name/e.def.color)는 STATUS_EFFECTS에서 그대로 가져오며
+        // 여기서 새로 만들거나 바꾸지 않음. 노드가 diffing으로 재사용되므로 이 innerHTML은 최초 생성 시
+        // 한 번만 구성되고, 이후엔 남은시간 텍스트만 갱신됨(zip163과 동일한 패턴, 툴팁 깜빡임 없음).
+        const g = glossaryEntry(e.key);
+        const descHtml = g && g.desc ? `<br><span style="font-weight:400;">${g.desc}</span>` : '';
+        // 이번 수정: 이름 줄만 가로 중앙 정렬(display:block 컨테이너에 text-align:center) — 설명 줄
+        // 서식(descHtml)과 툴팁 전체 레이아웃/디자인은 전혀 손대지 않음(요구사항 1번).
+        node.innerHTML = `${statusEffectIconHtml(e.def)}
+           <span class="monster-status-time"></span>
+           <span class="tooltip"><span style="display:block; text-align:center; color:${e.def.color}; font-weight:700;">${e.def.name}</span>${descHtml}</span>`;
+      }
+      const timeEl = node.querySelector('.monster-status-time');
+      timeEl.textContent = e.remainSec + '초'; // 요구사항 5번: 1초 단위 표시(소수점 없음)
+      timeEl.style.color = e.def.color; // 기존 뱃지가 쓰던 상태이상별 color를 그대로 유지
+      if(row.children[idx] !== node) row.insertBefore(node, row.children[idx] || null);
+    });
+    existing.forEach(node => node.remove()); // 더 이상 걸려있지 않은 상태이상 노드만 제거
   });
 }
 
@@ -2139,7 +2180,7 @@ function buildArtifactShopCardHtml(id){
         </div>
         <span class="scroll-count">${owned ? '보유함' : ''}</span>
       </div>
-      <div class="effect-line">${a.effectText}</div>
+      <div class="effect-line">${resolveGlossaryTermsHtml(a.effectText)}</div>
       <div class="scroll-body">
         <button class="scroll-buy" data-action="buy-artifact" data-type="${id}" style="flex:1;" ${disabled ? 'disabled' : ''}>${btnText}</button>
       </div>

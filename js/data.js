@@ -10,17 +10,60 @@ const INV_MAX = 50; // 장비(무기/방어구/장신구) 공용 인벤토리 �
 // 장비 타입. 무기 / 방어구 / 보조 / 장신구 / 아티팩트가 있음.
 const EQUIPMENT_TYPES = { weapon: '무기', armor: '방어구', sub: '보조', accessory: '장신구', artifact: '아티팩트' };
 
-// 무기 종류(카테고리) 구분: 양손 검 / 검 / 단검 / 지팡이. 무기 "이름"과는 별개의 개념.
-const WEAPON_KINDS = { two_handed_sword: '양손 검', sword: '검', dagger: '단검', staff: '지팡이' };
+// 무기 종류(weaponKind) 구분: 검 / 단검 / 지팡이(향후 도끼/창 등 추가 예정). "이름"과는 별개의 개념.
+// 착용 손수(handType: one_hand=한손 / two_hand=양손)와는 독립된 축이라, 검처럼 한손·양손 둘 다 존재하는
+// 종류도 weaponKind 하나로 표현하고 handType으로만 구분함(과거엔 weaponKind 자체를 'two_handed_sword'
+// 처럼 손수까지 합쳐서 표현했으나, 도끼/창 등 새 종류가 늘어날 때마다 조합이 배로 늘어나는 문제가 있어
+// 이번에 두 속성으로 분리함 — 무기 데이터의 id/이름/등급/수치/드랍 등은 전혀 변경되지 않음).
+const WEAPON_KINDS = { sword: '검', dagger: '단검', staff: '지팡이' };
+const HAND_TYPE_LABELS = { one_hand: '한손', two_hand: '양손' };
 
-// 무기 종류별 착용 요구 스탯 공식. 아이템 레벨(levelReq)에 배율을 곱해서 계산(소수점 반올림), 강화 단계와 무관.
-// stat: 'str'(힘) | 'agi'(민첩) | 'int'(지능)
-const WEAPON_KIND_STAT_REQ = {
-  sword:            [{ stat: 'str', mult: 2 }, { stat: 'agi', mult: 0.5 }],
-  two_handed_sword: [{ stat: 'str', mult: 3 }],
-  dagger:           [{ stat: 'str', mult: 1 }, { stat: 'agi', mult: 2 }],
-  staff:            [{ stat: 'int', mult: 3 }],
+// 무기 종류(weaponKind) + 손수(handType) 조합별 강화 프로필: 강화 구간(+1~+9)당 공격속도/치명타
+// 증가량(WEAPON_KIND_ATKSPEED_STEP/WEAPON_KIND_CRIT_STEP 대체) + 착용 요구 스탯 공식
+// (WEAPON_KIND_STAT_REQ 대체)을 한 곳에 묶음. 수치 자체는 기존 값에서 단 하나도 바뀌지 않았고, 조회
+// 키만 weaponKind 단일값에서 weaponKind+handType 조합으로 세분화됨(getWeaponProfile로 조회).
+// 같은 성장치를 쓰는 새 조합은 같은 프로필 객체를 그대로 참조하면 됨 — 예를 들어 나중에 추가할 도끼
+// 한손이 검 한손과 성장치가 같다면 데이터를 복사하지 않고
+//   WEAPON_PROFILES.axe = { one_hand: WEAPON_PROFILES.sword.one_hand }
+// 처럼 참조만 추가하면 재사용됨. 강화 공격력 자체는 이 프로필과 무관하게 항상 ENHANCE_ATK_LEVEL_MULT
+// 공식(아래)만 사용함(요청사항 8번 — 무기 종류/손수에 따라 달라지지 않음).
+const WEAPON_PROFILES = {
+  sword: {
+    one_hand: { // 기존 weaponKind:'sword'(한손 검)와 완전히 동일한 성장치
+      atkSpeedStep: [0.05, 0, 0.05, 0, 0.05, 0, 0.05, 0.1, 0.1],
+      critStep: [0, 1, 0, 1, 0, 1, 0, 1, 1],
+      statReq: [{ stat: 'str', mult: 2 }, { stat: 'agi', mult: 0.5 }],
+    },
+    two_hand: { // 기존 weaponKind:'two_handed_sword'(양손 검)와 완전히 동일한 성장치
+      atkSpeedStep: [0.02, 0, 0.02, 0, 0.02, 0, 0.02, 0.02, 0.05],
+      critStep: [0, 1, 0, 1, 0, 1, 0, 1, 1],
+      statReq: [{ stat: 'str', mult: 3 }],
+    },
+  },
+  dagger: {
+    one_hand: { // 기존 weaponKind:'dagger'와 완전히 동일한 성장치
+      atkSpeedStep: [0.1, 0, 0.1, 0, 0.1, 0, 0.1, 0.1, 0.1],
+      critStep: [1, 1, 1, 1, 1, 1, 1, 1, 2],
+      statReq: [{ stat: 'str', mult: 1 }, { stat: 'agi', mult: 2 }],
+    },
+  },
+  // 지팡이: 아직 실제로 등록된 무기가 하나도 없는 "구현 예정" 상태(02번 기획 문서)라 착용 요구 스탯
+  // 공식(지능×3, 기존 WEAPON_KIND_STAT_REQ.staff와 동일)만 정해져 있고 강화 성장치는 미확정(null,
+  // 기존과 동일). handType은 실제 지팡이 무기가 추가되며 확정될 예정이라 우선 one_hand에 배치했으며,
+  // 현재 이 프로필을 참조하는 무기가 하나도 없어 이 배치가 결과에 전혀 영향을 주지 않음.
+  staff: {
+    one_hand: {
+      atkSpeedStep: null,
+      critStep: null,
+      statReq: [{ stat: 'int', mult: 3 }],
+    },
+  },
 };
+// 무기 데이터(w) 하나의 강화 프로필 조회. weaponKind/handType 조합에 등록된 프로필이 없으면(방어구 등
+// weaponKind 자체가 없는 아이템 포함) null — 호출부는 기존처럼 "이 조합은 아직 정의 안 됨"으로 처리함.
+function getWeaponProfile(w){
+  return (WEAPON_PROFILES[w.weaponKind] || {})[w.handType] || null;
+}
 const STAT_LABELS = { str: '힘', agi: '민첩', int: '지능' };
 
 // 무기 등급(레어도). 색상만 우선 정의 — 텍스트 테두리 강조 등 시각 효과는 추후 추가 예정.
@@ -63,18 +106,20 @@ const ITEM_IMAGE_EXT = '.png';
 // 무기 종류 도감. 새로운 옵션(필드)이 필요해지면 이 객체에 항목만 추가하면 됨 — 언제든 확장 가능한 구조.
 // ---- 항목 설명 ----
 // desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고) / weaponKind: 무기 종류(WEAPON_KINDS) /
+// handType: 착용 손수(HAND_TYPE_LABELS, one_hand=한손/two_hand=양손) /
 // grade: 무기 등급(WEAPON_GRADES) / attackPower: 공격력 / attackSpeed: 공격 속도 / critRate: 치명타 확률(%) /
 // purchasable: 상점 구매 가능 여부(true면 상점에 자동 등록) / sellPrice: 판매 가격(플레이어가 상점에 파는 가격.
 // 상점 구매가는 이 값의 2배로 자동 계산됨) / levelReq: 아이템 레벨(착용하려면 플레이어 레벨이 이 수치 "이상"이어야 함. 구매/강화는 레벨과 무관하게 항상 가능) / image: 이미지 파일명
 // ---- 아래 강화 단계별(+0~+9) 수치는 전부 공식으로 자동 계산되어 채워짐 — 여기에 적는 값은
 // "+0(기본) 값"뿐이며, 나머지는 아래 forEach들이 attackPower/attackSpeed/critRate/sellPrice/grade/
-// weaponKind를 기준으로 계산해서 덮어씀. 직접 배열 전체를 적어둘 필요 없음(적어도 무시되고 재계산됨).
+// weaponKind+handType(WEAPON_PROFILES)을 기준으로 계산해서 덮어씀. 직접 배열 전체를 적어둘 필요 없음(적어도 무시되고 재계산됨).
 // atk/speed/crit: 단계별 공격력/공격속도/치명타확률 배열 / cost: 단계별 강화 비용 / sell: 단계별 판매가 / odds: 단계별 강화 확률
 const WEAPON_TYPES = {
   longsword: {
     id: 'longsword', name: '낡은 대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 30, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 100, levelReq: 1,
@@ -85,7 +130,8 @@ const WEAPON_TYPES = {
   greatsword: {
     id: 'greatsword', name: '낡은 그레이트소드', desc: '강력한 일격을 위한 대검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 43, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 5,
@@ -99,6 +145,7 @@ const WEAPON_TYPES = {
     id: 'shortsword', name: '낡은 검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 20, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 100, levelReq: 1,
@@ -110,6 +157,7 @@ const WEAPON_TYPES = {
     id: 'dagger', name: '낡은 비도', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 12, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 100, levelReq: 1,
@@ -121,6 +169,7 @@ const WEAPON_TYPES = {
     id: 'broadsword', name: '낡은 브로드소드', desc: '베고 찌르는 데 특화된 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 29, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 500, levelReq: 5,
@@ -132,6 +181,7 @@ const WEAPON_TYPES = {
     id: 'combatknife', name: '낡은 컴뱃 나이프', desc: '빠르게 휘두를 수 있게 설계된 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 18, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 5,
@@ -142,7 +192,8 @@ const WEAPON_TYPES = {
   longsword2: {
     id: 'longsword2', name: '대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 47, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 10,
@@ -154,6 +205,7 @@ const WEAPON_TYPES = {
     id: 'shortsword2', name: '검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 31, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 500, levelReq: 10,
@@ -165,6 +217,7 @@ const WEAPON_TYPES = {
     id: 'dagger2', name: '비도', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 19, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 500, levelReq: 10,
@@ -176,6 +229,7 @@ const WEAPON_TYPES = {
     id: 'poisonfang', name: '독 송곳니', desc: '맹독을 품은 송곳니를 벼려 만든 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 26, attackSpeed: 1.2, critRate: 15,
     purchasable: false, sellPrice: 2400, levelReq: 8,
@@ -193,13 +247,14 @@ const WEAPON_TYPES = {
       effectId: 'poison_on_hit',
       activateLevel: 5,
       chanceByLevel: { 5: 5, 6: 5, 7: 6, 8: 6, 9: 7 },
-      textTemplate: '공격 적중 시 {chance}% 확률로 중독',
+      textTemplate: "공격 적중 시 {chance}% 확률로 {term:poison}중독{/term}",
     },
   },
   greatsword2: {
     id: 'greatsword2', name: '그레이트소드', desc: '압도적인 위력으로 적을 분쇄하는 거대한 대검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 71, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 1000, levelReq: 15,
@@ -211,6 +266,7 @@ const WEAPON_TYPES = {
     id: 'broadsword2', name: '브로드소드', desc: '공격과 방어의 균형을 갖춘 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 48, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 1000, levelReq: 15,
@@ -222,6 +278,7 @@ const WEAPON_TYPES = {
     id: 'combatknife2', name: '컴뱃 나이프', desc: '신속한 근접전을 위한 다목적 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 28, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 1000, levelReq: 15,
@@ -232,7 +289,8 @@ const WEAPON_TYPES = {
   longsword3: {
     id: 'longsword3', name: '철제중검', desc: '튼튼한 내구성을 갖춘 모험가용 대검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 76, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 1250, levelReq: 20,
@@ -244,6 +302,7 @@ const WEAPON_TYPES = {
     id: 'shortsword3', name: '철검', desc: '균형 잡힌 성능의 모험가용 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 51, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 1250, levelReq: 20,
@@ -255,6 +314,7 @@ const WEAPON_TYPES = {
     id: 'dagger3', name: '철단도', desc: '가볍고 다루기 쉬운 모험가용 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검 (표기상 "양손 검"은 오타로 확인함)
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 30, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 1250, levelReq: 20,
@@ -266,6 +326,7 @@ const WEAPON_TYPES = {
     id: 'blacksword', name: '흑색 검', desc: '검은빛을 머금은 날은 적의 숨결마저 끊어낸다.',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 69, attackSpeed: 0.8, critRate: 5,
     purchasable: false, sellPrice: 4560, levelReq: 18,
@@ -285,7 +346,8 @@ const WEAPON_TYPES = {
   moongreatsword: {
     id: 'moongreatsword', name: '반월대도', desc: '거대한 반월형 칼날을 가진 대도',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
     attackPower: 146, attackSpeed: 0.6, critRate: 10,
     purchasable: false, sellPrice: 5900, levelReq: 25,
@@ -309,6 +371,7 @@ const WEAPON_TYPES = {
     id: 'tigersword', name: '척호검', desc: '맹수의 기운이 서려 있다.',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 123, attackSpeed: 0.8, critRate: 5,
     purchasable: false, sellPrice: 6000, levelReq: 30,
@@ -329,6 +392,7 @@ const WEAPON_TYPES = {
     id: 'firesword', name: '백화검', desc: '불타는 검신을 가진 명검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 870, attackSpeed: 0.8, critRate: 9,
     purchasable: false, sellPrice: 49900, levelReq: 70,
@@ -346,13 +410,14 @@ const WEAPON_TYPES = {
       effectId: 'burn_on_hit',
       activateLevel: 0,
       chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 5, 4: 5, 5: 7, 6: 7, 7: 9, 8: 10, 9: 15 },
-      textTemplate: '공격 적중 시 {chance}% 확률로 화상 부여',
+      textTemplate: "공격 적중 시 {chance}% 확률로 {term:burn}화상{/term} 부여",
     },
   },
   bloodtigerlongsword: {
     id: 'bloodtigerlongsword', name: '혈호대검', desc: '붉은 호랑이의 피와 살의를<br>머금은 거대한 양손 검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
     attackPower: 302, attackSpeed: 0.6, critRate: 7,
     purchasable: false, sellPrice: 9000, levelReq: 40,
@@ -368,7 +433,8 @@ const WEAPON_TYPES = {
   bent_greatsword: {
     id: 'bent_greatsword', name: '휘어진 양손 검', desc: '날이 휘어져 절삭력이 좋지 않다',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 35, attackSpeed: 0.6, critRate: 8,
     purchasable: false, sellPrice: 200, levelReq: 4,
@@ -379,7 +445,8 @@ const WEAPON_TYPES = {
   doubleedge_greatsword: {
     id: 'doubleedge_greatsword', name: '양날대검', desc: '세월의 흔적이 담긴 양손 검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 40, attackSpeed: 0.6, critRate: 9,
     purchasable: false, sellPrice: 350, levelReq: 7,
@@ -391,6 +458,7 @@ const WEAPON_TYPES = {
     id: 'doubleedge_sword', name: '양날검', desc: '세월의 흔적이 담긴 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 27, attackSpeed: 0.8, critRate: 4,
     purchasable: false, sellPrice: 350, levelReq: 7,
@@ -402,6 +470,7 @@ const WEAPON_TYPES = {
     id: 'iron_sword', name: '낡은 철검', desc: '조잡하지만 위력은 있는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 24, attackSpeed: 0.8, critRate: 3,
     purchasable: false, sellPrice: 195, levelReq: 4,
@@ -413,6 +482,7 @@ const WEAPON_TYPES = {
     id: 'plain_dagger', name: '단검', desc: '가볍지만 균형이 어긋나있다.',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 14, attackSpeed: 1.2, critRate: 9,
     purchasable: false, sellPrice: 195, levelReq: 4,
@@ -424,6 +494,7 @@ const WEAPON_TYPES = {
     id: 'sharp_dagger', name: '날카로운 단검', desc: '날 끝을 예리하게 갈아낸 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검 (사용자 확인 후 검→단검으로 수정함)
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 16, attackSpeed: 1.2, critRate: 9,
     purchasable: false, sellPrice: 340, levelReq: 7,
@@ -434,7 +505,8 @@ const WEAPON_TYPES = {
   bastardsword: {
     id: 'bastardsword', name: '바스타드 소드', desc: '상황에 따라 어떤 손으로든,<br>자유롭게 휘두를 수 있는 중검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 116, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 1750, levelReq: 25,
@@ -446,6 +518,7 @@ const WEAPON_TYPES = {
     id: 'armingsword', name: '아밍소드', desc: '균형 잡힌 검신을 가진<br>아름다운 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 73, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 1750, levelReq: 25,
@@ -457,6 +530,7 @@ const WEAPON_TYPES = {
     id: 'silverdagger', name: '실버 대거', desc: '어둠 속에서 빛나는<br>은빛 칼날의 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 47, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 1750, levelReq: 25,
@@ -468,6 +542,7 @@ const WEAPON_TYPES = {
     id: 'steelsword', name: '강철 검', desc: '단단한 강철로 벼려낸 믿음직한 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 82, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 2250, levelReq: 30,
@@ -478,7 +553,8 @@ const WEAPON_TYPES = {
   steelgreatsword: {
     id: 'steelgreatsword', name: '강철중검', desc: '무거운 강철로 만들어진 강력한 양손 검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 123, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 2250, levelReq: 30,
@@ -490,6 +566,7 @@ const WEAPON_TYPES = {
     id: 'steeldagger', name: '강철단도', desc: '날카롭게 벼려낸 가볍고 재빠른 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 49, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 2250, levelReq: 30,
@@ -501,6 +578,7 @@ const WEAPON_TYPES = {
     id: 'ninetaildagger', name: '제령도', desc: '희생된 영혼을 기리는 제사에 사용한 단검<br>강한 사념이 깃들어 많은 체력이 소모된다',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 86, attackSpeed: 1.2, critRate: 15,
     purchasable: false, sellPrice: 7000, levelReq: 33,
@@ -521,7 +599,8 @@ const WEAPON_TYPES = {
   dopplehander: {
     id: 'dopplehander', name: '쯔바이핸더', desc: '긴 검신과 묵직함으로 적을 분쇄하는 양손 검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 190, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 3500, levelReq: 35,
@@ -533,6 +612,7 @@ const WEAPON_TYPES = {
     id: 'saber', name: '세이버', desc: '속도와 기동성을 극대화한 우아한 곡검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 126, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 3500, levelReq: 35,
@@ -544,6 +624,7 @@ const WEAPON_TYPES = {
     id: 'guardsdagger', name: '가즈 대거', desc: '좁은 틈을 파고들어 치명상을 남기는 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 76, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 3500, levelReq: 35,
@@ -554,7 +635,8 @@ const WEAPON_TYPES = {
   claymore: {
     id: 'claymore', name: '클레이모어', desc: '거대한 검신에 강력한 참격을 담아내는 양손 검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 308, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 10000, levelReq: 45,
@@ -566,6 +648,7 @@ const WEAPON_TYPES = {
     id: 'falchion', name: '파르치온', desc: '묵직한 검신과 날카로움을 겸비한 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 171, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 10000, levelReq: 45,
@@ -577,6 +660,7 @@ const WEAPON_TYPES = {
     id: 'mercenaryknife', name: '머서너리 나이프', desc: '용병들이 애용하는 실용적인 전투용 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 124, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 10000, levelReq: 45,
@@ -587,7 +671,8 @@ const WEAPON_TYPES = {
   silvergreatsword: {
     id: 'silvergreatsword', name: '은제중검', desc: '거대한 은빛 검신의 강력한 중검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 201, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 5000, levelReq: 40,
@@ -599,6 +684,7 @@ const WEAPON_TYPES = {
     id: 'silversword', name: '은가검', desc: '은빛 칼날로 빛을 머금은 듯한 장검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 134, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 5000, levelReq: 40,
@@ -610,6 +696,7 @@ const WEAPON_TYPES = {
     id: 'silverdagger2', name: '은비도', desc: '은빛 칼날로 빈틈을 노리는 비도',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 80, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 5000, levelReq: 40,
@@ -620,7 +707,8 @@ const WEAPON_TYPES = {
   goldgreatsword: {
     id: 'goldgreatsword', name: '금제중검', desc: '찬란한 금빛 검신으로 일격을 내리꽂는 중검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 328, attackSpeed: 0.6, critRate: 10,
     purchasable: true, sellPrice: 12000, levelReq: 50,
@@ -632,6 +720,7 @@ const WEAPON_TYPES = {
     id: 'goldsword', name: '금협검', desc: '황금빛 검신에 날렵함을 담아낸 우아한 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 218, attackSpeed: 0.8, critRate: 5,
     purchasable: true, sellPrice: 12000, levelReq: 50,
@@ -643,6 +732,7 @@ const WEAPON_TYPES = {
     id: 'golddagger', name: '금장비도', desc: '황금빛 칼날로 치명적인 일격을 노리는 비도',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 131, attackSpeed: 1.2, critRate: 10,
     purchasable: true, sellPrice: 12000, levelReq: 50,
@@ -656,6 +746,7 @@ const WEAPON_TYPES = {
     id: 'eight_knife', name: '팔각비도', desc: '팔각형의 날을 가진 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 155, attackSpeed: 1.2, critRate: 12,
     purchasable: false, sellPrice: 15000, levelReq: 45,
@@ -671,7 +762,7 @@ const WEAPON_TYPES = {
       effectId: 'poison_target_damage_percent',
       activateLevel: 0,
       chanceByLevel: { 0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 11, 6: 11, 7: 12, 8: 13, 9: 15 },
-      textTemplate: '중독 상태 적 피해 {chance}% 증가',
+      textTemplate: "{term:poison}중독{/term} 상태 적 피해 {chance}% 증가",
     },
   },
   // 신규 무기 3종(요청사항 그대로 데이터만 등록) — 아직 던전/몬스터 드랍 테이블에 연결되지 않아
@@ -680,6 +771,7 @@ const WEAPON_TYPES = {
     id: 'moonsword', name: '월도', desc: '휘두를 때마다 달의 궤적을 그리는 검',
     equipType: 'weapon',
     weaponKind: 'sword', // 검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 352, attackSpeed: 0.8, critRate: 5,
     purchasable: false, sellPrice: 33600, levelReq: 56,
@@ -690,7 +782,8 @@ const WEAPON_TYPES = {
   heavysword: {
     id: 'heavysword', name: '현철중검', desc: '현철로 만들어진 거대한 검',
     equipType: 'weapon',
-    weaponKind: 'two_handed_sword', // 양손 검
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 527, attackSpeed: 0.6, critRate: 10,
     purchasable: false, sellPrice: 33600, levelReq: 56,
@@ -702,12 +795,73 @@ const WEAPON_TYPES = {
     id: 'heavydagger', name: '현철단검', desc: '현철로 만들어진 예리한 단검',
     equipType: 'weapon',
     weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 211, attackSpeed: 1.2, critRate: 10,
     purchasable: false, sellPrice: 33600, levelReq: 56,
     image: 'rare_heavysword', // 현철중검과 동일 이미지 재사용(사용자 확인 완료)
     atk: [211], speed: [1.2], crit: [10], sell: [33600],
     cost: [], odds: [],
+  },
+  // 월도(moonsword)/현철중검(heavysword)/현철단검(heavydagger) 레어 계열을 잇는 에픽 상위 계열 3종.
+  // 데이터만 우선 등록(요청사항) — 실제 드랍 테이블 연결은 다음 작업에서 진행.
+  moonsword_black: {
+    id: 'moonsword_black', name: "월도'흑", desc: '월도를 담금질하여 만들어진 흑검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    handType: 'one_hand',
+    grade: 'epic', // 에픽
+    attackPower: 681, attackSpeed: 0.8, critRate: 8,
+    purchasable: false, sellPrice: 52000, levelReq: 65,
+    image: 'epic_black_moonsword',
+    atk: [681], speed: [0.8], crit: [8], sell: [52000],
+    cost: [], odds: [],
+    // 고유 옵션: moongreatsword/ninetaildagger/tigersword/bloodtigerlongsword와 동일한 "고정형"
+    // 스키마(opt.text+opt.statBonus) — activateLevel:0이라 +0부터 바로 활성화되고 강화해도 오르지
+    // 않음(요청사항: "고정 수치로 +0단계에 해당 옵션이 활성화, 강화단계 성장 수치는 없다").
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +5<br>최대 체력 +200',
+      statBonus: { str: 5, maxHp: 200 },
+    },
+  },
+  heavysword_black: {
+    id: 'heavysword_black', name: '흑철중검', desc: '현철중검을 갈아 더욱 날카롭게 만든 중검',
+    equipType: 'weapon',
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
+    grade: 'epic', // 에픽
+    attackPower: 1022, attackSpeed: 0.6, critRate: 10,
+    purchasable: false, sellPrice: 52000, levelReq: 65,
+    image: 'epic_black_heavysword',
+    atk: [1022], speed: [0.6], crit: [10], sell: [52000],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +10<br>최대 체력 +550',
+      statBonus: { str: 10, maxHp: 550 },
+    },
+  },
+  heavydagger_black: {
+    id: 'heavydagger_black', name: '흑철비도', desc: '현철단검을 더욱 날카롭게 만든 비도',
+    equipType: 'weapon',
+    weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
+    grade: 'epic', // 에픽
+    attackPower: 408, attackSpeed: 1.2, critRate: 14,
+    purchasable: false, sellPrice: 52000, levelReq: 65,
+    image: 'epic_black_heavysword', // 흑철중검과 동일 이미지 재사용(사용자 확인 완료)
+    atk: [408], speed: [1.2], crit: [14], sell: [52000],
+    cost: [], odds: [],
+    // 고유 옵션: 민첩 스탯 보너스는 tigersword의 atkSpeedPercent와 동일한 방식(statBonus 신규 키)으로
+    // 일반화. 치명타 확률 보너스(critRate 키)는 이번에 처음 등장 — effectiveCritChance(formulas.js)에
+    // weaponUniqueOptionStatBonus('critRate') 합산을 추가해 blacksword류(effectId:'crit_chance_bonus'
+    // +chanceByLevel 성장형)와는 별개로, 성장 없는 고정 스탯 보너스 계열도 치명타 확률에 반영되도록 함.
+    uniqueOption: {
+      activateLevel: 0,
+      text: '민첩 +5<br>치명타 확률 +8%',
+      statBonus: { agi: 5, critRate: 8 },
+    },
   },
 };
 
@@ -877,7 +1031,7 @@ const ARMOR_TYPES = {
       effectId: 'poison_on_taking_damage',
       activateLevel: 0,
       chanceByLevel: { 0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 15 },
-      textTemplate: '피해 입을 시 {chance}% 확률로 중독 부여',
+      textTemplate: "피해 입을 시 {chance}% 확률로 {term:poison}중독{/term} 부여",
     },
   },
 };
@@ -1143,29 +1297,19 @@ const EQUIP_INVENTORY_POOLS = [
 // 항상 +0 기본 공격력만을 기준으로 직접 계산하며, 무기 종류/등급 보정은 이 공식에서 완전히 제외됨.
 const ENHANCE_ATK_LEVEL_MULT = [null, 1.5, 1.5, 1.5, 1.5, 1.55, 1.5, 1.6, 1.6, 1.65];
 
-// 2. 무기 종류별 강화 구간(+1~+9)당 공격속도 증가량 — 합연산. index 0 = +1, ... index 8 = +9
-const WEAPON_KIND_ATKSPEED_STEP = {
-  sword:            [0.05, 0, 0.05, 0, 0.05, 0, 0.05, 0.1, 0.1],
-  two_handed_sword: [0.02, 0, 0.02, 0, 0.02, 0, 0.02, 0.02, 0.05],
-  dagger:           [0.1, 0, 0.1, 0, 0.1, 0, 0.1, 0.1, 0.1],
-  staff: null,
-};
-
-// 2. 무기 종류별 강화 구간(+1~+9)당 치명타 확률 증가량(%p) — 합연산. index 0 = +1, ... index 8 = +9
-const WEAPON_KIND_CRIT_STEP = {
-  sword:            [0, 1, 0, 1, 0, 1, 0, 1, 1],
-  two_handed_sword: [0, 1, 0, 1, 0, 1, 0, 1, 1],
-  dagger:           [1, 1, 1, 1, 1, 1, 1, 1, 2],
-  staff: null,
-};
+// 2~3. 무기 종류별 강화 구간(+1~+9)당 공격속도/치명타 증가량은 이제 WEAPON_PROFILES(weaponKind+
+// handType 조합, 이 파일 상단)에 atkSpeedStep/critStep으로 통합 등록됨 — 기존 WEAPON_KIND_ATKSPEED_STEP/
+// WEAPON_KIND_CRIT_STEP과 수치는 완전히 동일하고 조회 키만 세분화됨.
 
 // 무기 하나의 +0~+9 공격력/공격속도/치명타 배열을 공식대로 계산.
 // 유니크 등급은 이 공식을 쓰지 않고 무기마다 고유 값을 직접 넣을 예정이라 대상에서 제외(공격력 계산 자체와 무관하게 유지).
-// 필요한 보정값이 없으면(아직 정의되지 않은 무기 종류) null을 반환 — 그 경우 기존 값을 그대로 둠.
+// 필요한 보정값이 없으면(아직 정의되지 않은 weaponKind+handType 조합 — getWeaponProfile이 null 반환)
+// null을 반환 — 그 경우 기존 값을 그대로 둠.
 function computeWeaponLevelStats(w){
   if(w.grade === 'unique') return null;
-  const atkSpeedSteps = WEAPON_KIND_ATKSPEED_STEP[w.weaponKind];
-  const critSteps = WEAPON_KIND_CRIT_STEP[w.weaponKind];
+  const profile = getWeaponProfile(w);
+  const atkSpeedSteps = profile && profile.atkSpeedStep;
+  const critSteps = profile && profile.critStep;
   if(atkSpeedSteps == null || critSteps == null) return null;
 
   const base = w.attackPower;
@@ -1438,8 +1582,8 @@ const ARTIFACTS = {
     // 플레이어의 직접 공격으로 몬스터에게 피해를 입힐 때마다 5% 확률로 그 몬스터에게 중독(STATUS_EFFECTS.poison)을
     // 부여함(dungeon.js attackTick에서 판정). 중독의 지속 피해 자체는 이 발동 조건에 포함되지 않음(플레이어의
     // 직접 공격 피해만 인정 — 상태이상 틱 데미지는 startStatusTicker의 별도 경로라 자동으로 제외됨).
-    effect: '몬스터에게 피해를 입힐 시, 피해를 입힌 몬스터에게 5%확률로 상태이상 "중독"을 부여한다.',
-    effectText: '공격 적중 시 5% 확률로 중독',
+    effect: '몬스터에게 피해를 입힐 시, 피해를 입힌 몬스터에게 5%확률로 상태이상 "{term:poison}중독{/term}"을 부여한다.',
+    effectText: "공격 적중 시 5% 확률로 {term:poison}중독{/term}",
     buyPrice: null,
   },
   antlerflag: {
@@ -2070,7 +2214,7 @@ const SKILLS = {
     damagePercent: 140, hits: 1,
   },
   sword_strike: {
-    name: '지면 강타', desc: '{dp}% 데미지로 적을 공격, 피해 입은 적은 {duration}초 동안 기절.',
+    name: '지면 강타', desc: '{dp}% 데미지로 적을 공격, 피해 입은 적은 {duration}초 동안 {term:stun}기절{/term}.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 20,
     cooldown: 10, resourceType: 'mp', resourceAmount: 120, castTime: 0.2,
     damagePercent: 120, hits: 1, icon: 'lv20atk',
@@ -2102,7 +2246,7 @@ const SKILLS = {
     hitDelayMs: 0.1,
   },
   ankle_slash: {
-    name: '발목 가르기', desc: '{dp}% 데미지로 공격한 후<br>피해 입은 적을 {duration}초 동안 둔화.',
+    name: '발목 가르기', desc: '{dp}% 데미지로 공격한 후<br>피해 입은 적을 {duration}초 동안 {term:slow}둔화{/term}.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 30,
     cooldown: 10, resourceType: 'mp', resourceAmount: 150, castTime: 0.2,
     damagePercent: 150, hits: 1, icon: 'lv30atk2',
@@ -2201,6 +2345,36 @@ const SKILLS = {
     buffEffect: { basicAtkDamagePercent: 100, durationMs: 80000 },
     upgradeFrom: 'bunsin', // 스킬 업그레이드: 분신 보유해야 습득 가능, 습득시 분신→무영으로 교체
   },
+  // 내려베기(slash)에서 이어지는 단일공격 업그레이드 체인(zip166 정정 — 처음엔 파쇄격의 upgradeFrom이
+  // 중압검으로 잘못 전달돼 압쇄검/파쇄격이 중압검에서 갈라지는 분기 구조였으나, 원래 의도는 단일 직선
+  // 체인이었음을 사용자가 확인해줌): 내려베기→중압검→압쇄검→파쇄격.
+  crushing_sword: {
+    name: '중압검', desc: '무기를 휘둘러 {dp}%의 데미지로 적을 공격.',
+    grade: 'normal', category: 'common', target: 'single', levelReq: 18,
+    cooldown: 4, resourceType: 'mp', resourceAmount: 50, castTime: 0,
+    damagePercent: 170, hits: 1, icon: 'lv18atk',
+    upgradeFrom: 'slash', // 스킬 업그레이드: 내려베기 보유해야 습득 가능, 습득시 내려베기→중압검으로 교체
+  },
+  crushing_sword2: {
+    name: '압쇄검', desc: '무기를 휘둘러 {dp}%의 데미지로 적을 공격.',
+    grade: 'normal', category: 'common', target: 'single', levelReq: 38,
+    cooldown: 4, resourceType: 'mp', resourceAmount: 120, castTime: 0,
+    damagePercent: 220, hits: 1, icon: 'lv38atk',
+    upgradeFrom: 'crushing_sword', // 스킬 업그레이드: 중압검 보유해야 습득 가능, 습득시 중압검→압쇄검으로 교체
+  },
+  shred_strike: {
+    name: '파쇄격', desc: "무기를 휘둘러 {dp}%의 데미지로 적을 {hits}번 공격.<br>적중한 적에게 {duration}초 동안 '{term:shredding}파쇄{/term}' 부여.",
+    grade: 'rare', category: 'common', target: 'single', levelReq: 74,
+    cooldown: 4, resourceType: 'mp', resourceAmount: 250, castTime: 0,
+    damagePercent: 280, hits: 2, icon: 'lv74atk', // 업로드 파일명은 lv75atk.svg였으나 요청 표의 icon 필드값·레벨제한(74)과
+    // 일치시키기 위해 lv74atk.svg로 저장함(기존 lvNN접두 아이콘 명명 규칙과도 일치) — 파일명 오탈자로 보여 이 자리에 알려드림.
+    hitDelayMs: 0.3, // 1타 즉시, 2타는 0.3초 뒤(이연격 등과 동일한 hitDelayMs 방식)
+    onHitStatus: { key: 'shredding', durationMs: 8000 }, // 적중(=피해를 입혀 대상이 생존)한 타격마다 파쇄 부여 —
+    // 2타 모두 적중하면 파쇄(zip164, stackDurationAdditive)가 두 번 적용되어 남은시간이 가산됨(기존 설계 그대로 재사용).
+    upgradeFrom: 'crushing_sword2', // 스킬 업그레이드: 압쇄검 보유해야 습득 가능(zip165 등록 당시 중압검으로 잘못
+    // 전달됐던 것을 사용자가 정정 — 원래 의도한 체인은 내려베기→중압검→압쇄검→파쇄격 단일 직선 체인),
+    // 습득시 압쇄검→파쇄격으로 교체
+  },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
 // (일반/레어/에픽/유니크 라벨·색상이 이미 동일하므로 SKILLS[id].grade를 WEAPON_GRADES에 그대로 대입해 조회).
@@ -2286,11 +2460,16 @@ const EQUIPMENT_SLOTS = [
 //  - 'atkSpeedMult' (둔화): 지속시간 동안 공격속도(초당 공격 횟수) 값에 atkSpeedMultiplier를 곱해서 적용
 // 'disable'/'atkSpeedMult'류는 데이터에 고정 지속시간을 두지 않음 — 상태 이상을 부여하는 스킬/아이템 등
 // 호출부가 매번 durationMs(밀리초)를 넘겨서 그때그때 지속시간을 지정함(요구사항 4번).
+// 상태이상 아이콘 이미지 경로(요구사항: 이모지 → SVG 아이콘 출력 방식으로 변경). weapon/monster/skill과
+// 동일한 패턴(디렉토리+확장자 상수, icon 필드에는 확장자 뺀 파일명만) — 새 상태이상을 추가할 때도
+// icon 필드에 파일명만 등록하면 statusEffectIconHtml(formulas.js)이 자동으로 이 경로를 사용함.
+const STATUS_EFFECT_IMAGE_DIR = 'assets/status/';
+const STATUS_EFFECT_IMAGE_EXT = '.svg';
 const STATUS_EFFECTS = {
   poison: {
     id: 1,
     name: '중독',
-    icon: '☠️',
+    icon: 'poison', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(확장자 제외) — 기존엔 이모지 '☠️'였음
     color: '#7fd67f', // 초록 계열
     type: 'dot',
     tickIntervalMs: 500,         // 0.5초마다
@@ -2300,14 +2479,14 @@ const STATUS_EFFECTS = {
   stun: {
     id: 2,
     name: '기절',
-    icon: '💤',
+    icon: 'stun', // 기존 이모지 '💤'
     color: '#ff5e26',
     type: 'disable',
   },
   slow: {
     id: 3,
     name: '둔화',
-    icon: '🐌',
+    icon: 'slow', // 기존 이모지 '🐌'
     color: '#fff5ae',
     type: 'atkSpeedMult',
     atkSpeedMultiplier: 0.65, // 공격속도(초당 공격 횟수) x 0.65
@@ -2315,7 +2494,7 @@ const STATUS_EFFECTS = {
   burn: {
     id: 4,
     name: '화상',
-    icon: '🔥',
+    icon: 'burn', // 기존 이모지 '🔥'
     color: '#db353c',
     type: 'dot',
     tickIntervalMs: 600,        // 0.6초마다
@@ -2323,7 +2502,53 @@ const STATUS_EFFECTS = {
     damagePercentOfMaxHp: 3,    // 매 틱 최대 체력의 3% 피해
     critDamageBonusPercent: 20, // 화상이 걸린 대상이 받는 치명타 피해 배율에 +20%p 합연산(critMultiplierFor, formulas.js)
   },
+  // 파쇄 — 기절/둔화와 마찬가지로 상태이상 자체에는 고정 최대 지속시간을 두지 않고, 부여하는 주체(스킬/
+  // 장비 등)가 매번 durationMs를 넘겨 그때그때 지정함. 이번 작업 범위는 데이터+지속시간/방어도 계산
+  // 로직뿐이며, 실제로 이 상태이상을 부여하는 스킬/장비는 아직 없음(추후 별도 작업).
+  shredding: {
+    id: 5,
+    name: '파쇄',
+    icon: 'shredding', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(shredding.svg)
+    color: '#001eff',
+    type: 'defenseBoost', // dot(중독·화상)도 disable(기절)도 atkSpeedMult(둔화)도 아닌 신규 타입 —
+                          // 기존 타입별 분기(attackSpeedMultiplier의 atkSpeedMult 체크 등)에 전혀 걸리지
+                          // 않으므로 기존 상태이상 로직에 영향이 없음(요구사항: 기존 로직 무영향).
+    stackDurationAdditive: true, // 재부여 시 기존 남은시간을 덮어쓰지 않고 새 지속시간을 더함(요구사항
+                                  // 3번) — 이 플래그가 없는 기존 상태이상(기절/둔화)은 지금처럼 덮어쓰는
+                                  // 동작을 그대로 유지함(applyStatusEffect, state.js).
+    defenseBonus: 20, // 적용 중인 동안 피해 계산에 사용하는 방어도에만 +20(요구사항 4·6번) — 실제
+                       // 몬스터 방어도 데이터(MONSTERS[].defense)는 전혀 변경하지 않음.
+  },
 };
+
+// ---- 용어사전(GLOSSARY) ----
+// 상태이상뿐 아니라 향후 방어도/치명타 피해/공격 속도 등 다른 게임 용어도 같은 방식으로 등록할 수 있는
+// 범용 구조(요청사항 5번) — type 필드로 어디서 이름/색을 가져올지 구분함. 상태이상 용어는
+// STATUS_EFFECTS와 동일한 key(statusKey)로 연결해 이름(name)·색상(color)을 그대로 가져다 쓰고(요청사항:
+// "상태이상 데이터를 중복해서 별도로 관리하지 않는다"), 여기엔 기존에 없던 "설명 문구(desc)"만 새로
+// 추가함. glossaryEntry()로 조회하며, 스킬 설명·무기 고유 옵션 텍스트에서
+// {term:키}단어{/term}로 감싸면 resolveGlossaryTermsHtml(formulas.js)이 이 desc/color를 이용해
+// 클릭 가능한 색깔 span으로 바꿔줌. 던전 상태이상 툴팁(renderStatusBadges, render.js)도 이 desc를
+// 그대로 재사용함 — 표의 설명 문구를 그대로 등록(중독/화상은 <br>로 줄바꿈).
+const GLOSSARY = {
+  poison: { type: 'statusEffect', statusKey: 'poison', desc: '0.5초마다 최대 체력의 1.5% 피해. (최대 5초)' },
+  stun: { type: 'statusEffect', statusKey: 'stun', desc: '지속 시간 동안 행동 불가' },
+  slow: { type: 'statusEffect', statusKey: 'slow', desc: '공격 속도 35% 감소' },
+  burn: { type: 'statusEffect', statusKey: 'burn', desc: '0.6초마다 최대 체력의 3% 피해 (최대 3초)<br>받는 치명타 피해 +20%p' },
+  shredding: { type: 'statusEffect', statusKey: 'shredding', desc: '방어도 +20 증가' },
+};
+// 용어 하나 조회 — { name, color, desc } 통일된 형태로 반환(type별 조회 방식은 이 함수 안에서만 분기).
+// 등록되지 않았거나(GLOSSARY에 없음) 연결된 상태이상 자체가 없으면(STATUS_EFFECTS에 없음) null.
+function glossaryEntry(id){
+  const g = GLOSSARY[id];
+  if(!g) return null;
+  if(g.type === 'statusEffect'){
+    const def = STATUS_EFFECTS[g.statusKey];
+    if(!def) return null;
+    return { name: def.name, color: def.color, desc: g.desc };
+  }
+  return { name: g.name, color: g.color, desc: g.desc }; // 향후 statusEffect가 아닌 용어 대비
+}
 
 // 모험가의 유해(장비) 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
 // 무기뿐 아니라 방어구/장신구도 대상이며(아티팩트·기타 아이템은 제외), 판정 순서는
@@ -2779,6 +3004,52 @@ const MONSTERS = {
       { name: '현철단검', chance: 10, weaponId: 'heavydagger' },
     ],
   },
+  // 흑령굴 신규 몬스터 4종. 원령은 유령굴의 불연과 동일한 방식(epicSpawnWeight+epicSpawnStages:[10])으로
+  // 10굴 전용 처리 — pickEpicMonsterId가 10굴이 아니면 사령만 후보로 남겨 항상 사령을 뽑고(가중치 무관),
+  // 10굴에서만 사령 40 : 원령 60 가중치 추첨이 실제로 작동함(유령굴 고급유령/불연과 완전히 동일한 구조).
+  blackghost: {
+    id: 'blackghost', name: '흑령', icon: '👻', grade: 'normal', level: 65, image: 'black_ghost',
+    defense: -20, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [
+      { name: '호박', chance: 15 },
+      { name: '흑철', chance: 5 },
+      { name: '현철', chance: 4 },
+    ],
+  },
+  blackghost2: {
+    id: 'blackghost2', name: '지령', icon: '👻', grade: 'normal', level: 66, image: 'black_ghost2',
+    defense: -25, hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
+    drops: [
+      { name: '호박', chance: 20 },
+      { name: '흑철', chance: 6 },
+      { name: '현철', chance: 5 },
+    ],
+  },
+  epicblackghost: {
+    id: 'epicblackghost', name: '사령', icon: '👻', grade: 'epic', level: 71, image: 'epic_blackghost',
+    defense: -25, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    epicSpawnWeight: 40, // 흑령굴 전용 — 원령과 합쳐 100%(10굴 기준. 그 외 스테이지는 원령이 후보에서
+    // 빠져 사령만 남으므로 이 가중치 값과 무관하게 항상 사령이 뽑힘)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '현철', chance: 10 },
+      { name: '흑철', chance: 10 },
+      { name: '현철단검', chance: 5, weaponId: 'heavydagger' },
+    ],
+  },
+  epicblackghost2: {
+    id: 'epicblackghost2', name: '원령', icon: '👻', grade: 'epic', level: 72, image: 'epic_blackghost2',
+    defense: -25, hpMult: 1.0, atkMult: 0.6, speedMult: 2.0,
+    epicSpawnWeight: 60, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '반짝이는 돌', chance: 5 },
+      { name: '현철', chance: 15 },
+      { name: "월도'흑", chance: 1, weaponId: 'moonsword_black' },
+      { name: '흑철중검', chance: 1, weaponId: 'heavysword_black' },
+      { name: '흑철비도', chance: 1, weaponId: 'heavydagger_black' },
+    ],
+  },
 };
 
 
@@ -2894,6 +3165,14 @@ const DUNGEONS = [
     icon: '',
     desc: '산 자의 발걸음을 기다리는 원혼들의 지하묘지',
     monsters: ['ghost', 'ghost2', 'epicghost', 'epicghost2'],
+    levelRange: 5,
+  },
+  {
+    id: 'black_ghost_den',
+    name: '흑령굴',
+    icon: '',
+    desc: '깊숙한 곳에 자리잡은 원혼들의 지하묘지',
+    monsters: ['blackghost', 'blackghost2', 'epicblackghost', 'epicblackghost2'],
     levelRange: 5,
   },
 ];

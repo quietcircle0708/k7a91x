@@ -28,7 +28,15 @@
 // 그대로 재사용할 수 있음 — 단, atk/speed/crit 등 무기 전용 필드를 쓰는 함수(atkFor 등)는 방어구
 // id로 호출하면 안 됨(호출부에서 equipType으로 구분해서 사용).
 function wpn(type){ return WEAPON_TYPES[type] || ARMOR_TYPES[type] || ACCESSORY_TYPES[type] || SUB_TYPES[type] || WEAPON_TYPES.longsword; }
-function weaponKindLabel(type){ return WEAPON_KINDS[wpn(type).weaponKind] || ''; }
+// 무기 종류 표시 — "한손 / 검"처럼 손수(handType)+종류(weaponKind)를 조합해서 만듦(완성 문자열을
+// 데이터에 직접 저장하지 않음). handType이 없는 조합(예: 아직 손수가 정해지지 않은 무기)은 종류만 표시.
+function weaponKindLabel(type){
+  const w = wpn(type);
+  const kind = WEAPON_KINDS[w.weaponKind];
+  if(!kind) return '';
+  const hand = HAND_TYPE_LABELS[w.handType];
+  return hand ? `${hand} / ${kind}` : kind;
+}
 function weaponGradeLabel(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.label : ''; }
 function weaponGradeColor(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.color : '#ffffff'; }
 // ---- 아이템 등급별 아이콘 슬롯 배경색(공통) ----
@@ -160,10 +168,13 @@ function weaponIconHtml(type, className, level){
 }
 
 // ---- 착용 제한(레벨 + 무기 종류별 요구 스탯) ----
-// 무기 종류에 따른 요구 스탯 목록을 계산 (레벨 제한 × 배율, 소수점 반올림, 강화 단계와 무관)
+// 무기 종류(weaponKind)+손수(handType) 조합에 따른 요구 스탯 목록을 계산(WEAPON_PROFILES.statReq,
+// 레벨 제한 × 배율, 소수점 반올림, 강화 단계와 무관). 기존 WEAPON_KIND_STAT_REQ[weaponKind] 단일키
+// 조회를 getWeaponProfile(weaponKind+handType 조합)로 대체 — 수치 자체는 완전히 동일.
 function weaponStatRequirements(type){
   const w = wpn(type);
-  const formula = WEAPON_KIND_STAT_REQ[w.weaponKind];
+  const profile = getWeaponProfile(w);
+  const formula = profile && profile.statReq;
   if(!formula || !w.levelReq) return [];
   return formula
     .map(f => ({ stat: f.stat, amount: Math.round(w.levelReq * f.mult) }))
@@ -285,7 +296,8 @@ function buildConsumableTooltipHtml(id){
   let html = `<div style="text-align:center;">`;
   html += `<div style="color:var(--forge-cream); font-weight:700; margin-bottom:4px;">${item.name}</div>`;
   if(item.class) html += wtipRow('', item.class);
-  if(item.effectText) html += wtipRow('효과', item.effectText);
+  // 소비 아이템 툴팁의 "효과" 문구도 무기/방어구/아티팩트와 동일하게 용어사전 용어를 클릭 가능하게 처리
+  if(item.effectText) html += wtipRow('효과', resolveGlossaryTermsHtml(item.effectText));
   if(item.buyPrice != null) html += wtipRow('구매 가격', item.buyPrice);
   html += `</div>`;
   return html;
@@ -301,9 +313,21 @@ function defenseDamageMultiplier(defense){
 }
 // 몬스터 개체(전투 인스턴스)의 방어도. 데이터(MONSTERS)에 등록된 값을 그대로 사용하고,
 // 방어도가 등록되지 않은 몬스터는 0으로 처리(몬스터 방어도 시스템 — 방어도 기본값 규칙).
+// 파쇄(shredding)가 적용 중이면 피해 계산에 사용할 방어도에만 shreddingDefenseBonusFor를 더함 —
+// MONSTERS[].defense(실제 데이터)는 전혀 변경하지 않음(요구사항 4·6번).
 function monsterDefenseFor(instance){
   const def = MONSTERS[instance.monsterId];
-  return (def && def.defense) || 0;
+  const base = (def && def.defense) || 0;
+  return base + shreddingDefenseBonusFor(instance);
+}
+// 파쇄 상태이상이 적용 중인 대상에게 피해 계산용으로만 가산되는 방어도 보너스(STATUS_EFFECTS.shredding.
+// defenseBonus, 기본 +20). 상태이상이 없거나 아직 등록되지 않았으면 0. target은 statusEffects 배열을
+// 가진 대상이면 몬스터/플레이어 상관없이 재사용 가능하도록 범용으로 분리함(현재는 monsterDefenseFor만
+// 사용 — 파쇄를 실제로 부여하는 스킬/장비가 아직 없어 항상 0으로 평가됨, 요구사항 7·8번).
+function shreddingDefenseBonusFor(target){
+  const def = STATUS_EFFECTS.shredding;
+  if(!def || !hasActiveStatusEffect(target, 'shredding')) return 0;
+  return def.defenseBonus || 0;
 }
 // 현재 착용 중인 방어구(투구/갑옷) 아이템 목록을 반환.
 function wornArmorItems(){
@@ -332,17 +356,19 @@ function wornSubItems(){
   const item = (state.subInventory || []).find(i => i.id === state.equippedSubId);
   return item ? [item] : [];
 }
-// ---- 양손 검 ↔ 보조 아이템 상호 배타 조건 ----
-// "양손 검을 장착한 경우에만" 보조 아이템 착용이 막히므로, 현재 착용 무기(실제 전투에 쓰이는 무기,
-// state.equippedId)의 weaponKind만 확인함(강화 대상 선택 상태인 forgeTargetId와는 무관).
+// ---- 양손 무기 ↔ 보조 아이템 상호 배타 조건 ----
+// "양손 무기를 장착한 경우에만" 보조 아이템 착용이 막히므로, 현재 착용 무기(실제 전투에 쓰이는 무기,
+// state.equippedId)의 handType만 확인함(강화 대상 선택 상태인 forgeTargetId와는 무관). weaponKind가
+// 'two_handed_sword'라는 특정 종류였던 과거와 달리 handType 기준이라, 앞으로 추가될 양손 도끼/창 등도
+// 별도 코드 없이 동일하게 처리됨(요청사항 10번).
 function isTwoHandedWeaponEquipped(){
   const equipped = getEquippedWeapon();
-  return !!(equipped && wpn(equipped.type).weaponKind === 'two_handed_sword');
+  return !!(equipped && wpn(equipped.type).handType === 'two_hand');
 }
-// 보조 아이템을 새로 착용할 수 있는지 — 양손 검을 장착하지 않은 경우에만 가능.
+// 보조 아이템을 새로 착용할 수 있는지 — 양손 무기를 장착하지 않은 경우에만 가능.
 function canEquipSubItem(){ return !isTwoHandedWeaponEquipped(); }
-// 양손 검을 장착(강화 선택 = equipItem)할 수 있는지 — 보조 아이템을 착용하지 않은 경우에만 가능.
-// 양손 검이 아닌 무기(검/단검/지팡이)는 이 조건과 무관하게 항상 착용 가능함(equipItem에서 무기 종류를
+// 양손 무기를 장착(강화 선택 = equipItem)할 수 있는지 — 보조 아이템을 착용하지 않은 경우에만 가능.
+// 양손이 아닌 무기(한손 검/단검/지팡이)는 이 조건과 무관하게 항상 착용 가능함(equipItem에서 handType을
 // 먼저 확인한 뒤에만 이 함수를 호출).
 function canEquipTwoHandedWeapon(){ return state.equippedSubId == null; }
 // 방어도/체력/마나/치명타 보너스에 실제로 기여하는 "착용 중인 모든 방어형 장비"(방어구+보조+장신구) 목록.
@@ -457,8 +483,8 @@ function buildArtifactTooltipHtml(id){
   // 3. 장비 타입 (라벨 없이 값만 출력)
   html += wtipRow('', EQUIPMENT_TYPES[a.equipType] || '');
 
-  // 4. 효과 설명 (라벨 없이 값만 출력)
-  if(a.effectText) html += wtipRow('', a.effectText);
+  // 4. 효과 설명 (라벨 없이 값만 출력) — 상태이상 용어({term:id}단어{/term})가 있으면 클릭 가능하게 처리
+  if(a.effectText) html += wtipRow('', resolveGlossaryTermsHtml(a.effectText));
 
   // 5. 상점 구매 가격 (공란이면 표시하지 않음)
   if(a.buyPrice != null) html += wtipRow('상점 구매 가격', a.buyPrice.toLocaleString() + ' G');
@@ -559,7 +585,7 @@ function weaponUniqueOptionTooltipHtml(type, level){
     return chance != null ? opt.textTemplate.replace('{chance}', chance) : null;
   })();
   if(rawText == null) return '';
-  const text = simplifyUniqueOptionTooltipText(rawText);
+  const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
   if(active) return wtipRow('', text);
   return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${text}<br>(+${opt.activateLevel} 활성화)</div>`;
 }
@@ -577,7 +603,7 @@ function subUniqueOptionTooltipHtml(type, level){
     return chance != null ? opt.textTemplate.replace('{chance}', chance) : null;
   })();
   if(rawText == null) return '';
-  const text = simplifyUniqueOptionTooltipText(rawText);
+  const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
   const lines = text.split(',').map(s => s.trim()).filter(Boolean);
   if(active) return lines.map(line => wtipRow('', line)).join('');
   return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${lines.join('<br>')}<br>(+${opt.activateLevel} 활성화)</div>`;
@@ -1015,6 +1041,19 @@ function hasConflictingLearnedSkill(id){
 }
 // ---- 스킬 설명(desc) 변수 자동 치환 ----
 // skill 객체 안에서 fieldName 값을 찾음. 최상위 필드(damagePercent, hits 등)를 먼저 보고, 없으면
+// desc/옵션 텍스트 안의 {term:id}단어{/term}를 클릭 가능한 색깔 span으로 변환. GLOSSARY(data.js)에
+// 등록 안 된 id는 태그만 제거하고 단어만 평문으로 남김(제어 문자가 화면에 그대로 노출되지 않게, 요청사항
+// 3번). 스킬 설명(resolveSkillDescText 결과)과 무기 고유 옵션 텍스트(weaponUniqueOptionTooltipHtml)
+// 양쪽에서 공통으로 사용됨 — "적용 대상: 스킬 설명 / 아이템 고유 옵션" 요구사항을 이 함수 하나로 처리.
+// 실제 클릭 시 팝업을 띄우는 동작은 main.js의 document 클릭 위임 리스너(.glossary-term 클래스 감지)가 담당.
+function resolveGlossaryTermsHtml(text){
+  if(!text) return text;
+  return text.replace(/\{term:(\w+)\}(.*?)\{\/term\}/g, (match, id, word) => {
+    const g = glossaryEntry(id);
+    if(!g) return word;
+    return `<span class="glossary-term" data-term="${id}" style="color:${g.color};">${word}</span>`;
+  });
+}
 // buffEffect/passiveEffect/onHitStatus처럼 스킬 안에 중첩된 하위 객체(object 타입 필드) 전체를 뒤져서
 // 동일한 이름의 값을 찾음 — 어떤 하위 객체 이름을 쓰든(새 효과 객체가 추가되어도) 자동으로 동작함.
 function findSkillFieldValue(skill, fieldName){
@@ -1053,7 +1092,7 @@ function buildSkillTooltipHtml(id){
   const grade = WEAPON_GRADES[s.grade];
   let html = `<div style="text-align:center;">`;
   html += `<div style="color:${grade ? grade.color : '#ffffff'}; font-weight:700; margin-bottom:2px;">${s.name}</div>`;
-  if(s.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${resolveSkillDescText(s)}</div>`;
+  if(s.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${resolveGlossaryTermsHtml(resolveSkillDescText(s))}</div>`;
   if(s.cooldown != null) html += wtipRow('쿨타임', s.cooldown + '초');
   if(s.resourceType != null){
     const resourceLabel = s.resourceType === 'hp' ? '체력' : '마나';
@@ -1078,6 +1117,15 @@ function skillIconHtml(skill, className){
   const file = skill.icon || SKILL_DEFAULT_ICON[kind] || SKILL_DEFAULT_ICON.attack;
   const cls = 'skill-icon-img' + (className ? ' ' + className : '');
   return `<img src="${SKILL_IMAGE_DIR}${file}${SKILL_IMAGE_EXT}" class="${cls}" alt="">`;
+}
+// 상태이상 아이콘 <img> HTML — skillIconHtml/monsterIconHtml과 동일한 방식(요구사항: 이모지 → SVG로
+// 변경, 상태이상 판정 로직은 무관). def.icon은 STATUS_EFFECT_IMAGE_DIR 기준 파일명(확장자 제외)이며,
+// name/color/지속시간 등 다른 필드는 전혀 건드리지 않음 — 새 상태이상을 추가할 때도 icon 필드에
+// 파일명만 등록하면 이 함수가 자동으로 처리함.
+function statusEffectIconHtml(def, className){
+  if(!def) return '';
+  const cls = 'status-effect-icon-img' + (className ? ' ' + className : '');
+  return `<img src="${STATUS_EFFECT_IMAGE_DIR}${def.icon}${STATUS_EFFECT_IMAGE_EXT}" class="${cls}" alt="">`;
 }
 // 습득한 패시브 스킬의 고정 보너스 합산(요구사항: "별도 사용 없이 항상 적용"). 공용/특화/기연 습득 목록을
 // 모두 뒤져 passiveEffect[key]가 있는 스킬을 전부 더함 — 새 패시브 스킬을 추가해도 자동으로 합산됨.
@@ -1253,6 +1301,10 @@ function effectiveCritChance(type, level){
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
   bonus += agi * 0.1; // 민첩 1당 치명타 확률 +0.1%(합연산)
   bonus += armorStatBonus('crit'); // 착용 중인 방어구/장신구의 치명타 확률 보너스 합산
+  // 무기 고유 옵션의 "고정 스탯 보너스"(statBonus.critRate) 합산 — 흑철비도(heavydagger_black)에서
+  // 처음 등장. 아래 effectId:'crit_chance_bonus'(blacksword류, chanceByLevel 성장형)와는 별개 경로이며,
+  // artifactStatBonus 등과 동일하게 weaponUniqueOptionStatBonus 하나로 앞으로 추가되는 무기도 자동 반영됨.
+  bonus += weaponUniqueOptionStatBonus('critRate');
   // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
   // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
   const opt = wpn(type).uniqueOption;
