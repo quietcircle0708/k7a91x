@@ -34,6 +34,16 @@
         <span class="curse-badge-time" id="curseBadgeForgeTime">0:00</span>
         <span class="tooltip">망자의 저주<br><span id="curseBadgeForgeDesc"></span></span>
       </div>
+
+      <!-- 강화/수리 탭(내구도 시스템 15번 요구사항) — 기존 인벤토리 탭과 동일한 스타일(.inv-tabs/.inv-tab-btn)을
+           그대로 재사용함(새 CSS 없이 기존 톤 유지). "수리" 탭은 이번 작업에서는 UI만 생성하며, 실제 수리
+           기능/장비창 연동은 다음 작업에서 구현할 예정(요구사항 15·16번). -->
+      <div class="inv-tabs" id="forgeTabs">
+        <button class="inv-tab-btn active" data-tab="enhance">강화</button>
+        <button class="inv-tab-btn" data-tab="repair">수리</button>
+      </div>
+
+      <div id="forgeTabEnhance">
       <div id="emptyNotice" class="empty-notice" style="display:none;">
         선택된 강화 대상 장비가 없습니다.<br>대장간 버튼(🔨)에서 강화할 장비를 선택하세요.
         <br>
@@ -102,6 +112,16 @@
           <button class="scroll-buy" id="buyBlessingBtn">구매 (<span id="blessingPrice">15000</span> G)</button>
           <button class="scroll-toggle blessing" id="toggleBlessingBtn">사용 안 함</button>
         </div>
+      </div>
+      </div>
+
+      <div id="forgeTabRepair" style="display:none;">
+        <div class="repair-topbar">
+          <button class="btn btn-main repair-select-btn" id="repairSelectBtn" style="width:auto;">인벤토리에서 선택</button>
+          <button class="btn btn-main repair-all-btn" id="repairAllBtn" style="width:auto;">모두 수리</button>
+        </div>
+        <div class="repair-hint">*슬롯을 클릭하여 개별 장비 수리*</div>
+        <div id="repairEquipPanel"></div>
       </div>
     </div>
 
@@ -286,7 +306,15 @@
 
   <div id="huntView" style="display:none;">
     <button class="back-btn" id="exitHuntBtn">← 던전 나가기</button>
-    <div class="forge-card" id="huntCard">
+
+    <!-- 던전 화면 좌우 패널 레이아웃(174 사용자 피드백 반영 — "던전 화면"은 huntCard 카드 전체를
+         가리키며, 그 안의 요소를 확장/축소하는 구조가 아니라 huntCard는 완전히 그대로 두고 같은
+         크기의 새 카드(huntTopSection)를 오른쪽에 별도로 추가하는 구조여야 함). 왼쪽 열은 지금은
+         빈 채로 두지만, 나중에 왼쪽 패널(인벤토리 등)을 채워도 이 구조를 그대로 재사용할 수 있음. -->
+    <div class="hunt-view-layout" id="huntViewLayout">
+      <div class="hunt-view-side-left" id="huntViewSideLeft"></div>
+
+      <div class="forge-card" id="huntCard">
       <div class="tier-label" id="huntDungeonName">다람쥐 굴</div>
 
       <!-- 플레이어 정보(레벨/체력/마나/경험치) — 토글과 무관하게 항상 노출. huntCard(position:relative)
@@ -306,7 +334,6 @@
 
       <div class="monster-stage" id="monsterStage">
         <div id="spawnToast"></div>
-        <div class="monster-icon treasure-chest" id="treasureChest" style="display:none;">🎁</div>
       </div>
 
       <div class="treasure-hint" id="treasureHint" style="display:none;">던전 구석진 곳에서 반짝이는 상자를 발견했다.... 열어볼까?</div>
@@ -314,12 +341,6 @@
       <div id="huntCombatPanel">
         <div class="combat-arena" id="combatArena">
           <button type="button" class="hunt-top-toggle-btn" id="huntTopToggleBtn">‹</button>
-          <!-- 토글 메뉴 — 기존 캐릭터 정보창(charStatsModal)과 완전히 동일한 UI(장비창+스탯+장착정보 /
-               적용 중인 아티팩트 효과, 2페이지)를 그대로 재사용해서 출력함(별도 신규 UI 아님). -->
-          <div class="hunt-toggle-panel" id="huntTopSection" style="display:none;">
-            <div class="pager" id="huntCharStatsPager"></div>
-            <div id="huntCharStatsBody"></div>
-          </div>
           <div class="player-slot" id="combatPlayerSlot">
             <div class="hp-bar-wrap">
               <div class="hp-bar-fill" id="combatPlayerHpFill" style="width:100%"></div>
@@ -332,6 +353,12 @@
             <div class="monster-icon player-icon" id="combatPlayerIcon"></div>
             <div class="player-lv-text" id="combatPlayerLevel">Lv.1</div>
           </div>
+          <!-- 11스테이지(숨겨진 장소) 보물상자 — 기존 #monsterStage(별도 영역)에 있던 것을 몬스터 슬롯과
+               같은 grid-area(top)를 쓰도록 combat-arena 안으로 옮김(요구사항: 몬스터 슬롯 영역 재사용).
+               #monsterRow는 renderMonsterRow()/enterStage()가 innerHTML을 통째로 다시 쓰므로, 그 영향을
+               받지 않도록 monsterRow와 별도인 combat-arena의 직계 자식으로 둠 — id/클릭 이벤트(main.js의
+               clickTreasureChest 리스너)·표시 로직(renderHunt)은 기존 그대로 재사용. -->
+          <div class="monster-icon treasure-chest" id="treasureChest" style="display:none;">🎁</div>
           <div class="monster-row" id="monsterRow"></div>
         </div>
         <div class="skill-quickslot-row">
@@ -341,6 +368,16 @@
       </div>
 
       <div class="msg" id="huntMsg"></div>
+      </div>
+
+      <!-- 오른쪽 패널 — huntCard와 완전히 동일한 카드 스타일(.forge-card)을 그대로 재사용한 "같은 규격"의
+           새 카드. 안에는 기존 캐릭터 메뉴(#characterView)와 완전히 동일한 [캐릭터 정보]/[스킬] 탭 구조를
+           재사용하되, 카드 크기에 맞게 내용을 페이지로 더 잘게 나눠 표시함(renderHuntCharPanel, render.js) —
+           탭/페이지 전환 UI 자체는 기존 캐릭터 메뉴·페이저 시스템을 그대로 씀, 새 UI 시스템 아님. -->
+      <div class="forge-card hunt-side-panel" id="huntTopSection" style="display:none;">
+        <div class="inv-tabs" id="huntCharTabsRow"></div>
+        <div id="huntCharTabPanels"></div>
+      </div>
     </div>
   </div>
 
@@ -359,6 +396,7 @@
       </div>
       <div class="kill-rewards" id="krRewards"></div>
       <div class="modal-actions">
+        <button class="nav-btn" id="krRetryBtn" style="display:none;">재탐험</button>
         <button class="nav-btn" id="krStopBtn">마을 귀환</button>
         <button class="btn btn-main" id="krContinueBtn" style="width:auto; padding:10px 18px;">탐험 계속</button>
       </div>
@@ -570,6 +608,21 @@
     </div>
   </div>
 
+  <!-- 수리 탭: "인벤토리에서 선택" 팝업(요구사항 5~11·18~19번) — 대장간 강화 장비 선택 팝업
+       (forgeSelectModal)의 구조를 그대로 응용함. -->
+  <div id="repairSelectModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box forge-select-modal">
+      <div class="char-stats-title-row">
+        <div class="modal-title">수리 장비 선택</div>
+        <div class="pager" id="repairSelectPager"></div>
+      </div>
+      <div id="repairSelectList"></div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="closeRepairSelectBtn">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 제작소 제작 진행 팝업(요청사항 3~10번). 상점 개수구매 팝업(buyQtyModal)의 레이아웃을 재사용/개조함. -->
   <div id="craftPopupModal" class="modal-overlay" style="display:none;">
     <div class="modal-box craft-popup-box">
@@ -707,7 +760,93 @@
     </div>
   </div>
 
+  <!-- 수리 시스템: 개별 수리 팝업(요구사항 9~18번) — 제작 재료 투입 UI(craftPopupModal/craftMaterialQtyModal)의
+       구조(아이콘+이름 중앙 배치, buy-qty-gold-row 골드/비용 표시, modal-actions 버튼)를 그대로 재사용함. -->
+  <div id="repairIndividualModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-popup-box">
+      <div class="modal-title repair-title">수리</div>
+
+      <div class="buy-qty-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box" id="repairIndivIconBox"></span>
+      </div>
+      <div class="craft-popup-name weapon-name-wrap" id="repairIndivNameWrap"></div>
+
+      <div class="repair-durability-line" id="repairIndivDurabilityLine"></div>
+      <div class="repair-cost-per-point-line" id="repairIndivCostPerPointLine"></div>
+
+      <div class="repair-amount-row">
+        <span class="settings-item-label">수리 내구도</span>
+        <input type="number" id="repairIndivAmountInput" class="buy-qty-input" min="0" value="0" inputmode="numeric" />
+      </div>
+      <div class="repair-quick-btns">
+        <button class="nav-btn" id="repairIndivMaxBtn">최대</button>
+        <button class="nav-btn" id="repairIndivTenPctBtn">10%</button>
+        <button class="nav-btn" id="repairIndivOnePctBtn">1%</button>
+        <button class="nav-btn" id="repairIndivResetBtn">초기화</button>
+      </div>
+
+      <div class="buy-qty-divider"></div>
+      <div class="buy-qty-gold-row">
+        <span>🪙 보유 골드</span>
+        <span id="repairIndivGold"></span>
+      </div>
+      <div class="buy-qty-gold-row total">
+        <span>🪙 수리 비용</span>
+        <span id="repairIndivCost"></span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="nav-btn" id="repairIndivCancelBtn">취소</button>
+        <button class="btn btn-main" id="repairIndivConfirmBtn" style="width:auto; padding:10px 18px;">수리</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 수리 시스템: 모두 수리 팝업(요구사항 3~8번) — 수리 품목 영역(repairAllList)은 인벤토리 장비 탭의
+       세로 카드 목록(.inv-card)을 그대로 재사용해 품목 개수만큼만 유동적으로 늘어남. -->
+  <div id="repairAllModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-popup-box">
+      <div class="modal-title repair-title">수리</div>
+      <div class="repair-all-desc">*장착한 아이템의 내구도를 100%로 수리합니다*</div>
+
+      <div class="craft-section-label">수리 품목</div>
+      <div id="repairAllList"></div>
+
+      <div class="buy-qty-divider"></div>
+      <div class="buy-qty-gold-row">
+        <span>🪙 보유 골드</span>
+        <span id="repairAllGold"></span>
+      </div>
+      <div class="buy-qty-gold-row total">
+        <span>🪙 총 수리 비용</span>
+        <span id="repairAllCost"></span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="nav-btn" id="repairAllCancelBtn">취소</button>
+        <button class="btn btn-main" id="repairAllConfirmBtn" style="width:auto; padding:10px 18px;">수리</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 수리 시스템: 최종 확인 UI(요구사항 19~21번) — 개별/모두 수리 공용. -->
+  <div id="repairConfirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-title">최종 확인</div>
+      <div class="modal-body">
+        이대로 수리를 진행 할 경우,<br>
+        <span class="repair-confirm-cost" id="repairConfirmCost"></span> 🪙골드를 지불하게 됩니다.<br><br>
+        진행하시겠습니까?
+      </div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="repairConfirmCancelBtn">취소</button>
+        <button class="btn btn-main" id="repairConfirmProceedBtn" style="width:auto; padding:10px 18px;">확인</button>
+      </div>
+    </div>
+  </div>
+
 </div>
+
 
 
 <!-- 스크립트 로드 순서 중요: 아래 순서를 바꾸면 안 됨 (뒤 파일이 앞 파일의 함수/데이터를 참조함) -->

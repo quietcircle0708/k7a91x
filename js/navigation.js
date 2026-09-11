@@ -15,6 +15,10 @@ function showView(name){
     hunt.chestOpened = false;
     hunt.paused = false;
     hunt.started = false;
+    // 던전 화면 좌우 패널 레이아웃(레이아웃 개편 요구사항 13번) — 패널이 열린 채로 화면을 벗어나도
+    // .wrap의 확장 클래스가 남아 다른 화면에 영향을 주지 않도록 항상 제거함.
+    const wrapEl = document.querySelector('.wrap');
+    if(wrapEl) wrapEl.classList.remove('hunt-panel-open');
   }
   if(currentView === 'character' && name !== 'character'){
     // 캐릭터 메뉴를 벗어날 때는 캐릭터 정보 모달을 닫을 때(closeCharStats)와 동일하게
@@ -40,6 +44,17 @@ function showView(name){
     el('craftCatalystModal').style.display = 'none';
     el('craftConfirmModal').style.display = 'none';
     el('craftAnimModal').style.display = 'none';
+  }
+  if(currentView === 'forge' && name !== 'forge'){
+    // 대장간(강화/수리 탭)을 벗어날 때 수리 관련 팝업 상태도 함께 정리(요청사항 없음이지만, craft와
+    // 동일한 이유로 팝업이 열린 채 화면을 벗어나는 잔류 상태를 방지).
+    repairIndividualPopup = null;
+    repairAllPopupOpen = false;
+    repairConfirmState = null;
+    el('repairIndividualModal').style.display = 'none';
+    el('repairAllModal').style.display = 'none';
+    el('repairConfirmModal').style.display = 'none';
+    el('repairSelectModal').style.display = 'none';
   }
   el('forgeView').style.display = name === 'forge' ? 'block' : 'none';
   el('shopView').style.display = name === 'shop' ? 'block' : 'none';
@@ -127,6 +142,139 @@ function switchCraftTab(tabId){
   craftUI.tab = (top && top.subTabs) ? top.subTabs[0].id : tabId;
   renderCraftTabs();
   renderCraftList(craftUI.tab);
+}
+
+// ---- 대장간 강화/수리 탭 전환(내구도 시스템 15번 요구사항) ----
+// "강화" 탭은 기존 화면을 그대로 보여주고, "수리" 탭은 장비창을 재사용한 실제 수리 기능 화면임.
+function switchForgeTab(tabId){
+  forgeUI.tab = tabId === 'repair' ? 'repair' : 'enhance';
+  renderForgeTabs();
+}
+
+// ---- 수리 탭: 개별 수리 팝업(요구사항 9~18번) ----
+// target: { source:'equipped', slotKey } — 장비창 슬롯 클릭(기존 방식) | { source:'inventory', kind,
+// itemId } — "인벤토리에서 선택" 팝업에서 고른 경우(요구사항 15·16번). 실제 대상 조회는 항상
+// resolveRepairTarget(state.js) 하나로 통일해서 처리하므로, 아래 함수들은 source를 직접 분기하지 않음.
+function openRepairIndividualPopup(target){
+  repairIndividualPopup = Object.assign({}, target, { amount: 0 });
+  el('repairIndividualModal').style.display = 'flex';
+  renderRepairIndividualModal();
+}
+function closeRepairIndividualPopup(){
+  repairIndividualPopup = null;
+  el('repairIndividualModal').style.display = 'none';
+}
+// 입력창 직접 입력(요구사항 14번) — 항상 clampRepairAmount로 0~최대수리가능량 사이로 강제함.
+function setRepairIndividualAmount(rawValue){
+  if(!repairIndividualPopup) return;
+  const found = resolveRepairTarget(repairIndividualPopup);
+  if(!found) return;
+  repairIndividualPopup.amount = clampRepairAmount(found.item, rawValue);
+  renderRepairIndividualModal();
+}
+// [최대]/[10%]/[1%]/[초기화] 버튼(요구사항 15번). 10%/1%는 "최대 내구도의 비율"이 기준이며, 그 값이
+// 현재 수리 가능한 최대치를 넘으면 clampRepairAmount가 자동으로 잘라줌(요구사항 15번 예외 조건).
+function applyRepairQuickAmount(kind){
+  if(!repairIndividualPopup) return;
+  const found = resolveRepairTarget(repairIndividualPopup);
+  if(!found) return;
+  const max = maxDurabilityFor(found.type);
+  let raw = 0;
+  if(kind === 'max') raw = repairAmountToFull(found.item);
+  else if(kind === '10pct') raw = Math.floor(max * 0.1);
+  else if(kind === '1pct') raw = Math.floor(max * 0.01);
+  else if(kind === 'reset') raw = 0;
+  setRepairIndividualAmount(raw);
+}
+// ---- 수리 탭: 모두 수리 팝업(요구사항 3~8번, 기존 그대로 — 장착 장비만 대상, 요구사항 21번) ----
+function openRepairAllPopup(){
+  if(repairAllTargetList().length === 0){
+    showMsg('이미 모든 장비가 최대 내구도 상태입니다', 'info'); // 수리 대상 없음(요구사항 1번 마지막 문장)
+    return;
+  }
+  repairAllPopupOpen = true;
+  el('repairAllModal').style.display = 'flex';
+  renderRepairAllModal();
+}
+function closeRepairAllPopup(){
+  repairAllPopupOpen = false;
+  el('repairAllModal').style.display = 'none';
+}
+// ---- 수리 탭: "인벤토리에서 선택" 팝업(요구사항 3~11·18~19번) ----
+// 대장간 "강화 장비 선택" 팝업(openForgeSelect/closeForgeSelect)과 완전히 동일한 구조 — 목록이 비어도
+// 팝업 자체는 열고 renderRepairSelectList()가 forgeSelectList와 동일한 방식으로 빈 안내 문구를 보여줌
+// (요구사항 19번 "기존 게임의 빈 목록 UI 스타일" 재사용).
+function openRepairSelectPopup(){
+  pageState.repairSelect = 1; // 열 때마다 항상 1페이지부터(강화 장비 선택과 동일한 관례)
+  renderRepairSelectList();
+  el('repairSelectModal').style.display = 'flex';
+}
+function closeRepairSelectPopup(){
+  el('repairSelectModal').style.display = 'none';
+}
+// 선택 목록에서 장비를 클릭했을 때(요구사항 11·13·14번) — 선택 팝업을 닫고, 그 장비를 대상으로 기존
+// 개별 수리 팝업을 그대로 엶(장착/강화 대상 변경 없음 — resolveRepairTarget이 인벤토리 인스턴스를
+// 직접 참조하므로 equipItem/selectForgeTarget 같은 장착 로직을 전혀 호출하지 않음, 요구사항 14번).
+function selectRepairFromInventory(kind, itemId){
+  closeRepairSelectPopup();
+  openRepairIndividualPopup({ source: 'inventory', kind, itemId });
+}
+// ---- 수리 탭: 최종 확인 UI(요구사항 19~21번) — 개별/모두 수리 공용 ----
+// 여기서는 아직 골드를 차감하거나 내구도를 바꾸지 않음(실제 실행은 confirmRepairProceed에서만).
+function openRepairConfirmFromIndividual(){
+  if(!repairIndividualPopup) return;
+  const found = resolveRepairTarget(repairIndividualPopup);
+  if(!found) return;
+  const amount = repairIndividualPopup.amount;
+  if(amount <= 0) return;
+  const cost = repairCostForAmount(found.type, amount);
+  if(state.gold < cost) return; // 골드 부족 시 확인창으로 넘어가지 않음(버튼도 disabled 처리되어 있음)
+  repairConfirmState = { mode: 'individual', target: repairIndividualPopup, amount, totalCost: cost };
+  el('repairIndividualModal').style.display = 'none';
+  el('repairConfirmModal').style.display = 'flex';
+  renderRepairConfirmModal();
+}
+function openRepairConfirmFromAll(){
+  const targets = repairAllTargetList();
+  if(targets.length === 0) return;
+  const totalCost = repairAllTotalCost(targets);
+  if(state.gold < totalCost) return;
+  repairConfirmState = { mode: 'all', totalCost };
+  el('repairAllModal').style.display = 'none';
+  el('repairConfirmModal').style.display = 'flex';
+  renderRepairConfirmModal();
+}
+// [취소] — 확인창만 닫고 원래 열려있던 팝업(개별/모두)으로 되돌아감. 입력했던 수리량/선택 상태는
+// repairIndividualPopup/repairAllPopupOpen을 그대로 유지해뒀으므로 별도 복원 처리가 필요 없음(요구사항 20번).
+// 인벤토리에서 선택해 들어온 개별 수리도 취소하면 "인벤토리에서 선택" 팝업이 아니라 수리 탭으로 바로
+// 돌아간다(요구사항 20번 — 개별 수리의 [취소]는 항상 수리 탭으로 복귀, source와 무관하게 동일 동작).
+function closeRepairConfirmPopup(){
+  if(!repairConfirmState) return;
+  const mode = repairConfirmState.mode;
+  repairConfirmState = null;
+  el('repairConfirmModal').style.display = 'none';
+  if(mode === 'individual'){
+    el('repairIndividualModal').style.display = 'flex';
+    renderRepairIndividualModal();
+  }else{
+    el('repairAllModal').style.display = 'flex';
+    renderRepairAllModal();
+  }
+}
+// [확인] — 실제 수리 실행(actions.js) 후 수리 탭 메인 화면으로 완전히 복귀(요구사항 21번).
+function confirmRepairProceed(){
+  if(!repairConfirmState) return;
+  const { mode, target, amount } = repairConfirmState;
+  const ok = mode === 'individual' ? executeIndividualRepair(target, amount) : executeRepairAll();
+  if(!ok) return; // 골드 부족 등으로 실패 — 확인창을 그대로 유지해 상태를 보여줌(버튼도 이미 disabled 상태)
+  repairConfirmState = null;
+  repairIndividualPopup = null;
+  repairAllPopupOpen = false;
+  el('repairConfirmModal').style.display = 'none';
+  el('repairIndividualModal').style.display = 'none';
+  el('repairAllModal').style.display = 'none';
+  // executeIndividualRepair/executeRepairAll이 이미 render()를 호출해 renderForgeTabs()→renderRepairTab()
+  // 체인으로 장비창/모두수리 버튼 상태가 갱신됨(요구사항 21번) — 별도 재호출 불필요.
 }
 
 // ---- 제작소: [제작 재료] 안내 토글(요청사항 1~2번) ----
@@ -411,12 +559,16 @@ const PAGE_RENDER_FN = {
   invSub: renderSubInventoryList,
   invAccessory: renderAccessoryInventoryList,
   forgeSelect: renderForgeSelectList,
+  repairSelect: renderRepairSelectList,
   shopWeapon: renderShopTab, shopArmor: renderShopTab, shopSub: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
   charStats: renderCharStats,
   charMenuInfo: renderCharacterMenu,
-  skillPage: renderCharacterMenu,
-  huntCharStats: renderHuntCharStatsToggle,
+  // skillPage(공용/특화/기연 스킬 목록의 레벨 구간 페이지)는 캐릭터 메뉴 스킬 탭과 던전 우측 카드 스킬
+  // 탭 2페이지가 공용 state로 함께 쓰므로, 페이지를 넘기면 둘 다 갱신함(둘 중 실제 존재하는 쪽만 반영됨).
+  skillPage: () => { renderCharacterMenu(); renderHuntSidePanel(); },
+  huntCharInfo: renderHuntSidePanel,
+  huntCharSkill: renderHuntSidePanel,
   craftWeapon: () => renderCraftList('weapon'),
   craftArmor: () => renderCraftList('armor'),
   craftSub: () => renderCraftList('sub'),
@@ -515,7 +667,7 @@ function pendingStatPoints(key){
 function refreshCharDisplays(){
   renderCharStats();
   renderCharacterMenu();
-  renderHuntCharStatsToggle(); // 던전 화면 토글에 재사용 중인 캐릭터 정보창 UI도 함께 갱신
+  renderHuntSidePanel(); // 던전 우측 카드에 재사용 중인 캐릭터 정보 UI도 함께 갱신
 }
 function allocateStat(key){
   if(!draftStats) return;
@@ -613,6 +765,13 @@ function switchCharTab(tabId){
   activeCharTab = tabId;
   renderCharacterMenu();
 }
+// 던전 우측 카드 전용 탭 선택 상태 — activeCharTab(캐릭터 메뉴)과는 독립적으로 관리함("지금 보고 있는
+// 탭"은 화면마다 다를 수 있는 화면 상태일 뿐이고, 실제 데이터는 공용 state이므로 값 자체는 항상 일치함).
+let huntCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
+function switchHuntCharTab(tabId){
+  huntCharTab = tabId;
+  renderHuntSidePanel();
+}
 
 // ---- 스킬 탭(캐릭터 메뉴 하위) ----
 // 하위 탭 전환은 SKILL_CATEGORIES(data.js)를 그대로 따르므로, 새 분류가 추가돼도 이 함수는 수정할 필요 없음.
@@ -620,6 +779,7 @@ let activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id :
 function switchSkillCategory(catId){
   activeSkillCategory = catId;
   renderCharacterMenu();
+  renderHuntSidePanel(); // 던전 우측 카드 스킬 탭도 같은 activeSkillCategory를 공유해서 씀
 }
 // 스킬 탭 세로 탭(공격/버프/패시브) 전환 — 요구사항 3번: 공용/특화/기연 하위 탭을 바꾸거나 페이지를
 // 넘겨도 이 값은 별도로 건드리지 않으므로(위 switchSkillCategory와 goPage 어디에도 activeSkillKind를
@@ -629,6 +789,7 @@ let activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null;
 function switchSkillKind(kindId){
   activeSkillKind = kindId;
   renderCharacterMenu();
+  renderHuntSidePanel();
 }
 // 스킬 습득: 포인트를 소비하고 해당 분류의 습득 목록(learnedSkills/learnedAwakeningSkills)에 추가함.
 // 에픽/유니크는 아직 해금 방식이 구현되지 않아(비급/깨달음 소비 예정) canLearnSkill이 항상 false를 반환하므로
@@ -657,6 +818,7 @@ function learnSkill(id){
     state.learnedSkills.push(id);
   }
   renderCharacterMenu();
+  renderHuntSidePanel(); // 던전 우측 카드 스킬 탭도 습득 가능 여부 등 최신 상태로 갱신
   renderSkillQuickSlots(); // 퀵슬롯이 교체됐을 수 있으므로 명시적으로 다시 갱신(다른 퀵슬롯 변경 함수들과 동일한 패턴)
   saveState();
 }
@@ -743,7 +905,7 @@ function confirmTraceRestore(){
   // 복구되는 장비는 파괴 당시 강화 단계가 아닌 +0으로 지급됨(요구사항 8) — 능력치/등급/아이템 레벨 등은
   // 원래 장비 데이터(forType의 WEAPON_TYPES/ARMOR_TYPES/ACCESSORY_TYPES 항목)를 그대로 사용함.
   const w = wpn(trace.forType);
-  const newItem = { id: state.nextItemId++, level: 0, type: trace.forType };
+  const newItem = { id: state.nextItemId++, level: 0, type: trace.forType, currentDurability: freshCurrentDurability(trace.forType) };
   if(w.equipType === 'armor') state.armorInventory.push(newItem);
   else if(w.equipType === 'accessory') state.accessoryInventory.push(newItem);
   else state.inventory.push(newItem);

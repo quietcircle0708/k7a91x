@@ -118,6 +118,7 @@ const WEAPON_TYPES = {
   longsword: {
     id: 'longsword', name: '낡은 대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -130,6 +131,7 @@ const WEAPON_TYPES = {
   greatsword: {
     id: 'greatsword', name: '낡은 그레이트소드', desc: '강력한 일격을 위한 대검',
     equipType: 'weapon',
+    durability: 6000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
@@ -144,6 +146,7 @@ const WEAPON_TYPES = {
   shortsword: {
     id: 'shortsword', name: '낡은 검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -156,6 +159,7 @@ const WEAPON_TYPES = {
   dagger: {
     id: 'dagger', name: '낡은 비도', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -168,6 +172,7 @@ const WEAPON_TYPES = {
   broadsword: {
     id: 'broadsword', name: '낡은 브로드소드', desc: '베고 찌르는 데 특화된 검',
     equipType: 'weapon',
+    durability: 6000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -180,6 +185,7 @@ const WEAPON_TYPES = {
   combatknife: {
     id: 'combatknife', name: '낡은 컴뱃 나이프', desc: '빠르게 휘두를 수 있게 설계된 단검',
     equipType: 'weapon',
+    durability: 6000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -192,6 +198,7 @@ const WEAPON_TYPES = {
   longsword2: {
     id: 'longsword2', name: '대검', desc: '균형 잡힌 장검',
     equipType: 'weapon',
+    durability: 6000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -204,6 +211,7 @@ const WEAPON_TYPES = {
   shortsword2: {
     id: 'shortsword2', name: '검', desc: '한 손으로 휘두르는 검',
     equipType: 'weapon',
+    durability: 6000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -216,6 +224,7 @@ const WEAPON_TYPES = {
   dagger2: {
     id: 'dagger2', name: '비도', desc: '짧은 두 개의 단검',
     equipType: 'weapon',
+    durability: 6000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -228,6 +237,7 @@ const WEAPON_TYPES = {
   poisonfang: {
     id: 'poisonfang', name: '독 송곳니', desc: '맹독을 품은 송곳니를 벼려 만든 단검',
     equipType: 'weapon',
+    durability: 15000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -253,6 +263,7 @@ const WEAPON_TYPES = {
   greatsword2: {
     id: 'greatsword2', name: '그레이트소드', desc: '압도적인 위력으로 적을 분쇄하는 거대한 대검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
@@ -265,6 +276,7 @@ const WEAPON_TYPES = {
   broadsword2: {
     id: 'broadsword2', name: '브로드소드', desc: '공격과 방어의 균형을 갖춘 검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -277,6 +289,7 @@ const WEAPON_TYPES = {
   combatknife2: {
     id: 'combatknife2', name: '컴뱃 나이프', desc: '신속한 근접전을 위한 다목적 단검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -289,6 +302,7 @@ const WEAPON_TYPES = {
   longsword3: {
     id: 'longsword3', name: '철제중검', desc: '튼튼한 내구성을 갖춘 모험가용 대검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -301,6 +315,7 @@ const WEAPON_TYPES = {
   shortsword3: {
     id: 'shortsword3', name: '철검', desc: '균형 잡힌 성능의 모험가용 검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -313,6 +328,7 @@ const WEAPON_TYPES = {
   dagger3: {
     id: 'dagger3', name: '철단도', desc: '가볍고 다루기 쉬운 모험가용 단검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'dagger', // 단검 (표기상 "양손 검"은 오타로 확인함)
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -325,6 +341,7 @@ const WEAPON_TYPES = {
   blacksword: {
     id: 'blacksword', name: '흑색 검', desc: '검은빛을 머금은 날은 적의 숨결마저 끊어낸다.',
     equipType: 'weapon',
+    durability: 20000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -346,6 +363,7 @@ const WEAPON_TYPES = {
   moongreatsword: {
     id: 'moongreatsword', name: '반월대도', desc: '거대한 반월형 칼날을 가진 대도',
     equipType: 'weapon',
+    durability: 50000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
@@ -370,6 +388,7 @@ const WEAPON_TYPES = {
   tigersword: {
     id: 'tigersword', name: '척호검', desc: '맹수의 기운이 서려 있다.',
     equipType: 'weapon',
+    durability: 30000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -391,6 +410,7 @@ const WEAPON_TYPES = {
   firesword: {
     id: 'firesword', name: '백화검', desc: '불타는 검신을 가진 명검',
     equipType: 'weapon',
+    durability: 200000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -416,6 +436,7 @@ const WEAPON_TYPES = {
   bloodtigerlongsword: {
     id: 'bloodtigerlongsword', name: '혈호대검', desc: '붉은 호랑이의 피와 살의를<br>머금은 거대한 양손 검',
     equipType: 'weapon',
+    durability: 50000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
@@ -433,6 +454,7 @@ const WEAPON_TYPES = {
   bent_greatsword: {
     id: 'bent_greatsword', name: '휘어진 양손 검', desc: '날이 휘어져 절삭력이 좋지 않다',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -445,6 +467,7 @@ const WEAPON_TYPES = {
   doubleedge_greatsword: {
     id: 'doubleedge_greatsword', name: '양날대검', desc: '세월의 흔적이 담긴 양손 검',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -457,6 +480,7 @@ const WEAPON_TYPES = {
   doubleedge_sword: {
     id: 'doubleedge_sword', name: '양날검', desc: '세월의 흔적이 담긴 검',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -469,6 +493,7 @@ const WEAPON_TYPES = {
   iron_sword: {
     id: 'iron_sword', name: '낡은 철검', desc: '조잡하지만 위력은 있는 검',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -481,6 +506,7 @@ const WEAPON_TYPES = {
   plain_dagger: {
     id: 'plain_dagger', name: '단검', desc: '가볍지만 균형이 어긋나있다.',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -493,6 +519,7 @@ const WEAPON_TYPES = {
   sharp_dagger: {
     id: 'sharp_dagger', name: '날카로운 단검', desc: '날 끝을 예리하게 갈아낸 단검',
     equipType: 'weapon',
+    durability: 5000,
     weaponKind: 'dagger', // 단검 (사용자 확인 후 검→단검으로 수정함)
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -505,6 +532,7 @@ const WEAPON_TYPES = {
   bastardsword: {
     id: 'bastardsword', name: '바스타드 소드', desc: '상황에 따라 어떤 손으로든,<br>자유롭게 휘두를 수 있는 중검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
@@ -517,6 +545,7 @@ const WEAPON_TYPES = {
   armingsword: {
     id: 'armingsword', name: '아밍소드', desc: '균형 잡힌 검신을 가진<br>아름다운 검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -529,6 +558,7 @@ const WEAPON_TYPES = {
   silverdagger: {
     id: 'silverdagger', name: '실버 대거', desc: '어둠 속에서 빛나는<br>은빛 칼날의 단검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -541,6 +571,7 @@ const WEAPON_TYPES = {
   steelsword: {
     id: 'steelsword', name: '강철 검', desc: '단단한 강철로 벼려낸 믿음직한 검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -553,6 +584,7 @@ const WEAPON_TYPES = {
   steelgreatsword: {
     id: 'steelgreatsword', name: '강철중검', desc: '무거운 강철로 만들어진 강력한 양손 검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -565,6 +597,7 @@ const WEAPON_TYPES = {
   steeldagger: {
     id: 'steeldagger', name: '강철단도', desc: '날카롭게 벼려낸 가볍고 재빠른 단검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -577,6 +610,7 @@ const WEAPON_TYPES = {
   ninetaildagger: {
     id: 'ninetaildagger', name: '제령도', desc: '희생된 영혼을 기리는 제사에 사용한 단검<br>강한 사념이 깃들어 많은 체력이 소모된다',
     equipType: 'weapon',
+    durability: 33333,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -599,6 +633,7 @@ const WEAPON_TYPES = {
   dopplehander: {
     id: 'dopplehander', name: '쯔바이핸더', desc: '긴 검신과 묵직함으로 적을 분쇄하는 양손 검',
     equipType: 'weapon',
+    durability: 20000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
@@ -611,6 +646,7 @@ const WEAPON_TYPES = {
   saber: {
     id: 'saber', name: '세이버', desc: '속도와 기동성을 극대화한 우아한 곡검',
     equipType: 'weapon',
+    durability: 20000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -623,6 +659,7 @@ const WEAPON_TYPES = {
   guardsdagger: {
     id: 'guardsdagger', name: '가즈 대거', desc: '좁은 틈을 파고들어 치명상을 남기는 단검',
     equipType: 'weapon',
+    durability: 20000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -635,6 +672,7 @@ const WEAPON_TYPES = {
   claymore: {
     id: 'claymore', name: '클레이모어', desc: '거대한 검신에 강력한 참격을 담아내는 양손 검',
     equipType: 'weapon',
+    durability: 30000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
@@ -647,6 +685,7 @@ const WEAPON_TYPES = {
   falchion: {
     id: 'falchion', name: '파르치온', desc: '묵직한 검신과 날카로움을 겸비한 검',
     equipType: 'weapon',
+    durability: 30000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -659,6 +698,7 @@ const WEAPON_TYPES = {
   mercenaryknife: {
     id: 'mercenaryknife', name: '머서너리 나이프', desc: '용병들이 애용하는 실용적인 전투용 단검',
     equipType: 'weapon',
+    durability: 30000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -671,6 +711,7 @@ const WEAPON_TYPES = {
   silvergreatsword: {
     id: 'silvergreatsword', name: '은제중검', desc: '거대한 은빛 검신의 강력한 중검',
     equipType: 'weapon',
+    durability: 20000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -683,6 +724,7 @@ const WEAPON_TYPES = {
   silversword: {
     id: 'silversword', name: '은가검', desc: '은빛 칼날로 빛을 머금은 듯한 장검',
     equipType: 'weapon',
+    durability: 20000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -695,6 +737,7 @@ const WEAPON_TYPES = {
   silverdagger2: {
     id: 'silverdagger2', name: '은비도', desc: '은빛 칼날로 빈틈을 노리는 비도',
     equipType: 'weapon',
+    durability: 20000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -707,6 +750,7 @@ const WEAPON_TYPES = {
   goldgreatsword: {
     id: 'goldgreatsword', name: '금제중검', desc: '찬란한 금빛 검신으로 일격을 내리꽂는 중검',
     equipType: 'weapon',
+    durability: 30000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
@@ -719,6 +763,7 @@ const WEAPON_TYPES = {
   goldsword: {
     id: 'goldsword', name: '금협검', desc: '황금빛 검신에 날렵함을 담아낸 우아한 검',
     equipType: 'weapon',
+    durability: 30000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -731,6 +776,7 @@ const WEAPON_TYPES = {
   golddagger: {
     id: 'golddagger', name: '금장비도', desc: '황금빛 칼날로 치명적인 일격을 노리는 비도',
     equipType: 'weapon',
+    durability: 30000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'normal', // 일반
@@ -745,6 +791,7 @@ const WEAPON_TYPES = {
   eight_knife: {
     id: 'eight_knife', name: '팔각비도', desc: '팔각형의 날을 가진 단검',
     equipType: 'weapon',
+    durability: 10000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -770,6 +817,7 @@ const WEAPON_TYPES = {
   moonsword: {
     id: 'moonsword', name: '월도', desc: '휘두를 때마다 달의 궤적을 그리는 검',
     equipType: 'weapon',
+    durability: 40000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -782,6 +830,7 @@ const WEAPON_TYPES = {
   heavysword: {
     id: 'heavysword', name: '현철중검', desc: '현철로 만들어진 거대한 검',
     equipType: 'weapon',
+    durability: 40000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
@@ -794,6 +843,7 @@ const WEAPON_TYPES = {
   heavydagger: {
     id: 'heavydagger', name: '현철단검', desc: '현철로 만들어진 예리한 단검',
     equipType: 'weapon',
+    durability: 40000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'rare', // 레어
@@ -808,6 +858,7 @@ const WEAPON_TYPES = {
   moonsword_black: {
     id: 'moonsword_black', name: "월도'흑", desc: '월도를 담금질하여 만들어진 흑검',
     equipType: 'weapon',
+    durability: 50000,
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -828,6 +879,7 @@ const WEAPON_TYPES = {
   heavysword_black: {
     id: 'heavysword_black', name: '흑철중검', desc: '현철중검을 갈아 더욱 날카롭게 만든 중검',
     equipType: 'weapon',
+    durability: 50000,
     weaponKind: 'sword', // 검
     handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
@@ -845,6 +897,7 @@ const WEAPON_TYPES = {
   heavydagger_black: {
     id: 'heavydagger_black', name: '흑철비도', desc: '현철단검을 더욱 날카롭게 만든 비도',
     equipType: 'weapon',
+    durability: 50000,
     weaponKind: 'dagger', // 단검
     handType: 'one_hand',
     grade: 'epic', // 에픽
@@ -886,6 +939,7 @@ const ARMOR_TYPES = {
   oldarmor: {
     id: 'oldarmor', name: '천 옷', desc: '낡았지만 아직 입을 만한 갑옷',
     equipType: 'armor',
+    durability: 1500,
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -1,
@@ -895,6 +949,7 @@ const ARMOR_TYPES = {
   oldhelmet: {
     id: 'oldhelmet', name: '천 모자', desc: '기본적인 방호력은 유지하고 있다',
     equipType: 'armor',
+    durability: 1500,
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -1,
@@ -904,6 +959,7 @@ const ARMOR_TYPES = {
   linenarmor: {
     id: 'linenarmor', name: '리넨 옷', desc: '가볍고 편안해 초보 모험가에게 적합한 기본 갑옷',
     equipType: 'armor',
+    durability: 1800,
     armorKind: 'armor', // 갑옷
     grade: 'rare', // 레어
     defense: -3, hp: 100,
@@ -913,6 +969,7 @@ const ARMOR_TYPES = {
   linenhelmet: {
     id: 'linenhelmet', name: '리넨 모자', desc: '볍고 편안하게 머리를 보호하는 초보자용 모자',
     equipType: 'armor',
+    durability: 1800,
     armorKind: 'helmet', // 투구
     grade: 'rare', // 레어
     defense: -1, hp: 50,
@@ -922,6 +979,7 @@ const ARMOR_TYPES = {
   leatherarmor: {
     id: 'leatherarmor', name: '가죽 옷', desc: '가볍고 질긴 가죽으로 만들어진 갑옷',
     equipType: 'armor',
+    durability: 2500,
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -5,
@@ -931,6 +989,7 @@ const ARMOR_TYPES = {
   leatherhelmet: {
     id: 'leatherhelmet', name: '가죽 모자', desc: '질긴 가죽으로 머리를 보호하는 모자',
     equipType: 'armor',
+    durability: 2500,
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -2,
@@ -940,6 +999,7 @@ const ARMOR_TYPES = {
   ironhelmet: {
     id: 'ironhelmet', name: '철 투구', desc: '거친 철로 벼려낸 투구',
     equipType: 'armor',
+    durability: 3000,
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -3,
@@ -949,6 +1009,7 @@ const ARMOR_TYPES = {
   ironarmor: {
     id: 'ironarmor', name: '철 갑옷', desc: '묵직한 철로 단련된 갑옷',
     equipType: 'armor',
+    durability: 3000,
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -8,
@@ -958,6 +1019,7 @@ const ARMOR_TYPES = {
   steelhelmet: {
     id: 'steelhelmet', name: '강철 투구', desc: '단단하게 벼려낸 강철 투구',
     equipType: 'armor',
+    durability: 5000,
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -5,
@@ -967,6 +1029,7 @@ const ARMOR_TYPES = {
   steelarmor: {
     id: 'steelarmor', name: '강철 갑옷', desc: '정교하게 단련된 강철 갑옷',
     equipType: 'armor',
+    durability: 5000,
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -12,
@@ -978,6 +1041,7 @@ const ARMOR_TYPES = {
   silverhelmet: {
     id: 'silverhelmet', name: '은 장식 투구', desc: '은빛 문양이 새겨진 투구',
     equipType: 'armor',
+    durability: 7000,
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -7,
@@ -987,6 +1051,7 @@ const ARMOR_TYPES = {
   silverarmor: {
     id: 'silverarmor', name: '은 장식 갑옷', desc: '은빛 문양이 새겨진 갑옷',
     equipType: 'armor',
+    durability: 7000,
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -16,
@@ -996,6 +1061,7 @@ const ARMOR_TYPES = {
   goldhelmet: {
     id: 'goldhelmet', name: '금 장식 투구', desc: '금빛 문양이 새겨진 투구',
     equipType: 'armor',
+    durability: 10000,
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -9,
@@ -1005,6 +1071,7 @@ const ARMOR_TYPES = {
   goldarmor: {
     id: 'goldarmor', name: '금 장식 갑옷', desc: '금빛 문양이 새겨진 갑옷',
     equipType: 'armor',
+    durability: 10000,
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -20,
@@ -1019,6 +1086,7 @@ const ARMOR_TYPES = {
   spiderarmor: {
     id: 'spiderarmor', name: '백현갑', desc: '거미의 독을 머금은 갑옷',
     equipType: 'armor',
+    durability: 10000,
     armorKind: 'armor', // 갑옷
     grade: 'unique', // 유니크
     defense: -23, hp: 1000, mana: 200,
@@ -1091,6 +1159,7 @@ const ACCESSORY_TYPES = {
   colorlessring: {
     id: 'colorlessring', name: '무색 반지', desc: '희미한 마나가 서려있는 반지',
     equipType: 'accessory',
+    durability: 1000,
     accessoryKind: 'ring',
     grade: 'normal', // 일반
     defense: -1,
@@ -1101,6 +1170,7 @@ const ACCESSORY_TYPES = {
   agilityring: {
     id: 'agilityring', name: '민첩의 반지', desc: '몸을 가볍게 하여 움직임을 돕는 반지',
     equipType: 'accessory',
+    durability: 1200,
     accessoryKind: 'ring',
     grade: 'rare', // 레어
     defense: -2, hp: 30, mana: 30,
@@ -1110,6 +1180,7 @@ const ACCESSORY_TYPES = {
   strengthring: {
     id: 'strengthring', name: '힘의 반지', desc: '미약한 힘이 깃드는 반지',
     equipType: 'accessory',
+    durability: 1200,
     accessoryKind: 'ring',
     grade: 'rare', // 레어
     defense: -2, hp: 100,
@@ -1119,6 +1190,7 @@ const ACCESSORY_TYPES = {
   wisdomring: {
     id: 'wisdomring', name: '지혜의 반지', desc: '정신을 맑게 하고 지혜를 더하는 반지',
     equipType: 'accessory',
+    durability: 1200,
     accessoryKind: 'ring',
     grade: 'rare', // 레어
     defense: -1, mana: 100,
@@ -1131,6 +1203,7 @@ const ACCESSORY_TYPES = {
   wolfmoonring: {
     id: 'wolfmoonring', name: '현랑반지', desc: '현랑귀의 날카로운 기운을 머금은 반지',
     equipType: 'accessory',
+    durability: 5000,
     accessoryKind: 'ring',
     grade: 'unique', // 유니크
     defense: -4, hp: 200, mana: 100, crit: 9,
@@ -1188,6 +1261,7 @@ const SUB_TYPES = {
   woodshield: {
     id: 'woodshield', name: '나무방패', desc: '나무로 만들어진 단순한 방패',
     equipType: 'sub',
+    durability: 2000,
     subKind: 'shield', // 방패
     grade: 'normal', // 일반
     defense: -1,
@@ -1201,6 +1275,7 @@ const SUB_TYPES = {
   squareshield: {
     id: 'squareshield', name: '사각방패', desc: '크기를 키웠지만 두께가 얇은 방패',
     equipType: 'sub',
+    durability: 5000,
     subKind: 'shield', // 방패
     grade: 'rare', // 레어
     defense: -3, hp: 200,
@@ -1210,6 +1285,7 @@ const SUB_TYPES = {
   ironshield: {
     id: 'ironshield', name: '철방패', desc: '크기를 키웠지만 두께가 얇은 방패',
     equipType: 'sub',
+    durability: 10000,
     subKind: 'shield', // 방패
     grade: 'rare', // 레어
     defense: -5, hp: 300,
@@ -1227,6 +1303,7 @@ const SUB_TYPES = {
   purpleshield: {
     id: 'purpleshield', name: '보라방패', desc: '보라색으로 빛나는 단단한 방패',
     equipType: 'sub',
+    durability: 10000,
     subKind: 'shield', // 방패
     grade: 'epic', // 에픽
     defense: -4, hp: 100, mana: 300,
@@ -2105,6 +2182,7 @@ const PAGE_SIZE = {
   invSub: 6,             // 인벤토리 보조 탭
   invAccessory: 6,       // 인벤토리 장신구 탭
   forgeSelect: 6,       // 대장간 "강화 장비 선택" 팝업
+  repairSelect: 6,      // 수리 탭 "인벤토리에서 선택" 팝업
   shopWeapon: 6,        // 상점 무기 탭
   shopArmor: 6,          // 상점 방어구 탭
   shopSub: 6,             // 상점 보조 탭
@@ -2139,6 +2217,11 @@ const CHARACTER_TABS = [
 // 장비창+캐릭터 정보를 좌우로 함께 배치)과 동일한 데이터를 쓰지만, 캐릭터 메뉴는 화면 폭이 좁아
 // 1페이지(캐릭터 정보) / 2페이지(장비창) / 3페이지(적용 중인 아티팩트 효과)로 완전히 분리함.
 const CHAR_MENU_INFO_PAGE_COUNT = 3;
+// 던전 화면 우측 카드 전용 페이지 수 — 캐릭터 메뉴와 콘텐츠 구성 자체가 다름(요구사항):
+//   [캐릭터 정보] 1p=장비창 레이아웃 / 2p=캐릭터 레벨~스탯 가능 포인트 / 3p=총 공격력~총 방어도
+//   [스킬] 1p=퀵슬롯 설정~초기화 버튼 / 2p=공용·특화·기연 탭~스킬 목록
+const HUNT_CHAR_INFO_PAGE_COUNT = 3;
+const HUNT_CHAR_SKILL_PAGE_COUNT = 2;
 
 // ---- 스킬 시스템 — 기반 구조 ----
 // 스킬 데이터 형식(SKILLS의 각 항목). 실제 스킬은 아직 등록하지 않음(이번 작업은 기반 구조만 구현) —

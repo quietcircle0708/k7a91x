@@ -20,6 +20,51 @@ el('invEquipSubTabs').addEventListener('click', (e)=>{
   if(!btn) return;
   switchInvTab(btn.dataset.tab);
 });
+// ---- 대장간 강화/수리 탭(내구도 시스템 15번 요구사항) ----
+el('forgeTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  switchForgeTab(btn.dataset.tab);
+});
+// ---- 수리 탭: 장비창 슬롯 클릭(요구사항 2번) — 내구도가 있는 장착 장비만 개별 수리 팝업을 엶.
+// 빈 슬롯/아티팩트(데이터 속성 자체가 없음)/내구도 시스템이 없는 장비는 아무 반응 없음.
+el('repairEquipPanel').addEventListener('click', (e)=>{
+  const slotEl = e.target.closest('.eq-slot[data-slot]');
+  if(!slotEl) return;
+  const slotKey = slotEl.dataset.slot;
+  const found = equippedInstanceForSlot(slotKey);
+  if(!found || !hasDurabilitySystem(found.type)) return;
+  openRepairIndividualPopup({ source: 'equipped', slotKey });
+});
+el('repairAllBtn').addEventListener('click', openRepairAllPopup);
+// ---- 수리 탭: "인벤토리에서 선택" 팝업(요구사항 4~11·18~19번) ----
+el('repairSelectBtn').addEventListener('click', openRepairSelectPopup);
+el('closeRepairSelectBtn').addEventListener('click', closeRepairSelectPopup);
+el('repairSelectList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="select-repair-target"]');
+  if(!btn) return;
+  selectRepairFromInventory(btn.dataset.kind, Number(btn.dataset.id));
+});
+el('repairSelectPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
+// ---- 수리 탭: 개별 수리 팝업 ----
+el('repairIndivCancelBtn').addEventListener('click', closeRepairIndividualPopup);
+el('repairIndivConfirmBtn').addEventListener('click', openRepairConfirmFromIndividual);
+el('repairIndivAmountInput').addEventListener('input', (e)=> setRepairIndividualAmount(e.target.value));
+el('repairIndivMaxBtn').addEventListener('click', ()=> applyRepairQuickAmount('max'));
+el('repairIndivTenPctBtn').addEventListener('click', ()=> applyRepairQuickAmount('10pct'));
+el('repairIndivOnePctBtn').addEventListener('click', ()=> applyRepairQuickAmount('1pct'));
+el('repairIndivResetBtn').addEventListener('click', ()=> applyRepairQuickAmount('reset'));
+// ---- 수리 탭: 모두 수리 팝업 ----
+el('repairAllCancelBtn').addEventListener('click', closeRepairAllPopup);
+el('repairAllConfirmBtn').addEventListener('click', openRepairConfirmFromAll);
+// ---- 수리 탭: 최종 확인 팝업(요구사항 19~21번) ----
+el('repairConfirmCancelBtn').addEventListener('click', closeRepairConfirmPopup);
+el('repairConfirmProceedBtn').addEventListener('click', confirmRepairProceed);
 // ---- 제작소 탭 ----
 el('craftTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-tab]');
@@ -98,12 +143,6 @@ el('shopPager').addEventListener('click', (e)=>{
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
 el('charStatsPager').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action]');
-  if(!btn) return;
-  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
-  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
-});
-el('huntCharStatsPager').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
@@ -199,36 +238,20 @@ el('charStatsBody').addEventListener('click', (e)=>{
   else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
   else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
 });
-// 던전 전투 화면 토글(huntCharStatsBody)도 charStatsBody와 완전히 동일한 콘텐츠(buildCharStatsInfoHtml)를
-// 그대로 재사용하므로, 클릭 위임 로직도 동일하게 복제(대상 컨테이너만 다름).
-el('huntCharStatsBody').addEventListener('click', (e)=>{
-  const statBtn = e.target.closest('button[data-stat]');
-  if(statBtn && !statBtn.disabled){
-    const statKey = statBtn.dataset.stat;
-    const statAction = statBtn.dataset.statAction;
-    if(statAction === 'add-bulk') allocateStatBulk(statKey);
-    else if(statAction === 'sub') deallocateStat(statKey);
-    else allocateStat(statKey);
-    return;
-  }
-  const actionBtn = e.target.closest('button[data-action]');
-  if(!actionBtn || actionBtn.disabled) return;
-  if(actionBtn.dataset.action === 'apply-stats') applyStatAlloc();
-  else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
-  else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
-});
 // ---- 캐릭터 메뉴 ----
 el('charTabsRow').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-char-tab]');
   if(!btn) return;
   switchCharTab(btn.dataset.charTab);
 });
-// 캐릭터 메뉴 안(정보 탭 + 스킬 탭)에서 일어나는 클릭을 전부 한 컨테이너에서 위임 처리함(둘 다 페이지
-// 전체가 매번 다시 그려지는 구조라 charStatsBody/charStatsPager처럼 따로 나눌 필요가 없음).
+// 캐릭터 메뉴(정보 탭 + 스킬 탭)와 던전 우측 카드(같은 [캐릭터 정보]/[스킬] 콘텐츠를 재사용하는 화면)
+// 양쪽 안에서 일어나는 클릭을 전부 이 한 함수로 위임 처리함(둘 다 페이지 전체가 매번 다시 그려지는
+// 구조라 charStatsBody/charStatsPager처럼 따로 나눌 필요가 없고, 두 화면이 완전히 동일한 콘텐츠/버튼
+// 구조를 재사용하므로 핸들러도 공유함 — 요구사항: "기존 캐릭터 메뉴의 기능을 그대로 재사용").
 // - 캐릭터 정보 탭: 스탯 배분 버튼 + 페이지 이동
 // - 스킬 탭: 하위 탭 전환 + 스킬 습득 + 스킬 퀵슬롯(배정/사용/제거) + 플라스크 퀵슬롯(기존 로직 그대로,
 //   skillTabFlaskRow가 quickSlotRow와 동일한 data-action 이름을 그대로 씀) + 퀵슬롯 초기화 + 페이지 이동
-el('charTabPanels').addEventListener('click', (e)=>{
+function handleCharPanelClick(e){
   const skillCatBtn = e.target.closest('button[data-skill-cat]');
   if(skillCatBtn){ switchSkillCategory(skillCatBtn.dataset.skillCat); return; }
 
@@ -273,6 +296,13 @@ el('charTabPanels').addEventListener('click', (e)=>{
   else if(actionBtn.dataset.action === 'reset-skills') openSkillResetConfirm();
   else if(actionBtn.dataset.action === 'page-prev') goPage(actionBtn.dataset.pageTarget, -1);
   else if(actionBtn.dataset.action === 'page-next') goPage(actionBtn.dataset.pageTarget, 1);
+}
+el('charTabPanels').addEventListener('click', handleCharPanelClick);
+el('huntCharTabPanels').addEventListener('click', handleCharPanelClick);
+el('huntCharTabsRow').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-hunt-char-tab]');
+  if(!btn) return;
+  switchHuntCharTab(btn.dataset.huntCharTab);
 });
 el('respawnBtn').addEventListener('click', respawnAtVillage);
 el('sellConfirmYesBtn').addEventListener('click', confirmSell);
@@ -292,6 +322,7 @@ el('skillResetCancelBtn').addEventListener('click', cancelSkillReset);
 el('skillResetConfirmBtn').addEventListener('click', confirmSkillReset);
 el('krStopBtn').addEventListener('click', returnToVillage);
 el('krContinueBtn').addEventListener('click', advanceStage);
+el('krRetryBtn').addEventListener('click', retryDungeon);
 el('dungeonListPager').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;
@@ -611,5 +642,36 @@ document.addEventListener('click', (e) => {
   }
   if(glossaryPopupEl && glossaryPopupEl.style.display !== 'none' && !glossaryPopupEl.contains(e.target)) hideGlossaryPopup();
 }, true);
+
+// ---- 던전 화면 좌우 패널 크기 자동 연동(레이아웃 개편 요구사항, 173/174/176 수정요청으로 관찰 대상
+// 및 반영 위치를 계속 정확한 값으로 좁혀옴) ----
+// "던전 화면"은 huntCard 카드 전체(#huntCard)를 가리킴 — combat-arena(플레이어/몬스터 배치용 내부
+// 그리드, 약 300×220px)도 아니고 combat-arena+스킬퀵슬롯을 합친 영역도 아니라, 사용자가 실제로 보는
+// 카드 그 자체임(176 수정요청 핵심 지적사항: "패널 안에 UI를 끼워넣는 구조가 아니라 같은 규격의 새
+// 패널이 오른쪽에 통째로 추가되는 구조"). huntCard의 실제 렌더링 크기를 CSS 커스텀 속성으로 흘려보내,
+// 오른쪽 패널(.hunt-side-panel, huntTopSection)이 항상 그 값을 그대로 따라가도록 함 — 하드코딩된 px
+// 값이 전혀 없어서, huntCard의 크기가 나중에 바뀌어도 이 옵저버가 실측값을 계속 갱신하므로 패널 CSS를
+// 별도로 다시 손댈 필요가 없음.
+// 커스텀 속성은 .wrap(엘리먼트) 위에 심음 — huntCard(하위 요소)에 심으면 그 조상인 .wrap이 값을 읽을
+// 수 없어서(CSS 커스텀 속성은 아래로만 상속됨) .wrap.hunt-panel-open의 width 계산식이 항상 기본값
+// (480px)으로만 동작하는 버그가 있었음(174 수정요청). .wrap에 심어두면 .wrap 자신과 그 하위의
+// #huntViewLayout/.hunt-side-panel 전부가 자연스럽게 상속받아 쓸 수 있음. huntView가 display:none이라
+// huntCard에 레이아웃 박스가 없는 동안에는 관찰 자체가 아무 값도 보고하지 않다가, 던전에 실제로
+// 진입해 보이게 되는 순간 자동으로 최초 실측값을 흘려보냄 — 별도의 진입 시점 재호출이 필요 없음.
+// huntCard는 오른쪽 패널을 담지 않는 별도 요소라서(관찰 대상 자신이 side panel을 포함하지 않음),
+// 패널이 열려 커지더라도 관찰값 자체가 그 영향을 받아 되먹임(순환 의존)이 생기지 않음.
+if(typeof ResizeObserver !== 'undefined'){
+  const huntCardEl = el('huntCard');
+  const wrapEl = document.querySelector('.wrap');
+  if(huntCardEl && wrapEl){
+    const syncHuntCardSize = () => {
+      const rect = huntCardEl.getBoundingClientRect();
+      if(rect.width > 0) wrapEl.style.setProperty('--hunt-card-width', rect.width + 'px');
+      if(rect.height > 0) wrapEl.style.setProperty('--hunt-card-height', rect.height + 'px');
+    };
+    new ResizeObserver(syncHuntCardSize).observe(huntCardEl);
+    syncHuntCardSize(); // 초기 1회 즉시 반영(옵저버 콜백은 다음 프레임부터 발동하므로)
+  }
+}
 
 loadState();

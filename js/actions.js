@@ -209,7 +209,7 @@ function sellItem(id){
   const item = state.inventory.find(i => i.id === id);
   if(!item) return;
   const type = item.type || 'longsword';
-  const value = sellValueFor(type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
   const label = `${weaponName(type)}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellItem(id));
 }
@@ -218,7 +218,7 @@ function performSellItem(id){
   if(idx === -1) return;
   const item = state.inventory[idx];
   const type = item.type || 'longsword';
-  const value = sellValueFor(type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
   state.gold += value;
   state.totalSold += value;
   showMsg(`${weaponName(type)}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
@@ -232,7 +232,7 @@ function performSellItem(id){
     // 인벤토리에서 직접 "강화 선택"해야 강화 화면에 표시됨.
     if(state.autoRebuy && state.gold >= weaponBuyPrice('longsword') && !equipInventoryFull()){
       state.gold -= weaponBuyPrice('longsword');
-      const newItem = { id: state.nextItemId++, level: 0, type: 'longsword' };
+      const newItem = { id: state.nextItemId++, level: 0, type: 'longsword', currentDurability: freshCurrentDurability('longsword') };
       state.inventory.push(newItem);
     }
   }
@@ -413,7 +413,7 @@ function buyWeapon(typeId, btn, silent){
     const price = weaponBuyPrice(typeId);
     if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
-    const newItem = { id: state.nextItemId++, level: 0, type: typeId };
+    const newItem = { id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) };
     state.inventory.push(newItem);
     // (구조 변경 5번) 예전에는 장착 중인 무기가 없으면 방금 구매한 무기를 자동으로 강화 대상으로
     // 지정했지만, 이제는 대장간 버튼/인벤토리에서 플레이어가 직접 "강화 선택"해야만 강화 화면에
@@ -430,7 +430,7 @@ function buyWeapon(typeId, btn, silent){
     if(!state.armorInventory) state.armorInventory = [];
     if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
-    state.armorInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
+    state.armorInventory.push({ id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) });
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
   }
@@ -443,7 +443,7 @@ function buyWeapon(typeId, btn, silent){
     if(!state.subInventory) state.subInventory = [];
     if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
-    state.subInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
+    state.subInventory.push({ id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) });
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
   }
@@ -453,7 +453,7 @@ function buyWeapon(typeId, btn, silent){
   if(!state.accessoryInventory) state.accessoryInventory = [];
   if(state.gold < accPrice || equipInventoryFull()) return false;
   state.gold -= accPrice;
-  state.accessoryInventory.push({ id: state.nextItemId++, level: 0, type: typeId });
+  state.accessoryInventory.push({ id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) });
   if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
   return true;
 }
@@ -464,7 +464,7 @@ function sellAccessoryItem(id){
   if(isEnhancing) return;
   const item = (state.accessoryInventory || []).find(i => i.id === id);
   if(!item) return;
-  const value = sellValueFor(item.type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   const label = `${ACCESSORY_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellAccessoryItem(id));
 }
@@ -473,7 +473,7 @@ function performSellAccessoryItem(id){
   if(idx === -1) return;
   const item = state.accessoryInventory[idx];
   const def = ACCESSORY_TYPES[item.type];
-  const value = sellValueFor(item.type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   state.gold += value;
   state.totalSold += value;
   showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
@@ -515,7 +515,7 @@ function sellArmorItem(id){
   if(isEnhancing) return;
   const item = (state.armorInventory || []).find(i => i.id === id);
   if(!item) return;
-  const value = sellValueFor(item.type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   const label = `${ARMOR_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellArmorItem(id));
 }
@@ -524,7 +524,7 @@ function performSellArmorItem(id){
   if(idx === -1) return;
   const item = state.armorInventory[idx];
   const def = ARMOR_TYPES[item.type];
-  const value = sellValueFor(item.type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   state.gold += value;
   state.totalSold += value;
   showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
@@ -567,7 +567,7 @@ function sellSubItem(id){
   if(isEnhancing) return;
   const item = (state.subInventory || []).find(i => i.id === id);
   if(!item) return;
-  const value = sellValueFor(item.type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   const label = `${SUB_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellSubItem(id));
 }
@@ -576,7 +576,7 @@ function performSellSubItem(id){
   if(idx === -1) return;
   const item = state.subInventory[idx];
   const def = SUB_TYPES[item.type];
-  const value = sellValueFor(item.type, item.level);
+  const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   state.gold += value;
   state.totalSold += value;
   showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
@@ -766,6 +766,10 @@ function resolveSkillEffect(id){
   const s = SKILLS[id];
   if(!s) return;
   if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return;
+  // 스킬이 여기까지 도달했다는 것은 자원/쿨타임/기절 조건을 모두 통과해 "정상적으로 시전이 완료"됐다는
+  // 뜻이므로(useSkill의 canUseSkillNow 가드 + 이 함수 진입부의 전투 상태 재확인), 무기 내구도를 딱 1만
+  // 감소시킴(요구사항 8번 — 다단히트 스킬이어도 시전 1회당 1만 감소, 타격 횟수와 무관).
+  decreaseEquippedWeaponDurability(getEquippedWeapon());
   // 버프 모션(요구사항 6번): target이 'buff'인 스킬은 회복형(healFlat)이어도 skillKindOf가 그대로 'buff'를
   // 반환하므로 여기서 한 번에 처리함(아래 healFlat 조기 반환보다 먼저 판정) — 현재 바라보고 있는 방향
   // 그대로 버프 이미지를 잠깐 보여주고 자동으로 기본 자세로 복귀함(effects.js triggerPlayerBuffMotion).
@@ -789,14 +793,15 @@ function resolveSkillEffect(id){
   const equipped = getEquippedWeapon();
   if(!equipped) return;
   const type = equipped.type || 'longsword';
-  const atk = effectiveAtk(type, equipped.level, equipped.damaged);
+  const durabilityZero = isEquipDurabilityZero(equipped);
+  const atk = effectiveAtk(type, equipped.level, equipped.damaged, durabilityZero);
   const perHit = Math.max(1, Math.round(atk * (s.damagePercent || 0) / 100));
   const hits = s.hits || 1;
   // 스킬 피해에도 기본 공격(dungeon.js attackTick)과 동일한 치명타 확률/배율을 적용함(요청사항) — 단,
   // 기본 공격은 "전체 공격에 1회" 판정인 반면 스킬은 "타수마다 독립적으로" 판정해야 하므로, 확률 자체는
   // 스킬 시전 시점(무기·레벨 고정)에 한 번만 계산해 두고, 실제 치명타 여부(Math.random())는 아래 각
   // 타격(및 지연 타격)마다 매번 새로 굴림. 치명타 배율(1.5배)은 기본 공격과 동일한 값을 그대로 사용.
-  const critChance = effectiveCritChance(type, equipped.level);
+  const critChance = effectiveCritChance(type, equipped.level, durabilityZero);
   const targets = s.target === 'aoe'
     ? hunt.monsters.slice()
     : [hunt.monsters.find(m => m.instanceId === hunt.targetId) || hunt.monsters[0]];
@@ -990,4 +995,38 @@ function toggleAutoRebuy(){
   if(isEnhancing) return;
   state.autoRebuy = !state.autoRebuy;
   render(); saveState();
+}
+
+// ---- 수리 실행(요구사항 19~23번) — 최종 확인 팝업에서 [확인]을 눌렀을 때만 호출됨. 골드 차감 +
+// currentDurability 변경 + 저장까지 한 번에 처리하는 "실제 수리 확정" 단계(요청사항 26번 역할 분리:
+// 비용 계산/대상 목록 조회는 순수 계산 함수(formulas.js)로 이미 분리되어 있고, 여기서는 그 결과를
+// 받아 실제 상태만 바꿈). 실패(골드 부족 등) 시 아무 것도 바꾸지 않고 false를 반환함.
+// target: resolveRepairTarget(state.js)이 받는 서술자({source:'equipped',slotKey} 또는
+// {source:'inventory',kind,itemId}) — 장착 장비든 인벤토리 장비든 이 함수 하나로 공통 처리함(장착
+// 장비 전용으로 중복 구현하지 않음, 인벤토리 확장 요구사항 12·15번).
+function executeIndividualRepair(target, amount){
+  const found = resolveRepairTarget(target);
+  if(!found) return false;
+  const clamped = clampRepairAmount(found.item, amount); // 최대 수리 가능량 재검증(요구사항 14번)
+  if(clamped <= 0) return false;
+  const cost = repairCostForAmount(found.type, clamped);
+  if(state.gold < cost) return false; // 골드 부족(요구사항 23번) — 차감/내구도 변경 전혀 없이 그대로 반환
+  state.gold -= cost;
+  const max = maxDurabilityFor(found.type);
+  const cur = found.item.currentDurability != null ? found.item.currentDurability : max;
+  found.item.currentDurability = Math.min(max, cur + clamped); // 최대 내구도 초과 방지(요구사항 21번)
+  saveState();
+  render();
+  return true;
+}
+function executeRepairAll(){
+  const targets = repairAllTargetList();
+  if(targets.length === 0) return false;
+  const totalCost = repairAllTotalCost(targets);
+  if(state.gold < totalCost) return false; // 골드 부족 — 전부 미실행(요구사항 23번)
+  state.gold -= totalCost;
+  targets.forEach(entry => { entry.item.currentDurability = maxDurabilityFor(entry.type); }); // 전부 100%로(요구사항 21번)
+  saveState();
+  render();
+  return true;
 }

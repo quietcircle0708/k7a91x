@@ -30,10 +30,23 @@ function enterStage(stageNum){
   hunt.paused = true;
   hunt.started = false;
   hunt.playerMotion = 'idle'; // 새 스테이지 시작 시 이전 스테이지의 공격/버프 모션이 남아있지 않도록 초기화
+  // 다음 스테이지 진입 시 플레이어 방향을 항상 기본값(위쪽, idle_up)으로 되돌림(UI 요구사항) — 이전
+  // 스테이지에서 좌/우 몬스터를 보고 있던 방향(hunt.playerDirection)이 그대로 남아있으면 스테이지가
+  // 바뀔 때 플레이어 이미지가 갑자기 좌/우를 보고 있는 것처럼 보이는 어색함을 방지함. 실제 타겟팅/전투
+  // 로직에는 전혀 영향 없음 — spawnMonsters()가 몬스터를 배치한 뒤 syncPlayerDirectionToTarget()이
+  // 새 타겟 기준으로 다시 정확히 갱신함.
+  hunt.playerDirection = 'up';
   if(playerMotionRevertTimeout){ clearTimeout(playerMotionRevertTimeout); playerMotionRevertTimeout = null; }
   renderHunt();
+  renderPlayerPose(); // 방향을 위(idle_up)로 되돌린 걸 즉시 화면에 반영(renderHunt는 최초 1회만 아이콘을 채우므로 별도 호출 필요)
   const row = el('monsterRow');
-  if(row) row.innerHTML = ''; // 이전 스테이지의 몬스터 슬롯 잔재 제거 — 입장 메시지가 끝나기 전엔 아무것도 안 보임
+  // 이전 스테이지의 몬스터 슬롯 잔재 제거 — 입장 메시지가 끝나기 전(몬스터 출현 결정 전)에도 상/좌/우
+  // 3자리를 전부 보이지 않는 자리표시자로 채워서, 실제 몬스터가 그려질 때와 화면상 차지하는 공간이
+  // 항상 동일하게 유지되도록 함(UI 요구사항 — "몬스터 상좌우가 등장했을 때의 화면 크기"를 기본값으로).
+  // .combat-arena 자체의 그리드 트랙(96px 100px 96px / 90px 130px)은 원래도 고정 px라 몬스터 수와
+  // 무관하게 크기가 변하지 않지만, 이 자리표시자는 화면상으로도 "항상 3자리가 차 있는" 것처럼 보이게
+  // 하기 위한 순수 표시용 처리이며 전투/스폰 로직에는 전혀 영향을 주지 않음(공식 무수정).
+  if(row) row.innerHTML = ['top', 'left', 'right'].map(buildEmptyMonsterSlotHtml).join('');
   const playerIcon = el('combatPlayerIcon');
   if(playerIcon){ playerIcon.classList.remove('hit', 'dead'); } // 이전 전투의 피격/사망 애니메이션 잔재 제거
   showDungeonMsg(stageEnterMessage(stageNum, hunt.dungeon.name));
@@ -67,11 +80,18 @@ function spawnMonsters(){
   renderHunt();
   renderMonsterRow();
   renderStatusBadges();
-  const combatPanel = el('huntCombatPanel');
-  if(combatPanel){
-    combatPanel.classList.remove('spawn-in');
-    void combatPanel.offsetWidth; // 리플로우를 강제해 애니메이션이 매번 처음부터 재생되도록 함
-    combatPanel.classList.add('spawn-in'); // 몬스터 이미지와 동시에 0.5초 페이드 인
+  // 전투 영역 전체의 페이드 인(spawn-in)은 1스테이지(던전 첫 입장)에서만 재생한다(기존 동작 유지).
+  // 2스테이지 이후 전환에서는 renderHunt()가 전투 영역을 계속 표시 상태로 유지하므로, 여기서 패널
+  // 전체를 다시 페이드 인시키면 "화면이 사라졌다 나타나는" 것처럼 보이는 현상이 재발한다 — 몬스터
+  // 개체별 등장 연출(monster-icon.spawn-in, buildMonsterSlotHtml)은 renderMonsterRow()가 그대로 적용하므로
+  // 몬스터가 새로 나타나는 연출 자체는 유지된다.
+  if(hunt.stage === 1){
+    const combatPanel = el('huntCombatPanel');
+    if(combatPanel){
+      combatPanel.classList.remove('spawn-in');
+      void combatPanel.offsetWidth; // 리플로우를 강제해 애니메이션이 매번 처음부터 재생되도록 함
+      combatPanel.classList.add('spawn-in'); // 몬스터 이미지와 동시에 0.5초 페이드 인
+    }
   }
   // 조우 메시지는 대표로 첫 번째 몬스터를 기준으로 출력(2마리 이상이어도 안내 문구 자체는 기존과 동일한 형식 사용)
   showEncounterToast(MONSTERS[hunt.monsters[0].monsterId]);
@@ -125,15 +145,19 @@ function beginStageCombat(){
 function startHuntLoop(){
   stopHuntLoop();
   const equipped = getEquippedWeapon(); // 공격속도는 실제 착용 무기 기준(대장간 선택 대상과 무관)
-  const baseSpeed = equipped ? effectiveAtkSpeed(equipped.type || 'longsword', equipped.level) : 0.5;
+  const baseSpeed = equipped ? effectiveAtkSpeed(equipped.type || 'longsword', equipped.level, isEquipDurabilityZero(equipped)) : 0.5;
   const speed = baseSpeed * attackSpeedMultiplier(hunt.player); // 둔화 등 공격속도 배율형 상태 이상 반영
-  const intervalMs = Math.round(1000 / speed);
-
-  // 플레이어 첫 공격: 전투 시작 0.5초 후, 이후 무기 공격속도 주기로 반복
-  hunt.playerFirstAttackTimeout = setTimeout(() => {
-    attackTick();
-    hunt.timerId = setInterval(attackTick, intervalMs);
-  }, 500);
+  // 무기 내구도가 0이면(요구사항 7번) speed가 0이 되어 1000/0=Infinity가 나오므로, 이 경우 공격 타이머
+  // 자체를 설정하지 않음(자동 귀환/전투 강제 종료 없이 그냥 플레이어 쪽 공격만 멈춤 — 몬스터 공격/상태
+  // 이상 등 나머지 전투 로직은 그대로 계속 진행됨).
+  if(speed > 0){
+    const intervalMs = Math.round(1000 / speed);
+    // 플레이어 첫 공격: 전투 시작 0.5초 후, 이후 무기 공격속도 주기로 반복
+    hunt.playerFirstAttackTimeout = setTimeout(() => {
+      attackTick();
+      hunt.timerId = setInterval(attackTick, intervalMs);
+    }, 500);
+  }
 
   hunt.monsters.forEach(startMonsterAttackTimer);
   startStatusTicker();
@@ -157,11 +181,12 @@ function startMonsterAttackTimer(instance){
 function refreshPlayerAttackTimer(){
   if(!hunt.started || hunt.paused || !hunt.timerId) return; // 아직 첫 공격 대기 중이면 시작될 때 자연히 반영됨
   clearInterval(hunt.timerId);
+  hunt.timerId = null;
   const equipped = getEquippedWeapon();
   if(!equipped) return;
-  const baseSpeed = effectiveAtkSpeed(equipped.type || 'longsword', equipped.level);
+  const baseSpeed = effectiveAtkSpeed(equipped.type || 'longsword', equipped.level, isEquipDurabilityZero(equipped));
   const speed = baseSpeed * attackSpeedMultiplier(hunt.player);
-  hunt.timerId = setInterval(attackTick, Math.round(1000 / speed));
+  if(speed > 0) hunt.timerId = setInterval(attackTick, Math.round(1000 / speed)); // speed<=0(내구도 0)이면 재시작하지 않음(요구사항 7번)
 }
 function refreshMonsterAttackTimer(instance){
   if(!instance || !instance.atkIntervalId) return; // 아직 첫 공격 전(atkFirstTimeout 대기 중)이면 시작될 때 자연히 반영됨
@@ -242,8 +267,9 @@ function attackTick(){
     updateTargetHighlight();
   }
   const type = equipped.type || 'longsword';
-  const atk = effectiveAtk(type, equipped.level, equipped.damaged);
-  const critChance = effectiveCritChance(type, equipped.level);
+  const durabilityZero = isEquipDurabilityZero(equipped);
+  const atk = effectiveAtk(type, equipped.level, equipped.damaged, durabilityZero);
+  const critChance = effectiveCritChance(type, equipped.level, durabilityZero);
   const isCrit = Math.random() * 100 < critChance;
   const baseDmg = isCrit ? Math.round(atk * critMultiplierFor(target)) : atk;
   // 기본 공격 전용 피해량 증가 버프(예: 야수의 심장 +25%). effectiveAtk가 아니라 여기서만 곱하는 이유는
@@ -261,6 +287,7 @@ function attackTick(){
   target.hp -= dmg;
   monsterHitEffect(target.instanceId, dmg, isCrit);
   triggerPlayerAttackMotion(); // 기본 공격 적중 시 현재 타겟 방향의 공격 모션 표시(요구사항 5번)
+  decreaseEquippedWeaponDurability(equipped); // 기본 공격 적중 시 무기 내구도 -1(내구도 시스템 요구사항 8번)
   if(target.hp > 0){
     // 독 플라스크(아티팩트)와 무기 고유 옵션 등 "중독/화상 부여" 효과를 가진 모든 활성 소스의 확률을
     // 각각 합산해 1회만 판정(activeEffectChance, formulas.js). 소스가 하나도 없으면 0%로 판정 안 됨.
@@ -282,6 +309,30 @@ function attackTick(){
   } else {
     updateMonsterSlot(target);
   }
+}
+// ---- 내구도 감소(요구사항 8·9·11번) ----
+// 무기: 기본 공격 적중 시(attackTick) / 스킬 정상 시전 완료 시(actions.js resolveSkillEffect)에 -1.
+// 내구도 시스템이 없는 종류(maxDurabilityFor null)나 이미 0인 경우는 조용히 무시(0 아래로 내려가지 않음).
+// 감소로 인해 내구도가 0이 되는 순간 즉시 공격 타이머를 다시 계산해(refreshPlayerAttackTimer) 공격속도
+// 비활성화가 바로 반영되도록 함("즉시 반영" 요구사항 11번) — 장착 해제/전투 강제 종료는 하지 않음.
+function decreaseEquippedWeaponDurability(equipped){
+  if(!equipped || !hasDurabilitySystem(equipped.type)) return;
+  const cur = equipped.currentDurability != null ? equipped.currentDurability : maxDurabilityFor(equipped.type);
+  if(cur <= 0) return;
+  equipped.currentDurability = cur - 1;
+  if(equipped.currentDurability === 0) refreshPlayerAttackTimer();
+}
+// 방어구/장신구/보조: 몬스터 공격이 플레이어에게 정상 적중했을 때(monsterAttackTick) 현재 착용 중인
+// 각 부위마다 개별적으로 -1(요구사항 9·10번). 무기와 달리 이 장비들은 전투 루프 타이머에 영향을 주지
+// 않으므로(방어도/체력/마나/옵션 등은 매 계산 시점에 effectiveXxx 계열 함수가 매번 새로 읽으므로) 별도
+// 타이머 재계산이 필요 없음 — 다음 피해 계산부터 자동으로 반영됨.
+function decreaseWornDefensiveDurability(){
+  wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()).forEach(item => {
+    if(!hasDurabilitySystem(item.type)) return;
+    const cur = item.currentDurability != null ? item.currentDurability : maxDurabilityFor(item.type);
+    if(cur <= 0) return;
+    item.currentDurability = cur - 1;
+  });
 }
 // 플레이어가 몬스터를 클릭해 공격 대상을 직접 지정
 function selectTarget(instanceId){
@@ -306,6 +357,7 @@ function monsterAttackTick(instanceId){
   dmg = Math.max(1, Math.round(dmg * defenseDamageMultiplier(playerTotalDefense())));
   state.playerHp = Math.max(0, state.playerHp - dmg);
   playerHitEffect(dmg);
+  decreaseWornDefensiveDurability(); // 몬스터 공격 적중 시 착용 중인 방어구/장신구/보조 내구도 -1(요구사항 9번)
   // 백현갑 등 "피해 입을 시 확률로 중독 부여" 방어구 고유 옵션 판정 — 공격해온 몬스터 개체(instance)를
   // 대상으로 함(activeEffectChance의 무기 고유 옵션 패턴과 동일하게 합산 후 1회만 판정).
   const poisonBackChance = armorUniqueOptionChance('poison_on_taking_damage');
@@ -560,6 +612,7 @@ function openKillResultModal(rewards){
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
   // 10스테이지 이하를 클리어한 경우에만 "탐험 계속"으로 다음 스테이지를 진행할 수 있음(11=숨겨진 장소는 별도 처리)
   el('krContinueBtn').style.display = 'inline-block';
+  el('krRetryBtn').style.display = 'none'; // "재탐험"은 11스테이지(숨겨진 장소) 보상 팝업 전용
   el('killResultModal').style.display = 'flex';
 }
 function closeKillResultModal(){
@@ -578,6 +631,15 @@ function returnToVillage(){
   saveState();
   showView('forge');
   showTownToast(STAGE_RETURN_MSG);
+}
+// "재탐험"(11스테이지 보상 팝업 전용): 마을로 이동하지 않고, 체력/마나 회복도 없이, 현재 클리어한
+// 던전(hunt.dungeon)의 1스테이지로 즉시 재입장한다. 마을 화면을 거치지 않고 마을 귀환→던전 탭에서
+// 같은 던전 재선택하는 과정을 생략하는 단축 기능 — 기존 enterDungeon()을 그대로 재사용하므로
+// 첫 입장과 동일한 초기화 로직(체력/마나/스테이지/몬스터 등)이 그대로 적용된다.
+function retryDungeon(){
+  const dungeonId = hunt.dungeon && hunt.dungeon.id;
+  closeKillResultModal();
+  if(dungeonId) enterDungeon(dungeonId);
 }
 
 // ---- 11스테이지: 숨겨진 장소(보물 상자) ----
@@ -612,7 +674,7 @@ function grantRelicEquipDrop(drop){
   const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === (drop.equipType || 'weapon'));
   const arr = pool ? pool.items() : state.inventory;
   if(equipInventoryFull()) return false;
-  arr.push({ id: state.nextItemId++, level: drop.level, type: drop.type });
+  arr.push({ id: state.nextItemId++, level: drop.level, type: drop.type, currentDurability: freshCurrentDurability(drop.type) });
   return true;
 }
 // 장비(무기/방어구/장신구) 공용 인벤토리 슬롯이 가득 찼는지 — 결과 화면의 "인벤토리가 가득 찼습니다"
@@ -674,5 +736,6 @@ function openTreasureResultModal(result){
   el('krRewards').innerHTML = rewardsHtml;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
   el('krContinueBtn').style.display = 'none'; // 11스테이지 다음은 없으므로 "탐험 계속" 버튼은 숨김
+  el('krRetryBtn').style.display = 'inline-block'; // "재탐험": 마을을 거치지 않고 같은 던전 1스테이지로 즉시 재입장
   el('killResultModal').style.display = 'flex';
 }

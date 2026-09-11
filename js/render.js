@@ -9,6 +9,7 @@ function render(){
   const equipped = getEquipped();
   const stage = el('swordStage');
 
+  renderForgeTabs(); // 대장간 강화/수리 탭(내구도 시스템 15번 요구사항) — 정적 토글이라 render() 매 사이클 갱신
   renderHuntCharPanel();
   renderQuickSlots();
   // 플라스크 퀵슬롯(renderQuickSlots)과 동일한 이유로 여기서 항상 호출함 — 예전에는 캐릭터 메뉴의
@@ -130,7 +131,7 @@ function render(){
       oddsRow.innerHTML = chips;
       el('enhanceBtn').disabled = state.gold < costFor(type, level);
       el('enhanceBtn').textContent = '강화하기';
-      el('costLine').innerHTML = `비용: ${costFor(type, level).toLocaleString()} G · <span class="sell-part">판매가: ${sellValueFor(type, level).toLocaleString()} G</span>`;
+      el('costLine').innerHTML = `비용: ${costFor(type, level).toLocaleString()} G · <span class="sell-part">판매가: ${durabilityAdjustedSellValue(sellValueFor(type, level), equipped).toLocaleString()} G</span>`;
     }
     el('sellBtn').disabled = false;
   }
@@ -213,9 +214,10 @@ function renderForgeSelectList(){
   wrap.innerHTML = `<div class="forge-select-list">${pageEntries.map(entry => {
     const isCurrent = entry.id === state.forgeTargetId;
     const itemColor = weaponNameColor(entry.type, entry.level);
+    const display = equipInstanceDisplayInfo(entry.item, entry.type); // 아이콘 hover 시 기존 장비 툴팁(요구사항 1번)
     return `
       <button class="forge-select-item ${isCurrent ? 'active' : ''}" data-action="select-forge-target" data-id="${entry.id}">
-        <span class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img', entry.level)}</span>
+        <span class="inv-icon weapon-name-wrap" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img', entry.level)}<span class="tooltip">${display.tooltipHtml}</span></span>
         <span class="forge-select-info">
           <span class="forge-select-name" style="color:${itemColor};">${weaponName(entry.type)}${levelSuffix(entry.level)}</span>
           ${isCurrent ? '<span class="inv-badge">선택됨</span>' : ''}
@@ -244,7 +246,7 @@ function renderInventoryList(){
     const meta = TIER_META[tier];
     const itemColor = weaponNameColor(type, item.level);
     const isEquipped = item.id === state.equippedId;
-    const sellVal = sellValueFor(type, item.level);
+    const sellVal = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
     // 양손 무기는 보조 아이템을 착용 중이면 장착(강화 선택)할 수 없음(문서 3번 상호 배타 조건).
     // 양손이 아닌 무기는 이 조건과 무관하게 항상 착용 가능. handType 기준 판정(요청사항 10번).
@@ -262,7 +264,7 @@ function renderInventoryList(){
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${weaponName(type)}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
-            <span class="tooltip">${buildWeaponTooltipHtml(type, item.level, item.damaged)}</span>
+            <span class="tooltip">${buildWeaponTooltipHtml(type, item.level, item.damaged, item.currentDurability)}</span>
           </span>
           <div class="inv-sub">${meta.label}</div>
         </div>
@@ -307,7 +309,7 @@ function renderArmorInventoryList(){
     if(!def) return '';
     const itemColor = weaponNameColor(type, item.level);
     const isWorn = !!(state.equippedArmor && state.equippedArmor[def.armorKind] === item.id);
-    const sellVal = sellValueFor(type, item.level);
+    const sellVal = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
     const wearBtnHtml = isWorn
       ? `<button class="inv-btn equip active" data-action="unwear-armor" data-id="${item.id}">착용 해제</button>`
@@ -325,7 +327,7 @@ function renderArmorInventoryList(){
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
-            <span class="tooltip">${buildArmorTooltipHtml(type, item.level, item.damaged)}</span>
+            <span class="tooltip">${buildArmorTooltipHtml(type, item.level, item.damaged, item.currentDurability)}</span>
           </span>
           <div class="inv-sub">${ARMOR_KINDS[def.armorKind] || ''}</div>
         </div>
@@ -366,7 +368,7 @@ function renderSubInventoryList(){
     if(!def) return '';
     const itemColor = weaponNameColor(type, item.level);
     const isWorn = state.equippedSubId === item.id;
-    const sellVal = sellValueFor(type, item.level);
+    const sellVal = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
     const canWear = !isWorn && reqOk && canEquipSubItem();
     const wearBtnHtml = isWorn
@@ -384,7 +386,7 @@ function renderSubInventoryList(){
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
-            <span class="tooltip">${buildSubTooltipHtml(type, item.level, item.damaged)}</span>
+            <span class="tooltip">${buildSubTooltipHtml(type, item.level, item.damaged, item.currentDurability)}</span>
           </span>
           <div class="inv-sub">${SUB_KINDS[def.subKind] || ''}</div>
         </div>
@@ -423,7 +425,7 @@ function renderAccessoryInventoryList(){
     if(!def) return '';
     const itemColor = weaponNameColor(type, item.level);
     const isWorn = wornList.includes(item.id);
-    const sellVal = sellValueFor(type, item.level);
+    const sellVal = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
     const canWear = !isWorn && reqOk && !slotsFull;
     const wearBtnHtml = isWorn
@@ -441,7 +443,7 @@ function renderAccessoryInventoryList(){
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
-            <span class="tooltip">${buildAccessoryTooltipHtml(type, item.level, item.damaged)}</span>
+            <span class="tooltip">${buildAccessoryTooltipHtml(type, item.level, item.damaged, item.currentDurability)}</span>
           </span>
           <div class="inv-sub">${ACCESSORY_KINDS[def.accessoryKind] || ''}</div>
         </div>
@@ -452,6 +454,18 @@ function renderAccessoryInventoryList(){
         </div>
       </div>`;
   }).join('');
+}
+
+// ---- 대장간 강화/수리 탭 표시 갱신(내구도 시스템 15번 요구사항) ----
+// invUI/craftUI의 renderXxxTabs()와 동일한 구조. "수리" 탭은 이번 작업에서는 안내 문구만 있는 빈
+// 화면(forgeTabRepair)이라 별도 렌더링 함수 없이 표시/숨김만 전환함.
+function renderForgeTabs(){
+  document.querySelectorAll('#forgeTabs .inv-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === forgeUI.tab);
+  });
+  el('forgeTabEnhance').style.display = forgeUI.tab === 'enhance' ? '' : 'none';
+  el('forgeTabRepair').style.display = forgeUI.tab === 'repair' ? '' : 'none';
+  if(forgeUI.tab === 'repair') renderRepairTab();
 }
 
 // ---- 인벤토리: 탭(장비 최상위+하위탭 / 소비 / 마석 / 기타) 표시 상태 갱신 ----
@@ -945,14 +959,14 @@ function renderHuntCharPanel(){
   }
   const combatLv = el('combatPlayerLevel');
   if(combatLv) combatLv.textContent = 'Lv.' + lv;
-  // 토글 메뉴(캐릭터 정보창 UI)가 펼쳐진 상태라면 그 안의 체력/마나/공격력 등도 전투 중 실시간으로 갱신.
-  if(hunt.topUiExpanded) renderHuntCharStatsToggle();
+  // 토글 메뉴(캐릭터 정보 카드)가 펼쳐진 상태라면 그 안의 체력/마나/공격력 등도 전투 중 실시간으로 갱신.
+  if(hunt.topUiExpanded) renderHuntSidePanel();
 }
 
 // 플라스크 퀵슬롯이 표시되는 모든 위치. 사냥 화면(quickSlotRow)에 있던 기존 UI를 그대로 재사용해
 // 캐릭터 메뉴 스킬 탭(skillTabFlaskRow, "오른쪽: 기존 플라스크 퀵슬롯 그대로 사용")에도 동일하게 출력함 —
 // 같은 state.quickSlots를 보여주는 것뿐이라 여기 목록에 id만 추가하면 다른 코드 수정 없이 그대로 반영됨.
-const QUICK_SLOT_ROW_IDS = ['quickSlotRow', 'skillTabFlaskRow'];
+const QUICK_SLOT_ROW_IDS = ['quickSlotRow', 'skillTabFlaskRow', 'huntPanelSkillFlaskRow'];
 function renderQuickSlots(){
   if(!Array.isArray(state.quickSlots) || state.quickSlots.length !== QUICK_SLOT_COUNT){
     const prev = Array.isArray(state.quickSlots) ? state.quickSlots : [];
@@ -1047,6 +1061,24 @@ function renderStatAllocRow(key, label, value){
   `;
 }
 
+// 인벤토리 인스턴스(item)와 종류(type)로부터 "인벤토리 장비 탭과 동일한" 표시 정보를 만듦(수리
+// 시스템 요구사항 5·11번 + 강화 장비 선택/수리 장비 선택 팝업 툴팁 요구사항 — 기존 장비 툴팁/이름/등급
+// 표시를 그대로 재사용하고 새 툴팁 데이터를 만들지 않기 위한 공용 헬퍼). 아이콘/툴팁을 쓰는 화면이면
+// 어디서든(수리 품목 목록, 강화 장비 선택 팝업, 수리 장비 선택 팝업 등) 이 함수 하나로 통일해서 씀.
+// equippedItemForSlot과 달리 아이콘 크기를 인벤토리 카드 크기(inv-icon-img)로 맞춰서, 인벤토리 장비
+// 탭의 세로 카드와 완전히 동일하게 보이도록 함(장비창 슬롯 아이콘 크기와는 별개).
+function equipInstanceDisplayInfo(item, type){
+  const level = item.level;
+  const color = weaponNameColor(type, level);
+  const iconHtml = weaponIconHtml(type, 'inv-icon-img', level);
+  const equipType = wpn(type).equipType;
+  let tooltipHtml;
+  if(equipType === 'armor') tooltipHtml = buildArmorTooltipHtml(type, level, item.damaged, item.currentDurability);
+  else if(equipType === 'accessory') tooltipHtml = buildAccessoryTooltipHtml(type, level, item.damaged, item.currentDurability);
+  else if(equipType === 'sub') tooltipHtml = buildSubTooltipHtml(type, level, item.damaged, item.currentDurability);
+  else tooltipHtml = buildWeaponTooltipHtml(type, level, item.damaged, item.currentDurability);
+  return { name: weaponName(type), level, color, iconHtml, tooltipHtml };
+}
 // 슬롯 키 → 현재 장착 중인 아이템 표시 정보(이름/강화단계/색상/아이콘/툴팁) 조회.
 // 무기는 기존 장착 시스템(getEquipped)을 그대로 사용해 조회하고, 아직 실제 장비 데이터가 없는 슬롯
 // (투구/갑옷/장신구1/장신구2)은 항상 null을 반환해 빈 슬롯으로 표시됨 — 해당 장비 타입이 실제로 추가되면
@@ -1065,7 +1097,7 @@ function equippedItemForSlot(slotKey){
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
       iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
-      tooltipHtml: buildWeaponTooltipHtml(type, level),
+      tooltipHtml: buildWeaponTooltipHtml(type, level, undefined, equipped.currentDurability),
     };
   }
   if(slotKey === 'helmet' || slotKey === 'armor'){
@@ -1079,7 +1111,7 @@ function equippedItemForSlot(slotKey){
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
       iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
-      tooltipHtml: buildArmorTooltipHtml(type, level),
+      tooltipHtml: buildArmorTooltipHtml(type, level, undefined, item.currentDurability),
     };
   }
   if(slotKey === 'sub'){
@@ -1092,7 +1124,7 @@ function equippedItemForSlot(slotKey){
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
       iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
-      tooltipHtml: buildSubTooltipHtml(type, level),
+      tooltipHtml: buildSubTooltipHtml(type, level, undefined, item.currentDurability),
     };
   }
   if(slotKey === 'accessory1' || slotKey === 'accessory2'){
@@ -1107,7 +1139,7 @@ function equippedItemForSlot(slotKey){
       name: weaponName(type), level,
       color: weaponNameColor(type, level),
       iconHtml: weaponIconHtml(type, 'eq-slot-icon-img', level),
-      tooltipHtml: buildAccessoryTooltipHtml(type, level),
+      tooltipHtml: buildAccessoryTooltipHtml(type, level, undefined, item.currentDurability),
     };
   }
   return null;
@@ -1115,9 +1147,9 @@ function equippedItemForSlot(slotKey){
 function equipSlotHtml(slot){
   const item = equippedItemForSlot(slot.key);
   if(!item){
-    return `<div class="eq-slot ${slot.cellClass}"><span class="eq-slot-empty-label">${slot.label}</span></div>`;
+    return `<div class="eq-slot ${slot.cellClass}" data-slot="${slot.key}"><span class="eq-slot-empty-label">${slot.label}</span></div>`;
   }
-  return `<div class="eq-slot filled ${slot.cellClass}">${item.iconHtml}<span class="tooltip">${item.tooltipHtml}</span></div>`;
+  return `<div class="eq-slot filled ${slot.cellClass}" data-slot="${slot.key}">${item.iconHtml}<span class="tooltip">${item.tooltipHtml}</span></div>`;
 }
 // 아티팩트 슬롯 — 현재 최대 슬롯 수(ARTIFACT_SLOT_MAX)만큼 자동 생성되므로, 이 숫자가 바뀌면
 // 장비창의 아티팩트 칸 개수도 코드 수정 없이 그대로 함께 바뀜(단, 상단 가로 배치 그리드 영역
@@ -1175,6 +1207,118 @@ function buildEquipPanelHtml(includeInfo){
     <div class="equipped-item-info">${equippedItemInfoLinesHtml()}</div>
   `;
 }
+
+// ---- 수리 탭(요구사항 1~2번) ----
+// 장비창(buildEquipPanelHtml)을 그대로 재사용해 배치하고("모두 수리" 버튼/안내 문구는 index.html에
+// 이미 고정 배치됨), "모두 수리" 버튼은 수리할 대상이 하나도 없으면 비활성화함(요구사항 1번 마지막
+// 문장 — 기존 코드베이스 전반의 "지금 할 수 없는 행동은 버튼을 비활성화" 관례를 그대로 따름).
+function renderRepairTab(){
+  el('repairEquipPanel').innerHTML = buildEquipPanelHtml(true);
+  el('repairAllBtn').disabled = repairAllTargetList().length === 0;
+}
+// ---- 수리 탭: 개별 수리 팝업(요구사항 9~18번) ----
+function renderRepairIndividualModal(){
+  if(!repairIndividualPopup) return;
+  const found = resolveRepairTarget(repairIndividualPopup);
+  if(!found){ closeRepairIndividualPopup(); return; } // 팝업이 열려있는 사이 대상 장비가 사라진 예외 상황 방어
+  const { item, type } = found;
+  const display = equipInstanceDisplayInfo(item, type);
+  const max = maxDurabilityFor(type);
+  const cur = item.currentDurability != null ? item.currentDurability : max;
+  const pct = durabilityPercent(cur, max);
+  const costPerPoint = repairCostPerPointFor(type);
+  const amount = repairIndividualPopup.amount;
+  const cost = repairCostForAmount(type, amount);
+
+  el('repairIndivIconBox').innerHTML = display.iconHtml;
+  el('repairIndivIconBox').style.borderColor = display.color;
+  el('repairIndivNameWrap').innerHTML =
+    `<span class="inv-name" style="color:${display.color};">${display.name}${levelSuffix(display.level)}</span>` +
+    `<span class="tooltip">${display.tooltipHtml}</span>`;
+  el('repairIndivDurabilityLine').textContent = `내구도 ${cur}/${max} (${pct}%)`;
+  el('repairIndivCostPerPointLine').innerHTML =
+    `수리 비용 : 내구도 1당 <span class="repair-cost-per-point-value">${costPerPoint.toLocaleString()}골드</span>`;
+  el('repairIndivAmountInput').max = repairAmountToFull(item);
+  el('repairIndivAmountInput').value = amount;
+  el('repairIndivGold').textContent = '🪙 ' + state.gold.toLocaleString();
+  el('repairIndivCost').textContent = '🪙 ' + cost.toLocaleString();
+  el('repairIndivConfirmBtn').disabled = amount <= 0 || state.gold < cost;
+}
+// ---- 수리 탭: 모두 수리 팝업(요구사항 3~8번) ----
+// 수리 품목 목록은 인벤토리 장비 탭의 세로 카드(.inv-card)를 그대로 재사용 — 품목 개수만큼만
+// 자연스럽게 늘어나고(요구사항 4번 "영역 유동적 구성"), 아이템 툴팁도 기존 툴팁 함수를 그대로 씀.
+function renderRepairAllList(targets){
+  if(targets.length === 0) return `<div class="inv-empty">수리가 필요한 장비가 없습니다.</div>`;
+  return targets.map(entry => {
+    const display = equipInstanceDisplayInfo(entry.item, entry.type);
+    const max = maxDurabilityFor(entry.type);
+    const cur = entry.item.currentDurability != null ? entry.item.currentDurability : max;
+    const pct = durabilityPercent(cur, max);
+    return `
+      <div class="inv-card">
+        <div class="inv-icon" style="border-color:${display.color};">${display.iconHtml}</div>
+        <div class="inv-info">
+          <span class="weapon-name-wrap">
+            <span class="inv-name" style="color:${display.color};">${display.name}${levelSuffix(display.level)}</span>
+            <span class="tooltip">${display.tooltipHtml}</span>
+          </span>
+          <div class="inv-sub">내구도 ${cur}/${max} (${pct}%)</div>
+        </div>
+        <div class="inv-actions">
+          <span class="txt-gold">🪙 ${entry.cost.toLocaleString()}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+function renderRepairAllModal(){
+  if(!repairAllPopupOpen) return;
+  const targets = repairAllTargetList();
+  const totalCost = repairAllTotalCost(targets);
+  el('repairAllList').innerHTML = renderRepairAllList(targets);
+  el('repairAllGold').textContent = '🪙 ' + state.gold.toLocaleString();
+  el('repairAllCost').textContent = '🪙 ' + totalCost.toLocaleString();
+  el('repairAllConfirmBtn').disabled = targets.length === 0 || state.gold < totalCost;
+}
+// ---- 수리 탭: "인벤토리에서 선택" 팝업(요구사항 5~11·18~19번) ----
+// 대장간 renderForgeSelectList()와 완전히 동일한 구조(페이지 시스템·목록 스타일·아이콘·이름 표시 재사용,
+// 요구사항 5·9·23번) — 후보 목록만 repairSelectableInventoryItems()(장착 여부 무관, formulas.js)로
+// 교체하고, 클릭 시 selectForgeTarget 대신 selectRepairFromInventory를 호출함. 장착 중 표시는 기존
+// 인벤토리 탭의 [장착 중] 배지(.inv-badge)를 그대로 재사용(요구사항 7번).
+function renderRepairSelectList(){
+  const wrap = el('repairSelectList');
+  if(!wrap) return;
+  const pagerWrap = el('repairSelectPager');
+  const entries = repairSelectableInventoryItems();
+  if(entries.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">수리 가능한 장비가 없습니다.</div>`; // 요구사항 19번
+    if(pagerWrap) pagerWrap.innerHTML = '';
+    return;
+  }
+  const pageSize = PAGE_SIZE.repairSelect;
+  const totalPageCount = pageCount(entries.length, pageSize);
+  pageState.repairSelect = clampPage(pageState.repairSelect, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('repairSelect', pageState.repairSelect, totalPageCount);
+  const pageEntries = pageSlice(entries, pageState.repairSelect, pageSize);
+  wrap.innerHTML = `<div class="forge-select-list">${pageEntries.map(entry => {
+    const itemColor = weaponNameColor(entry.type, entry.level);
+    const display = equipInstanceDisplayInfo(entry.item, entry.type); // 아이콘 hover 시 기존 장비 툴팁(요구사항 10번)
+    return `
+      <button class="forge-select-item" data-action="select-repair-target" data-kind="${entry.kind}" data-id="${entry.id}">
+        <span class="inv-icon weapon-name-wrap" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img', entry.level)}<span class="tooltip">${display.tooltipHtml}</span></span>
+        <span class="forge-select-info">
+          <span class="forge-select-name" style="color:${itemColor};">${weaponName(entry.type)}${levelSuffix(entry.level)}</span>
+          ${entry.worn ? '<span class="inv-badge">장착 중</span>' : ''}
+        </span>
+      </button>`;
+  }).join('')}</div>`;
+}
+// ---- 수리 탭: 최종 확인 UI(요구사항 19~21번) ----
+function renderRepairConfirmModal(){
+  if(!repairConfirmState) return;
+  el('repairConfirmCost').textContent = repairConfirmState.totalCost.toLocaleString();
+  el('repairConfirmProceedBtn').disabled = state.gold < repairConfirmState.totalCost;
+}
+
 // 캐릭터 정보 모달 — 인벤토리와 동일한 페이지네이션 시스템(pageState/pagerHtml/goPage)을 그대로 재사용해
 // 1페이지(장비창+캐릭터 정보) / 2페이지(적용 중인 아티팩트 효과)를 전환함.
 function renderCharStats(){
@@ -1190,9 +1334,9 @@ function renderCharStats(){
 }
 // 캐릭터 정보(레벨/체력/마나/경험치 → 스탯 배분 → 전투 능력치) HTML 조립. 캐릭터 정보 모달(1페이지 우측)과
 // 캐릭터 메뉴(신규, "캐릭터 정보" 탭 1페이지)가 이 함수를 그대로 공유해서 쓰므로, 기능/데이터가 항상 동일함.
-function buildCharStatsInfoHtml(){
-  const equipped = getEquippedWeapon();
-
+// 캐릭터 정보 중 "레벨~스탯 배분" 구간만(요구사항: 던전 우측 카드 2페이지). 캐릭터 레벨/체력/마나/
+// 경험치 + 스탯 포인트 배분 UI까지 — buildCharStatsInfoHtml()의 앞부분을 그대로 뺀 것.
+function buildCharLevelStatsHtml(){
   const lv = state.playerLevel;
   const maxHp = effectiveMaxHp(lv);
   const maxMp = effectiveMaxMp(lv);
@@ -1201,7 +1345,7 @@ function buildCharStatsInfoHtml(){
   const expReq = lv >= PLAYER_MAX_LEVEL ? 0 : requiredExp(lv);
   const expPct = lv >= PLAYER_MAX_LEVEL ? 100 : Math.min(100, Math.round(state.playerExp / expReq * 1000) / 10);
 
-  let rightHtml = `
+  return `
     <div class="char-stat-row big"><span>캐릭터 레벨</span><span class="v">Lv.${lv}</span></div>
     <div class="player-bar-label">체력 <span>${hp.toLocaleString()} / ${maxHp.toLocaleString()}</span></div>
     <div class="player-bar-wrap"><div class="player-bar-fill hp" style="width:${(hp/maxHp*100)}%;"></div></div>
@@ -1223,19 +1367,26 @@ function buildCharStatsInfoHtml(){
     </div>
     <div class="char-stat-divider"></div>
   `;
+}
+// 캐릭터 정보 중 "전투 능력치" 구간만(요구사항: 던전 우측 카드 3페이지). 장착 무기/총 공격력~치명타 +
+// 총 방어도~장신구 요약까지 — buildCharStatsInfoHtml()의 뒷부분을 그대로 뺀 것.
+function buildCombatStatsHtml(){
+  const equipped = getEquippedWeapon();
+  let html = '';
 
   if(!equipped){
-    rightHtml += `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
+    html += `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
   } else {
     const type = equipped.type || 'longsword';
     const level = equipped.level;
-    const totalAtk = effectiveAtk(type, level, equipped.damaged);
+    const durabilityZero = isEquipDurabilityZero(equipped);
+    const totalAtk = effectiveAtk(type, level, equipped.damaged, durabilityZero);
     const baseSpeed = atkSpeedFor(type, level);
-    const totalSpeed = effectiveAtkSpeed(type, level);
-    const totalCrit = effectiveCritChance(type, level);
+    const totalSpeed = effectiveAtkSpeed(type, level, durabilityZero);
+    const totalCrit = effectiveCritChance(type, level, durabilityZero);
     const hasSpeedBonus = isArtifactEquipped('batwing');
 
-    rightHtml += `
+    html += `
       <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)}${equipped.damaged ? '(손상)' : ''}${levelSuffix(level)}</span></div>
       <div class="char-stat-divider"></div>
       <div class="char-stat-row big"><span>총 공격력</span><span class="v">${totalAtk}</span></div>
@@ -1243,7 +1394,7 @@ function buildCharStatsInfoHtml(){
       <div class="char-stat-row big"><span>치명타 확률</span><span class="v">${totalCrit}%</span></div>
     `;
     if(hasSpeedBonus){
-      rightHtml += `<div class="char-stat-note">공격속도 = 무기 기본 ${baseSpeed.toFixed(2)} + 박쥐 날개 5%</div>`;
+      html += `<div class="char-stat-note">공격속도 = 무기 기본 ${baseSpeed.toFixed(2)} + 박쥐 날개 5%</div>`;
     }
   }
 
@@ -1255,18 +1406,23 @@ function buildCharStatsInfoHtml(){
   const wornSub = wornSubItems()[0] || null;
   const wornAccessories = wornAccessoryItems();
   if(wornHelmet || wornBody || wornSub || wornAccessories.length > 0){
-    rightHtml += `<div class="char-stat-divider"></div>`;
-    rightHtml += `<div class="char-stat-row big"><span>총 방어도</span><span class="v">${playerTotalDefense()}</span></div>`;
-    if(wornHelmet) rightHtml += `<div class="char-stat-row"><span>투구</span><span class="v">${ARMOR_TYPES[wornHelmet.type].name}${levelSuffix(wornHelmet.level)}</span></div>`;
-    if(wornBody) rightHtml += `<div class="char-stat-row"><span>갑옷</span><span class="v">${ARMOR_TYPES[wornBody.type].name}${levelSuffix(wornBody.level)}</span></div>`;
-    if(wornSub) rightHtml += `<div class="char-stat-row"><span>보조</span><span class="v">${SUB_TYPES[wornSub.type].name}${levelSuffix(wornSub.level)}</span></div>`;
+    html += `<div class="char-stat-divider"></div>`;
+    html += `<div class="char-stat-row big"><span>총 방어도</span><span class="v">${playerTotalDefense()}</span></div>`;
+    if(wornHelmet) html += `<div class="char-stat-row"><span>투구</span><span class="v">${ARMOR_TYPES[wornHelmet.type].name}${levelSuffix(wornHelmet.level)}</span></div>`;
+    if(wornBody) html += `<div class="char-stat-row"><span>갑옷</span><span class="v">${ARMOR_TYPES[wornBody.type].name}${levelSuffix(wornBody.level)}</span></div>`;
+    if(wornSub) html += `<div class="char-stat-row"><span>보조</span><span class="v">${SUB_TYPES[wornSub.type].name}${levelSuffix(wornSub.level)}</span></div>`;
     wornAccessories.forEach(acc => {
       const accDef = ACCESSORY_TYPES[acc.type];
-      rightHtml += `<div class="char-stat-row"><span>${accDef ? ACCESSORY_KINDS[accDef.accessoryKind] || '장신구' : '장신구'}</span><span class="v">${accDef ? accDef.name : acc.type}${levelSuffix(acc.level)}</span></div>`;
+      html += `<div class="char-stat-row"><span>${accDef ? ACCESSORY_KINDS[accDef.accessoryKind] || '장신구' : '장신구'}</span><span class="v">${accDef ? accDef.name : acc.type}${levelSuffix(acc.level)}</span></div>`;
     });
   }
 
-  return rightHtml;
+  return html;
+}
+// 캐릭터 정보 모달/캐릭터 메뉴 1페이지가 쓰는 공용 함수 — 위 두 함수를 그대로 이어붙인 것과 완전히
+// 동일한 결과를 냄(기존 호출부는 전혀 수정하지 않아도 됨).
+function buildCharStatsInfoHtml(){
+  return buildCharLevelStatsHtml() + buildCombatStatsHtml();
 }
 // 1페이지 — 좌: 장비창, 우: 캐릭터 정보(buildCharStatsInfoHtml 공용 함수).
 function renderCharStatsPage1(){
@@ -1347,29 +1503,46 @@ function renderCharacterMenu(){
   `;
 }
 
-// ---- 스킬 탭 ----
-// 상단: 스킬 퀵슬롯(5칸) + 기존 플라스크 퀵슬롯 + 초기화 버튼 → 하위 탭(공용/특화/기연, SKILL_CATEGORIES
-// 기반) → 페이지 이동 → 하위 탭별 본문(buildSkillCategoryBodyHtml). 하위 탭 버튼도 인벤토리와 동일한
-// inv-tabs 클래스를 그대로 사용함(요구사항: "탭 UI는 현재 인벤토리에서 사용하는 탭 구조를 그대로 사용").
-function buildSkillTabHtml(){
+// 스킬 퀵슬롯 섹션(퀵슬롯 5칸+플라스크 퀵슬롯+초기화 버튼)만 따로 뺀 것 — 요구사항: 던전 우측 카드
+// 스킬 탭 1페이지("퀵슬롯 설정 ~ 초기화 버튼"). rowId/flaskRowId를 인자로 받는 이유는 캐릭터 메뉴
+// 스킬 탭과 던전 우측 카드 두 곳에서 동시에 이 섹션을 쓰기 때문(같은 id를 중복 사용할 수 없어 각자
+// 다른 id를 넘겨 받음) — renderSkillQuickSlots()/renderQuickSlots()가 두 id를 모두 채워줌.
+function buildSkillQuickSlotSectionHtml(quickSlotRowId, flaskRowId){
+  return `
+    <div class="skill-quickslot-row">
+      <div class="quickslot-row skill-quickslot-grid" id="${quickSlotRowId}"></div>
+      <div class="quickslot-row" id="${flaskRowId}"></div>
+      <button class="nav-btn" data-action="reset-skill-quickslots">초기화</button>
+    </div>
+  `;
+}
+// 스킬 분류 탭(공용/특화/기연)+페이지 이동+스킬 목록만 따로 뺀 것 — 요구사항: 던전 우측 카드 스킬 탭
+// 2페이지("공용/특화/기연 ~ 스킬 목록").
+function buildSkillListSectionHtml(){
   const catTabsHtml = SKILL_CATEGORIES.map(c =>
     `<button class="inv-tab-btn${c.id === activeSkillCategory ? ' active' : ''}" data-skill-cat="${c.id}">${c.label}</button>`
   ).join('');
   const page = clampPage(pageState.skillPage, SKILL_PAGES.length);
   pageState.skillPage = page;
   return `
+    <div class="inv-tabs">${catTabsHtml}</div>
+    <div class="skill-menu-info-head">
+      <button class="nav-btn skill-reset-btn" data-action="reset-skills" title="스킬 초기화">⟲</button>
+      ${pagerHtml('skillPage', page, SKILL_PAGES.length)}
+    </div>
+    ${buildSkillCategoryBodyHtml(activeSkillCategory)}
+  `;
+}
+// ---- 스킬 탭 ----
+// 상단: 스킬 퀵슬롯(5칸) + 기존 플라스크 퀵슬롯 + 초기화 버튼 → 하위 탭(공용/특화/기연, SKILL_CATEGORIES
+// 기반) → 페이지 이동 → 하위 탭별 본문(buildSkillCategoryBodyHtml). 하위 탭 버튼도 인벤토리와 동일한
+// inv-tabs 클래스를 그대로 사용함(요구사항: "탭 UI는 현재 인벤토리에서 사용하는 탭 구조를 그대로 사용").
+// 위 두 섹션 빌더를 그대로 이어붙인 것과 완전히 동일한 결과(기존 호출부는 전혀 수정하지 않아도 됨).
+function buildSkillTabHtml(){
+  return `
     <div class="inv-tab-panel">
-      <div class="skill-quickslot-row">
-        <div class="quickslot-row skill-quickslot-grid" id="skillTabQuickSlotRow"></div>
-        <div class="quickslot-row" id="skillTabFlaskRow"></div>
-        <button class="nav-btn" data-action="reset-skill-quickslots">초기화</button>
-      </div>
-      <div class="inv-tabs">${catTabsHtml}</div>
-      <div class="skill-menu-info-head">
-        <button class="nav-btn skill-reset-btn" data-action="reset-skills" title="스킬 초기화">⟲</button>
-        ${pagerHtml('skillPage', page, SKILL_PAGES.length)}
-      </div>
-      ${buildSkillCategoryBodyHtml(activeSkillCategory)}
+      ${buildSkillQuickSlotSectionHtml('skillTabQuickSlotRow', 'skillTabFlaskRow')}
+      ${buildSkillListSectionHtml()}
     </div>
   `;
 }
@@ -1407,10 +1580,14 @@ function renderSkillQuickSlots(){
   if(skillTabRow) skillTabRow.innerHTML = buildSkillQuickSlotsHtml(true);
   const huntRow = el('huntSkillQuickSlotRow');
   if(huntRow) huntRow.innerHTML = buildSkillQuickSlotsHtml(false);
+  // 던전 우측 카드 스킬 탭 1페이지의 퀵슬롯 섹션(설정 가능 — showRemove:true, 캐릭터 메뉴와 동일).
+  // 해당 페이지가 열려 있을 때만 실제로 DOM에 존재하므로, 없으면 조용히 무시함(다른 두 위치와 동일 패턴).
+  const huntPanelRow = el('huntPanelSkillQuickSlotRow');
+  if(huntPanelRow) huntPanelRow.innerHTML = buildSkillQuickSlotsHtml(true);
 }
 // 스킬 퀵슬롯이 표시되는 모든 위치 — 쿨타임 실시간 표시를 가볍게 갱신할 때 순회 대상(플라스크의
 // QUICK_SLOT_ROW_IDS와 동일한 패턴).
-const SKILL_QUICK_SLOT_ROW_IDS = ['skillTabQuickSlotRow', 'huntSkillQuickSlotRow'];
+const SKILL_QUICK_SLOT_ROW_IDS = ['skillTabQuickSlotRow', 'huntSkillQuickSlotRow', 'huntPanelSkillQuickSlotRow'];
 // updateQuickSlotCooldowns(플라스크용)와 동일한 목적의 가벼운 갱신 — 매번 전체를 다시 그리지 않고
 // 쿨타임 표시/비활성화 상태만 갱신함. main.js에서 짧은 주기로 반복 호출됨.
 function updateSkillQuickSlotCooldowns(){
@@ -1717,25 +1894,85 @@ function updateHuntTopUiToggle(){
   if(!section || !btn) return;
   section.style.display = hunt.topUiExpanded ? 'block' : 'none';
   btn.textContent = hunt.topUiExpanded ? '›' : '‹';
-  if(hunt.topUiExpanded) renderHuntCharStatsToggle(); // 펼치는 시점에 최신 내용으로 갱신
+  // 패널이 열려 있을 때만 .wrap의 480px 상한을 해제(요구사항 13번) — 닫히면 즉시 원복해서 다른 화면에
+  // 영향이 남지 않게 함(추가로 showView()가 던전 화면을 완전히 벗어날 때도 항상 제거함).
+  const wrapEl = document.querySelector('.wrap');
+  if(wrapEl) wrapEl.classList.toggle('hunt-panel-open', hunt.topUiExpanded);
+  if(hunt.topUiExpanded) renderHuntSidePanel(); // 펼치는 시점에 최신 내용으로 갱신
 }
 function toggleHuntTopUi(){
   hunt.topUiExpanded = !hunt.topUiExpanded;
+  if(hunt.topUiExpanded){
+    // 던전 우측 카드를 열 때마다 캐릭터 메뉴 진입/캐릭터 정보 모달을 열 때와 동일한 규칙으로 draftStats를
+    // 다시 세팅함(적용하지 않은 이전 임시 배분은 버리고 항상 최신 state.stats 기준으로 시작) — 이게 없으면
+    // 던전에 입장한 뒤 캐릭터 메뉴를 한 번도 연 적이 없는 상태에서는 draftStats가 비어 있어(null) 던전
+    // 우측 카드의 스탯 배분 버튼이 전혀 동작하지 않는 문제가 있었음(요구사항: 던전에서도 스탯 투자 가능).
+    draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+    draftStatPoints = state.statPoints || 0;
+    statAllocActive = { str: false, agi: false, int: false };
+  }
   updateHuntTopUiToggle();
 }
-// 던전 전투 화면의 `<`/`>` 토글 메뉴 내용 — 기존 캐릭터 정보창(charStatsModal)과 완전히 동일한 콘텐츠
-// 빌더(buildEquipPanelHtml/buildCharStatsInfoHtml/buildArtifactEffectsHtml)와 페이지네이션 패턴
-// (renderCharStatsPage1/2와 동일 구조)을 그대로 재사용함 — 새 캐릭터 정보 UI를 따로 만들지 않음.
-// pageState 키만 'huntCharStats'로 별도 관리해서, 캐릭터 정보창(모달)의 현재 페이지와는 독립적으로 동작함.
-function renderHuntCharStatsToggle(){
-  pageState.huntCharStats = clampPage(pageState.huntCharStats, CHAR_STATS_PAGE_COUNT);
-  const pagerWrap = el('huntCharStatsPager');
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('huntCharStats', pageState.huntCharStats, CHAR_STATS_PAGE_COUNT);
-  const body = el('huntCharStatsBody');
-  if(!body) return;
-  body.innerHTML = pageState.huntCharStats === 2
-    ? buildArtifactEffectsHtml()
-    : `<div class="char-stats-page1"><div class="char-stats-left">${buildEquipPanelHtml()}</div><div class="char-stats-right">${buildCharStatsInfoHtml()}</div></div>`;
+// 던전 우측 카드 — 기존 캐릭터 메뉴(#characterView)와 완전히 동일한 [캐릭터 정보]/[스킬] 탭 구조를
+// 그대로 재사용하되(CHARACTER_TABS 그대로 순회), 카드 크기가 정해져 있어 내용을 더 잘게 페이지로
+// 나눔(요구사항). 사용하는 콘텐츠 빌더는 전부 기존 것 그대로:
+//   [캐릭터 정보] 1p=buildEquipPanelHtml, 2p=buildCharLevelStatsHtml, 3p=buildCombatStatsHtml
+//   [스킬]        1p=buildSkillQuickSlotSectionHtml, 2p=buildSkillListSectionHtml
+// 탭 선택(huntCharTab)과 정보 탭의 페이지(pageState.huntCharInfo/huntCharSkill)는 캐릭터 메뉴 쪽
+// 상태(activeCharTab/pageState.charMenuInfo)와 별개로 관리함(화면마다 독립적인 "지금 보고 있는 페이지"
+// 이며, 스탯/스킬 같은 실제 데이터는 전부 공용 state를 그대로 읽으므로 두 화면 값은 항상 자동으로
+// 일치함 — 예: 던전에서 스탯을 적용하면 캐릭터 메뉴도 다음에 열었을 때 곧바로 반영되어 있음).
+// 이름 주의: 던전 화면 좌상단 상시 HUD(레벨/체력/마나바)는 별도의 renderHuntCharPanel()(위쪽에 먼저
+// 정의됨)이 담당함 — 이 함수는 그 오른쪽에 붙는 카드 전체를 가리키는 별개 함수라 이름을 다르게 둠
+// (두 함수가 한때 이름이 같아서 이 함수가 저 함수를 덮어써 좌상단 HUD가 갱신되지 않는 버그가 있었음).
+function renderHuntSidePanel(){
+  const tabsRow = el('huntCharTabsRow');
+  const panelsWrap = el('huntCharTabPanels');
+  if(!tabsRow || !panelsWrap) return;
+
+  tabsRow.innerHTML = CHARACTER_TABS.map(t =>
+    `<button class="inv-tab-btn${t.id === huntCharTab ? ' active' : ''}" data-hunt-char-tab="${t.id}">${t.label}</button>`
+  ).join('');
+
+  const tab = CHARACTER_TABS.find(t => t.id === huntCharTab) || CHARACTER_TABS[0];
+  if(!tab){ panelsWrap.innerHTML = ''; return; }
+
+  if(tab.id === 'skill'){
+    pageState.huntCharSkill = clampPage(pageState.huntCharSkill, HUNT_CHAR_SKILL_PAGE_COUNT);
+    const page = pageState.huntCharSkill;
+    const pageBodyHtml = page === 2
+      ? buildSkillListSectionHtml()
+      : buildSkillQuickSlotSectionHtml('huntPanelSkillQuickSlotRow', 'huntPanelSkillFlaskRow');
+    panelsWrap.innerHTML = `
+      <div class="inv-tab-panel">
+        <div class="char-menu-info-head">${pagerHtml('huntCharSkill', page, HUNT_CHAR_SKILL_PAGE_COUNT)}</div>
+        <div>${pageBodyHtml}</div>
+      </div>
+    `;
+    renderSkillQuickSlots(); // 1페이지일 때만 실제 존재하는 huntPanelSkillQuickSlotRow를 채움(없으면 조용히 무시됨)
+    renderQuickSlots();
+    return;
+  }
+
+  if(tab.id !== 'info'){
+    panelsWrap.innerHTML = `<div class="inv-tab-panel"></div>`;
+    return;
+  }
+
+  ensurePlayerVitals();
+  pageState.huntCharInfo = clampPage(pageState.huntCharInfo, HUNT_CHAR_INFO_PAGE_COUNT);
+  const page = pageState.huntCharInfo;
+  // 1페이지는 "장비창 레이아웃"만(요구사항: 장착 아이템 정보·아티팩트 정보 생략) — includeInfo=false.
+  const pageBodyHtml = page === 1 ? buildEquipPanelHtml(false)
+    : page === 2 ? buildCharLevelStatsHtml()
+    : buildCombatStatsHtml();
+
+  panelsWrap.innerHTML = `
+    <div class="inv-tab-panel">
+      <div class="char-menu-info-head">${pagerHtml('huntCharInfo', page, HUNT_CHAR_INFO_PAGE_COUNT)}</div>
+      <div>${pageBodyHtml}</div>
+    </div>
+  `;
 }
 
 // ---- 던전(사냥) 전투 화면 ----
@@ -1757,12 +1994,18 @@ function renderHunt(){
   const chestEl = el('treasureChest');
   const hintEl = el('treasureHint');
   const combatPanel = el('huntCombatPanel');
+  const playerSlot = el('combatPlayerSlot');
   const showChest = isTreasureStage && !hunt.chestOpened;
   if(chestEl) chestEl.style.display = showChest ? 'block' : 'none';
   if(hintEl) hintEl.style.display = showChest ? 'block' : 'none';
-  // 몬스터 정보(이름/체력/능력치)는 몬스터가 실제로 존재할 때만 표시 — 입장 메시지 대기 중엔 숨겨져 있다가
-  // 몬스터 이미지가 등장하는 순간(spawnMonsters) 함께 나타남
-  if(combatPanel) combatPanel.style.display = (isTreasureStage || hunt.monsters.length === 0) ? 'none' : 'block';
+  // 스테이지 전환 중 전투 영역이 사라졌다 다시 나타나는 현상 수정(요구사항): 1스테이지(던전 첫 입장)는
+  // 몬스터가 없는 입장 메시지 대기 구간에 전투 영역 자체를 숨기는 기존 동작을 그대로 유지한다. 2스테이지
+  // 이후(스테이지 전환·11스테이지 숨겨진 장소)부터는 몬스터 유무·숨겨진 장소 여부와 무관하게 전투 영역을
+  // 항상 표시 상태로 유지해, 이전 스테이지 몬스터만 제거된 채 화면(플레이어·레이아웃)은 계속 보이게 한다.
+  if(combatPanel) combatPanel.style.display = (hunt.stage === 1 && hunt.monsters.length === 0) ? 'none' : 'block';
+  // 11스테이지(숨겨진 장소)는 전투가 아니므로 플레이어 표시는 숨기되(요구사항), 전투 영역 자체(#combatArena
+  // 등)는 위에서 계속 표시 상태이므로 레이아웃 크기는 그대로 유지된다.
+  if(playerSlot) playerSlot.style.display = isTreasureStage ? 'none' : '';
   renderHuntBuffUi(); // 던전 진입/스테이지 전환 시 즉시 1회 반영(그 이후 실시간 갱신은 main.js의 100ms 타이머)
 }
 // 던전 전투화면 버프 지속시간 UI(요구사항) — activeBuffListForUi(formulas.js)가 이미 "지속시간 남은
@@ -1801,7 +2044,7 @@ function renderHuntBuffUi(){
       node.className = 'hunt-buff-icon';
       node.dataset.key = e.key;
       node.innerHTML = e.kind === 'curse'
-        ? `<img src="assets/ui/DEATH_CURSE.svg" class="hunt-buff-icon-img" alt="">
+        ? `<img src="assets/ui/DEATH_CURSE.svg" class="hunt-buff-icon-img" alt="" draggable="false">
            <span class="hunt-buff-time"></span>
            <span class="tooltip">망자의 저주<br><span class="hunt-buff-curse-desc"></span></span>`
         : `${skillIconHtml(SKILLS[e.id], 'hunt-buff-icon-img')}
@@ -1839,6 +2082,25 @@ function buildMonsterSlotHtml(instance){
       <div class="monster-name-row">
         <span class="monster-name" style="color:${grade.color};">${monsterDef.name}</span>
         <span class="monster-lv" id="monster-lv-${instance.instanceId}">Lv.${instance.level} · 공격력 ${instance.atk}</span>
+      </div>
+    </div>`;
+}
+// 상/좌/우 자리를 "몬스터가 있는 것처럼" 자리만 차지하고 화면엔 보이지 않는 자리표시자로 채울 때 씀
+// (UI 요구사항 — 스테이지 진입 메시지가 끝나기 전, 몬스터 출현 결정 전에도 항상 3자리가 채워진 것과
+// 동일한 화면 크기를 유지하기 위함). buildMonsterSlotHtml과 동일한 뼈대(.monster-slot, hp-bar-wrap,
+// monster-icon, monster-name-row)를 그대로 쓰되 실제 데이터 없이 빈 값만 채우고 visibility:hidden으로
+// 감춤 — 전투/스폰 로직에는 전혀 관여하지 않는 순수 표시용 함수.
+function buildEmptyMonsterSlotHtml(pos){
+  return `
+    <div class="monster-slot pos-${pos} placeholder-slot">
+      <div class="hp-bar-wrap">
+        <div class="hp-bar-fill" style="width:0%"></div>
+        <div class="hp-text">&nbsp;</div>
+      </div>
+      <div class="monster-icon">&nbsp;</div>
+      <div class="monster-name-row">
+        <span class="monster-name">&nbsp;</span>
+        <span class="monster-lv">&nbsp;</span>
       </div>
     </div>`;
 }

@@ -21,6 +21,123 @@
 //      (예: "중독 상태 적 피해 +10%" → 방어도 적용 후 피해량에 ×1.10).
 //   7. 최종 피해량 반올림       — 모든 보정을 적용한 뒤 반올림해 실제 피해량으로 사용.
 
+// ---- 내구도 시스템 ----
+// 장비 종류(type)의 "최대 내구도"(데이터에 직접 하드코딩된 값, durability 필드). 이 필드가 없는 종류는
+// 아직 내구도 시스템이 적용되지 않은 아이템(예: 등록을 못 한 경우)으로 취급해 null을 반환하며, 아래
+// 모든 내구도 관련 함수는 null이면 "내구도 없음"으로 보고 기존 동작(표시/감소/판정 없음)을 그대로 유지함.
+function maxDurabilityFor(type){
+  const w = wpn(type);
+  return (w && w.durability != null) ? w.durability : null;
+}
+function hasDurabilitySystem(type){ return maxDurabilityFor(type) != null; }
+// 신규 생성(구매/드랍/제작/흔적 복구 등)되는 장비 인스턴스의 초기 현재 내구도 — 항상 최대 내구도(100%)로
+// 시작함(요구사항 4번). 내구도 시스템이 없는 종류는 null(필드 자체를 의미 없이 두지 않기 위함).
+function freshCurrentDurability(type){ return maxDurabilityFor(type); }
+// 장비 인스턴스({type, currentDurability, ...})가 내구도 0 상태인지 — true면 해당 장비의 능력치/옵션이
+// 전부 비활성화되어야 함(요구사항 7번). 내구도 시스템이 없는 종류는 항상 false(정상 적용).
+function isEquipDurabilityZero(item){
+  if(!item) return false;
+  const max = maxDurabilityFor(item.type);
+  if(max == null) return false;
+  const cur = item.currentDurability != null ? item.currentDurability : max;
+  return cur <= 0;
+}
+// 내구도 퍼센트(정수, 1% 단위 반올림). 현재 내구도가 1 이상이면 반올림 결과가 0%가 되지 않도록 최소
+// 1%로 보정하고(예: 1/10000 → 1%), 정확히 0이면 0%로 표시함(요구사항 6번).
+function durabilityPercent(current, max){
+  if(!max || max <= 0) return 0;
+  if(current <= 0) return 0;
+  return Math.max(1, Math.round(current / max * 100));
+}
+// 장비 툴팁에 삽입할 내구도 한 줄. 위치는 "무기 종류 아래, 공격력(또는 방어도) 위"(요구사항 6번) —
+// 각 buildXxxTooltipHtml에서 종류 행 다음, 첫 스탯 행 앞에 이어붙여 사용함. currentDurability를
+// 넘기지 않으면(카탈로그/상점/미리보기 등 실제 인스턴스가 없는 화면) 항상 최대 내구도(100%)로 표시함.
+// 내구도 시스템이 없는 종류는 빈 문자열을 반환해 기존 툴팁과 완전히 동일하게 유지됨.
+function durabilityTooltipLine(type, currentDurability){
+  const max = maxDurabilityFor(type);
+  if(max == null) return '';
+  const cur = currentDurability != null ? currentDurability : max;
+  const pct = durabilityPercent(cur, max);
+  return wtipRow('내구도', `${cur}/${max} (${pct}%)`);
+}
+// 판매가에 내구도 비율을 곱하는 마지막 보정 단계(요구사항 14번) — 기존 강화 판매가 공식(sellValueFor)
+// 계산이 끝난 뒤에만 적용함. 내구도 시스템이 없는 종류는 보정 없이 원래 값 그대로 반환.
+function durabilityAdjustedSellValue(baseValue, item){
+  const max = maxDurabilityFor(item.type);
+  if(max == null) return baseValue;
+  const cur = item.currentDurability != null ? item.currentDurability : max;
+  if(cur <= 0) return 0;
+  return Math.round(baseValue * (cur / max));
+}
+// 내구도 1당 수리 비용(요구사항 12번) — 장비 데이터에 고유 수리비(repairCostPerPoint)가 있으면 그 값을
+// 최우선 사용하고, 없으면 등급별 기본값을 사용함. 이번 작업에서는 실제 수리 기능(버튼/골드 차감)은
+// 구현하지 않으며, 이후 수리 기능이 이 함수를 그대로 가져다 쓸 수 있도록 계산 로직만 미리 준비해둠.
+const REPAIR_COST_PER_POINT_BY_GRADE = { normal: 1, rare: 2, epic: 4, unique: 8 };
+function repairCostPerPointFor(type){
+  const w = wpn(type);
+  if(w.repairCostPerPoint != null) return w.repairCostPerPoint;
+  return REPAIR_COST_PER_POINT_BY_GRADE[w.grade] || 1;
+}
+
+// ---- 수리 시스템(내구도 시스템 위에 얹는 순수 계산 함수들 — 골드 차감/currentDurability 변경 같은
+// 실제 상태 변경은 actions.js에서 이 함수들을 가져다 씀) ----
+
+// 해당 인스턴스가 최대치까지 회복하는 데 필요한 내구도량(0 이상). 내구도 시스템이 없는 종류는 0.
+function repairAmountToFull(item){
+  const max = maxDurabilityFor(item.type);
+  if(max == null) return 0;
+  const cur = item.currentDurability != null ? item.currentDurability : max;
+  return Math.max(0, max - cur);
+}
+// 수리할 내구도량(amount)에 대한 골드 비용 = amount × 내구도 1당 수리 비용(요구사항 16·6번).
+function repairCostForAmount(type, amount){
+  return Math.round(amount * repairCostPerPointFor(type));
+}
+// 사용자가 입력/버튼으로 지정한 수리량을, "0 이상 정수" & "최대 수리 가능량(=repairAmountToFull) 이하"로
+// 안전하게 잘라냄(요구사항 14번 입력 제한 — 음수/소수/초과값 전부 방지).
+function clampRepairAmount(item, requestedAmount){
+  const maxAmount = repairAmountToFull(item);
+  const n = Math.floor(Number(requestedAmount) || 0);
+  if(n <= 0) return 0;
+  return Math.min(n, maxAmount);
+}
+// EQUIPMENT_SLOTS(data.js) 순서(무기→투구→갑옷→보조→장신구1→장신구2, 요구사항 4번 "무기→투구→갑옷→
+// 보조→장신구" 순서와 정확히 일치)를 그대로 순회해, 실제 장착 중이면서 내구도 시스템이 있고 아직
+// 100%가 아닌 슬롯만 골라 "모두 수리" 대상 목록을 만듦. 새 장비 슬롯이 EQUIPMENT_SLOTS에 추가돼도
+// 이 함수 수정 없이 자동으로 반영됨(요구사항 4번 "확장하기 쉬운 구조").
+function repairAllTargetList(){
+  return EQUIPMENT_SLOTS.reduce((list, slot) => {
+    const found = equippedInstanceForSlot(slot.key);
+    if(found && hasDurabilitySystem(found.type) && !isEquipDurabilityFull(found.item)){
+      const amount = repairAmountToFull(found.item);
+      list.push({ slotKey: slot.key, item: found.item, type: found.type, amount, cost: repairCostForAmount(found.type, amount) });
+    }
+    return list;
+  }, []);
+}
+// "모두 수리" 총 비용 = 대상 목록 각 항목 비용의 합(요구사항 6번).
+function repairAllTotalCost(list){
+  return list.reduce((sum, entry) => sum + entry.cost, 0);
+}
+// ---- "인벤토리에서 선택" 팝업(요구사항 6~9번): 인벤토리 전체에서 수리 후보 조회 ----
+// forgeSelectableItems()(대장간 강화 장비 선택)와 완전히 동일하게 EQUIP_INVENTORY_POOLS(data.js)를
+// 그대로 순회함 — 장비 종류를 하드코딩해 나열하지 않으므로 새 장비 슬롯이 추가돼도 이 함수 수정이
+// 필요 없음(요구사항 8·9번). 장착 여부는 조건으로 쓰지 않고(요구사항 7번) 그냥 표시용으로만 계산해
+// 함께 반환함 — 착용 중이어도 대상에서 제외하지 않는다는 점이 forgeSelectableItems와의 핵심 차이.
+function repairSelectableInventoryItems(){
+  const list = [];
+  EQUIP_INVENTORY_POOLS.forEach(pool => {
+    const items = (typeof pool.items === 'function' ? pool.items() : pool.items) || [];
+    items.forEach(item => {
+      const type = item.type;
+      if(!hasDurabilitySystem(type)) return; // 내구도 시스템이 없는 종류(아티팩트 등)는 애초에 이 풀에 없지만, 방어적으로 재확인
+      if(isEquipDurabilityFull(item)) return; // 이미 100%면 수리 대상 아님(요구사항 6번)
+      list.push({ kind: pool.kind, id: item.id, type, level: item.level, item, worn: isEquipInstanceWorn(pool.kind, item.id) });
+    });
+  });
+  return list;
+}
+
 // ---- 무기 스탯 조회 ----
 // 방어구 시스템 추가 이후: WEAPON_TYPES에 없으면 ARMOR_TYPES(→ACCESSORY_TYPES)도 찾아봄. 아이템 id는
 // 도감 간에 겹치지 않으므로 기존 무기 id 조회 동작은 완전히 그대로 유지됨(항상 WEAPON_TYPES가 먼저
@@ -98,7 +215,7 @@ function monsterIconHtml(monsterDefLike, className){
   if(!monsterDefLike || !monsterDefLike.image) return monsterDefLike ? monsterDefLike.icon : '';
   const cls = 'monster-icon-img' + (className ? ' ' + className : '');
   const path = MONSTER_IMAGE_DIR + monsterDefLike.image + MONSTER_IMAGE_EXT;
-  return `<img src="${path}" class="${cls}" alt="" data-fallback-emoji="${monsterDefLike.icon}" onerror="monsterImgError(this)">`;
+  return `<img src="${path}" class="${cls}" alt="" draggable="false" data-fallback-emoji="${monsterDefLike.icon}" onerror="monsterImgError(this)">`;
 }
 // monsterIconHtml의 <img onerror>에서 호출됨: PNG 로드 실패 시 오류 없이 이모지 텍스트로 즉시 대체.
 function monsterImgError(img){
@@ -113,7 +230,7 @@ function playerCombatIconHtml(direction, motion){
   const dir = PLAYER_POSE_DIRECTIONS.includes(direction) ? direction : 'up';
   const mo = PLAYER_POSE_MOTIONS.includes(motion) ? motion : 'idle';
   const path = PLAYER_POSE_IMAGE_DIR + mo + '_' + dir + PLAYER_IMAGE_EXT;
-  return `<img src="${path}" class="monster-icon-img" alt="" data-fallback-emoji="${PLAYER_IMAGE_FALLBACK_EMOJI}" onerror="monsterImgError(this)">`;
+  return `<img src="${path}" class="monster-icon-img" alt="" draggable="false" data-fallback-emoji="${PLAYER_IMAGE_FALLBACK_EMOJI}" onerror="monsterImgError(this)">`;
 }
 
 // 기타/아티팩트/소비 아이템 아이콘 HTML 생성(monsterIconHtml과 완전히 동일한 구조 재사용). image 필드가
@@ -127,7 +244,7 @@ function itemIconHtml(itemDefLike, className){
   if(!itemDefLike || !itemDefLike.image) return itemDefLike ? itemDefLike.icon : '';
   const cls = 'item-icon-img' + (className ? ' ' + className : '');
   const path = ITEM_IMAGE_DIR + itemDefLike.image + ITEM_IMAGE_EXT;
-  const img = `<img src="${path}" class="${cls}" alt="" data-fallback-emoji="${itemDefLike.icon}" onerror="itemImgError(this)">`;
+  const img = `<img src="${path}" class="${cls}" alt="" draggable="false" data-fallback-emoji="${itemDefLike.icon}" onerror="itemImgError(this)">`;
   const bgCls = gradeIconBgClass(itemDefLike.grade);
   return bgCls ? `<span class="${bgCls}">${img}</span>` : img;
 }
@@ -159,7 +276,7 @@ function weaponIconHtml(type, className, level){
   // 방어구/장신구/보조는 무기용 폴백(공용 숏소드 이미지)으로 대체하면 오히려 혼란스러우므로, 실패 시 그냥
   // 자기 경로를 유지함(이미지가 없으면 빈 아이콘으로 보임 — 해당 종류 PNG 에셋 추가 시 자동 해결됨).
   const fallback = isEquipKind ? weaponImagePath(type) : weaponImageFallbackPath();
-  const img = `<img src="${weaponImagePath(type)}" class="${cls}" alt="" onerror="this.onerror=null;this.src='${fallback}';">`;
+  const img = `<img src="${weaponImagePath(type)}" class="${cls}" alt="" draggable="false" onerror="this.onerror=null;this.src='${fallback}';">`;
   const levelEffect = (level != null) ? (ENHANCE_LEVEL_EFFECTS[level] || null) : null;
   const hasGlow = !!(levelEffect && levelEffect.glow && levelEffect.glow !== 'none');
   const withGlow = hasGlow ? `<span class="icon-enhance-glow" style="filter:${levelEffect.glow};">${img}</span>` : img;
@@ -205,7 +322,7 @@ function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
 function wtipRow(label, value){
   return `<div>${label ? `<span style="color:var(--forge-cream-dim);">${label}</span> ` : ''}<span style="color:var(--forge-gold);">${value}</span></div>`;
 }
-function buildWeaponTooltipHtml(type, level, damaged){
+function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   const w = wpn(type);
   const grade = WEAPON_GRADES[w.grade];
   const lvl = level != null ? level : 0;
@@ -225,6 +342,9 @@ function buildWeaponTooltipHtml(type, level, damaged){
   // 3. 무기 종류
   const kindLabel = weaponKindLabel(type);
   if(kindLabel) html += wtipRow('무기 종류', kindLabel);
+
+  // 3-2. 내구도 — 무기 종류 아래, 공격력 위(요구사항 6번)
+  html += durabilityTooltipLine(type, currentDurability);
 
   // 4. 공격력 — 손상된 아이템은 해당 강화단계 공격력의 80%로 표시(요청사항 12번, 다른 수치는 그대로 유지)
   const rawAtk = atkFor(type, lvl);
@@ -257,7 +377,7 @@ function armorManaFor(type, level){ const w = wpn(type); return w.manaArr ? w.ma
 // 방어구 툴팁: 무기 툴팁(buildWeaponTooltipHtml)과 동일한 레이아웃/서식(이름·등급 색상 효과, wtipRow
 // 구조)을 그대로 재사용하되("장비 전역 설정" — 등급 색상/이름 색상/중앙 정렬 서식 공용), 표시 항목만
 // 방어구 데이터 스키마에 맞게 구성함: 이름/등급/장비 설명/방어구 종류/방어도/체력/마나/(고유 옵션)/레벨 제한.
-function buildArmorTooltipHtml(type, level, damaged){
+function buildArmorTooltipHtml(type, level, damaged, currentDurability){
   const a = wpn(type);
   const grade = WEAPON_GRADES[a.grade];
   const lvl = level != null ? level : 0;
@@ -270,6 +390,8 @@ function buildArmorTooltipHtml(type, level, damaged){
 
   const kindLabel = armorKindLabel(type);
   if(kindLabel) html += wtipRow('', kindLabel);
+
+  html += durabilityTooltipLine(type, currentDurability);
 
   const def = defenseFor(type, lvl);
   if(def != null) html += wtipRow('방어도', def);
@@ -376,12 +498,13 @@ function canEquipTwoHandedWeapon(){ return state.equippedSubId == null; }
 function wornEquipmentItems(){ return wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()); }
 // 착용 중인 방어구+장신구+아티팩트 전체의 방어도 합산.
 function playerTotalDefense(){
-  return wornEquipmentItems().reduce((sum, item) => sum + (defenseFor(item.type, item.level) || 0), 0)
+  return wornEquipmentItems().reduce((sum, item) => sum + (isEquipDurabilityZero(item) ? 0 : (defenseFor(item.type, item.level) || 0)), 0)
     + artifactDefenseBonus(); // 사각 방패 등 방어도를 갖는 아티팩트 합산
 }
 // 착용 중인 방어구+장신구 전체의 체력/마나/치명타 보너스 합산. key: 'hp' | 'mana' | 'crit'
 function armorStatBonus(key){
   return wornEquipmentItems().reduce((sum, item) => {
+    if(isEquipDurabilityZero(item)) return sum; // 내구도 0 — 이 장비의 능력치 비활성화(요구사항 7번)
     let val;
     if(key === 'hp') val = armorHpFor(item.type, item.level);
     else if(key === 'mana') val = armorManaFor(item.type, item.level);
@@ -395,7 +518,7 @@ function accessoryKindLabel(type){ return ACCESSORY_KINDS[wpn(type).accessoryKin
 // 장신구 툴팁: 방어구 툴팁(buildArmorTooltipHtml)과 서식은 동일("장비 전역 설정" 공용)하되, 표시
 // 항목만 장신구 데이터 스키마에 맞게 구성함: 이름/등급/장비 설명/장신구 종류/방어도/체력/마나/치명타
 // 확률/(고유 옵션)/착용 제한(문서에 명시된 그대로 "착용 제한 : 레벨 N 이상" 형식 사용).
-function buildAccessoryTooltipHtml(type, level, damaged){
+function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
   const a = wpn(type);
   const grade = WEAPON_GRADES[a.grade];
   const lvl = level != null ? level : 0;
@@ -408,6 +531,8 @@ function buildAccessoryTooltipHtml(type, level, damaged){
 
   const kindLabel = accessoryKindLabel(type);
   if(kindLabel) html += wtipRow('', kindLabel);
+
+  html += durabilityTooltipLine(type, currentDurability);
 
   const def = defenseFor(type, lvl);
   if(def != null) html += wtipRow('방어도', def);
@@ -430,7 +555,7 @@ function subKindLabel(type){ return SUB_KINDS[wpn(type).subKind] || ''; }
 // 보조 툴팁: 장신구 툴팁(buildAccessoryTooltipHtml)과 서식은 동일("장비 전역 설정" 공용)하되, 치명타
 // 확률 항목은 보조 아이템 스키마에 없으므로 표시하지 않음. 출력 순서(문서 4번 규칙): 이름/등급/장비
 // 설명/보조 종류/방어도/체력/마나/(고유 옵션)/착용 제한.
-function buildSubTooltipHtml(type, level, damaged){
+function buildSubTooltipHtml(type, level, damaged, currentDurability){
   const a = wpn(type);
   const grade = WEAPON_GRADES[a.grade];
   const lvl = level != null ? level : 0;
@@ -443,6 +568,8 @@ function buildSubTooltipHtml(type, level, damaged){
 
   const kindLabel = subKindLabel(type);
   if(kindLabel) html += wtipRow('', kindLabel);
+
+  html += durabilityTooltipLine(type, currentDurability);
 
   const def = defenseFor(type, lvl);
   if(def != null) html += wtipRow('방어도', def);
@@ -615,7 +742,7 @@ function activeEffectChance(effectId){
   let total = 0;
   if(effectId === 'poison_on_hit' && isArtifactEquipped('poisonflask')) total += 5;
   const equipped = getEquippedWeapon(); // 전투 중 발동하는 무기 고유 옵션이므로 실제 착용 무기 기준
-  if(equipped){
+  if(equipped && !isEquipDurabilityZero(equipped)){
     const opt = wpn(equipped.type).uniqueOption;
     if(opt && opt.effectId === effectId && weaponUniqueOptionActive(equipped.type, equipped.level)){
       total += weaponUniqueOptionChance(equipped.type, equipped.level) || 0;
@@ -631,7 +758,7 @@ function activeEffectChance(effectId){
 function armorUniqueOptionChance(effectId){
   return wornArmorItems().concat(wornSubItems()).reduce((sum, item) => {
     const opt = wpn(item.type).uniqueOption;
-    if(opt && opt.effectId === effectId && weaponUniqueOptionActive(item.type, item.level)){
+    if(opt && opt.effectId === effectId && weaponUniqueOptionActive(item.type, item.level) && !isEquipDurabilityZero(item)){
       return sum + (weaponUniqueOptionChance(item.type, item.level) || 0);
     }
     return sum;
@@ -1116,7 +1243,7 @@ function skillIconHtml(skill, className){
   const kind = skillKindOf(skill);
   const file = skill.icon || SKILL_DEFAULT_ICON[kind] || SKILL_DEFAULT_ICON.attack;
   const cls = 'skill-icon-img' + (className ? ' ' + className : '');
-  return `<img src="${SKILL_IMAGE_DIR}${file}${SKILL_IMAGE_EXT}" class="${cls}" alt="">`;
+  return `<img src="${SKILL_IMAGE_DIR}${file}${SKILL_IMAGE_EXT}" class="${cls}" alt="" draggable="false">`;
 }
 // 상태이상 아이콘 <img> HTML — skillIconHtml/monsterIconHtml과 동일한 방식(요구사항: 이모지 → SVG로
 // 변경, 상태이상 판정 로직은 무관). def.icon은 STATUS_EFFECT_IMAGE_DIR 기준 파일명(확장자 제외)이며,
@@ -1125,7 +1252,7 @@ function skillIconHtml(skill, className){
 function statusEffectIconHtml(def, className){
   if(!def) return '';
   const cls = 'status-effect-icon-img' + (className ? ' ' + className : '');
-  return `<img src="${STATUS_EFFECT_IMAGE_DIR}${def.icon}${STATUS_EFFECT_IMAGE_EXT}" class="${cls}" alt="">`;
+  return `<img src="${STATUS_EFFECT_IMAGE_DIR}${def.icon}${STATUS_EFFECT_IMAGE_EXT}" class="${cls}" alt="" draggable="false">`;
 }
 // 습득한 패시브 스킬의 고정 보너스 합산(요구사항: "별도 사용 없이 항상 적용"). 공용/특화/기연 습득 목록을
 // 모두 뒤져 passiveEffect[key]가 있는 스킬을 전부 더함 — 새 패시브 스킬을 추가해도 자동으로 합산됨.
@@ -1186,6 +1313,7 @@ function canLearnSkill(id){
 function weaponUniqueOptionStatBonus(stat){
   const equipped = getEquippedWeapon();
   if(!equipped) return 0;
+  if(isEquipDurabilityZero(equipped)) return 0; // 내구도 0 — 무기 고유 옵션 비활성화(요구사항 7번)
   const opt = wpn(equipped.type).uniqueOption;
   if(!opt || !opt.statBonus) return 0;
   if(!weaponUniqueOptionActive(equipped.type, equipped.level)) return 0;
@@ -1200,7 +1328,7 @@ function weaponUniqueOptionStatBonus(stat){
 function armorUniqueOptionStatBonus(stat){
   return wornArmorItems().concat(wornSubItems()).reduce((sum, item) => {
     const opt = wpn(item.type).uniqueOption;
-    if(opt && opt.statBonus && weaponUniqueOptionActive(item.type, item.level)){
+    if(opt && opt.statBonus && weaponUniqueOptionActive(item.type, item.level) && !isEquipDurabilityZero(item)){
       return sum + (opt.statBonus[stat] || 0);
     }
     return sum;
@@ -1272,7 +1400,8 @@ function effectiveMaxMp(level){
   mp += weaponUniqueOptionStatBonus('maxMana'); // 착용 무기의 고유 옵션 중 고정 마나 보너스(예: 제령도) 합산
   return mp;
 }
-function effectiveAtkSpeed(type, level){
+function effectiveAtkSpeed(type, level, durabilityZero){
+  if(durabilityZero) return 0; // 내구도 0 — 무기 자체의 공격속도 비활성화(요구사항 7번)
   let s = atkSpeedFor(type, level);
   if(isArtifactEquipped('batwing')) s *= 1.05;
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
@@ -1281,20 +1410,22 @@ function effectiveAtkSpeed(type, level){
   s *= 1 + weaponUniqueOptionStatBonus('atkSpeedPercent') / 100; // 착용 무기의 고유 옵션 중 공격속도% 보너스(예: 척호검) 합산
   return s;
 }
-function effectiveAtk(type, level, damaged){
+function effectiveAtk(type, level, damaged, durabilityZero){
   const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
   // 힘 1당 공격력 +4, 민첩 1당 공격력 +1, 활성화된 버프 스킬(예: 분노)의 고정 공격력 보너스를 더함.
   // 손상된 아이템(요청사항 12번)은 "아이템 자체"의 공격력만 80%로 줄어들고, 힘/민첩/버프 등 플레이어
   // 쪽 보너스는 전혀 영향받지 않음 — atkFor(type,level) 부분에만 0.8을 곱함.
+  // 내구도 0(durabilityZero)이면 손상 배율과 무관하게 아이템 자체 공격력이 완전히 0이 됨(요구사항 7번) —
+  // 힘/민첩/버프 보너스는 손상과 마찬가지로 영향받지 않음.
   const baseAtk = atkFor(type, level);
-  const itemAtk = damaged ? Math.round(baseAtk * 0.8) : baseAtk;
+  const itemAtk = durabilityZero ? 0 : (damaged ? Math.round(baseAtk * 0.8) : baseAtk);
   return itemAtk + str * 4 + agi * 1 + activeBuffBonus('atkFlat');
 }
 // 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
 // 미리보기에서 그대로 쓰이고(무기 하나만의 값을 보여줘야 하므로), 실제 전투 판정과 캐릭터 정보창의
 // "총 치명타 확률"에는 이 함수를 사용함(effectiveAtk와 동일한 역할 분담).
-function effectiveCritChance(type, level){
+function effectiveCritChance(type, level, durabilityZero){
   let bonus = 0;
   if(isArtifactEquipped('oldarmguard')) bonus += 3;
   if(isArtifactEquipped('blackarmguard')) bonus += 8;
@@ -1307,11 +1438,13 @@ function effectiveCritChance(type, level){
   bonus += weaponUniqueOptionStatBonus('critRate');
   // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
   // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
+  // 내구도 0(durabilityZero)이면 이 옵션도 비활성화됨(요구사항 7번).
   const opt = wpn(type).uniqueOption;
-  if(opt && opt.effectId === 'crit_chance_bonus' && weaponUniqueOptionActive(type, level)){
+  if(!durabilityZero && opt && opt.effectId === 'crit_chance_bonus' && weaponUniqueOptionActive(type, level)){
     bonus += weaponUniqueOptionChance(type, level) || 0;
   }
-  return critChanceFor(type, level) + bonus;
+  // 무기 자체의 치명타 확률도 내구도 0이면 비활성화됨(요구사항 7번).
+  return (durabilityZero ? 0 : critChanceFor(type, level)) + bonus;
 }
 
 // ---- 상점 "개수 지정 구매" 팝업 공용 헬퍼 ----
@@ -1399,7 +1532,7 @@ function forgeSelectableItems(){
       if(item.id !== state.forgeTargetId && !pool.meetsReq(type)) return; // 착용 가능 조건
       if(!typeDef.cost || typeDef.cost.length === 0) return; // 강화 가능 조건(강화단계 비용 데이터가 있어야 함) — 무기/방어구 공용
       if(item.damaged) return; // 손상된 아이템은 강화 대상으로 선택할 수 없음(요청사항 13번)
-      list.push({ kind: pool.kind, id: item.id, type, level: item.level });
+      list.push({ kind: pool.kind, id: item.id, type, level: item.level, item });
     });
   });
   return list;
@@ -1997,12 +2130,22 @@ function isEquipInstanceWorn(equipType, id){
   if(equipType === 'accessory') return (state.equippedAccessories || []).includes(id);
   return false;
 }
-// 재료로 쓸 수 있는 장비 인벤토리 항목만(착용 중 제외·손상된 아이템 제외 — 요청사항 8·13번) 반환.
+// 재료로 쓸 수 있는 장비 인벤토리 항목만(착용 중 제외·손상된 아이템 제외·내구도 완전 온전한 것만 —
+// 요청사항 8·13번, 내구도 시스템 13번) 반환. 내구도 시스템이 없는 종류는 이 조건에서 항상 통과함
+// (hasDurabilitySystem이 false면 isEquipDurabilityZero처럼 "제한 없음"으로 취급).
 function craftEligibleEquipInstances(resource){
   const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
   if(!pool) return [];
   const items = (typeof pool.items === 'function' ? pool.items() : pool.items) || [];
-  return items.filter(it => it.type === resource.typeId && !it.damaged && !isEquipInstanceWorn(resource.equipType, it.id));
+  return items.filter(it => it.type === resource.typeId && !it.damaged && !isEquipInstanceWorn(resource.equipType, it.id) && isEquipDurabilityFull(it));
+}
+// 내구도가 "완전히 온전한(현재 내구도 === 최대 내구도)" 상태인지 — 내구도 시스템이 없는 종류는 항상
+// true(제한 없음).
+function isEquipDurabilityFull(item){
+  const max = maxDurabilityFor(item.type);
+  if(max == null) return true;
+  const cur = item.currentDurability != null ? item.currentDurability : max;
+  return cur === max;
 }
 // 재료 하나(이름 기준)의 "현재 보유량" — 장비면 재료로 쓸 수 있는 인스턴스 개수, 일반 재료면 기존
 // state[stateKey] 수량 그대로.
@@ -2137,7 +2280,7 @@ function craftGrantResultItems(item){
   const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
   if(heldIdx !== -1){
     const held = craftAnim.heldEquip.splice(heldIdx, 1)[0];
-    pool.items().push({ id: state.nextItemId++, type: held.typeId, level: held.level, damaged: true }); // 손상 지급(요청사항 10·11번)
+    pool.items().push({ id: state.nextItemId++, type: held.typeId, level: held.level, damaged: true, currentDurability: freshCurrentDurability(held.typeId) }); // 손상 지급(요청사항 10·11번). 새로 지급되는 인스턴스이므로 내구도는 최대치(100%)로 시작(요구사항 4번) — damaged(공격력80%)와는 별개 개념.
   } else {
     // 문서에 명시되지 않은 경우(반환 아이템이 이번에 투입한 재료와 다른 종류의 장비인 경우) — 홀딩해둔
     // "그 개체"가 없으므로 새 +0 장비로 지급(성공 지급과 동일한 방식).

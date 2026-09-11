@@ -65,6 +65,21 @@ let invUI = { tab: 'weapon', equipTab: 'weapon' };
 // 지금은 최상위 탭이 "제작" 하나뿐이라 equipTab과 같은 "최상위 복귀용 기억" 필드는 아직 불필요하지만,
 // 추후 최상위 탭이 늘어나면 invUI/shopUI와 동일한 패턴(예: craftTopTab)을 그대로 추가하면 됨.
 let craftUI = { tab: 'weapon', openMaterialIds: new Set() }; // openMaterialIds: 목록의 [제작 재료] 토글이 열려있는 "category:id" 집합
+// 대장간 강화/수리 탭 UI 상태(내구도 시스템 15번 요구사항). shopUI/invUI/craftUI와 동일한 이유로
+// 화면 상태일 뿐 저장 대상 아님. "수리" 탭은 이번 작업에서는 안내 문구만 있는 빈 화면임(요구사항 15·16번).
+let forgeUI = { tab: 'enhance' };
+// ---- 수리 탭 팝업 상태(요구사항 2·3·9번) ----
+// 개별 수리 팝업. null이면 닫혀있음. { slotKey, amount } — amount는 입력창에 표시 중인, 아직 확정하지
+// 않은 "수리할 내구도" 값(요구사항 14·15번). slotKey로 매번 equippedInstanceForSlot(state.js)를 다시
+// 조회해서 아이템/타입을 얻으므로, 별도로 아이템 참조를 들고 있지 않음(전투 중 내구도가 바뀌어도 항상
+// 최신 상태를 반영).
+let repairIndividualPopup = null;
+// "모두 수리" 팝업. true면 열려있음(별도 파라미터 없음 — repairAllTargetList()를 매번 새로 계산해서 씀).
+let repairAllPopupOpen = false;
+// 최종 확인 팝업 상태. null이면 닫혀있음. { mode: 'all' | 'individual', slotKey?(individual일 때만),
+// amount?(individual일 때만), totalCost } — "취소" 시 이 정보를 이용해 원래 팝업(모두 수리/개별 수리)으로
+// 되돌아감(요구사항 20번, 입력값·선택 상태 유지).
+let repairConfirmState = null;
 // 제작 진행 팝업 상태. null이면 팝업이 닫혀있음.
 // { category, itemId, slots: [ { name, qty }, ... ] } — slots 길이는 해당 제작 아이템의 materials
 // 개수와 동일하게 시작. 재료는 이름(name)으로 findCraftResource(formulas.js)를 거쳐 자동 연동됨.
@@ -90,12 +105,16 @@ let pageState = {
   invSub: 1,
   invAccessory: 1,
   forgeSelect: 1,
+  repairSelect: 1,
   shopWeapon: 1, shopArmor: 1, shopSub: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
   charStats: 1,
   charMenuInfo: 1,
   skillPage: 1,
-  huntCharStats: 1,
+  // 던전 우측 카드 전용 페이지 상태 — [캐릭터 정보] 3페이지(장비창/레벨~스탯/전투능력치), [스킬] 2페이지
+  // (퀵슬롯 설정/목록). charMenuInfo와는 페이지 구성이 달라 별도 키로 관리함(요구사항).
+  huntCharInfo: 1,
+  huntCharSkill: 1,
   craftWeapon: 1, craftArmor: 1, craftSub: 1, craftAccessory: 1,
   // dungeonDrop 페이지는 던전마다 따로 관리해야 해서 고정 키 하나가 아니라, 던전 카드를 그릴 때
   // `dungeonDrop:<던전id>` 형태의 동적 키를 이 오브젝트에 필요할 때마다 추가해서 씀(goPage의 범용
@@ -116,6 +135,58 @@ function getEquipped(){
 // 공격, 캐릭터 정보창의 "장착 무기" 패널 등) — 대장간 화면에 방어구가 선택되어 있어도 이 함수는 항상
 // state.equippedId(착용 무기)만 반환함. 방어구 시스템 추가 이전의 원래 getEquipped()와 동일한 동작.
 function getEquippedWeapon(){ return state.inventory.find(i => i.id === state.equippedId) || null; }
+// 슬롯 키(EQUIPMENT_SLOTS의 key) → 그 슬롯에 실제 장착된 "원본 인벤토리 인스턴스"를 반환(수리 시스템
+// 요구사항). render.js의 equippedItemForSlot()과 완전히 동일한 슬롯 판별 로직이지만, 그쪽은 표시용
+// 가공 정보({name,color,iconHtml,tooltipHtml})만 반환하는 반면 이 함수는 currentDurability를 직접
+// 수정해야 하는 수리 로직(actions.js)이 써야 하므로 원본 아이템 객체 참조 자체를 반환함.
+// 반환값: { item, type } | null — item은 인벤토리 배열 안의 실제 객체(참조)라 여기서 필드를 바꾸면
+// state에 바로 반영됨.
+function equippedInstanceForSlot(slotKey){
+  if(slotKey === 'weapon'){
+    const item = getEquippedWeapon();
+    return item ? { item, type: item.type || 'longsword' } : null;
+  }
+  if(slotKey === 'helmet' || slotKey === 'armor'){
+    const id = state.equippedArmor && state.equippedArmor[slotKey];
+    if(id == null) return null;
+    const item = (state.armorInventory || []).find(i => i.id === id);
+    return item ? { item, type: item.type } : null;
+  }
+  if(slotKey === 'sub'){
+    if(state.equippedSubId == null) return null;
+    const item = (state.subInventory || []).find(i => i.id === state.equippedSubId);
+    return item ? { item, type: item.type } : null;
+  }
+  if(slotKey === 'accessory1' || slotKey === 'accessory2'){
+    const slotIdx = slotKey === 'accessory1' ? 0 : 1;
+    const id = Array.isArray(state.equippedAccessories) ? state.equippedAccessories[slotIdx] : null;
+    if(id == null) return null;
+    const item = (state.accessoryInventory || []).find(i => i.id === id);
+    return item ? { item, type: item.type } : null;
+  }
+  return null;
+}
+// EQUIP_INVENTORY_POOLS(data.js)의 kind + 인벤토리 인스턴스 id로 원본 아이템을 조회(수리 시스템
+// "인벤토리에서 선택" 기능 요구사항 15·16번 — 장착 슬롯이 아니라 인벤토리 인스턴스 자체를 대상으로
+// 삼아야 하므로, 같은 종류의 장비가 여러 개 있어도 반드시 고유 id로만 식별함). 반환값은
+// equippedInstanceForSlot과 동일한 { item, type } 형태라 아래 resolveRepairTarget에서 그대로 통일해서 씀.
+function inventoryInstanceByKindAndId(kind, id){
+  const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === kind);
+  if(!pool) return null;
+  const items = (typeof pool.items === 'function' ? pool.items() : pool.items) || [];
+  const item = items.find(i => i.id === id);
+  return item ? { item, type: item.type } : null;
+}
+// 개별 수리 대상 서술자(target) → { item, type } 조회 공용 함수(수리 시스템 요구사항 15번 — "수리 실행
+// 로직이 장착 장비 전용으로 중복 구현되지 않도록" 하기 위한 단일 진입점). target 모양:
+//   { source: 'equipped', slotKey }   — 장비창 슬롯 클릭(기존 방식)
+//   { source: 'inventory', kind, itemId } — "인벤토리에서 선택" 팝업에서 고른 경우(신규)
+// source가 없으면(과거 { slotKey } 형태 방어) 'equipped'로 취급 — 하위 호환.
+function resolveRepairTarget(target){
+  if(!target) return null;
+  if(target.source === 'inventory') return inventoryInstanceByKindAndId(target.kind, target.itemId);
+  return equippedInstanceForSlot(target.slotKey);
+}
 
 // SETTINGS_SCHEMA를 순회하며 state.settings에 없는 키를 기본값으로 채움.
 // 새 설정 메뉴가 추가돼도 기존 저장 데이터를 불러올 때 자동으로 기본값이 채워짐.
@@ -397,6 +468,17 @@ function applyLoadedRaw(raw){
     const prev = Array.isArray(state.quickSlots) ? state.quickSlots : [];
     state.quickSlots = Array.from({ length: QUICK_SLOT_COUNT }, (_, i) => prev[i] || null);
   }
+  // 내구도 시스템 추가 이전 세이브 마이그레이션(요구사항 17번): currentDurability 필드가 없는 장비는
+  // 최대 내구도(100%)로 채움. 내구도 시스템이 없는 종류(durability 데이터 없음)는 필드를 추가하지
+  // 않음(hasDurabilitySystem이 false면 항상 "내구도 없음"으로 취급되므로 그대로 두어도 안전함).
+  // EQUIP_INVENTORY_POOLS(data.js)를 그대로 순회해 새 장비 타입이 추가돼도 이 코드 수정이 필요 없음.
+  EQUIP_INVENTORY_POOLS.forEach(pool => {
+    pool.items().forEach(item => {
+      if(item.currentDurability == null && hasDurabilitySystem(item.type)){
+        item.currentDurability = maxDurabilityFor(item.type);
+      }
+    });
+  });
   ensureSettingsDefaults();
 }
 async function loadState(){
