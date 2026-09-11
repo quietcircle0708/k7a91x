@@ -210,6 +210,7 @@ function ensureSettingsDefaults(){
       }
     });
   });
+  applyScreenPreset(); // 화면 프리셋 클래스를 항상 현재 state.settings 값과 동기화(로드/초기화 시마다 호출됨)
 }
 
 // ---- 사망 패널티(망자의 저주) ----

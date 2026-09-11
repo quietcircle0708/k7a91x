@@ -639,6 +639,36 @@
     max-width:none;
     width: calc(var(--hunt-card-width, 480px) * 3 + 28px);
   }
+  /* 모바일 UI 개편 3단계 — 실제 던전 전투 화면(#huntCard)과 캐릭터 패널(#huntTopSection). 데스크톱의
+     3열 그리드(왼쪽 여백 / huntCard / 패널)는 화면이 좁은 모바일에서는 그대로 쓸 수 없어(3칸을 다
+     나란히 넣을 폭이 없음) body.mobile-preset 전용 규칙으로 세로 1칸 배치로 바꾸고, huntCard와 패널
+     중 하나만 보이도록 함(전환은 updateHuntTopUiToggle()이 그대로 담당 — 새 상태 없음).
+     .wrap.hunt-panel-open의 3배 폭 확장(위 규칙)은 데스크톱 3열 레이아웃 전용이라 모바일에서는 그대로
+     두면 화면이 필요 이상으로 넓어지므로, 여기서 기존 480px 상한으로 되돌림(선택자 특이도가 더 높아
+     소스 순서와 무관하게 이 규칙이 이김). */
+  body.mobile-preset .wrap.hunt-panel-open{
+    max-width:480px; width:100%;
+  }
+  body.mobile-preset .hunt-view-layout{ display:block; }
+  body.mobile-preset .hunt-view-side-left{ display:none; } /* 원래도 빈 요소, 그리드 1fr 여백 칸이라 모바일 세로배치에선 불필요 */
+  /* huntCard 자체 크기 — 폭은 기존 width:100%(부모 .wrap이 이미 최대 480px라 별도 상한 불필요)를 그대로
+     쓰고, 세로로 긴 모바일 화면에서 카드 내부 요소(플레이어 정보~스킬 퀵슬롯까지)가 뷰포트 높이를
+     넘기면 카드 내부에서만 스크롤되도록 함(특정 기기 하드코딩 px가 아닌 뷰포트 기준 vh 사용). */
+  body.mobile-preset #huntCard{
+    max-width:none; max-height: calc(100vh - 32px); overflow-y:auto; overflow-x:hidden; box-sizing:border-box;
+  }
+  /* 패널이 huntCard를 대신 표시하는 동안에는 huntCard 크기(--hunt-card-width/height)를 그대로 물려받을
+     필요가 없음(모바일에서는 나란히 배치가 아니라 서로 대체하는 관계) — 패널 자신의 폭(100%)과 동일한
+     뷰포트 기준 높이 상한을 독립적으로 가짐. */
+  body.mobile-preset .hunt-side-panel{
+    width:100%; height:auto; max-height: calc(100vh - 32px);
+  }
+  /* huntCard 안 깊숙이 있던 상단 UI 토글 버튼을 모바일에서는 #huntViewLayout 바로 아래로 옮겨(JS,
+     navigation.js relocateHuntTopToggleBtn) 화면에 고정 표시 — huntCard가 display:none이 되어도 패널을
+     다시 닫을 방법이 항상 남아있게 함(요구사항: 닫기 버튼이 가려지거나 클릭 불가능해지면 안 됨). */
+  body.mobile-preset #huntTopToggleBtn{
+    position:fixed; top:10px; right:10px; z-index:500;
+  }
   .monster-stage{ display:flex; justify-content:center; align-items:center; height:36px; position:relative; margin-bottom:6px; }
   .monster-icon{ font-size:72px; transition: transform .1s, filter .15s; position:relative; z-index:1; }
   /* 몬스터 PNG는 부모(.monster-icon 등)의 font-size를 1em 기준으로 그대로 물려받아 크기를 맞춤 —
@@ -1135,6 +1165,17 @@
     border-radius:999px; padding:6px 14px; font-size:12px; cursor:pointer; font-family:'JetBrains Mono', monospace; white-space:nowrap;
   }
   .settings-toggle-btn.on{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+  .settings-radio-group{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+  .settings-radio-btn{
+    display:flex; align-items:center; gap:7px; text-align:left;
+    border:1px solid var(--forge-line); background: var(--forge-panel-2); color: var(--forge-cream-dim);
+    border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer; font-family:'Noto Sans KR', sans-serif; white-space:nowrap;
+  }
+  .settings-radio-btn.selected{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+  .settings-radio-dot{
+    width:11px; height:11px; border-radius:50%; border:1px solid var(--forge-line); flex-shrink:0; box-sizing:border-box;
+  }
+  .settings-radio-btn.selected .settings-radio-dot{ border-color: var(--forge-gold); background: var(--forge-gold); }
   .settings-stepper{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
   .settings-stepper-value{
     display:inline-block; min-width:38px; text-align:center; padding:6px 4px;

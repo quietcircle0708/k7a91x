@@ -1002,6 +1002,45 @@ function toggleSetting(id){
   renderSettings();
   saveState();
 }
+// radio 타입 설정값 선택(단일 선택) — toggleSetting/adjustSetting과 동일한 패턴(state.settings에 저장 후
+// renderSettings+saveState로 화면 갱신·저장, 별도 저장 시스템을 새로 만들지 않음).
+function selectSettingRadio(id, value){
+  if(!state.settings) state.settings = {};
+  if(state.settings[id] === value) return; // 이미 선택된 값이면 아무 것도 하지 않음
+  state.settings[id] = value;
+  renderSettings();
+  saveState();
+  if(id === 'screenPreset') applyScreenPreset(); // 화면 프리셋 변경 시 즉시 전역 클래스 갱신
+}
+// 현재 선택된 화면 프리셋(state.settings.screenPreset)을 문서 최상위(body)에 클래스로 반영.
+// 이번 단계에서는 이 클래스에 대응하는 모바일 전용 CSS를 만들지 않으므로(2~4단계에서 진행 예정),
+// desktop-preset이면 기존 화면과 완전히 동일하게 보임 — 다음 단계에서 .mobile-preset 하위 선택자로
+// 모바일 전용 스타일을 추가할 수 있는 기반만 마련해둠. ensureSettingsDefaults()(state.js)가 게임 로드/
+// 초기화 시마다 호출하므로 새로고침·새 게임 어느 경우에도 항상 현재 값이 반영됨.
+function applyScreenPreset(){
+  const preset = (state.settings && state.settings.screenPreset) || 'desktop';
+  document.body.classList.toggle('desktop-preset', preset === 'desktop');
+  document.body.classList.toggle('mobile-preset', preset === 'mobile');
+  relocateHuntTopToggleBtn(preset);
+}
+// 모바일 UI 개편 3단계: #huntTopToggleBtn은 원래 #combatArena 안에 깊이 중첩돼 있어서, 모바일에서
+// huntCard 전체를 display:none으로 숨기면 이 버튼도 함께 사라져 패널을 다시 닫을 방법이 없어짐(요구사항:
+// 닫기 버튼이 항상 접근 가능해야 함). 그래서 모바일에서는 버튼 노드 자체를(새 버튼을 만들지 않고) huntCard
+// 밖으로— #huntViewLayout 바로 아래로 — 옮겨서 huntCard가 숨어도 항상 클릭 가능하게 하고, CSS에서
+// position:fixed로 화면에 고정 표시함. 데스크톱으로 돌아오면 원래 자리(#combatArena 맨 앞)로 되돌려
+// 기존 위치/좌표 계산에 전혀 영향이 없도록 함. 버튼 요소 자체(이벤트 리스너 포함)는 그대로 재사용 —
+// appendChild로 옮기기만 하므로 main.js의 클릭 리스너는 다시 걸 필요 없음.
+function relocateHuntTopToggleBtn(preset){
+  const btn = el('huntTopToggleBtn');
+  const layout = el('huntViewLayout');
+  const combatArena = el('combatArena');
+  if(!btn || !layout || !combatArena) return; // 정적 마크업이라 보통 항상 존재하지만, 안전하게 가드
+  if(preset === 'mobile'){
+    if(btn.parentElement !== layout) layout.appendChild(btn);
+  } else if(btn.parentElement !== combatArena){
+    combatArena.insertBefore(btn, combatArena.firstChild);
+  }
+}
 // stepper 타입 설정값을 증감(min/max/step은 SETTINGS_SCHEMA에서 조회)
 function adjustSetting(id, dir){
   let itemDef = null;

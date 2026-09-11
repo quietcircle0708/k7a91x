@@ -2204,6 +2204,11 @@ const SHOP_PAGE_KEY = {
 // 2페이지(적용 중인 아티팩트 효과)"처럼 완전히 다른 내용을 페이지로 나눈 것이라 PAGE_SIZE(개수 기반 분할)는
 // 쓰지 않지만, pageState·pagerHtml·goPage·clampPage 등 페이지 이동 시스템 자체는 그대로 재사용함.
 const CHAR_STATS_PAGE_COUNT = 2;
+// 대장간 [캐릭터 정보] 팝업(#charStatsModal)의 모바일 프리셋 전용 페이지 수 — 데스크톱(장비창+정보 좌우
+// 배치/아티팩트효과 2페이지)과 콘텐츠 구성이 달라(모바일은 던전 우측 카드 [캐릭터 정보]와 동일하게
+// 1p=장비창/2p=레벨·스탯/3p=전투스탯) renderCharStats()가 screenPreset에 따라 이 값과
+// CHAR_STATS_PAGE_COUNT 중 하나를 골라 씀(모바일 UI 개편 2단계 수정).
+const CHAR_STATS_MOBILE_PAGE_COUNT = 3;
 
 // ---- 캐릭터 메뉴(좌측 상단바 메뉴) — 탭 구성 ----
 // 데이터 기반 목록이라 새 탭을 추가하려면 이 배열에 { id, label } 항목만 추가하면 됨(renderCharacterMenu가
@@ -3444,6 +3449,23 @@ const STORAGE_KEY = 'forge-state-v5';
 // type('toggle' | 'stepper' | 'stepper-row'), default(기본값).
 // stepper-row는 여러 개의 스테퍼(fields)를 한 줄에 배치할 때 사용 — 각 field는 min/max/step/unit/default 필요.
 const SETTINGS_SCHEMA = [
+  {
+    id: 'screen',
+    label: '화면',
+    icon: '🖥️',
+    items: [
+      {
+        id: 'screenPreset',
+        label: '화면 프리셋',
+        type: 'radio',
+        default: 'desktop', // 기존 저장 데이터에 이 키가 없으면 ensureSettingsDefaults()가 데스크톱으로 채움
+        options: [
+          { value: 'desktop', label: '데스크톱' },
+          { value: 'mobile', label: '모바일' },
+        ],
+      },
+    ],
+  },
   {
     id: 'combat',
     label: '전투',

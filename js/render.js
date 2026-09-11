@@ -1323,9 +1323,26 @@ function renderRepairConfirmModal(){
 // 1페이지(장비창+캐릭터 정보) / 2페이지(적용 중인 아티팩트 효과)를 전환함.
 function renderCharStats(){
   ensurePlayerVitals();
-  pageState.charStats = clampPage(pageState.charStats, CHAR_STATS_PAGE_COUNT);
+  // 모바일 UI 개편 2단계(수정판): 데스크톱 전용 renderCharacterMenu()가 아니라 대장간 [캐릭터 정보]
+  // 팝업(#charStatsModal) 쪽에 모바일 분기를 둠 — 상단/마을 "캐릭터" 메뉴(renderCharacterMenu)와 던전
+  // 우측 패널(renderHuntSidePanel)은 이 변경과 완전히 무관하게 기존 그대로 동작한다.
+  const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
+  const totalPages = isMobile ? CHAR_STATS_MOBILE_PAGE_COUNT : CHAR_STATS_PAGE_COUNT;
+  pageState.charStats = clampPage(pageState.charStats, totalPages);
   const pagerWrap = el('charStatsPager');
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('charStats', pageState.charStats, CHAR_STATS_PAGE_COUNT);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('charStats', pageState.charStats, totalPages);
+
+  if(isMobile){
+    // 던전 우측 카드([캐릭터 정보])와 완전히 같은 콘텐츠 빌더를 그대로 재사용(buildEquipPanelHtml/
+    // buildCharLevelStatsHtml/buildCombatStatsHtml) — HTML을 새로 복사하지 않음. 장착 아이템 상세
+    // 정보·아티팩트 정보는 던전 우측 패널과 동일하게 1페이지에서 제외함(buildEquipPanelHtml(false)).
+    const page = pageState.charStats;
+    el('charStatsBody').innerHTML = page === 1 ? buildEquipPanelHtml(false)
+      : page === 2 ? buildCharLevelStatsHtml()
+      : buildCombatStatsHtml();
+    return;
+  }
+
   if(pageState.charStats === 2){
     renderCharStatsPage2();
   } else {
@@ -1899,6 +1916,16 @@ function updateHuntTopUiToggle(){
   const wrapEl = document.querySelector('.wrap');
   if(wrapEl) wrapEl.classList.toggle('hunt-panel-open', hunt.topUiExpanded);
   if(hunt.topUiExpanded) renderHuntSidePanel(); // 펼치는 시점에 최신 내용으로 갱신
+  // 모바일 UI 개편 3단계: 모바일 프리셋에서는 화면 폭이 좁아 huntCard(던전 전투 화면)와 huntTopSection
+  // (캐릭터/스킬 패널)을 나란히 배치하지 않고, 패널이 열리면 huntCard 자리를 대신 표시함 — 던전/전투
+  // 로직에는 전혀 손대지 않고 순수하게 두 카드 중 하나만 보이도록 display만 전환함(hunt.topUiExpanded
+  // 값 자체는 데스크톱과 동일하게 그대로 사용). 데스크톱은 huntCard가 항상 표시된 채로(기존 3열 구조)
+  // 유지되도록 별도 처리 없이 그냥 빈 문자열로 되돌려 기존 CSS(grid-column:2)가 그대로 적용되게 함.
+  const huntCardEl = el('huntCard');
+  if(huntCardEl){
+    const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
+    huntCardEl.style.display = (isMobile && hunt.topUiExpanded) ? 'none' : '';
+  }
 }
 function toggleHuntTopUi(){
   hunt.topUiExpanded = !hunt.topUiExpanded;
@@ -2266,6 +2293,22 @@ function renderSettings(){
           </div>`;
       }).join('');
       return `<div class="settings-item settings-stepper-row">${fieldsHtml}</div>`;
+    }
+    if(item.type === 'radio'){
+      const current = (state.settings && state.settings[item.id] != null) ? state.settings[item.id] : item.default;
+      const optionsHtml = item.options.map(opt => `
+        <button class="settings-radio-btn ${current === opt.value ? 'selected' : ''}" data-radio="${item.id}" data-value="${opt.value}">
+          <span class="settings-radio-dot"></span>${opt.label}
+        </button>
+      `).join('');
+      return `
+        <div class="settings-item">
+          <div class="settings-item-info">
+            <div class="settings-item-label">${item.label}</div>
+            ${item.desc ? `<div class="settings-item-desc">${item.desc}</div>` : ''}
+          </div>
+          <div class="settings-radio-group">${optionsHtml}</div>
+        </div>`;
     }
     return ''; // 새로운 설정 타입이 생기면 여기 분기만 추가하면 됨
   }).join('');
