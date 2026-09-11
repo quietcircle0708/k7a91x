@@ -435,21 +435,31 @@ function defenseDamageMultiplier(defense){
 }
 // 몬스터 개체(전투 인스턴스)의 방어도. 데이터(MONSTERS)에 등록된 값을 그대로 사용하고,
 // 방어도가 등록되지 않은 몬스터는 0으로 처리(몬스터 방어도 시스템 — 방어도 기본값 규칙).
-// 파쇄(shredding)가 적용 중이면 피해 계산에 사용할 방어도에만 shreddingDefenseBonusFor를 더함 —
-// MONSTERS[].defense(실제 데이터)는 전혀 변경하지 않음(요구사항 4·6번).
+// 파쇄(shredding)·저주(curse) 등 defenseBoost 타입 상태이상이 적용 중이면 피해 계산에 사용할 방어도에만
+// statusDefenseBonusFor를 더함 — MONSTERS[].defense(실제 데이터)는 전혀 변경하지 않음(요구사항 4·6번).
 function monsterDefenseFor(instance){
   const def = MONSTERS[instance.monsterId];
   const base = (def && def.defense) || 0;
-  return base + shreddingDefenseBonusFor(instance);
+  return base + statusDefenseBonusFor(instance);
 }
-// 파쇄 상태이상이 적용 중인 대상에게 피해 계산용으로만 가산되는 방어도 보너스(STATUS_EFFECTS.shredding.
-// defenseBonus, 기본 +20). 상태이상이 없거나 아직 등록되지 않았으면 0. target은 statusEffects 배열을
-// 가진 대상이면 몬스터/플레이어 상관없이 재사용 가능하도록 범용으로 분리함(현재는 monsterDefenseFor만
-// 사용 — 파쇄를 실제로 부여하는 스킬/장비가 아직 없어 항상 0으로 평가됨, 요구사항 7·8번).
-function shreddingDefenseBonusFor(target){
-  const def = STATUS_EFFECTS.shredding;
-  if(!def || !hasActiveStatusEffect(target, 'shredding')) return 0;
-  return def.defenseBonus || 0;
+// 상태이상으로 인한 방어도 보너스(요구사항 6번) — 특정 상태이상(예: 파쇄)만 직접 확인하던 기존 구조를
+// 일반화해, 대상에게 걸린 상태이상 중 STATUS_EFFECTS의 type이 'defenseBoost'인 것을 전부 훑어 그
+// defenseBonus를 합산함. 현재는 파쇄(+20)·저주(+40)가 이 타입이며 서로 동시에 존재할 수 없도록
+// STATUS_EFFECT_INTERACTIONS(data.js)에서 막고 있어 실질적으로는 항상 둘 중 하나의 보너스만 적용되지만,
+// 이 함수 자체는 여러 defenseBoost 상태이상이 동시에 걸리는 경우도 자연스럽게 합산 처리함 — 앞으로 새
+// defenseBoost 상태이상이 추가되면 STATUS_EFFECTS에 defenseBonus 값만 등록하면 자동으로 반영됨(기존
+// monsterDefenseFor/방어도 계산 공식 자체는 무변경). target은 statusEffects 배열을 가진 대상이면
+// 몬스터/플레이어 상관없이 재사용 가능(현재는 monsterDefenseFor만 사용).
+function statusDefenseBonusFor(target){
+  if(!target || !target.statusEffects || target.statusEffects.length === 0) return 0;
+  let bonus = 0;
+  target.statusEffects.forEach(s => {
+    const def = STATUS_EFFECTS[s.key];
+    if(!def || def.type !== 'defenseBoost') return;
+    if(!hasActiveStatusEffect(target, s.key)) return;
+    bonus += def.defenseBonus || 0;
+  });
+  return bonus;
 }
 // 현재 착용 중인 방어구(투구/갑옷) 아이템 목록을 반환.
 function wornArmorItems(){

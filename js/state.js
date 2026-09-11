@@ -54,7 +54,16 @@ let state = {
 };
 let isEnhancing = false;
 let currentView = 'forge';
-let hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle' };
+// hunt(던전/전투 진행 상태) 기본값. 게임 최초 로드(아래 let hunt=...)와 resetGame()의 "새 게임 시작"
+// 양쪽에서 이 함수 하나만 사용하도록 통일함 — 예전엔 두 곳에 각각 객체 리터럴을 따로 두고 있었는데,
+// hunt에 새 필드(deathAnimTimeouts/rewardModalTimeout/player/topUiExpanded 등)가 추가될 때마다 resetGame()
+// 쪽 리터럴이 갱신되지 않아 "새 게임 시작 후 hunt.deathAnimTimeouts가 undefined라 stopHuntLoop()가
+// 예외를 던지고, 그 여파로 전투 타이머 자체가 생성되지 않아 공격이 전혀 진행되지 않는" 버그가 발생했음
+// (원인 파악·수정: 2026-09-11). 이제 필드를 추가할 땐 이 함수 한 곳만 고치면 두 경로 모두 자동 반영됨.
+function defaultHuntState(){
+  return { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle' };
+}
+let hunt = defaultHuntState();
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
 // equipTab: "장비" 최상위 탭 안에서 마지막으로 보고 있던 하위탭(weapon/armor/accessory/artifact)을
 // 기억해뒀다가, "장비" 최상위 버튼을 다시 눌렀을 때 그 탭으로 돌아가기 위한 값.
@@ -297,6 +306,19 @@ function applyStatusEffect(target, key, durationMs){
   const def = STATUS_EFFECTS[key];
   if(!def) return;
   if(!target.statusEffects) target.statusEffects = [];
+  // 상태이상 간 상호작용 규칙(STATUS_EFFECT_INTERACTIONS, data.js) 적용 — 저주/파쇄처럼 특정 상태이상
+  // 조합을 여러 곳에 하드코딩하지 않고 여기 한 곳에서만 처리함(요구사항 5번).
+  const interaction = STATUS_EFFECT_INTERACTIONS[key];
+  if(interaction){
+    // blockedBy: 목록에 있는 상태이상이 이미 걸려 있으면 이번 적용 자체를 무시(대상의 기존 상태에는
+    // 영향 없음 — 예: 저주가 있는 동안 파쇄를 적용하려 하면 그냥 적용하지 않고 끝냄).
+    if(interaction.blockedBy && interaction.blockedBy.some(k => hasActiveStatusEffect(target, k))) return;
+    // overrides: 이 상태이상이 적용되는 순간, 목록에 있는 상태이상을 남은 지속시간과 무관하게 즉시 제거
+    // (예: 저주 적용 시 기존 파쇄를 바로 제거).
+    if(interaction.overrides && interaction.overrides.length > 0){
+      target.statusEffects = target.statusEffects.filter(s => !interaction.overrides.includes(s.key));
+    }
+  }
   const existing = target.statusEffects.find(s => s.key === key);
   if(def.type === 'dot'){
     // lastTickAt: 이 상태 이상 자신의 tickIntervalMs 간격을 실시간으로 재는 기준 시각.
@@ -542,7 +564,7 @@ function resetGame(){
   el('resetLink').style.opacity = '';
   stopHuntLoop();
   stopDeathCurseTicker();
-  hunt = { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, playerDirection: 'up', playerMotion: 'idle' };
+  hunt = defaultHuntState(); // 게임 최초 로드 시와 동일한 기본값 사용(위 defaultHuntState 참고) — 필드 누락 방지
 
   state = {
     gold: 1000, inventory: [], equippedId: null, forgeTargetId: null, nextItemId: 1,

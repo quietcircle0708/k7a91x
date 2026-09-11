@@ -2602,6 +2602,36 @@ const STATUS_EFFECTS = {
     defenseBonus: 20, // 적용 중인 동안 피해 계산에 사용하는 방어도에만 +20(요구사항 4·6번) — 실제
                        // 몬스터 방어도 데이터(MONSTERS[].defense)는 전혀 변경하지 않음.
   },
+  // 저주 — 파쇄와 동일한 defenseBoost 타입(방어도 보너스만 다름). 고정 maxDuration을 두지 않고 부여하는
+  // 쪽(스킬/장비 등)이 durationMs를 넘겨 지정하는 것도 기절/둔화/파쇄와 동일함. 이번 작업 범위는 데이터
+  // +적용 로직+상태이상 간 상호작용(STATUS_EFFECT_INTERACTIONS)뿐이며, 실제로 저주를 부여하는 스킬/장비는
+  // 아직 없음(추후 별도 작업).
+  curse: {
+    id: 6,
+    name: '저주',
+    icon: 'curse', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(curse.svg)
+    color: '#c50d0d',
+    type: 'defenseBoost', // 파쇄와 같은 타입 — statusDefenseBonusFor(formulas.js)가 defenseBoost 타입을
+                          // 전부 훑어 합산하므로 이 타입으로 등록하는 것만으로 방어도 계산에 자동 반영됨.
+    defenseBonus: 40, // 적용 중인 동안 피해 계산에 사용하는 방어도에만 +40(요구사항 2번).
+  },
+};
+
+// ---- 상태이상 간 상호작용 규칙(요구사항 4·5번) ----
+// "if(curse) ..." 처럼 저주/파쇄 관계를 여러 함수에 하드코딩하지 않기 위한 데이터 구조. 상태이상마다
+// 필요한 관계만 명시적으로 정의함(전역 상위/하위 등급 체계가 아님) — applyStatusEffect(state.js)가 상태
+// 이상을 적용하기 직전에 이 표를 참조해 처리함.
+// - overrides: 이 상태이상이 적용되는 순간, 목록에 있는 상태이상을 남은 지속시간과 무관하게 즉시 제거.
+// - blockedBy: 목록에 있는 상태이상이 이미 적용 중이면, 이 상태이상은 적용하지 않음(적용 시도 자체를 무시).
+// 향후 새 상태이상 관계(예: "지속시간 초기화", "동시 존재 가능"의 명시적 표기 등)가 필요해지면 이 표에
+// 새 키(예: resetsDurationOf)만 추가하고 applyStatusEffect에서 해당 키를 확인하는 처리만 더하면 됨.
+const STATUS_EFFECT_INTERACTIONS = {
+  curse: {
+    overrides: ['shredding'],
+  },
+  shredding: {
+    blockedBy: ['curse'],
+  },
 };
 
 // ---- 용어사전(GLOSSARY) ----
@@ -2619,6 +2649,7 @@ const GLOSSARY = {
   slow: { type: 'statusEffect', statusKey: 'slow', desc: '공격 속도 35% 감소' },
   burn: { type: 'statusEffect', statusKey: 'burn', desc: '0.6초마다 최대 체력의 3% 피해 (최대 3초)<br>받는 치명타 피해 +20%p' },
   shredding: { type: 'statusEffect', statusKey: 'shredding', desc: '방어도 +20 증가' },
+  curse: { type: 'statusEffect', statusKey: 'curse', desc: '방어도 +40 증가' },
 };
 // 용어 하나 조회 — { name, color, desc } 통일된 형태로 반환(type별 조회 방식은 이 함수 안에서만 분기).
 // 등록되지 않았거나(GLOSSARY에 없음) 연결된 상태이상 자체가 없으면(STATUS_EFFECTS에 없음) null.
