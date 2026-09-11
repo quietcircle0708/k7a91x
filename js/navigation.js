@@ -1036,7 +1036,10 @@ function relocateHuntTopToggleBtn(preset){
   const combatArena = el('combatArena');
   if(!btn || !layout || !combatArena) return; // 정적 마크업이라 보통 항상 존재하지만, 안전하게 가드
   if(preset === 'mobile'){
-    if(btn.parentElement !== layout) layout.appendChild(btn);
+    // 실기기 테스트 결과 position:fixed로 화면 한쪽 구석에 띄우는 방식은 버튼을 찾기 어렵다는 피드백에
+    // 따라, 문서 흐름 안에 항상 보이는 요소로 바꿈 — #huntViewLayout의 맨 앞(huntCard/패널보다 위)에
+    // 배치해 던전 화면에 들어가면 다른 것에 가리거나 화면 밖으로 밀려날 일 없이 항상 눈에 보이게 함.
+    if(btn.parentElement !== layout || btn !== layout.firstChild) layout.insertBefore(btn, layout.firstChild);
   } else if(btn.parentElement !== combatArena){
     combatArena.insertBefore(btn, combatArena.firstChild);
   }
