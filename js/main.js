@@ -222,7 +222,7 @@ el('settingsBody').addEventListener('click', (e)=>{
   const stepperBtn = e.target.closest('button[data-stepper]');
   if(stepperBtn && !stepperBtn.disabled){ adjustSetting(stepperBtn.dataset.stepper, stepperBtn.dataset.dir); return; }
   const radioBtn = e.target.closest('button[data-radio]');
-  if(radioBtn){ selectSettingRadio(radioBtn.dataset.radio, radioBtn.dataset.value); }
+  if(radioBtn && !radioBtn.disabled){ selectSettingRadio(radioBtn.dataset.radio, radioBtn.dataset.value); }
 });
 el('charStatsBody').addEventListener('click', (e)=>{
   const statBtn = e.target.closest('button[data-stat]');

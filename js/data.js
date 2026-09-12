@@ -3464,6 +3464,21 @@ const SETTINGS_SCHEMA = [
           { value: 'mobile', label: '모바일' },
         ],
       },
+      // 던전 화면(#huntCard)의 캐릭터/스킬 패널을 여는 버튼 형식 — 모바일 프리셋에서만 실제로 적용됨
+      // (desktop-preset에서는 이 값이 아무 효과가 없음, css/style.css의 body.mobile-preset 스코프 참고).
+      // desktopPreset일 때도 목록엔 표시하되 선택은 disabledUnless로 막음(요구사항).
+      {
+        id: 'mobileHuntPanelStyle',
+        label: '우측 패널 형식',
+        desc: '모바일 프리셋을 선택했을 때만 고를 수 있습니다.',
+        type: 'radio',
+        default: 'bar', // 기존 저장 데이터에 키가 없으면 최신 방식(가로바)으로 채움
+        disabledUnless: { settingId: 'screenPreset', value: 'mobile' },
+        options: [
+          { value: 'bar', label: '가로바' },
+          { value: 'corner', label: '정사각형 버튼 (우상단)' },
+        ],
+      },
     ],
   },
   {

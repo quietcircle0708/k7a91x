@@ -1852,10 +1852,16 @@ function buildDungeonDropIcons(d){
   // 12개 이하는 기존 그대로(더보기 버튼 없이 전부 출력). 13개 이상인 던전만 페이지 전환 UI 적용 —
   // 한 페이지에 최대 11개 아이템 + 마지막 칸에 다음/이전 버튼 1개(총 12칸)로, 기존에 한 줄에 들어가던
   // 최대 개수(12개)를 그대로 유지해 카드 크기가 커지지 않도록 함.
-  if(iconHtmls.length <= 12) return iconHtmls.join('');
+  // 모바일 UI 개편 4단계: 화면 폭이 좁은 모바일 프리셋에서는 이 12/11 기준을 그대로 쓰면 아이콘 행이
+  // 카드 밖으로 넘치므로, 페이지당 표시 개수만 7개로 줄임(데스크톱 PAGE_SIZE.dungeonDrop=11은 그대로
+  // 유지 — 전역 값을 바꾸지 않고 여기서 프리셋에 따라 다른 값을 고르기만 함). 페이지네이션 계산
+  // 함수(pageCount/pageSlice/clampPage)와 페이지 버튼 로직은 데스크톱과 완전히 동일하게 재사용.
+  const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
+  const pageSize = isMobile ? 7 : PAGE_SIZE.dungeonDrop;
+  const showAllThreshold = isMobile ? 7 : 12; // 모바일: 7개까지 전부 표시 / 데스크톱: 기존 12개 그대로
+  if(iconHtmls.length <= showAllThreshold) return iconHtmls.join('');
 
   const target = 'dungeonDrop:' + d.id;
-  const pageSize = PAGE_SIZE.dungeonDrop;
   const totalPageCount = pageCount(iconHtmls.length, pageSize);
   pageState[target] = clampPage(pageState[target] || 1, totalPageCount);
   const page = pageState[target];
@@ -2296,13 +2302,20 @@ function renderSettings(){
     }
     if(item.type === 'radio'){
       const current = (state.settings && state.settings[item.id] != null) ? state.settings[item.id] : item.default;
+      // disabledUnless: 다른 설정값이 특정 값일 때만 선택 가능(예: 화면 프리셋이 모바일일 때만 우측 패널
+      // 형식을 고를 수 있음) — 목록엔 항상 표시하되 조건을 만족하지 않으면 버튼을 disabled 처리함.
+      let disabled = false;
+      if(item.disabledUnless){
+        const depValue = state.settings ? state.settings[item.disabledUnless.settingId] : undefined;
+        disabled = depValue !== item.disabledUnless.value;
+      }
       const optionsHtml = item.options.map(opt => `
-        <button class="settings-radio-btn ${current === opt.value ? 'selected' : ''}" data-radio="${item.id}" data-value="${opt.value}">
+        <button class="settings-radio-btn ${current === opt.value ? 'selected' : ''}" data-radio="${item.id}" data-value="${opt.value}" ${disabled ? 'disabled' : ''}>
           <span class="settings-radio-dot"></span>${opt.label}
         </button>
       `).join('');
       return `
-        <div class="settings-item">
+        <div class="settings-item settings-item-stacked">
           <div class="settings-item-info">
             <div class="settings-item-label">${item.label}</div>
             ${item.desc ? `<div class="settings-item-desc">${item.desc}</div>` : ''}
