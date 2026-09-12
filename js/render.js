@@ -1857,8 +1857,8 @@ function buildDungeonDropIcons(d){
   // 유지 — 전역 값을 바꾸지 않고 여기서 프리셋에 따라 다른 값을 고르기만 함). 페이지네이션 계산
   // 함수(pageCount/pageSlice/clampPage)와 페이지 버튼 로직은 데스크톱과 완전히 동일하게 재사용.
   const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
-  const pageSize = isMobile ? 7 : PAGE_SIZE.dungeonDrop;
-  const showAllThreshold = isMobile ? 7 : 12; // 모바일: 7개까지 전부 표시 / 데스크톱: 기존 12개 그대로
+  const pageSize = isMobile ? 9 : PAGE_SIZE.dungeonDrop;
+  const showAllThreshold = isMobile ? 9 : 12; // 모바일: 9개까지 전부 표시 / 데스크톱: 기존 12개 그대로
   if(iconHtmls.length <= showAllThreshold) return iconHtmls.join('');
 
   const target = 'dungeonDrop:' + d.id;
