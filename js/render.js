@@ -529,7 +529,10 @@ function renderCraftList(kind){
   const wrap = el(panelId + 'List');
   if(!wrap) return;
   const pagerWrap = el('craft' + kind.charAt(0).toUpperCase() + kind.slice(1) + 'Pager');
-  const items = CRAFTABLE_ITEMS[kind] || [];
+  // 제작소 목록 전용 정렬: 착용 제한 레벨이 낮은 순(craftItemLevelReq, formulas.js). 원본
+  // CRAFTABLE_ITEMS[kind] 배열 순서(선언 순서)는 그대로 두고, 화면에 쓸 복사본만 정렬함 — 다른 화면
+  // (인벤토리/상점 등)의 정렬에는 전혀 영향 없음.
+  const items = (CRAFTABLE_ITEMS[kind] || []).slice().sort((a, b) => craftItemLevelReq(a) - craftItemLevelReq(b));
   if(items.length === 0){
     wrap.innerHTML = `<div class="inv-empty">제작 가능한 아이템이 없습니다.<br>추후 업데이트를 통해 추가될 예정입니다.</div>`;
     if(pagerWrap) pagerWrap.innerHTML = '';

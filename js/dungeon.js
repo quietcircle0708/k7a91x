@@ -303,6 +303,16 @@ function attackTick(){
       applyStatusEffect(target, 'burn');
       renderStatusBadges();
     }
+    // 저주 부여(진월도/진혼검/혈영비도 고유 옵션, effectId 'curse_on_hit') — 중독/화상과 동일한 판정
+    // 방식(합산확률 1회 판정)이되 별도의 독립적인 판정으로 처리함(서로 다른 상태 이상은 동시 적용 가능).
+    // 저주는 dot이 아니라 지속시간형(defenseBoost) 상태이상이라 durationMs(4초)를 직접 넘겨줌 — 고정된
+    // 최대 지속시간이 상태이상 자체에 없고, 부여하는 쪽(이 무기 고유 옵션)이 매번 지정하는 구조(state.js
+    // applyStatusEffect 참고).
+    const curseChance = activeEffectChance('curse_on_hit');
+    if(curseChance > 0 && Math.random() * 100 < curseChance){
+      applyStatusEffect(target, 'curse', 4000);
+      renderStatusBadges();
+    }
   }
   if(target.hp <= 0){
     killMonsterInstance(target.instanceId);

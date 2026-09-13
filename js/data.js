@@ -916,6 +916,74 @@ const WEAPON_TYPES = {
       statBonus: { agi: 5, critRate: 8 },
     },
   },
+  // 월도'흑/흑철중검/흑철비도(에픽) 계열을 잇는 유니크 최종 단계 3종.
+  // 드랍 테이블 연결은 다음 작업에서 진행(현재 획득 경로 없음, 정상 상태).
+  // atk/speed/crit은 +0 기준값만 적어두면 위 forEach가 일반 공식으로 +1~+9까지 자동 계산함(유니크도
+  // 예외 없이 기본 적용 — 요청사항: "특별한 요청이 없으면 기존 공격력 공식을 그대로 사용").
+  moonsword_unique: {
+    id: 'moonsword_unique', name: '진월도', desc: "월도'흑의 검신에 원령이 깃든 불길한 검",
+    equipType: 'weapon',
+    durability: 80000,
+    weaponKind: 'sword', // 검
+    handType: 'one_hand', // 월도 계열과 동일하게 한손으로 배치(요청사항에 손수 명시 없음 — 확인 필요)
+    grade: 'unique', // 유니크
+    attackPower: 900, attackSpeed: 0.8, critRate: 5,
+    purchasable: false, sellPrice: 70000, levelReq: 70,
+    image: 'unique_final_moonsword',
+    atk: [900], speed: [0.8], crit: [5], sell: [70000],
+    cost: [], odds: [],
+    // 고유 옵션: 기본 공격 적중 시 확률로 대상에게 저주(4초) 부여. effectId는 poison_on_hit/
+    // burn_on_hit와 동일한 패턴으로 'curse_on_hit' 사용 — activeEffectChance('curse_on_hit')로 장착
+    // 무기의 발동 확률이 자동 합산되고, dungeon.js attackTick에도 poison_on_hit/burn_on_hit와 동일한
+    // 방식으로 curse_on_hit 처리가 연결되어 실제로 저주가 부여됨(applyStatusEffect(target,'curse',4000)).
+    // chanceByLevel은 강화 단계별 증가치(합연산, +0 기본 5%)를 누적한 확정값(사용자 확인 완료).
+    uniqueOption: {
+      effectId: 'curse_on_hit',
+      activateLevel: 0,
+      chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 6, 4: 6, 5: 7, 6: 7, 7: 8, 8: 8, 9: 10 },
+      textTemplate: "기본 공격 적중 시 {chance}% 확률로 4초 동안 {term:curse}저주{/term} 부여",
+    },
+  },
+  heavysword_unique: {
+    id: 'heavysword_unique', name: '진혼검', desc: '흑철중검의 검신에 원령이 깃든 불길한 검',
+    equipType: 'weapon',
+    durability: 100000,
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검(요청사항 명시)
+    grade: 'unique', // 유니크
+    attackPower: 1400, attackSpeed: 0.6, critRate: 10,
+    purchasable: false, sellPrice: 70000, levelReq: 70,
+    image: 'unique_final_bhsword',
+    atk: [1400], speed: [0.6], crit: [10], sell: [70000],
+    cost: [], odds: [],
+    // 고유 옵션: moonsword_unique와 동일한 방식(진월도 주석 참고) — 실제 발동 로직도 동일하게 연결됨.
+    uniqueOption: {
+      effectId: 'curse_on_hit',
+      activateLevel: 0,
+      chanceByLevel: { 0: 8, 1: 8, 2: 8, 3: 9, 4: 9, 5: 10, 6: 10, 7: 11, 8: 11, 9: 13 },
+      textTemplate: "기본 공격 적중 시 {chance}% 확률로 4초 동안 {term:curse}저주{/term} 부여",
+    },
+  },
+  heavydagger_unique: {
+    id: 'heavydagger_unique', name: '혈영비도', desc: '흑철비도의 검신에 원령이 깃든 불길한 검',
+    equipType: 'weapon',
+    durability: 50000, // 다른 두 무기와 달리 유니크 단계에서도 증가하지 않음 — 무기 종류 페널티로 의도됨(사용자 확인 완료)
+    weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
+    grade: 'unique', // 유니크
+    attackPower: 550, attackSpeed: 1.2, critRate: 10,
+    purchasable: false, sellPrice: 70000, levelReq: 70,
+    image: 'unique_final_bhsword', // 진혼검과 동일 이미지 사용(요청사항)
+    atk: [550], speed: [1.2], crit: [10], sell: [70000],
+    cost: [], odds: [],
+    // 고유 옵션: moonsword_unique와 동일한 방식(진월도 주석 참고) — 실제 발동 로직도 동일하게 연결됨.
+    uniqueOption: {
+      effectId: 'curse_on_hit',
+      activateLevel: 0,
+      chanceByLevel: { 0: 3, 1: 3, 2: 3, 3: 3, 4: 3, 5: 4, 6: 4, 7: 5, 8: 6, 9: 8 },
+      textTemplate: "기본 공격 적중 시 {chance}% 확률로 4초 동안 {term:curse}저주{/term} 부여",
+    },
+  },
 };
 
 
@@ -1365,8 +1433,10 @@ const EQUIP_INVENTORY_POOLS = [
 
 // ============================================================
 // 강화 단계별 공격력/공격속도/치명타 계산 공식
-// 일반/레어/에픽 등급에 적용됨. 유니크 등급은 이 공식을 쓰지 않고 무기마다 고유 값을 직접 넣을 예정이라 대상에서 제외.
-// 필요한 보정값이 아직 없는 무기 종류(예: 지팡이, 구상 중)도 자동으로 제외되고 기존 값이 그대로 유지됨.
+// 등급과 무관하게 모든 무기(유니크 포함)에 기본 적용됨. 특정 무기가 이 공식과 다른 자체 성장치를 써야
+// 하는 "특별 요청"이 있는 경우에만, 그 무기 데이터에 statsOverride({atk,speed,crit} 배열, 각 길이10)를
+// 넣어 자동 계산을 건너뛰고 그 값을 그대로 사용함(등급으로 일괄 제외하지 않음 — 무기별 개별 예외).
+// 필요한 보정값이 아직 없는 무기 종류(예: 지팡이, 구상 중)는 자동으로 제외되고 기존 값이 그대로 유지됨.
 // ============================================================
 
 // 1. 강화 단계별 공격력 배율 (index = 강화단계, [0]은 사용 안 함)
@@ -1378,12 +1448,11 @@ const ENHANCE_ATK_LEVEL_MULT = [null, 1.5, 1.5, 1.5, 1.5, 1.55, 1.5, 1.6, 1.6, 1
 // handType 조합, 이 파일 상단)에 atkSpeedStep/critStep으로 통합 등록됨 — 기존 WEAPON_KIND_ATKSPEED_STEP/
 // WEAPON_KIND_CRIT_STEP과 수치는 완전히 동일하고 조회 키만 세분화됨.
 
-// 무기 하나의 +0~+9 공격력/공격속도/치명타 배열을 공식대로 계산.
-// 유니크 등급은 이 공식을 쓰지 않고 무기마다 고유 값을 직접 넣을 예정이라 대상에서 제외(공격력 계산 자체와 무관하게 유지).
+// 무기 하나의 +0~+9 공격력/공격속도/치명타 배열을 공식대로 계산. 등급과 무관하게 항상 시도함(호출부인
+// forEach가 w.statsOverride 유무로 이 함수 자체를 건너뛸지 먼저 판단함).
 // 필요한 보정값이 없으면(아직 정의되지 않은 weaponKind+handType 조합 — getWeaponProfile이 null 반환)
 // null을 반환 — 그 경우 기존 값을 그대로 둠.
 function computeWeaponLevelStats(w){
-  if(w.grade === 'unique') return null;
   const profile = getWeaponProfile(w);
   const atkSpeedSteps = profile && profile.atkSpeedStep;
   const critSteps = profile && profile.critStep;
@@ -1404,8 +1473,16 @@ function computeWeaponLevelStats(w){
   return { atk, speed, crit };
 }
 
-// WEAPON_TYPES 전체에 위 공식을 적용해서 atk/speed/crit 배열을 새로 채움(대상 아닌 무기는 기존 값 유지)
+// WEAPON_TYPES 전체에 위 공식을 적용해서 atk/speed/crit 배열을 새로 채움(대상 아닌 무기는 기존 값 유지).
+// statsOverride가 있는 무기는 공식 계산을 아예 건너뛰고 그 값을 그대로 사용함(특별 요청으로 개별 밸런스를
+// 준 경우 전용 — 현재는 사용하는 무기가 없고, 앞으로 필요할 때만 개별 무기 데이터에 추가하면 됨).
 Object.values(WEAPON_TYPES).forEach(w => {
+  if(w.statsOverride){
+    if(w.statsOverride.atk) w.atk = w.statsOverride.atk;
+    if(w.statsOverride.speed) w.speed = w.statsOverride.speed;
+    if(w.statsOverride.crit) w.crit = w.statsOverride.crit;
+    return;
+  }
   const computed = computeWeaponLevelStats(w);
   if(computed){
     w.atk = computed.atk;
@@ -1907,6 +1984,13 @@ const MISC_ITEMS = {
     desc: '태고의 수액이 굳어 만들어진 신비로운 호박',
     sellPrice: 800, stateKey: 'purpleAmbers',
   },
+  // 신규 기타 아이템(요청사항 그대로 데이터만 등록) — 아직 어떤 무기/드랍 테이블에도 연결되지 않아
+  // 현재는 획득 경로가 없음(정상 상태, 다음 작업에서 던전 드랍 테이블과 함께 연결 예정).
+  cursedLetter: {
+    id: 'cursedLetter', name: '원한이 담긴 유서', icon: '📜', image: 'epic_cursed_letter', itemClass: 'misc', grade: 'epic',
+    desc: '죽음을 앞둔 자가 풀지 못한<br>원한을 적어 남긴 유서',
+    sellPrice: 450, stateKey: 'cursedLetters',
+  },
   snakeFang: {
     id: 'snakeFang', name: '독사의 송곳니', icon: '🦷', image: 'monster_teeth', itemClass: 'misc', grade: 'rare',
     desc: '치명적인 독을 품고 있는 독사의 송곳니',
@@ -2104,6 +2188,122 @@ CRAFTABLE_ITEMS.weapon.push(
     ],
     failReturns: [
       { name: '독 송곳니', chance: 100 },
+    ],
+  },
+  {
+    id: 'craft_moongreatsword', name: '반월대도', grade: 'epic',
+    iconType: 'weapon', iconRef: 'moongreatsword',
+    successChance: 40, craftCost: 8000,
+    materials: [
+      { name: '흑철', need: 2 },
+      { name: '쇠조각', need: 3 },
+      { name: '마석 조각', need: 10 },
+    ],
+    failReturns: [
+      { name: '흑철', chance: 50 },
+      { name: '쇠조각', chance: 50 },
+    ],
+  },
+  // 월도'흑/흑철중검/흑철비도(에픽) 3종 — 각각 그 아래 등급(레어) 무기 1개를 재료로 소모하는 "강화 제작"
+  // 방식. 재료로 넣은 그 레어 무기 이름을 failReturns에도 그대로 등록해, 실패 시 투입했던 그 개체가
+  // 강화 단계 그대로 손상 상태로 반환됨(craft_eight_knife의 "독 송곳니(손상)"와 동일한 원리).
+  {
+    id: 'craft_moonsword_black', name: "월도'흑", grade: 'epic',
+    iconType: 'weapon', iconRef: 'moonsword_black',
+    successChance: 35, craftCost: 30000,
+    materials: [
+      { name: '월도', need: 1 },
+      { name: '반짝이는 돌', need: 1 },
+      { name: '현철', need: 10 },
+      { name: '흑철', need: 7 },
+      { name: '쇠조각', need: 10 },
+    ],
+    failReturns: [
+      { name: '월도', chance: 100 },
+    ],
+  },
+  {
+    id: 'craft_heavysword_black', name: '흑철중검', grade: 'epic',
+    iconType: 'weapon', iconRef: 'heavysword_black',
+    successChance: 35, craftCost: 30000,
+    materials: [
+      { name: '현철중검', need: 1 },
+      { name: '반짝이는 돌', need: 1 },
+      { name: '현철', need: 10 },
+      { name: '흑철', need: 7 },
+      { name: '쇠조각', need: 10 },
+    ],
+    failReturns: [
+      { name: '현철중검', chance: 100 },
+    ],
+  },
+  {
+    id: 'craft_heavydagger_black', name: '흑철비도', grade: 'epic',
+    iconType: 'weapon', iconRef: 'heavydagger_black',
+    successChance: 35, craftCost: 30000,
+    materials: [
+      { name: '현철단검', need: 1 },
+      { name: '반짝이는 돌', need: 1 },
+      { name: '현철', need: 10 },
+      { name: '흑철', need: 7 },
+      { name: '쇠조각', need: 10 },
+    ],
+    failReturns: [
+      { name: '현철단검', chance: 100 },
+    ],
+  },
+  // 진월도/진혼검/혈영비도(유니크) 3종 — 위 에픽 3종과 동일한 "강화 제작" 방식으로, 그 에픽 무기 1개를
+  // 재료로 소모함. failReturns는 요청사항 원문의 오탈자를 바로잡아 각자 자신의 재료(에픽 무기) 이름으로
+  // 등록함(진월도는 "독 송곳니"가 아니라 "월도'흑", 혈영비도는 "혈영비도"가 아니라 "흑철비도"가 맞음 —
+  // 사용자 확인 완료). craft_eight_knife/위 세 항목과 동일하게 "실패 시 투입한 재료 그 자체가 손상
+  // 반환"되는 구조라, 재료로 넣지도 않은 다른 아이템 이름을 반환 후보로 등록하면 findCraftResource가
+  // 엉뚱한 것을 손상 처리하거나 존재하지 않는 재료를 참조하게 되어 정상 동작하지 않았을 부분이었음.
+  {
+    id: 'craft_moonsword_unique', name: '진월도', grade: 'unique',
+    iconType: 'weapon', iconRef: 'moonsword_unique',
+    successChance: 15, craftCost: 50000,
+    materials: [
+      { name: "월도'흑", need: 1 },
+      { name: '반짝이는 돌', need: 2 },
+      { name: '현철', need: 10 },
+      { name: '흑철', need: 10 },
+      { name: '쇠조각', need: 10 },
+      { name: '진호박', need: 5 },
+    ],
+    failReturns: [
+      { name: "월도'흑", chance: 100 },
+    ],
+  },
+  {
+    id: 'craft_heavysword_unique', name: '진혼검', grade: 'unique',
+    iconType: 'weapon', iconRef: 'heavysword_unique',
+    successChance: 15, craftCost: 50000,
+    materials: [
+      { name: '흑철중검', need: 1 },
+      { name: '반짝이는 돌', need: 2 },
+      { name: '현철', need: 10 },
+      { name: '흑철', need: 10 },
+      { name: '쇠조각', need: 10 },
+      { name: '진호박', need: 5 },
+    ],
+    failReturns: [
+      { name: '흑철중검', chance: 100 },
+    ],
+  },
+  {
+    id: 'craft_heavydagger_unique', name: '혈영비도', grade: 'unique',
+    iconType: 'weapon', iconRef: 'heavydagger_unique',
+    successChance: 15, craftCost: 50000,
+    materials: [
+      { name: '흑철비도', need: 1 },
+      { name: '반짝이는 돌', need: 2 },
+      { name: '현철', need: 10 },
+      { name: '흑철', need: 10 },
+      { name: '쇠조각', need: 10 },
+      { name: '진호박', need: 5 },
+    ],
+    failReturns: [
+      { name: '흑철비도', chance: 100 },
     ],
   },
 );
@@ -3169,6 +3369,61 @@ const MONSTERS = {
       { name: '흑철비도', chance: 1, weaponId: 'heavydagger_black' },
     ],
   },
+  // 해골굴 신규 몬스터 4종. 사해골/불산은 흑령굴 사령/원령과 완전히 동일한 구조(epicSpawnWeight+
+  // epicSpawnStages:[10])로 10굴 전용 처리 — pickEpicMonsterId가 10굴이 아니면 불산이 후보에서 빠져
+  // 항상 사해골만 뽑히고, 10굴에서만 사해골 40 : 불산 60 가중치 추첨이 실제로 작동함.
+  skeleton: {
+    id: 'skeleton', name: '해골', icon: '💀', grade: 'normal', level: 70, image: 'monster_skeleton',
+    defense: -20, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    drops: [
+      { name: '호박', chance: 15 },
+      { name: '흑철', chance: 5 },
+      { name: '현철', chance: 4 },
+      { name: '원한이 담긴 유서', chance: 1 },
+    ],
+  },
+  skeleton2: {
+    id: 'skeleton2', name: '칼든 해골', icon: '💀', grade: 'normal', level: 71, image: 'monster_skeleton2',
+    defense: -25, hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
+    drops: [
+      { name: '호박', chance: 20 },
+      { name: '흑철', chance: 6 },
+      { name: '현철', chance: 5 },
+      { name: '원한이 담긴 유서', chance: 1 },
+    ],
+  },
+  epicskeleton: {
+    id: 'epicskeleton', name: '사해골', icon: '💀', grade: 'epic', level: 76, image: 'epic_skeleton',
+    defense: -25, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
+    epicSpawnWeight: 40, // 해골굴 전용 — 불산과 합쳐 100%(10굴 기준. 그 외 스테이지는 불산이 후보에서
+    // 빠져 이 가중치 값과 무관하게 항상 사해골이 뽑힘)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '현철', chance: 10 },
+      { name: '흑철', chance: 10 },
+      { name: "월도'흑", chance: 2, weaponId: 'moonsword_black' },
+      { name: '흑철중검', chance: 2, weaponId: 'heavysword_black' },
+      { name: '흑철비도', chance: 2, weaponId: 'heavydagger_black' },
+      { name: '원한이 담긴 유서', chance: 5 },
+    ],
+  },
+  epicskeleton2: {
+    id: 'epicskeleton2', name: '불산', icon: '💀', grade: 'epic', level: 77, image: 'epic_skeleton2',
+    defense: -25, hpMult: 1.0, atkMult: 0.6, speedMult: 2.0,
+    epicSpawnWeight: 60, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '반짝이는 돌', chance: 5 },
+      { name: '현철', chance: 15 },
+      { name: "월도'흑", chance: 4, weaponId: 'moonsword_black' },
+      { name: '흑철중검', chance: 4, weaponId: 'heavysword_black' },
+      { name: '흑철비도', chance: 4, weaponId: 'heavydagger_black' },
+      { name: '진월도', chance: 2, weaponId: 'moonsword_unique' },
+      { name: '진혼검', chance: 2, weaponId: 'heavysword_unique' },
+      { name: '혈영비도', chance: 2, weaponId: 'heavydagger_unique' },
+      { name: '원한이 담긴 유서', chance: 10 },
+    ],
+  },
 };
 
 
@@ -3292,6 +3547,14 @@ const DUNGEONS = [
     icon: '',
     desc: '깊숙한 곳에 자리잡은 원혼들의 지하묘지',
     monsters: ['blackghost', 'blackghost2', 'epicblackghost', 'epicblackghost2'],
+    levelRange: 5,
+  },
+  {
+    id: 'skeleton_den',
+    name: '해골굴',
+    icon: '',
+    desc: '해골이 잠든 저주받은 지하 동굴',
+    monsters: ['skeleton', 'skeleton2', 'epicskeleton', 'epicskeleton2'],
     levelRange: 5,
   },
 ];

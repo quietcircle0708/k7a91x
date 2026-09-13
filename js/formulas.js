@@ -824,9 +824,10 @@ function weaponUniqueOptionForgeHtml(type, level){
   const activeNext = hasNext ? weaponUniqueOptionActive(type, level+1) : activeNow;
 
   if(opt.text != null){
-    if(activeNow) return `<div style="color:var(--forge-cream);">${opt.text}</div>`;
+    const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(opt.text));
+    if(activeNow) return `<div style="color:var(--forge-cream);">${text}</div>`;
     const note = activeNext ? '고유 옵션 활성화' : `+${opt.activateLevel} 달성 시 활성화`;
-    return `<div style="color:var(--forge-cream-dim);">${opt.text}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${note}</div>`;
+    return `<div style="color:var(--forge-cream-dim);">${text}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${note}</div>`;
   }
 
   const chanceNow = weaponUniqueOptionChance(type, level);
@@ -839,12 +840,14 @@ function weaponUniqueOptionForgeHtml(type, level){
     const valueHtml = changed
       ? formatStatDelta(chanceNow, chanceNext, 0, '%')
       : (chanceNow + '%');
-    const text = opt.textTemplate.replace('{chance}%', valueHtml);
+    const rawText = opt.textTemplate.replace('{chance}%', valueHtml);
+    const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
     return `<div style="color:var(--forge-cream);">${text}</div>`;
   }
 
   // 아직 비활성화 상태 — 활성화 조건 시점의 미리보기 수치를 회색으로 보여줌(무기 툴팁과 동일한 값).
-  const text = opt.textTemplate.replace('{chance}', chanceNow);
+  const rawText = opt.textTemplate.replace('{chance}', chanceNow);
+  const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
   const note = activeNext
     ? '고유 옵션 활성화' // 지금 강화하면(다음 단계에서) 바로 활성화되는 경우
     : `+${opt.activateLevel} 달성 시 활성화`; // 아직 활성화까지 강화가 더 필요한 경우
@@ -2091,6 +2094,14 @@ function craftItemTooltipHtml(item){
 }
 function findCraftItem(category, id){
   return (CRAFTABLE_ITEMS[category] || []).find(it => it.id === id);
+}
+// 제작소 목록 정렬 전용(요청사항: 별도 정렬 기준이 없던 목록에 "착용 제한 레벨 낮은 순" 기준을 새로
+// 도입 — 제작소 화면에만 적용되고 인벤토리/상점 등 다른 목록 정렬에는 전혀 영향 없음). iconType에 맞는
+// 실제 장비 데이터의 levelReq를 그대로 조회 — craftItemIconHtml/craftItemTooltipHtml과 동일한 분기
+// 구조라 iconType이 늘어나면 여기에도 같은 방식으로 분기만 추가하면 됨.
+function craftItemLevelReq(item){
+  if(item.iconType === 'weapon') return wpn(item.iconRef).levelReq || 0;
+  return 0; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
 }
 
 // ---- 제작소: 이름 기반 자원(재료/반환 아이템) 조회(요청사항 1·2번) ----
