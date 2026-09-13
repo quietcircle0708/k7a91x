@@ -2032,8 +2032,8 @@ CRAFTABLE_ITEMS.weapon.push(
     iconType: 'weapon', iconRef: 'poisonfang',
     successChance: 60, craftCost: 4000,
     materials: [
-      { name: '독사의 송곳니', need: 3 },
-      { name: '쇠조각', need: 3 },
+      { name: '독사의 송곳니', need: 2 },
+      { name: '쇠조각', need: 1 },
       { name: '마석 파편', need: 3 },
     ],
     failReturns: [
@@ -2047,7 +2047,7 @@ CRAFTABLE_ITEMS.weapon.push(
     successChance: 40, craftCost: 8000,
     materials: [
       { name: '흑철', need: 3 },
-      { name: '쇠조각', need: 3 },
+      { name: '쇠조각', need: 2 },
       { name: '마석 조각', need: 3 },
     ],
     failReturns: [
@@ -2077,13 +2077,13 @@ CRAFTABLE_ITEMS.weapon.push(
     iconType: 'weapon', iconRef: 'bloodtigerlongsword',
     successChance: 35, craftCost: 18000,
     materials: [
-      { name: '자호의 송곳니', need: 5 },
+      { name: '자호의 송곳니', need: 2 },
       { name: '흑철', need: 5 },
       { name: '쇠조각', need: 6 },
       { name: '마석 조각', need: 8 },
     ],
     failReturns: [
-      { name: '자호의 송곳니', need: 2, chance: 30 },
+      { name: '자호의 송곳니', need: 1, chance: 30 },
       { name: '흑철', need: 2, chance: 30 },
       { none: true, chance: 20 },
     ],
@@ -2734,10 +2734,10 @@ const FLASK_TIER_RULES = [
 // 추첨 대상에서 제외됨(rollTreasureMiscDrop이 처리).
 const TREASURE_MISC_DROP_TABLE = [
   { itemId: 'rareScrapmetal', tiers: [ // 쇠조각
-    { minLevel: 1,  maxLevel: 29, chance: 10, qtyOptions: [1] },
-    { minLevel: 30, maxLevel: 49, chance: 12, qtyOptions: [1] },
-    { minLevel: 50, maxLevel: 89, chance: 15, qtyOptions: [1] },
-    { minLevel: 90, maxLevel: 99, chance: 20, qtyOptions: [1, 2] },
+    { minLevel: 1,  maxLevel: 29, chance: 35, qtyOptions: [1] },
+    { minLevel: 30, maxLevel: 49, chance: 40, qtyOptions: [1] },
+    { minLevel: 50, maxLevel: 89, chance: 50, qtyOptions: [1] },
+    { minLevel: 90, maxLevel: 99, chance: 60, qtyOptions: [1, 2] },
   ]},
   { itemId: 'epicShinystone', tiers: [ // 반짝이는 돌 (1~29구간은 chance 0 → 추첨 대상 제외)
     { minLevel: 1,  maxLevel: 29, chance: 0,  qtyOptions: [1] },
