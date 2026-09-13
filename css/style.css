@@ -1025,6 +1025,12 @@
   .blacksmith-icon-fallback{ font-size:16px; line-height:1; }
   .blacksmith-icon-img{ width:20px; height:20px; object-fit:contain; }
 
+  /* 공지사항(패치노트) 버튼: 설정 버튼(settings-peek-btn) 바로 위, 왼쪽 상단에 같은 크기로 배치.
+     설정 버튼은 이 버튼이 들어갈 자리만큼 아래로(top:60px) 내림 — 대장간/캐릭터정보 버튼 쌍과 동일한 배치 방식. */
+  .patchnote-peek-btn{ top:16px; left:16px; right:auto; font-size:16px; }
+  .patchnote-icon-fallback{ font-size:16px; line-height:1; }
+  .patchnote-icon-img{ width:20px; height:20px; object-fit:contain; }
+
   /* 캐릭터 메뉴 "캐릭터 정보" 탭 — 화면 폭이 좁아 페이지 이동 버튼만 우측 정렬로 표시 */
   .char-menu-info-head{ display:flex; justify-content:flex-end; margin-bottom:10px; }
   /* 스킬 탭 전용 헤더 — 페이지 이동 버튼(pagerHtml)은 그대로 우측에 두고, 왼쪽에 스킬 초기화(⟲) 버튼을
@@ -1164,8 +1170,21 @@
   #spawnToast.show{ opacity:1; transform:translate(-50%,0); }
 
   /* ---- 설정 화면 ---- */
-  .settings-peek-btn{ left:16px; right:auto; font-size:16px; }
+  .settings-peek-btn{ top:60px; left:16px; right:auto; font-size:16px; }
   .settings-modal{ max-width:380px; text-align:left; }
+
+  /* ---- 공지사항(패치노트) 모달 ---- */
+  /* 세로로 긴 이미지에서도 닫기 버튼에 항상 접근 가능하도록 모달 박스 자체를 화면 높이 안으로
+     제한하고 넘치는 만큼은 스크롤 처리(다른 모달을 건드리지 않는 전용 CSS). */
+  .patchnote-modal{ max-width:420px; max-height: calc(100vh - 32px); overflow-y:auto; box-sizing:border-box; }
+  .patchnote-image-wrap{ display:flex; justify-content:center; margin:14px 0; }
+  /* 비율 유지 + 화면보다 큰 이미지만 축소(object-fit:contain, 억지로 늘리지 않음). */
+  .patchnote-img{ max-width:100%; max-height:56vh; width:auto; height:auto; object-fit:contain; border-radius:8px; display:block; }
+  .patchnote-hide-today-label{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    font-size:12px; color: var(--forge-cream-dim); margin:14px 0 4px; cursor:pointer;
+  }
+  .patchnote-hide-today-label input{ cursor:pointer; }
   .settings-layout{ display:flex; gap:14px; margin: 14px 0 18px; align-items:flex-start; }
   .settings-cat-list{ display:flex; flex-direction:column; gap:6px; min-width:84px; flex-shrink:0; }
   .settings-cat-btn{

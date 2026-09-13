@@ -3442,6 +3442,15 @@ const DROP_GLOW_GRADE_LEVEL = { normal: 0, rare: 3, epic: 5, unique: 7 };
 // 저장소 키
 const STORAGE_KEY = 'forge-state-v5';
 
+// ---- 공지사항(패치노트) ----
+// assets/ui/patchnote/patchnote1.png부터 연속 번호 이미지 파일로 관리하며, 게임 버전/패치 번호는
+// 코드에 전혀 기록하지 않음(이미지 파일 자체가 내용이자 유일한 관리 단위).
+// "오늘 다시 보지 않음" 값은 게임 세이브(STORAGE_KEY)와 완전히 분리된 별도 키에 저장해, resetGame()이나
+// 세이브 마이그레이션이 이 값에 영향을 주지 않도록 함.
+const PATCHNOTE_IMAGE_DIR = 'assets/ui/patchnote/';
+const PATCHNOTE_MAX_PAGES = 20; // 존재하지 않는 번호를 무한히 요청하지 않기 위한 상한(연속 파일이 끊기면 그 전에 멈춤)
+const PATCHNOTE_HIDE_DATE_KEY = 'forge-patchnote-hide-date-v1';
+
 // ---- 설정 시스템 ----
 // 카테고리(예: 전투) 안에 메뉴(예: 회복 설정)들이 들어가는 구조.
 // 새 카테고리/메뉴를 추가할 때는 이 배열에 항목만 추가하면 됨 — 모달 UI, 저장 로직은 자동으로 반영됨.

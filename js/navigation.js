@@ -573,6 +573,7 @@ const PAGE_RENDER_FN = {
   craftArmor: () => renderCraftList('armor'),
   craftSub: () => renderCraftList('sub'),
   craftAccessory: () => renderCraftList('accessory'),
+  patchNote: renderPatchNote,
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
@@ -981,6 +982,76 @@ function confirmSkillReset(){
   resetSkillQuickSlots(); // 습득 스킬이 사라지므로 등록된 스킬 퀵슬롯도 전부 초기화(내부에서 렌더+저장까지 처리)
   renderCharacterMenu();
   saveState();
+}
+
+// ---- 공지사항(패치노트) 모달 ----
+// patchnote1.png부터 연속 번호 이미지가 존재하는 개수만큼만 페이지로 취급함(11~12번 요구사항).
+// 폴더 목록을 읽는 방법이 없는 정적 페이지 환경이라, Image 로드 성공/실패로 순차 확인하며 실패하는
+// 순간(또는 PATCHNOTE_MAX_PAGES 도달) 멈춰서 무한 요청을 방지함.
+let patchNoteTotalPages = 0;
+function probePatchNoteImages(){
+  return new Promise(resolve => {
+    function tryNext(n){
+      if(n > PATCHNOTE_MAX_PAGES){ resolve(n - 1); return; }
+      const img = new Image();
+      img.onload = () => tryNext(n + 1);
+      img.onerror = () => resolve(n - 1);
+      img.src = `${PATCHNOTE_IMAGE_DIR}patchnote${n}.png`;
+    }
+    tryNext(1);
+  });
+}
+// "오늘 다시 보지 않음" 값 전용 저장(게임 세이브와 분리, hasClaudeStorage()는 state.js에 이미 정의된
+// window.storage 우선+localStorage 폴백 판정 함수를 그대로 재사용함).
+async function getPatchNoteHideDate(){
+  try{
+    if(hasClaudeStorage()){
+      const res = await window.storage.get(PATCHNOTE_HIDE_DATE_KEY, false);
+      return res && res.value ? res.value : null;
+    }
+    return localStorage.getItem(PATCHNOTE_HIDE_DATE_KEY);
+  }catch(e){
+    try{ return localStorage.getItem(PATCHNOTE_HIDE_DATE_KEY); }
+    catch(e2){ return null; }
+  }
+}
+async function setPatchNoteHideDateToday(){
+  const today = todayDateString();
+  try{
+    if(hasClaudeStorage()){
+      await window.storage.set(PATCHNOTE_HIDE_DATE_KEY, today, false);
+      return;
+    }
+  }catch(e){ /* 아래 localStorage로 폴백 */ }
+  try{ localStorage.setItem(PATCHNOTE_HIDE_DATE_KEY, today); }
+  catch(e){ /* 저장 실패해도 게임 진행에는 영향 없음 */ }
+}
+function todayDateString(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+// 자동 표시든(게임 시작) 수동 열기든(대장간 📣 버튼) 항상 1페이지부터 시작.
+function openPatchNote(){
+  if(patchNoteTotalPages < 1) return; // patchnote1.png 자체가 없으면 안전하게 무시(11번 요구사항)
+  pageState.patchNote = 1;
+  el('patchNoteHideTodayCheckbox').checked = false;
+  renderPatchNote();
+  el('patchNoteModal').style.display = 'flex';
+}
+function closePatchNote(){
+  el('patchNoteModal').style.display = 'none';
+  // 체크했을 때만 오늘 날짜 저장(체크 안 했으면 다음 게임 시작 때 다시 자동 표시).
+  if(el('patchNoteHideTodayCheckbox').checked) setPatchNoteHideDateToday();
+}
+// 게임 시작 시 1회 호출: 이미지 개수 확인 후, 오늘 이미 숨김 처리된 게 아니면 자동으로 엶.
+// loadState()의 game state(state 객체)와는 무관하게 동작하므로 독립적으로 호출해도 안전함.
+async function initPatchNoteSystem(){
+  patchNoteTotalPages = await probePatchNoteImages();
+  if(patchNoteTotalPages < 1) return;
+  const hideDate = await getPatchNoteHideDate();
+  if(hideDate === todayDateString()) return;
+  openPatchNote();
 }
 
 // ---- 설정 모달 ----

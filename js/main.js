@@ -209,6 +209,14 @@ el('forgeSelectPager').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
+el('openPatchNoteBtn').addEventListener('click', openPatchNote);
+el('closePatchNoteBtn').addEventListener('click', closePatchNote);
+el('patchNotePager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 el('openSettingsBtn').addEventListener('click', openSettings);
 el('closeSettingsBtn').addEventListener('click', closeSettings);
 el('settingsCategoryList').addEventListener('click', (e)=>{
@@ -677,3 +685,4 @@ if(typeof ResizeObserver !== 'undefined'){
 }
 
 loadState();
+initPatchNoteSystem();

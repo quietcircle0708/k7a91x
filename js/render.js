@@ -2239,6 +2239,17 @@ function buildInvPeekHtml(){
   return `인벤토리 (${totalEquipInventoryCount()}/${INV_MAX})<br>${lines}`;
 }
 
+// ---- 공지사항(패치노트) 모달 ----
+// 아이템 목록을 잘라 보여주는 게 아니라 이미지 파일 자체를 한 장씩 넘기는 UI라 pageSlice는 쓰지
+// 않고, 페이지 이동 UI(1/N, 이전/다음)만 기존 pagerHtml/goPage 시스템을 그대로 재사용함.
+function renderPatchNote(){
+  const imgEl = el('patchNoteImg');
+  const pagerWrap = el('patchNotePager');
+  if(!imgEl || !pagerWrap) return;
+  imgEl.src = `${PATCHNOTE_IMAGE_DIR}patchnote${pageState.patchNote}.png`;
+  pagerWrap.innerHTML = pagerHtml('patchNote', pageState.patchNote, patchNoteTotalPages);
+}
+
 // ---- 설정 화면 ----
 // SETTINGS_SCHEMA를 그대로 순회해서 그리기 때문에, 카테고리나 메뉴가 늘어나도 이 함수는 수정할 필요 없음.
 function renderSettings(){

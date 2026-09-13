@@ -125,6 +125,8 @@ let pageState = {
   huntCharInfo: 1,
   huntCharSkill: 1,
   craftWeapon: 1, craftArmor: 1, craftSub: 1, craftAccessory: 1,
+  // 공지사항(패치노트) 팝업 — 자동 표시든 대장간 버튼으로 수동으로 열든 항상 1페이지부터 시작(요구사항).
+  patchNote: 1,
   // dungeonDrop 페이지는 던전마다 따로 관리해야 해서 고정 키 하나가 아니라, 던전 카드를 그릴 때
   // `dungeonDrop:<던전id>` 형태의 동적 키를 이 오브젝트에 필요할 때마다 추가해서 씀(goPage의 범용
   // "pageState[target] = ..." 로직을 그대로 재사용하기 위함, render.js buildDungeonDropIcons 참고).
