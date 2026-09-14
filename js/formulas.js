@@ -2071,27 +2071,18 @@ function tierOf(level){
 // computeAverageExpectedCosts/computeWeaponSellPrices(data.js, 게임 시작 시 1회 계산되는 기대비용/
 // 판매가)에는 절대 접근하거나 영향을 주지 않음 — 항상 oddsFor/costFor로 얻은 값을 복사해서만 가공함.
 
-// 집중의 기도 보정: 성공 확률에 ×1.2(최대 100%) 적용, 증가분은 유지/하락에서 균등 차감(부족하면
-// 반대쪽에서 추가 차감), 파괴 확률은 절대 건드리지 않음. baseOdds를 직접 수정하지 않고 새 배열 반환.
+// 집중의 기도 보정: 성공 확률에 ×1.2(최대 100%) 적용, 증가분은 실패(유지)에서만 전부 차감(실패(하락)와
+// 파괴 확률은 절대 건드리지 않음). baseOdds를 직접 수정하지 않고 새 배열 반환.
 function focusAdjustedOdds(baseOdds, focusActive){
   if(!baseOdds) return baseOdds;
   if(!focusActive) return baseOdds.slice();
   const success = Math.min(100, baseOdds[0] * 1.2);
   const increase = Math.max(0, success - baseOdds[0]);
-  const destroy = baseOdds[3]; // 파괴 확률은 항상 원본 그대로 유지
-  let stay = baseOdds[1];
-  let down = baseOdds[2];
-  if(increase > 0){
-    let stayCut = increase / 2, downCut = increase / 2;
-    if(stay < stayCut){ downCut += (stayCut - stay); stayCut = stay; }
-    if(down < downCut){ stayCut += (downCut - down); downCut = down; }
-    // 유지+하락 합계보다 증가분이 큰 극단적인 경우(현재 실제 확률표에서는 발생하지 않음)에도 파괴
-    // 확률은 절대 건드리지 않기 위한 최종 방어 clamp.
-    stayCut = Math.min(stayCut, stay);
-    downCut = Math.min(downCut, down);
-    stay = Math.max(0, stay - stayCut);
-    down = Math.max(0, down - downCut);
-  }
+  const down = baseOdds[2]; // 하락 확률은 항상 원본 그대로 유지
+  const destroy = baseOdds[3]; // 파괴 확률도 항상 원본 그대로 유지
+  // 유지가 증가분보다 부족한 극단적인 경우(현재 실제 확률표에서는 발생하지 않음)에도 하락/파괴는
+  // 절대 건드리지 않기 위해 0 아래로 내려가지 않게만 방어.
+  const stay = Math.max(0, baseOdds[1] - increase);
   return [success, stay, down, destroy];
 }
 
