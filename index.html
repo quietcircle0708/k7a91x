@@ -61,6 +61,20 @@
       <div class="equip-row" id="equipRow"></div>
 
       <div class="sword-stage" id="swordStage">
+        <div class="prayer-icon-col" id="prayerIconCol">
+          <button class="prayer-icon-btn" id="prayerCharmBtn" title="끈기의 기도">
+            <img src="assets/ui/prayer_charm.svg" class="prayer-icon-img" alt="끈기의 기도">
+            <span class="tooltip">끈기의 기도<br>적용 시 강화 단계 하락 방지<br>강화 비용 × 2.5<br><em>*보호의 기도와 중복 사용 불가</em></span>
+          </button>
+          <button class="prayer-icon-btn" id="prayerBlessingBtn" title="보호의 기도">
+            <img src="assets/ui/prayer_blessing.svg" class="prayer-icon-img" alt="보호의 기도">
+            <span class="tooltip">보호의 기도<br>적용 시 아이템 파괴 방지<br>강화 비용 × 3.0<br><em>*끈기의 기도와 중복 사용 불가</em></span>
+          </button>
+          <button class="prayer-icon-btn" id="prayerFocusBtn" title="집중의 기도">
+            <img src="assets/ui/prayer_focus.svg" class="prayer-icon-img" alt="집중의 기도">
+            <span class="tooltip">집중의 기도<br>적용 시 성공 확률 20% 증가<br>강화 비용 × 2.0</span>
+          </button>
+        </div>
         <div class="sword-visual" id="swordVisual">
           <img id="swordImg" class="sword-img" src="assets/sword/longsword.png" alt="장착 무기">
         </div>
@@ -84,36 +98,6 @@
       </div>
 
       <button class="btn btn-sell" id="sellBtn">아이템 판매</button>
-
-      <div class="scroll-title">보호 장치</div>
-
-      <div class="scroll-card charm">
-        <div class="scroll-head">
-          <span class="scroll-name-wrap">
-            <span class="scroll-name charm">네레스의 집념이 서린 쇠조각</span>
-            <span class="tooltip">전설의 대장장이 네레스의 집념이 담겨졌던 파편. 강화 실패시 단계가 하락되지 않는다.</span>
-          </span>
-          <span class="scroll-count">보유 <span id="charmCount">0</span>개</span>
-        </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" id="buyCharmBtn">구매 (<span id="charmPrice">1500</span> G)</button>
-          <button class="scroll-toggle charm" id="toggleCharmBtn">사용 안 함</button>
-        </div>
-      </div>
-
-      <div class="scroll-card blessing">
-        <div class="scroll-head">
-          <span class="scroll-name-wrap">
-            <span class="scroll-name blessing">네레스의 축복이 서린 보석</span>
-            <span class="tooltip">전설의 대장장이 네레스가, 축복을 담아 세공한 보석. 강화 실패시 무기가 파괴되지 않는다.</span>
-          </span>
-          <span class="scroll-count">보유 <span id="blessingCount">0</span>개</span>
-        </div>
-        <div class="scroll-body">
-          <button class="scroll-buy" id="buyBlessingBtn">구매 (<span id="blessingPrice">15000</span> G)</button>
-          <button class="scroll-toggle blessing" id="toggleBlessingBtn">사용 안 함</button>
-        </div>
-      </div>
       </div>
 
       <div id="forgeTabRepair" style="display:none;">

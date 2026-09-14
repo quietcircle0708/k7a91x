@@ -1,9 +1,18 @@
 // ============================================================
 // render.js — 화면(DOM) 렌더링
 // state를 읽어서 화면에 반영하는 함수들. 여기서 state를 직접
-// 바꾸는 경우는 render() 안의 charmActive/blessingActive 자동
+// 바꾸는 경우는 render() 안의 charmActive/blessingActive/focusActive 자동
 // 해제처럼 "표시 조건이 깨졌을 때 정리"하는 최소한의 경우뿐임(원본 그대로 유지).
 // ============================================================
+
+// 기도 아이콘 버튼(끈기/보호/집중) 공통 상태 갱신 — ON이면 불투명+금색 테두리(.on), OFF면 30%
+// 투명도+회색 테두리(기본 CSS), 사용 불가 조건이면 버튼 자체를 disabled 처리.
+function setPrayerButtonState(id, isOn, isDisabled){
+  const btn = el(id);
+  if(!btn) return;
+  btn.classList.toggle('on', isOn);
+  btn.disabled = isDisabled;
+}
 
 function render(){
   const equipped = getEquipped();
@@ -48,14 +57,9 @@ function render(){
     el('enhanceBtn').textContent = '강화하기';
     el('costLine').innerHTML = '장착된 장비가 없습니다';
     el('sellBtn').disabled = true;
-    el('charmCount').textContent = state.charmCount;
-    el('charmPrice').textContent = state.charmPrice.toLocaleString();
-    el('blessingCount').textContent = state.blessingCount;
-    el('blessingPrice').textContent = state.blessingPrice.toLocaleString();
-    el('toggleCharmBtn').disabled = true; el('toggleCharmBtn').textContent = '사용 안 함'; el('toggleCharmBtn').classList.remove('on');
-    el('toggleBlessingBtn').disabled = true; el('toggleBlessingBtn').textContent = '사용 안 함'; el('toggleBlessingBtn').classList.remove('on');
-    el('buyCharmBtn').disabled = state.gold < state.charmPrice;
-    el('buyBlessingBtn').disabled = state.gold < state.blessingPrice;
+    setPrayerButtonState('prayerCharmBtn', false, true);
+    setPrayerButtonState('prayerBlessingBtn', false, true);
+    setPrayerButtonState('prayerFocusBtn', false, true);
   } else {
     el('emptyNotice').style.display = 'none';
     stage.classList.remove('empty');
@@ -85,33 +89,20 @@ function render(){
 
     updateAuraSmoke(!!levelEffect.smoke, levelEffect.glowColor || '#ffffff');
 
-    el('charmCount').textContent = state.charmCount;
-    el('charmPrice').textContent = state.charmPrice.toLocaleString();
-    el('blessingCount').textContent = state.blessingCount;
-    el('blessingPrice').textContent = state.blessingPrice.toLocaleString();
-
     const noEnhanceData = !wpn(type).cost || wpn(type).cost.length === 0; // 아직 강화 단계별 데이터가 없는 장비(숏소드/대거 등)
     const atMax = noEnhanceData || level >= MAX_LEVEL;
-    const odds = atMax ? null : oddsFor(type, level);
-    const downPossible = odds && odds[2] > 0;
-    const destroyPossible = odds && odds[3] > 0;
+    // 화면에 보여줄 확률(끈기/보호가 막아주는 항목은 0%로 접어서 표시, 요구사항14) — 사용 가능 조건
+    // 판정(prayerCanUseCharm/Blessing)은 이 접힌 값이 아니라 effectivePrayerOdds(집중만 반영)를 내부에서
+    // 따로 조회하므로 순환 참조 없음(끈기를 켠 순간 하락이 0%로 보인다고 해서 끈기 자체가 꺼지지 않음).
+    const odds = atMax ? null : displayEnhanceOdds(type, level);
 
-    const charmToggle = el('toggleCharmBtn');
-    const canToggleCharm = downPossible && (state.charmCount > 0 || state.charmActive);
-    charmToggle.disabled = !canToggleCharm;
-    charmToggle.textContent = state.charmActive ? '사용 중' : '사용 안 함';
-    charmToggle.classList.toggle('on', state.charmActive);
-    el('buyCharmBtn').disabled = state.gold < state.charmPrice;
+    if(!prayerCanUseCharm(type, level) && state.charmActive) state.charmActive = false;
+    if(!prayerCanUseBlessing(type, level) && state.blessingActive) state.blessingActive = false;
+    if(!prayerCanUseFocus(type, level) && state.focusActive) state.focusActive = false;
 
-    const blessingToggle = el('toggleBlessingBtn');
-    const canToggleBlessing = destroyPossible && (state.blessingCount > 0 || state.blessingActive);
-    blessingToggle.disabled = !canToggleBlessing;
-    blessingToggle.textContent = state.blessingActive ? '사용 중' : '사용 안 함';
-    blessingToggle.classList.toggle('on', state.blessingActive);
-    el('buyBlessingBtn').disabled = state.gold < state.blessingPrice;
-
-    if(!downPossible && state.charmActive) state.charmActive = false;
-    if(!destroyPossible && state.blessingActive) state.blessingActive = false;
+    setPrayerButtonState('prayerCharmBtn', state.charmActive, atMax || !prayerCanUseCharm(type, level) && !state.charmActive);
+    setPrayerButtonState('prayerBlessingBtn', state.blessingActive, atMax || !prayerCanUseBlessing(type, level) && !state.blessingActive);
+    setPrayerButtonState('prayerFocusBtn', state.focusActive, atMax || !prayerCanUseFocus(type, level) && !state.focusActive);
 
     const oddsRow = el('oddsRow');
     if(noEnhanceData){
@@ -125,13 +116,23 @@ function render(){
       el('enhanceBtn').textContent = '최대 강화 완료';
       el('costLine').innerHTML = '판매하여 새 장비를 시작하세요';
     } else {
-      let chips = `<span class="odds-chip success">성공 ${odds[0]}%</span><span class="odds-chip stay">유지 ${odds[1]}%</span>`;
-      if(odds[2] > 0) chips += `<span class="odds-chip down">하락 ${odds[2]}%</span>`;
-      if(odds[3] > 0) chips += `<span class="odds-chip destroy">파괴 ${odds[3]}%</span>`;
+      // 성공 100%(집중의 기도로 상한에 도달)면 유지/하락/파괴 표시를 전부 숨김(요구사항 3).
+      let chips = `<span class="odds-chip success">성공 ${fmtOddsNum(odds[0])}%</span>`;
+      if(odds[0] < 100){
+        chips += `<span class="odds-chip stay">유지 ${fmtOddsNum(odds[1])}%</span>`;
+        if(odds[2] > 0) chips += `<span class="odds-chip down">하락 ${fmtOddsNum(odds[2])}%</span>`;
+        if(odds[3] > 0) chips += `<span class="odds-chip destroy">파괴 ${fmtOddsNum(odds[3])}%</span>`;
+      }
       oddsRow.innerHTML = chips;
-      el('enhanceBtn').disabled = state.gold < costFor(type, level);
+      const breakdown = enhanceCostBreakdown(type, level);
+      el('enhanceBtn').disabled = state.gold < breakdown.total;
       el('enhanceBtn').textContent = '강화하기';
-      el('costLine').innerHTML = `비용: ${costFor(type, level).toLocaleString()} G · <span class="sell-part">판매가: ${durabilityAdjustedSellValue(sellValueFor(type, level), equipped).toLocaleString()} G</span>`;
+      const sellPart = `<span class="sell-part">판매가: ${durabilityAdjustedSellValue(sellValueFor(type, level), equipped).toLocaleString()} G</span>`;
+      const costTooltip = enhanceCostTooltipText(breakdown);
+      const costText = costTooltip
+        ? `비용: <span class="enhance-cost-wrap enhance-cost-boosted">${breakdown.total.toLocaleString()} G<span class="tooltip">${costTooltip}</span></span>`
+        : `비용: ${breakdown.total.toLocaleString()} G`;
+      el('costLine').innerHTML = `${costText} · ${sellPart}`;
     }
     el('sellBtn').disabled = false;
   }
@@ -174,10 +175,9 @@ function render(){
     el('enhanceBtn').disabled = true;
     el('enhanceBtn').textContent = '강화 중...';
     el('sellBtn').disabled = true;
-    el('buyCharmBtn').disabled = true;
-    el('buyBlessingBtn').disabled = true;
-    el('toggleCharmBtn').disabled = true;
-    el('toggleBlessingBtn').disabled = true;
+    el('prayerCharmBtn').disabled = true;
+    el('prayerBlessingBtn').disabled = true;
+    el('prayerFocusBtn').disabled = true;
     el('openShopBtn').disabled = true;
     el('openInventoryBtn').disabled = true;
     el('openDungeonBtn').disabled = true;
@@ -852,15 +852,6 @@ function renderStoneList(){
 
 function renderConsumableList(){
   const wrap = el('consumableList');
-  const scrolls = [
-    { name: '네레스의 집념이 서린 쇠조각', icon: '🧿', count: state.charmCount,
-      desc: '전설의 대장장이 네레스의 집념이 담겨졌던 파편.', effect: '강화 실패 시 단계가 하락되지 않는다.',
-      note: '강화 화면에서 사용할 수 있어요.' },
-    { name: '네레스의 축복이 서린 보석', icon: '💎', count: state.blessingCount,
-      desc: '전설의 대장장이 네레스가 축복을 담아 세공한 보석.', effect: '강화 실패 시 무기가 파괴되지 않는다.',
-      note: '강화 화면에서 사용할 수 있어요.' },
-  ].filter(it => it.count > 0);
-
   const flasks = Object.values(CONSUMABLES)
     .map(item => ({ item, count: (state.consumables && state.consumables[item.id]) || 0 }))
     .filter(({ count }) => count > 0);
@@ -870,23 +861,12 @@ function renderConsumableList(){
   // weaponIconHtml로 그대로 재사용함(별도 흔적 전용 이미지 없이도 어떤 장비의 흔적인지 한눈에 구분됨).
   const traces = state.traceInventory || [];
 
-  if(scrolls.length === 0 && flasks.length === 0 && traces.length === 0){
+  if(flasks.length === 0 && traces.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 소비 아이템이 없습니다.<br>대장간 강화 화면이나 상점에서 구매할 수 있어요.</div>`;
     return;
   }
 
-  let html = scrolls.map(it => `
-    <div class="inv-card">
-      <div class="inv-icon" style="border-color: var(--forge-line);">${it.icon}</div>
-      <div class="inv-info">
-        <div class="inv-name">${it.name} ×${it.count}</div>
-        <div class="inv-sub">${it.desc}</div>
-        <div class="inv-sub">효과: ${resolveGlossaryTermsHtml(it.effect)}</div>
-        <div class="inv-sub">${it.note}</div>
-      </div>
-    </div>`).join('');
-
-  html += flasks.map(({ item, count }) => `
+  let html = flasks.map(({ item, count }) => `
     <div class="inv-card">
       <div class="inv-icon" style="border-color: var(--forge-line);">${itemIconHtml(item)}</div>
       <div class="inv-info">

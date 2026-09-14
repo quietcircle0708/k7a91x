@@ -27,8 +27,12 @@ let state = {
   traceInventory: [],                           // 보유 흔적 목록({id,forType} — forType은 복구할 장비의 WEAPON_TYPES/
                                                   // ARMOR_TYPES/ACCESSORY_TYPES 키. 강화 파괴 시 processDestroyReward가
                                                   // 지급하고, useTraceItem→confirmTraceRestore로 소모해 +0 장비로 복구함)
-  charmCount: 0, charmPrice: 1500, charmActive: false,
-  blessingCount: 0, blessingPrice: 15000, blessingActive: false,
+  // 보호 장치(기도) — 보유 개수/구매 개념 없이 ON/OFF 상태만 존재(강화 보호 장치 시스템 개편).
+  // charmActive="끈기의 기도"(하락 방지), blessingActive="보호의 기도"(파괴 방지), focusActive="집중의
+  // 기도"(성공률 20% 증가). 이름만 바뀌었을 뿐 charmActive/blessingActive 키 자체는 기존 그대로 재사용.
+  charmActive: false,
+  blessingActive: false,
+  focusActive: false,
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
   equippedArtifacts: [], // 장착 중인 아티팩트 id 목록(최대 ARTIFACT_SLOT_MAX) — 이전엔 저장된 데이터를
                           // 불러올 때(applyLoadedRaw)만 채워졌는데, 저장 데이터가 아예 없는 최초 실행
@@ -575,8 +579,7 @@ function resetGame(){
     subInventory: [], equippedSubId: null,
     accessoryInventory: [], equippedAccessories: [null, null],
     traceInventory: [],
-    charmCount:0, charmPrice:1500, charmActive:false,
-    blessingCount:0, blessingPrice:15000, blessingActive:false,
+    charmActive:false, blessingActive:false, focusActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
     acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0,
     skipEffects:false, autoRebuy:false,

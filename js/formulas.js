@@ -2066,6 +2066,99 @@ function tierOf(level){
   if(level>=9) return 4; if(level>=8) return 3; if(level>=6) return 2; if(level>=3) return 1; return 0;
 }
 
+// ---- 강화 보호 장치(기도) ----
+// 아래 함수들은 모두 "현재 강화 시도 1회"에만 쓰이는 표시/판정용이며, w.odds/w.cost 원본 배열이나
+// computeAverageExpectedCosts/computeWeaponSellPrices(data.js, 게임 시작 시 1회 계산되는 기대비용/
+// 판매가)에는 절대 접근하거나 영향을 주지 않음 — 항상 oddsFor/costFor로 얻은 값을 복사해서만 가공함.
+
+// 집중의 기도 보정: 성공 확률에 ×1.2(최대 100%) 적용, 증가분은 유지/하락에서 균등 차감(부족하면
+// 반대쪽에서 추가 차감), 파괴 확률은 절대 건드리지 않음. baseOdds를 직접 수정하지 않고 새 배열 반환.
+function focusAdjustedOdds(baseOdds, focusActive){
+  if(!baseOdds) return baseOdds;
+  if(!focusActive) return baseOdds.slice();
+  const success = Math.min(100, baseOdds[0] * 1.2);
+  const increase = Math.max(0, success - baseOdds[0]);
+  const destroy = baseOdds[3]; // 파괴 확률은 항상 원본 그대로 유지
+  let stay = baseOdds[1];
+  let down = baseOdds[2];
+  if(increase > 0){
+    let stayCut = increase / 2, downCut = increase / 2;
+    if(stay < stayCut){ downCut += (stayCut - stay); stayCut = stay; }
+    if(down < downCut){ stayCut += (downCut - down); downCut = down; }
+    // 유지+하락 합계보다 증가분이 큰 극단적인 경우(현재 실제 확률표에서는 발생하지 않음)에도 파괴
+    // 확률은 절대 건드리지 않기 위한 최종 방어 clamp.
+    stayCut = Math.min(stayCut, stay);
+    downCut = Math.min(downCut, down);
+    stay = Math.max(0, stay - stayCut);
+    down = Math.max(0, down - downCut);
+  }
+  return [success, stay, down, destroy];
+}
+
+// 현재 화면에 표시/실제 판정에 쓰일 최종 확률 — 집중의 기도만 반영(끈기/보호는 확률 자체를 바꾸지
+// 않고 판정 이후 결과를 가로채는 방식, 기존 로직 그대로 유지). null-safe.
+function effectivePrayerOdds(type, level){
+  const base = oddsFor(type, level);
+  if(!base) return null;
+  return focusAdjustedOdds(base, state.focusActive);
+}
+
+// 화면에 "표시"할 확률 — effectivePrayerOdds(집중만 반영, 실제 판정용)에서 한 단계 더 나아가
+// 끈기/보호가 막아주는 항목을 0으로 접고 그만큼을 유지(%)로 흡수해서 보여줌(요구사항 14). 실제
+// 판정(resolveEnhance)은 여전히 "굴린 뒤 결과를 가로채는" 기존 구조를 그대로 쓰지만(요구사항 15),
+// 통계적으로 정확히 같은 분포이므로 화면 표시만 이렇게 미리 접어도 실제 확률과 어긋나지 않음.
+function displayEnhanceOdds(type, level){
+  const odds = effectivePrayerOdds(type, level);
+  if(!odds) return null;
+  if(state.blessingActive) return [odds[0], odds[1] + odds[3], odds[2], 0];
+  if(state.charmActive) return [odds[0], odds[1] + odds[2], 0, odds[3]];
+  return odds;
+}
+
+// 사용 가능 조건(요구사항 5) — 끈기/보호는 서로 배타적이며, 둘 다 "현재 표시되는(집중 반영된)"
+// 하락/파괴 확률이 0보다 커야 함. 강화 데이터가 없거나 최대 강화인 경우 셋 다 사용 불가.
+function prayerCanUseCharm(type, level){
+  const odds = effectivePrayerOdds(type, level);
+  return !!odds && odds[2] > 0 && level <= 6 && !state.blessingActive;
+}
+function prayerCanUseBlessing(type, level){
+  const odds = effectivePrayerOdds(type, level);
+  return !!odds && odds[3] > 0 && level <= 7 && !state.charmActive;
+}
+function prayerCanUseFocus(type, level){
+  const base = oddsFor(type, level);
+  return !!base && base[0] < 100;
+}
+
+// 강화 비용 배율 계산 — 기본 강화 비용(costFor)에 활성화된 기도들의 배율을 더해서 "이번 강화 1회"의
+// 실제 비용만 계산함. 반환된 값은 오직 startEnhance(실제 차감)와 render(화면 표시/툴팁)에서만 쓰이고,
+// computeAverageExpectedCosts/computeWeaponSellPrices가 참조하는 w.cost 배열 자체는 전혀 건드리지 않음.
+function enhanceCostBreakdown(type, level){
+  const base = costFor(type, level);
+  if(base === undefined) return { base, total: base, parts: [] };
+  const parts = [];
+  if(state.charmActive) parts.push({ key: 'charm', label: PRAYERS.charm.name, mult: PRAYERS.charm.costMult });
+  if(state.blessingActive) parts.push({ key: 'blessing', label: PRAYERS.blessing.name, mult: PRAYERS.blessing.costMult });
+  if(state.focusActive) parts.push({ key: 'focus', label: PRAYERS.focus.name, mult: PRAYERS.focus.costMult });
+  const total = Math.round(base + parts.reduce((sum, p) => sum + base * p.mult, 0));
+  return { base, total, parts };
+}
+
+// 비용 툴팁 문구(요구사항 13) — "100 + (100 × 5.0)[보호] + (100 × 2.0)[집중] = 800 G" 형태.
+// 활성화된 기도가 하나도 없으면 null(호출부가 기존 표시/동작을 그대로 유지하도록).
+function enhanceCostTooltipText(breakdown){
+  if(!breakdown || breakdown.parts.length === 0) return null;
+  const terms = breakdown.parts.map(p => `(${breakdown.base.toLocaleString()} × ${p.mult.toFixed(1)})[${p.label.replace('의 기도','')}]`);
+  return `${breakdown.base.toLocaleString()} + ${terms.join(' + ')} = ${breakdown.total.toLocaleString()} G`;
+}
+
+
+// 집중의 기도 적용 시 유지/하락 50:50 분배 과정에서 소수(.5%p)가 나올 수 있어(예: 65%→78%, 증가분
+// 13%p를 반씩 나누면 6.5%p) 정수면 그대로, 아니면 소수점 1자리까지만 표시(총합 100%는 항상 유지됨).
+function fmtOddsNum(n){
+  return Number.isInteger(n) ? n : (Math.round(n * 10) / 10);
+}
+
 // ---- 강화 결과 추첨 ----
 function weightedOutcome(odds){
   const r = Math.random()*100;

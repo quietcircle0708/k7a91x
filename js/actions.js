@@ -35,12 +35,12 @@ function startEnhance(){
   const level = equipped.level;
   const type = equipped.type || 'longsword';
   if(level >= MAX_LEVEL) return;
-  const cost = costFor(type, level);
-  if(cost === undefined) return; // 아직 강화 데이터가 없는 무기(숏소드/대거 등)
-  if(state.gold < cost) return;
+  const breakdown = enhanceCostBreakdown(type, level); // 기도 배율이 적용된 "이번 강화 1회"의 실제 비용
+  if(breakdown.total === undefined) return; // 아직 강화 데이터가 없는 무기(숏소드/대거 등)
+  if(state.gold < breakdown.total) return;
 
   isEnhancing = true;
-  state.gold -= cost;
+  state.gold -= breakdown.total;
   state.totalAttempts++;
   showMsg('', '');
   render();
@@ -55,7 +55,7 @@ function startEnhance(){
   stage.classList.add('charging');
   startEmbers();
 
-  const highRisk = oddsFor(type, level)[3] > 0; // 파괴 확률이 있는 단계는 긴장감 있게 연출을 더 길게
+  const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[3] > 0; // 파괴 확률이 있는 단계는 긴장감 있게 연출을 더 길게
   const delay = highRisk ? 1000 : 700;
   setTimeout(()=> resolveEnhance(equipped.id, level), delay);
 }
@@ -72,7 +72,7 @@ function resolveEnhance(itemId, level){
   const isArmorItem = equipTypeNow === 'armor';
   const isAccessoryItem = equipTypeNow === 'accessory';
 
-  const odds = oddsFor(type, level);
+  const odds = effectivePrayerOdds(type, level); // 집중의 기도 반영(끈기/보호는 확률이 아니라 판정 결과를 가로챔, 아래)
   let outcome = weightedOutcome(odds);
 
   const stage = el('swordStage');
@@ -82,15 +82,16 @@ function resolveEnhance(itemId, level){
 
   let blessingTriggered = false, charmTriggered = false, popLevelDisplay = false;
 
-  if(outcome === 'destroy' && state.blessingActive && state.blessingCount > 0){
-    state.blessingCount--;
-    state.blessingActive = false;
-    outcome = 'down';
+  // 끈기/보호의 기도는 더 이상 개수를 소모하는 소비 아이템이 아니라 ON/OFF 상태이므로, 발동해도
+  // 여기서 끄지 않음 — 다음 강화에서도 사용 조건(prayerCanUseCharm/Blessing)을 계속 만족하는 한
+  // render()가 알아서 ON 상태를 유지시키고, 조건이 깨지는 순간에만 자동으로 꺼짐(요구사항 17).
+  // 보호의 기도: "파괴 방지 → 현재 단계 유지"(요구사항 원문) — 파괴가 하락으로 완화되는 게 아니라
+  // 곧바로 유지(stay)로 전환됨. 끈기의 기도도 동일하게 하락→유지로 직접 전환.
+  if(outcome === 'destroy' && state.blessingActive){
+    outcome = 'stay';
     blessingTriggered = true;
   }
-  if(outcome === 'down' && state.charmActive && state.charmCount > 0){
-    state.charmCount--;
-    state.charmActive = false;
+  if(outcome === 'down' && state.charmActive){
     outcome = 'stay';
     charmTriggered = true;
   }
@@ -116,9 +117,12 @@ function resolveEnhance(itemId, level){
       showMsg('강화 성공! +' + item.level, 'success');
     }
   } else if(outcome === 'stay'){
-    if(charmTriggered){
+    if(blessingTriggered){
+      vortexBurst('var(--forge-blue)');
+      showMsg('보호의 기도가 파괴를 막아냈습니다 (+' + item.level + ')', 'stay');
+    } else if(charmTriggered){
       vortexBurst('var(--forge-green)');
-      showMsg('쇠조각의 집념이 하락을 막아냈습니다', 'stay');
+      showMsg('끈기의 기도가 하락을 막아냈습니다', 'stay');
     } else {
       smokePuff();
       showMsg('실패... 레벨 유지', 'stay');
@@ -127,12 +131,7 @@ function resolveEnhance(itemId, level){
     item.level = Math.max(0, level - 1);
     stage.classList.add('shake');
     smokePuff(8);
-    if(blessingTriggered){
-      vortexBurst('var(--forge-blue)');
-      showMsg('보석이 부서지며 파괴를 막아냈습니다 (+' + item.level + ')', 'down');
-    } else {
-      showMsg('실패! 레벨이 하락했습니다 (+' + item.level + ')', 'down');
-    }
+    showMsg('실패! 레벨이 하락했습니다 (+' + item.level + ')', 'down');
   } else if(outcome === 'destroy'){
     state.totalDestroys++;
     stage.classList.add('shake-hard');
@@ -339,29 +338,37 @@ function selectForgeTarget(id){
   closeForgeSelect();
 }
 
-// ---- 보호 장치(쇠조각/보석) ----
+// ---- 보호 장치(기도: 끈기/보호/집중) ----
+// 더 이상 구매/보유 개수 개념이 없는 ON-OFF 토글. OFF로 끄는 것은 항상 허용하고, ON으로 켤 때만
+// prayerCanUseXXX(formulas.js)의 사용 가능 조건을 검사함(끈기/보호 동시 사용 불가 포함).
 function toggleCharm(){
-  if(isEnhancing || !getEquipped() || !(state.charmCount > 0 || state.charmActive)) return;
+  if(isEnhancing) return;
+  const equipped = getEquipped();
+  if(!equipped) return;
+  const type = equipped.type || 'longsword';
+  const level = equipped.level;
+  if(!state.charmActive && !prayerCanUseCharm(type, level)) return;
   state.charmActive = !state.charmActive;
   render(); saveState();
 }
 function toggleBlessing(){
-  if(isEnhancing || !getEquipped() || !(state.blessingCount > 0 || state.blessingActive)) return;
+  if(isEnhancing) return;
+  const equipped = getEquipped();
+  if(!equipped) return;
+  const type = equipped.type || 'longsword';
+  const level = equipped.level;
+  if(!state.blessingActive && !prayerCanUseBlessing(type, level)) return;
   state.blessingActive = !state.blessingActive;
   render(); saveState();
 }
-function buyCharm(btn){
-  if(isEnhancing || state.gold < state.charmPrice) return;
-  state.gold -= state.charmPrice;
-  state.charmCount++;
-  purchaseEffect(btn || null);
-  render(); saveState();
-}
-function buyBlessing(btn){
-  if(isEnhancing || state.gold < state.blessingPrice) return;
-  state.gold -= state.blessingPrice;
-  state.blessingCount++;
-  purchaseEffect(btn || null);
+function toggleFocus(){
+  if(isEnhancing) return;
+  const equipped = getEquipped();
+  if(!equipped) return;
+  const type = equipped.type || 'longsword';
+  const level = equipped.level;
+  if(!state.focusActive && !prayerCanUseFocus(type, level)) return;
+  state.focusActive = !state.focusActive;
   render(); saveState();
 }
 

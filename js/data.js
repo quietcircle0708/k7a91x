@@ -3702,6 +3702,27 @@ const ENHANCE_LEVEL_EFFECTS = [
 const DROP_GLOW_ITEM_KEYWORD = '호박';
 const DROP_GLOW_GRADE_LEVEL = { normal: 0, rare: 3, epic: 5, unique: 7 };
 
+// ---- 강화 보호 장치(기도) ----
+// 기존 "네레스의 집념이 서린 쇠조각/축복이 서린 보석"을 이름만 바꾸고(효과 동일), "집중의 기도"를
+// 신규 추가함. 보유 개수/구매가 없는 ON-OFF 방식으로 개편(state.charmActive/blessingActive/focusActive).
+// costMult는 "현재 선택된 강화의 기본 강화 비용" 기준 배율(예: 끈기 ON이면 기본비용×3.0이 추가로 붙음) —
+// 이 배율은 실제 강화 1회 비용에만 적용되고, 기대 강화 비용/판매가 계산(computeAverageExpectedCosts,
+// computeWeaponSellPrices)에는 전혀 관여하지 않음(별도 함수 enhanceCostBreakdown에서만 사용, formulas.js).
+const PRAYERS = {
+  charm: {
+    key: 'charm', name: '끈기의 기도', desc: '적용 시 강화 단계 하락 방지', costMult: 2.5,
+    image: 'prayer_charm',
+  },
+  blessing: {
+    key: 'blessing', name: '보호의 기도', desc: '적용 시 아이템 파괴 방지', costMult: 3.0,
+    image: 'prayer_blessing',
+  },
+  focus: {
+    key: 'focus', name: '집중의 기도', desc: '적용 시 성공 확률 20% 증가', costMult: 2.0,
+    image: 'prayer_focus',
+  },
+};
+
 // 저장소 키
 const STORAGE_KEY = 'forge-state-v5';
 

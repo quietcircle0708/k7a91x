@@ -6,10 +6,9 @@
 
 el('enhanceBtn').addEventListener('click', startEnhance);
 el('sellBtn').addEventListener('click', doSell);
-el('toggleCharmBtn').addEventListener('click', toggleCharm);
-el('toggleBlessingBtn').addEventListener('click', toggleBlessing);
-el('buyCharmBtn').addEventListener('click', (e)=> buyCharm(e.currentTarget));
-el('buyBlessingBtn').addEventListener('click', (e)=> buyBlessing(e.currentTarget));
+el('prayerCharmBtn').addEventListener('click', toggleCharm);
+el('prayerBlessingBtn').addEventListener('click', toggleBlessing);
+el('prayerFocusBtn').addEventListener('click', toggleFocus);
 el('invTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-tab]');
   if(!btn) return;
