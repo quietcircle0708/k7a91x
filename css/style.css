@@ -1103,7 +1103,7 @@
   .eq-slot.filled{ border-style:solid; border-color: var(--forge-gold); background:#2c2415; }
   .eq-slot-empty-label{ font-size:10.5px; color: var(--forge-cream-dim); text-align:center; padding:0 2px; }
   .eq-slot-artifact .eq-slot-empty-label{ font-size:8.5px; } /* 30% 축소된 슬롯 크기에 맞춰 라벨도 축소 */
-  .eq-slot-icon-img{ width:34px; height:auto; max-height:44px; object-fit:contain; }
+  .eq-slot-icon-img{ width:44px; height:auto; max-height:44px; object-fit:contain; }
   .eq-slot-artifact .eq-slot-icon-img, .eq-slot-artifact .item-icon-img{ width:24px; max-height:31px; } /* 30% 축소 */
   .eq-slot .tooltip{ width:220px; left:50%; transform:translateX(-50%); bottom:112%; }
   .eq-slot:hover .tooltip{ visibility:visible; opacity:1; }

@@ -1276,7 +1276,7 @@ const ACCESSORY_TYPES = {
     grade: 'unique', // 유니크
     defense: -4, hp: 200, mana: 100, crit: 9,
     purchasable: false, sellPrice: 30000, levelReq: 50,
-    image: '', // 비워두면 반지 기본 이미지(ringbase) 자동 적용(ACCESSORY_DEFAULT_IMAGE)
+    image: 'unique_wolfmoonring',
   },
 };
 
