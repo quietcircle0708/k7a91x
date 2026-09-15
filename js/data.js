@@ -1584,7 +1584,7 @@ Object.values(WEAPON_TYPES).forEach(w => {
 // ============================================================
 
 // 강화 단계별 판매 배율. index = 강화 단계(1~9). 무기 종류/등급과 무관하게 고정값.
-const ENHANCE_SELL_STEP_MULT = [null, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.05, 1.08, 1.10];
+const ENHANCE_SELL_STEP_MULT = [null, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.20, 1.20, 1.20];
 
 // 선형연립방정식 Ax=b를 가우스 소거법(부분 피벗팅)으로 푸는 범용 함수.
 // 평균 기대비용 계산 전용으로 쓰지만, 그 자체로는 강화 시스템과 무관한 독립적인 수학 유틸리티.
@@ -1610,26 +1610,41 @@ function solveLinearSystem(A, b){
   return M.map(row => row[n]);
 }
 
+// 파괴 발생 시 "재획득비용(reacquireCost)을 내고 +0부터 같은 목표까지 다시 강화" 하는 재귀를 최대
+// 이 횟수만큼만 적용한다(4번째 파괴부터는 추가 재획득 비용을 기대비용에 포함하지 않음 — 7번 문서 참고).
+const ENHANCE_SELL_MAX_DESTROY_RECURSION = 3;
+
 // 현재 강화 비용(cost)/강화 확률(odds)을 그대로 사용해, 목표 강화 단계(+1~+최대단계)까지 도달하는
-// "평균 기대비용"을 각각 계산. 파괴가 발생하면 재획득비용(reacquireCost)을 내고 +0부터 같은 목표까지
-// 다시 강화하는 전체 비용(자기 자신, E_0)이 다시 더해지는 재귀 구조라, 단계별로 연립방정식을 세워서 품.
+// "평균 기대비용"을 각각 계산. 파괴가 발생하면 재획득비용을 내고 +0부터 같은 목표까지 다시 강화하는
+// 전체 비용이 다시 더해지는 재귀 구조이되, 이 재귀는 최대 ENHANCE_SELL_MAX_DESTROY_RECURSION회까지만
+// 적용됨 — "파괴가 몇 번째로 발생했는가"를 레벨(j)로 두고, j=최대치(재귀 더 못 함) → j=0(최초 시도)
+// 순으로 각각 독립된 연립방정식을 풀어 내려간다(j=최대치 단계는 파괴 항 자체를 방정식에서 제외해
+// "추가 재획득 비용 없이 그대로 종료"를 표현, 그 이하 단계는 한 단계 위(j+1)에서 구한 E_0을 상수로
+// 대입해 사용 — 자기 자신을 참조하는 항이 사라지므로 단순 삼중대각 연립방정식이 됨).
 // (기존 강화 진행 로직과는 완전히 분리된 독립 계산 함수 — cost/odds 값만 입력받아 결과만 반환함)
-function computeAverageExpectedCosts(cost, odds, reacquireCost){
+function computeAverageExpectedCosts(cost, odds, reacquireCost, maxDestroyRecursion = ENHANCE_SELL_MAX_DESTROY_RECURSION){
   const maxLevel = Math.min(cost.length, odds.length);
   const results = [];
   for(let target = 1; target <= maxLevel; target++){
     const n = target; // 미지수: 0부터 target까지, 각 단계(0~target-1)에서의 기대비용 E_0 ... E_(n-1)
-    const A = Array.from({ length: n }, () => new Array(n).fill(0));
-    const b = new Array(n).fill(0);
-    for(let i = 0; i < n; i++){
-      const [ps, pt, pd, px] = odds[i].map(v => v / 100);
-      A[i][i] += 1 - pt;              // 유지: 같은 자리에 머무름
-      A[i][Math.max(i - 1, 0)] -= pd; // 하락: 한 단계 아래로 (0 밑으로는 안 내려감)
-      A[i][0] -= px;                  // 파괴: 재획득 후 다시 0부터
-      if(i + 1 < n) A[i][i + 1] -= ps; // 성공: 목표(n)에 도달하면 그 이후 비용은 0이라 항이 없음
-      b[i] = cost[i] + px * reacquireCost;
+    let e0FromDeeperLevel = 0; // j=maxDestroyRecursion 단계에서 쓰일, "더 이상 재귀 없음"을 나타내는 값(0)
+    for(let j = maxDestroyRecursion; j >= 0; j--){
+      const A = Array.from({ length: n }, () => new Array(n).fill(0));
+      const b = new Array(n).fill(0);
+      const isCapLevel = j === maxDestroyRecursion; // 이 단계에서 파괴가 나면 그게 4번째(=cap+1번째) 파괴
+      for(let i = 0; i < n; i++){
+        const [ps, pt, pd, px] = odds[i].map(v => v / 100);
+        A[i][i] += 1 - pt;              // 유지: 같은 자리에 머무름
+        A[i][Math.max(i - 1, 0)] -= pd; // 하락: 한 단계 아래로 (0 밑으로는 안 내려감)
+        if(i + 1 < n) A[i][i + 1] -= ps; // 성공: 목표(n)에 도달하면 그 이후 비용은 0이라 항이 없음
+        // 파괴 항: cap 단계면 재획득 비용도, 더 아래 단계로의 재귀도 전혀 없음(추가 비용 0).
+        // cap이 아니면, 한 단계 아래(j+1)에서 이미 구해둔 E_0 상수를 그대로 더함(자기참조 항이 아니므로
+        // 좌변(A)에는 반영할 게 없고 우변(b)에만 더해짐).
+        b[i] = cost[i] + (isCapLevel ? 0 : px * (reacquireCost + e0FromDeeperLevel));
+      }
+      e0FromDeeperLevel = solveLinearSystem(A, b)[0]; // 이번 단계(j)의 E_0 = 0부터 target까지의 평균 기대비용
     }
-    results.push(solveLinearSystem(A, b)[0]); // E_0 = 0부터 target까지의 평균 기대비용
+    results.push(e0FromDeeperLevel); // j=0(최초 시도) 단계에서 구한 E_0이 최종 결과
   }
   return results; // index0 = +1까지 기대비용, ... index(maxLevel-1) = +maxLevel까지 기대비용
 }
@@ -2264,6 +2279,7 @@ CRAFTABLE_ITEMS.weapon.push(
     successChance: 15, craftCost: 50000,
     materials: [
       { name: "월도'흑", need: 1 },
+      { name: '원한이 담긴 유서', need: 5 },
       { name: '반짝이는 돌', need: 2 },
       { name: '현철', need: 10 },
       { name: '흑철', need: 10 },
@@ -2280,6 +2296,7 @@ CRAFTABLE_ITEMS.weapon.push(
     successChance: 15, craftCost: 50000,
     materials: [
       { name: '흑철중검', need: 1 },
+      { name: '원한이 담긴 유서', need: 5 },
       { name: '반짝이는 돌', need: 2 },
       { name: '현철', need: 10 },
       { name: '흑철', need: 10 },
@@ -2296,6 +2313,7 @@ CRAFTABLE_ITEMS.weapon.push(
     successChance: 15, craftCost: 50000,
     materials: [
       { name: '흑철비도', need: 1 },
+      { name: '원한이 담긴 유서', need: 5 },
       { name: '반짝이는 돌', need: 2 },
       { name: '현철', need: 10 },
       { name: '흑철', need: 10 },
@@ -3364,9 +3382,6 @@ const MONSTERS = {
       { name: '진호박', chance: 30 },
       { name: '반짝이는 돌', chance: 5 },
       { name: '현철', chance: 15 },
-      { name: "월도'흑", chance: 1, weaponId: 'moonsword_black' },
-      { name: '흑철중검', chance: 1, weaponId: 'heavysword_black' },
-      { name: '흑철비도', chance: 1, weaponId: 'heavydagger_black' },
     ],
   },
   // 해골굴 신규 몬스터 4종. 사해골/불산은 흑령굴 사령/원령과 완전히 동일한 구조(epicSpawnWeight+
@@ -3401,9 +3416,6 @@ const MONSTERS = {
       { name: '진호박', chance: 20 },
       { name: '현철', chance: 10 },
       { name: '흑철', chance: 10 },
-      { name: "월도'흑", chance: 2, weaponId: 'moonsword_black' },
-      { name: '흑철중검', chance: 2, weaponId: 'heavysword_black' },
-      { name: '흑철비도', chance: 2, weaponId: 'heavydagger_black' },
       { name: '원한이 담긴 유서', chance: 5 },
     ],
   },
@@ -3415,12 +3427,9 @@ const MONSTERS = {
       { name: '진호박', chance: 30 },
       { name: '반짝이는 돌', chance: 5 },
       { name: '현철', chance: 15 },
-      { name: "월도'흑", chance: 4, weaponId: 'moonsword_black' },
-      { name: '흑철중검', chance: 4, weaponId: 'heavysword_black' },
-      { name: '흑철비도', chance: 4, weaponId: 'heavydagger_black' },
-      { name: '진월도', chance: 2, weaponId: 'moonsword_unique' },
-      { name: '진혼검', chance: 2, weaponId: 'heavysword_unique' },
-      { name: '혈영비도', chance: 2, weaponId: 'heavydagger_unique' },
+      { name: "월도'흑", chance: 0.5, weaponId: 'moonsword_black' },
+      { name: '흑철중검', chance: 0.5, weaponId: 'heavysword_black' },
+      { name: '흑철비도', chance: 0.5, weaponId: 'heavydagger_black' },
       { name: '원한이 담긴 유서', chance: 10 },
     ],
   },
