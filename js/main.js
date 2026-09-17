@@ -332,6 +332,14 @@ el('skillResetConfirmBtn').addEventListener('click', confirmSkillReset);
 el('krStopBtn').addEventListener('click', returnToVillage);
 el('krContinueBtn').addEventListener('click', advanceStage);
 el('krRetryBtn').addEventListener('click', retryDungeon);
+// 보상창 "획득 아이템" 그리드의 페이지 이동 버튼 — #krRewards는 innerHTML로 매번 다시 그려지므로
+// (그 안의 .reward-item-pager는 정적 요소가 아님), 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.
+el('krRewards').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.pager-btn');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
 el('dungeonListPager').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;

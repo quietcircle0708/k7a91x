@@ -1185,6 +1185,30 @@
     color: var(--forge-gold); font-weight:900; text-align:center; font-size:14px;
     text-shadow: 0 0 8px rgba(224,177,60,.6); margin-top:4px;
   }
+  /* 던전 전투 종료 보상창 "획득 아이템" 아이콘 그리드(5열×3행). 슬롯 자체는 기존 인벤토리 아이콘
+     슬롯(.inv-icon)과 같은 구조(테두리색은 인라인 style로 등급/종류별 색을 그대로 받아옴)를 재사용하되
+     보상창 전용 크기로만 새로 잡음 — 새 아이콘/등급 표시 규칙은 만들지 않음. */
+  .reward-item-section{ margin-top:6px; padding-top:10px; border-top:1px dashed var(--forge-line); }
+  .reward-item-title{ text-align:center; font-size:11px; color: var(--forge-cream-dim); margin-bottom:8px; letter-spacing:.02em; }
+  .reward-item-grid{ display:flex; flex-direction:column; gap:6px; }
+  /* 첫 번째 줄만 실제 슬롯 개수에 맞춰 가운데 정렬, 두 번째 줄부터는 기본값(왼쪽 정렬)을 그대로 둠
+     (4번 문서 "정렬 규칙") — 줄 단위 div가 달라서 줄마다 다른 정렬을 줄 수 있음. */
+  .reward-item-row{ display:flex; gap:6px; }
+  .reward-item-row-first{ justify-content:center; }
+  .reward-item-slot{
+    position:relative; flex-shrink:0; width:42px; height:42px; border-radius:9px;
+    border:1.5px solid var(--forge-line); background: var(--forge-panel);
+    display:flex; align-items:center; justify-content:center; font-size:19px;
+  }
+  .reward-item-slot .reward-icon-img{ width:28px; height:28px; object-fit:contain; }
+  .reward-item-qty{
+    position:absolute; right:2px; bottom:0px; font-size:10.5px; font-weight:700; color:#fff;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 2px #000;
+    line-height:1; z-index:2; pointer-events:none;
+  }
+  .reward-item-slot .tooltip{ width:200px; left:50%; transform:translateX(-50%); bottom:120%; line-height:1.6; }
+  .reward-item-slot:hover .tooltip{ visibility:visible; opacity:1; }
+  .reward-item-pager{ display:flex; justify-content:center; margin-top:10px; }
 
   #spawnToast{
     position:absolute; top:2px; left:50%; transform:translate(-50%,-6px);

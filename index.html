@@ -64,15 +64,15 @@
         <div class="prayer-icon-col" id="prayerIconCol">
           <button class="prayer-icon-btn" id="prayerCharmBtn" title="끈기의 기도">
             <img src="assets/ui/prayer_charm.svg" class="prayer-icon-img" alt="끈기의 기도">
-            <span class="tooltip">끈기의 기도<br>적용 시 강화 단계 하락 방지<br>강화 비용 × 2.5<br><em>*보호의 기도와 중복 사용 불가</em></span>
+            <span class="tooltip">끈기의 기도<br>현재 비활성화(강화 단계 하락 결과가 삭제되어 추후 개편 예정)</span>
           </button>
           <button class="prayer-icon-btn" id="prayerBlessingBtn" title="보호의 기도">
             <img src="assets/ui/prayer_blessing.svg" class="prayer-icon-img" alt="보호의 기도">
-            <span class="tooltip">보호의 기도<br>적용 시 아이템 파괴 방지<br>강화 비용 × 3.0<br><em>*끈기의 기도와 중복 사용 불가</em></span>
+            <span class="tooltip">보호의 기도<br>적용 시 <span style="color:var(--forge-blood);">파괴</span> 확률 <b style="color:var(--forge-gold);">30%</b> 감소<br>강화 비용 × <b style="color:var(--forge-gold);">3.5</b><br><em>*끈기의 기도와 중복 사용 불가</em></span>
           </button>
           <button class="prayer-icon-btn" id="prayerFocusBtn" title="집중의 기도">
             <img src="assets/ui/prayer_focus.svg" class="prayer-icon-img" alt="집중의 기도">
-            <span class="tooltip">집중의 기도<br>적용 시 성공 확률 20% 증가<br>강화 비용 × 2.0</span>
+            <span class="tooltip">집중의 기도<br>적용 시 <span style="color:var(--forge-green);">성공</span> 확률 <b style="color:var(--forge-gold);">15%</b> 증가<br>강화 비용 × <b style="color:var(--forge-gold);">2.0</b></span>
           </button>
         </div>
         <div class="sword-visual" id="swordVisual">
@@ -343,7 +343,7 @@
                #monsterRow는 renderMonsterRow()/enterStage()가 innerHTML을 통째로 다시 쓰므로, 그 영향을
                받지 않도록 monsterRow와 별도인 combat-arena의 직계 자식으로 둠 — id/클릭 이벤트(main.js의
                clickTreasureChest 리스너)·표시 로직(renderHunt)은 기존 그대로 재사용. -->
-          <div class="monster-icon treasure-chest" id="treasureChest" style="display:none;">🎁</div>
+          <div class="monster-icon treasure-chest" id="treasureChest" style="display:none;"></div>
           <div class="monster-row" id="monsterRow"></div>
         </div>
         <div class="skill-quickslot-row">

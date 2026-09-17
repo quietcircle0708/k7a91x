@@ -1953,6 +1953,89 @@ function resolveDrops(monsterDef, dungeon, level){
   return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, artifactDropIds, miscDrops };
 }
 
+// ---- 던전 전투 종료 보상창의 "획득 아이템" 아이콘 그리드 표시용 데이터 ----
+// 실제 지급/드랍 로직(resolveDrops, killMonsterInstance)에는 전혀 관여하지 않는 순수 표시용 변환 함수.
+// hunt.pendingRewards(이미 지급이 끝난 결과 데이터)를 그대로 입력받아, 보상창에 그릴 슬롯 배열만
+// 만들어 반환함 — 원본 pendingRewards 객체는 건드리지 않고 읽기만 함.
+// 정렬: 1순위 종류(장비>소비>기타>마석), 2순위 등급(유니크>에픽>레어>일반, WEAPON_GRADE_RANK 재사용).
+// 동일 종류+동일 등급(또는 등급 자체가 없는 종류)끼리는 Array.sort의 안정 정렬 특성으로 기존 획득 순서가
+// 그대로 유지됨. 아이템 이름을 하드코딩해 분기하지 않고 데이터(itemClass/grade/equipType)만으로 분류하므로
+// 새로 추가되는 장비/소비/기타/마석도 이 함수 수정 없이 자동으로 대응됨.
+const REWARD_ITEM_CATEGORY_ORDER = ['equip', 'consumable', 'misc', 'stone'];
+function buildRewardDisplayItems(rewards){
+  const slots = [];
+  const pushEquipSlot = (type, level, grade) => {
+    // equipInstanceDisplayInfo(render.js)를 그대로 재사용해 등급색/툴팁을 얻되, 보상창 전용 크기의
+    // 아이콘만 새로 생성함(다른 화면들도 화면마다 아이콘 크기 클래스만 다르게 재사용하는 기존 방식과 동일).
+    const info = equipInstanceDisplayInfo({ level, damaged: false, currentDurability: undefined }, type);
+    slots.push({
+      category: 'equip',
+      gradeRank: WEAPON_GRADE_RANK[grade] ?? -1,
+      iconHtml: weaponIconHtml(type, 'reward-icon-img', level),
+      tooltipHtml: info.tooltipHtml,
+      borderColor: info.color,
+      qty: null,
+    });
+  };
+  rewards.weaponDrops.forEach(w => pushEquipSlot(w.type, w.level, wpn(w.type).grade));
+  rewards.weaponIdDrops.forEach(w => pushEquipSlot(w.type, w.level, wpn(w.type).grade));
+  rewards.artifactDrops.forEach(id => {
+    const a = ARTIFACTS[id];
+    if(!a) return;
+    // 8번 문서: 아티팩트는 "기타"가 아니라 장비 카테고리로 취급하고, 장비와 동일하게 절대 합치지 않음.
+    slots.push({
+      category: 'equip',
+      gradeRank: WEAPON_GRADE_RANK[a.grade] ?? -1,
+      iconHtml: itemIconHtml(a, 'reward-icon-img'),
+      tooltipHtml: buildArtifactTooltipHtml(id),
+      borderColor: artifactNameColor(id),
+      qty: null,
+    });
+  });
+  Object.keys(rewards.flaskDrops).forEach(itemId => {
+    const item = CONSUMABLES[itemId];
+    if(!item) return;
+    slots.push({
+      category: 'consumable',
+      gradeRank: -1, // 소비 아이템은 등급 필드가 없음 — 정렬 대상 아님(안정 정렬로 기존 순서 유지)
+      iconHtml: itemIconHtml(item, 'reward-icon-img'),
+      tooltipHtml: buildConsumableTooltipHtml(itemId),
+      borderColor: 'var(--forge-line)',
+      qty: rewards.flaskDrops[itemId],
+    });
+  });
+  Object.keys(rewards.miscDrops).forEach(itemId => {
+    const item = MISC_ITEMS[itemId];
+    if(!item) return;
+    slots.push({
+      category: 'misc',
+      gradeRank: WEAPON_GRADE_RANK[item.grade] ?? -1,
+      iconHtml: itemIconHtml(item, 'reward-icon-img'),
+      tooltipHtml: buildMiscTooltipHtml(itemId),
+      borderColor: miscNameColor(itemId),
+      qty: rewards.miscDrops[itemId].qty,
+    });
+  });
+  Object.keys(rewards.stoneDrops).forEach(itemId => {
+    const item = MISC_ITEMS[itemId];
+    if(!item) return;
+    slots.push({
+      category: 'stone',
+      gradeRank: WEAPON_GRADE_RANK[item.grade] ?? -1,
+      iconHtml: itemIconHtml(item, 'reward-icon-img'),
+      tooltipHtml: buildStoneTooltipHtml(itemId),
+      borderColor: stoneNameColor(itemId),
+      qty: rewards.stoneDrops[itemId],
+    });
+  });
+
+  const catRank = c => { const i = REWARD_ITEM_CATEGORY_ORDER.indexOf(c); return i === -1 ? REWARD_ITEM_CATEGORY_ORDER.length : i; };
+  return slots
+    .map((s, i) => ({ s, i })) // Array.sort는 안정 정렬이지만, 비교 함수를 명시적으로 완전히 결정적으로
+    .sort((a, b) => (catRank(a.s.category) - catRank(b.s.category)) || (b.s.gradeRank - a.s.gradeRank) || (a.i - b.i))
+    .map(x => x.s);
+}
+
 // ---- 한국어 조사 처리 ----
 // 한국어 조사(이/가, 을/를) 선택: 받침 유무로 판정
 function hasBatchim(word){
@@ -2071,59 +2154,77 @@ function tierOf(level){
 // computeAverageExpectedCosts/computeWeaponSellPrices(data.js, 게임 시작 시 1회 계산되는 기대비용/
 // 판매가)에는 절대 접근하거나 영향을 주지 않음 — 항상 oddsFor/costFor로 얻은 값을 복사해서만 가공함.
 
-// 집중의 기도 보정: 성공 확률에 ×1.2(최대 100%) 적용, 증가분은 실패(유지)에서만 전부 차감(실패(하락)와
-// 파괴 확률은 절대 건드리지 않음). baseOdds를 직접 수정하지 않고 새 배열 반환.
+// 집중의 기도 보정: 성공 확률에 ×1.15(최대 100%) 적용, 증가분은 실패(유지)에서만 전부 차감(파괴
+// 확률은 절대 건드리지 않음). baseOdds를 직접 수정하지 않고 새 배열 반환.
+// (6단계 개편: 성공 확률 증가폭 20%→15%로 하향)
 function focusAdjustedOdds(baseOdds, focusActive){
   if(!baseOdds) return baseOdds;
   if(!focusActive) return baseOdds.slice();
-  const success = Math.min(100, baseOdds[0] * 1.2);
+  const success = Math.min(100, baseOdds[0] * 1.15);
   const increase = Math.max(0, success - baseOdds[0]);
-  const down = baseOdds[2]; // 하락 확률은 항상 원본 그대로 유지
-  const destroy = baseOdds[3]; // 파괴 확률도 항상 원본 그대로 유지
-  // 유지가 증가분보다 부족한 극단적인 경우(현재 실제 확률표에서는 발생하지 않음)에도 하락/파괴는
+  const destroy = baseOdds[2]; // 파괴 확률은 항상 원본 그대로 유지
+  // 유지가 증가분보다 부족한 극단적인 경우(현재 실제 확률표에서는 발생하지 않음)에도 파괴는
   // 절대 건드리지 않기 위해 0 아래로 내려가지 않게만 방어.
   const stay = Math.max(0, baseOdds[1] - increase);
-  return [success, stay, down, destroy];
+  return [success, stay, destroy];
 }
 
-// 현재 화면에 표시/실제 판정에 쓰일 최종 확률 — 집중의 기도만 반영(끈기/보호는 확률 자체를 바꾸지
-// 않고 판정 이후 결과를 가로채는 방식, 기존 로직 그대로 유지). null-safe.
+// 보호의 기도 보정(6단계 개편): 기존엔 강화 결과가 '파괴'로 나온 뒤에 사후적으로 '유지'로 가로채는
+// 방식이었으나, 이제는 강화를 시도하기 "전에" 확률표 자체에서 파괴 확률을 30% 낮추고(=70%로 감소),
+// 줄어든 만큼을 그대로 유지 확률에 더하는 방식으로 바뀜 — 이후에는 이 조정된 확률표를 기준으로
+// 기존과 동일한 성공/유지/파괴 처리 로직(weightedOutcome 등)을 그대로 사용함(결과를 가로채지 않음).
+function blessingAdjustedOdds(baseOdds, blessingActive){
+  if(!baseOdds) return baseOdds;
+  if(!blessingActive) return baseOdds.slice();
+  const destroy = baseOdds[2] * 0.7; // 파괴 확률을 원래의 70%로 감소(=30% 감소)
+  const reduction = baseOdds[2] - destroy;
+  const stay = baseOdds[1] + reduction; // 줄어든 만큼 유지 확률로 이동
+  return [baseOdds[0], stay, destroy];
+}
+
+// 현재 화면에 표시/실제 판정에 쓰일 최종 확률 — 보호(파괴 확률 감소)와 집중(성공 확률 증가)을 순서대로
+// 적용. 두 기도가 동시에 켜져 있어도 서로 다른 항목(보호는 파괴↔유지, 집중은 성공↔유지)만 건드리므로
+// 순서와 무관하게 항상 정확히 더해짐(요구사항: 동시 활성화 시에도 정확한 확률 처리). 이제 보호도
+// 사후 결과 가로채기가 아니라 확률표 자체를 바꾸는 방식이라, 화면 표시와 실제 판정이 완전히 같은
+// 값을 쓰게 됨(예전처럼 "표시용으로만 접어서 보여주는" 별도 처리가 필요 없어짐). null-safe.
 function effectivePrayerOdds(type, level){
   const base = oddsFor(type, level);
   if(!base) return null;
-  return focusAdjustedOdds(base, state.focusActive);
+  const afterBlessing = blessingAdjustedOdds(base, state.blessingActive);
+  return focusAdjustedOdds(afterBlessing, state.focusActive);
 }
 
-// 화면에 "표시"할 확률 — effectivePrayerOdds(집중만 반영, 실제 판정용)에서 한 단계 더 나아가
-// 끈기/보호가 막아주는 항목을 0으로 접고 그만큼을 유지(%)로 흡수해서 보여줌(요구사항 14). 실제
-// 판정(resolveEnhance)은 여전히 "굴린 뒤 결과를 가로채는" 기존 구조를 그대로 쓰지만(요구사항 15),
-// 통계적으로 정확히 같은 분포이므로 화면 표시만 이렇게 미리 접어도 실제 확률과 어긋나지 않음.
+// 화면에 "표시"할 확률 — 이제 실제 판정에 쓰이는 확률(effectivePrayerOdds)과 완전히 동일함(보호가
+// 더 이상 결과를 사후에 가로채지 않고 확률표 자체를 바꾸기 때문). 기존 호출부(render.js)를 그대로
+// 유지하기 위해 함수 자체는 남겨두되, 내부에서는 단순히 위임만 함.
 function displayEnhanceOdds(type, level){
-  const odds = effectivePrayerOdds(type, level);
-  if(!odds) return null;
-  if(state.blessingActive) return [odds[0], odds[1] + odds[3], odds[2], 0];
-  if(state.charmActive) return [odds[0], odds[1] + odds[2], 0, odds[3]];
-  return odds;
+  return effectivePrayerOdds(type, level);
 }
 
-// 사용 가능 조건(요구사항 5) — 끈기/보호는 서로 배타적이며, 둘 다 "현재 표시되는(집중 반영된)"
-// 하락/파괴 확률이 0보다 커야 함. 강화 데이터가 없거나 최대 강화인 경우 셋 다 사용 불가.
+// 사용 가능 조건. 강화 데이터가 없거나 최대 강화인 경우 사용 불가.
+// 끈기의 기도: 2단계 강화 확률 개편으로 하락 결과 자체가 삭제되어 막아줄 대상이 없어짐 — 새로운
+// 역할은 추후 별도로 결정할 예정이므로, 그 전까지는 임의로 새 조건을 만들지 않고 항상 사용
+// 불가로 정리함(버튼은 항상 비활성 상태로 표시됨).
 function prayerCanUseCharm(type, level){
-  const odds = effectivePrayerOdds(type, level);
-  return !!odds && odds[2] > 0 && level <= 6 && !state.blessingActive;
+  return false;
 }
+// 보호의 기도(6단계 개편): 파괴 확률이 존재하는 강화 단계라면 언제든 사용 가능 — 기존에 있던
+// "레벨 7 이하만" 제한을 삭제해 +8 이상(마지막 +8→+9 시도 포함)에서도 사용할 수 있도록 함.
+// 파괴 확률이 원래 0%인 단계에서는 여전히 사용할 수 없음(줄일 파괴 확률 자체가 없으므로).
 function prayerCanUseBlessing(type, level){
-  const odds = effectivePrayerOdds(type, level);
-  return !!odds && odds[3] > 0 && level <= 7 && !state.charmActive;
+  const odds = oddsFor(type, level);
+  return !!odds && odds[2] > 0 && !state.charmActive;
 }
 function prayerCanUseFocus(type, level){
   const base = oddsFor(type, level);
   return !!base && base[0] < 100;
 }
 
-// 강화 비용 배율 계산 — 기본 강화 비용(costFor)에 활성화된 기도들의 배율을 더해서 "이번 강화 1회"의
-// 실제 비용만 계산함. 반환된 값은 오직 startEnhance(실제 차감)와 render(화면 표시/툴팁)에서만 쓰이고,
-// computeAverageExpectedCosts/computeWeaponSellPrices가 참조하는 w.cost 배열 자체는 전혀 건드리지 않음.
+// 강화 비용 배율 계산 — 활성화된 기도들의 배율을 전부 합산한 뒤, 기본 강화 비용(costFor)에 그
+// 합계를 한 번만 곱해서 "이번 강화 1회"의 실제 비용을 구함(6단계 개편 — 기존엔 기본 비용에 각
+// 기도의 "추가 비용"(기본비용×배율)을 하나씩 더하는 방식이었음). 기도가 하나도 없으면 기본 비용
+// 그대로 사용. 이 배율은 실제 강화 1회 비용에만 적용되고, 기대 강화 비용/판매가 계산
+// (computeAverageExpectedCosts, computeWeaponSellPrices)에는 전혀 관여하지 않음.
 function enhanceCostBreakdown(type, level){
   const base = costFor(type, level);
   if(base === undefined) return { base, total: base, parts: [] };
@@ -2131,19 +2232,19 @@ function enhanceCostBreakdown(type, level){
   if(state.charmActive) parts.push({ key: 'charm', label: PRAYERS.charm.name, mult: PRAYERS.charm.costMult });
   if(state.blessingActive) parts.push({ key: 'blessing', label: PRAYERS.blessing.name, mult: PRAYERS.blessing.costMult });
   if(state.focusActive) parts.push({ key: 'focus', label: PRAYERS.focus.name, mult: PRAYERS.focus.costMult });
-  const total = Math.round(base + parts.reduce((sum, p) => sum + base * p.mult, 0));
+  const total = parts.length === 0
+    ? base
+    : Math.round(base * parts.reduce((sum, p) => sum + p.mult, 0));
   return { base, total, parts };
 }
 
-// 비용 툴팁 문구(요구사항 13) — "100 + (100 × 5.0)[보호] + (100 × 2.0)[집중] = 800 G" 형태.
+// 비용 툴팁 문구(6단계 개편 — "기본비용 × (배율1[라벨1] + 배율2[라벨2]) = 합계 G" 형태로 변경).
 // 활성화된 기도가 하나도 없으면 null(호출부가 기존 표시/동작을 그대로 유지하도록).
 function enhanceCostTooltipText(breakdown){
   if(!breakdown || breakdown.parts.length === 0) return null;
-  const terms = breakdown.parts.map(p => `(${breakdown.base.toLocaleString()} × ${p.mult.toFixed(1)})[${p.label.replace('의 기도','')}]`);
-  return `${breakdown.base.toLocaleString()} + ${terms.join(' + ')} = ${breakdown.total.toLocaleString()} G`;
+  const terms = breakdown.parts.map(p => `${p.mult.toFixed(1)}[${p.label.replace('의 기도','')}]`);
+  return `${breakdown.base.toLocaleString()} × (${terms.join(' + ')}) = ${breakdown.total.toLocaleString()} G`;
 }
-
-
 // 집중의 기도 적용 시 유지/하락 50:50 분배 과정에서 소수(.5%p)가 나올 수 있어(예: 65%→78%, 증가분
 // 13%p를 반씩 나누면 6.5%p) 정수면 그대로, 아니면 소수점 1자리까지만 표시(총합 100%는 항상 유지됨).
 function fmtOddsNum(n){
@@ -2151,11 +2252,11 @@ function fmtOddsNum(n){
 }
 
 // ---- 강화 결과 추첨 ----
+// 2단계 강화 확률 개편으로 하락 결과가 완전히 삭제되어, 이제 성공/유지/파괴 3가지 결과만 존재함.
 function weightedOutcome(odds){
   const r = Math.random()*100;
   if(r < odds[0]) return 'success';
   if(r < odds[0]+odds[1]) return 'stay';
-  if(r < odds[0]+odds[1]+odds[2]) return 'down';
   return 'destroy';
 }
 

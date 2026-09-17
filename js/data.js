@@ -74,6 +74,26 @@ const WEAPON_GRADES = {
   unique: { label: '유니크', color: '#ff8a3d' },
 };
 
+// ---- 장비 아이템 전역 기본 판매가 공식(1단계) ----
+// 최종 기본 판매 가격 = 착용 제한 레벨 × (해당 레벨 구간의 등급별 레벨당 가격). 구간/가격을 이 표
+// 하나로만 관리해 추후 조정이 쉽도록 함(요구사항 8번) — 장비 종류(무기/방어구/장신구/보조)에 따라
+// 별도 공식을 만들지 않고 전부 이 표+함수 하나를 공용으로 씀.
+const EQUIP_SELL_PRICE_TABLE = [
+  { minLevel: 1,  maxLevel: 49, perLevel: { normal: 100, rare: 200,  epic: 350,  unique: 600 } },
+  { minLevel: 50, maxLevel: 69, perLevel: { normal: 300, rare: 600,  epic: 1050, unique: 1800 } },
+  { minLevel: 70, maxLevel: 89, perLevel: { normal: 600, rare: 1200, epic: 2100, unique: 3600 } },
+  { minLevel: 90, maxLevel: 94, perLevel: { normal: 900, rare: 1800, epic: 3150, unique: 5400 } },
+  { minLevel: 95, maxLevel: 99, perLevel: { normal: 1260, rare: 2520, epic: 4410, unique: 7560 } },
+];
+// 착용 제한 레벨+등급으로 기본 판매 가격을 자동 계산. 해당하는 구간이 없거나(방어적 처리 — 현재
+// 레벨 범위 1~99는 위 표가 전부 커버하므로 실제로는 발생하지 않음) 등급별 가격이 없으면 0을 반환.
+function equipBaseSellPrice(levelReq, grade){
+  const tier = EQUIP_SELL_PRICE_TABLE.find(t => levelReq >= t.minLevel && levelReq <= t.maxLevel);
+  if(!tier) return 0;
+  const perLevel = tier.perLevel[grade];
+  return perLevel != null ? levelReq * perLevel : 0;
+}
+
 // ---- 무기 이름 색상 ----
 // 무기 이름 색상 = 무기 등급 색상이 기본. 단, 강화 단계 색상의 "가치"가 더 높으면 그 색으로 대체됨.
 // 가치 순서(낮음→높음): 흰색 < 하늘색 < 보라색 < 주황색 < 금색. (무기 이미지 발광 효과와는 별개의 시스템)
@@ -123,7 +143,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 30, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 100, levelReq: 1,
+    purchasable: true, levelReq: 1,
     image: 'common_longsword',
     atk: [30], speed: [0.6], crit: [10], sell: [100],
     cost: [], odds: [],
@@ -136,7 +156,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 43, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 500, levelReq: 5,
+    purchasable: true, levelReq: 5,
     image: 'rare_greatsword',
     atk: [43], speed: [0.6], crit: [10], sell: [500],
     cost: [], odds: [],
@@ -151,7 +171,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 20, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 100, levelReq: 1,
+    purchasable: true, levelReq: 1,
     image: 'common_shortsword',
     atk: [20], speed: [0.8], crit: [5], sell: [100],
     cost: [], odds: [],
@@ -164,7 +184,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 12, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 100, levelReq: 1,
+    purchasable: true, levelReq: 1,
     image: 'common_dagger',
     atk: [12], speed: [1.2], crit: [10], sell: [100],
     cost: [], odds: [],
@@ -177,7 +197,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 29, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 500, levelReq: 5,
+    purchasable: true, levelReq: 5,
     image: 'rare_broadsword',
     atk: [29], speed: [0.8], crit: [5], sell: [500],
     cost: [], odds: [],
@@ -190,7 +210,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 18, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 500, levelReq: 5,
+    purchasable: true, levelReq: 5,
     image: 'rare_combatknife',
     atk: [18], speed: [1.2], crit: [10], sell: [500],
     cost: [], odds: [],
@@ -203,7 +223,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 47, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 500, levelReq: 10,
+    purchasable: true, levelReq: 10,
     image: 'common_longsword2',
     atk: [47], speed: [0.6], crit: [10], sell: [500],
     cost: [], odds: [],
@@ -216,7 +236,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 31, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 500, levelReq: 10,
+    purchasable: true, levelReq: 10,
     image: 'common_shortsword2',
     atk: [31], speed: [0.8], crit: [5], sell: [500],
     cost: [], odds: [],
@@ -229,7 +249,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 19, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 500, levelReq: 10,
+    purchasable: true, levelReq: 10,
     image: 'common_dagger2',
     atk: [19], speed: [1.2], crit: [10], sell: [500],
     cost: [], odds: [],
@@ -242,7 +262,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 26, attackSpeed: 1.2, critRate: 15,
-    purchasable: false, sellPrice: 2400, levelReq: 8,
+    purchasable: false, levelReq: 8,
     image: 'epic_poisonfang',
     atk: [26], speed: [1.2], crit: [15], sell: [2400],
     cost: [], odds: [],
@@ -268,7 +288,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 71, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 1000, levelReq: 15,
+    purchasable: true, levelReq: 15,
     image: 'rare_greatsword2',
     atk: [71], speed: [0.6], crit: [10], sell: [1000],
     cost: [], odds: [],
@@ -281,7 +301,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 48, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 1000, levelReq: 15,
+    purchasable: true, levelReq: 15,
     image: 'rare_broadsword2',
     atk: [48], speed: [0.8], crit: [5], sell: [1000],
     cost: [], odds: [],
@@ -294,7 +314,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 28, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 1000, levelReq: 15,
+    purchasable: true, levelReq: 15,
     image: 'rare_combatknife2',
     atk: [28], speed: [1.2], crit: [10], sell: [1000],
     cost: [], odds: [],
@@ -307,7 +327,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 76, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 1250, levelReq: 20,
+    purchasable: true, levelReq: 20,
     image: 'common_longsword3',
     atk: [76], speed: [0.6], crit: [10], sell: [1250],
     cost: [], odds: [],
@@ -320,7 +340,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 51, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 1250, levelReq: 20,
+    purchasable: true, levelReq: 20,
     image: 'common_shortsword3',
     atk: [51], speed: [0.8], crit: [5], sell: [1250],
     cost: [], odds: [],
@@ -333,7 +353,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 30, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 1250, levelReq: 20,
+    purchasable: true, levelReq: 20,
     image: 'common_dagger2', // 기존 dagger2와 이미지 공유(재사용) — 신규 파일 없음
     atk: [30], speed: [1.2], crit: [10], sell: [1250],
     cost: [], odds: [],
@@ -346,7 +366,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 69, attackSpeed: 0.8, critRate: 5,
-    purchasable: false, sellPrice: 4560, levelReq: 18,
+    purchasable: false, levelReq: 18,
     image: 'epic_blacksword',
     atk: [69], speed: [0.8], crit: [5], sell: [4560],
     cost: [], odds: [],
@@ -368,7 +388,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
     attackPower: 146, attackSpeed: 0.6, critRate: 10,
-    purchasable: false, sellPrice: 5900, levelReq: 25,
+    purchasable: false, levelReq: 25,
     image: 'epic_moongreatsword',
     atk: [146], speed: [0.6], crit: [10], sell: [5900],
     cost: [], odds: [],
@@ -393,7 +413,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 123, attackSpeed: 0.8, critRate: 5,
-    purchasable: false, sellPrice: 6000, levelReq: 30,
+    purchasable: false, levelReq: 30,
     image: 'epic_tigersword',
     atk: [123], speed: [0.8], crit: [5], sell: [6000],
     cost: [], odds: [],
@@ -415,7 +435,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 870, attackSpeed: 0.8, critRate: 9,
-    purchasable: false, sellPrice: 49900, levelReq: 70,
+    purchasable: false, levelReq: 70,
     image: 'epic_firesword',
     atk: [870], speed: [0.8], crit: [9], sell: [49900],
     cost: [], odds: [],
@@ -441,7 +461,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
     attackPower: 302, attackSpeed: 0.6, critRate: 7,
-    purchasable: false, sellPrice: 9000, levelReq: 40,
+    purchasable: false, levelReq: 40,
     image: 'epic_tigerlongsword',
     atk: [302], speed: [0.6], crit: [7], sell: [9000],
     cost: [], odds: [],
@@ -459,7 +479,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 35, attackSpeed: 0.6, critRate: 8,
-    purchasable: false, sellPrice: 200, levelReq: 4,
+    purchasable: false, levelReq: 4,
     image: 'common_longsword', // 기존 이미지 재사용
     atk: [35], speed: [0.6], crit: [8], sell: [200],
     cost: [], odds: [],
@@ -472,7 +492,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 40, attackSpeed: 0.6, critRate: 9,
-    purchasable: false, sellPrice: 350, levelReq: 7,
+    purchasable: false, levelReq: 7,
     image: 'common_longsword', // 기존 이미지 재사용
     atk: [40], speed: [0.6], crit: [9], sell: [350],
     cost: [], odds: [],
@@ -485,7 +505,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 27, attackSpeed: 0.8, critRate: 4,
-    purchasable: false, sellPrice: 350, levelReq: 7,
+    purchasable: false, levelReq: 7,
     image: 'common_shortsword', // 기존 이미지 재사용
     atk: [27], speed: [0.8], crit: [4], sell: [350],
     cost: [], odds: [],
@@ -498,7 +518,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 24, attackSpeed: 0.8, critRate: 3,
-    purchasable: false, sellPrice: 195, levelReq: 4,
+    purchasable: false, levelReq: 4,
     image: 'common_shortsword', // 기존 이미지 재사용
     atk: [24], speed: [0.8], crit: [3], sell: [195],
     cost: [], odds: [],
@@ -511,7 +531,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 14, attackSpeed: 1.2, critRate: 9,
-    purchasable: false, sellPrice: 195, levelReq: 4,
+    purchasable: false, levelReq: 4,
     image: 'common_dagger', // 기존 이미지 재사용
     atk: [14], speed: [1.2], crit: [9], sell: [195],
     cost: [], odds: [],
@@ -524,7 +544,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 16, attackSpeed: 1.2, critRate: 9,
-    purchasable: false, sellPrice: 340, levelReq: 7,
+    purchasable: false, levelReq: 7,
     image: 'common_dagger', // 기존 이미지 재사용
     atk: [16], speed: [1.2], crit: [9], sell: [340],
     cost: [], odds: [],
@@ -537,7 +557,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 116, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 1750, levelReq: 25,
+    purchasable: true, levelReq: 25,
     image: 'rare_basterdsword',
     atk: [116], speed: [0.6], crit: [10], sell: [1750],
     cost: [], odds: [],
@@ -550,7 +570,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 73, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 1750, levelReq: 25,
+    purchasable: true, levelReq: 25,
     image: 'rare_armingsword',
     atk: [73], speed: [0.8], crit: [5], sell: [1750],
     cost: [], odds: [],
@@ -563,7 +583,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 47, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 1750, levelReq: 25,
+    purchasable: true, levelReq: 25,
     image: 'rare_silverdagger',
     atk: [47], speed: [1.2], crit: [10], sell: [1750],
     cost: [], odds: [],
@@ -576,7 +596,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 82, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 2250, levelReq: 30,
+    purchasable: true, levelReq: 30,
     image: 'common_shortsword4',
     atk: [82], speed: [0.8], crit: [5], sell: [2250],
     cost: [], odds: [],
@@ -589,7 +609,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 123, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 2250, levelReq: 30,
+    purchasable: true, levelReq: 30,
     image: 'common_longsword4',
     atk: [123], speed: [0.6], crit: [10], sell: [2250],
     cost: [], odds: [],
@@ -602,7 +622,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 49, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 2250, levelReq: 30,
+    purchasable: true, levelReq: 30,
     image: 'common_dagger4',
     atk: [49], speed: [1.2], crit: [10], sell: [2250],
     cost: [], odds: [],
@@ -615,7 +635,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 86, attackSpeed: 1.2, critRate: 15,
-    purchasable: false, sellPrice: 7000, levelReq: 33,
+    purchasable: false, levelReq: 33,
     image: 'epic_ninetaildagger',
     atk: [86], speed: [1.2], crit: [15], sell: [7000],
     cost: [], odds: [],
@@ -638,7 +658,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 190, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 3500, levelReq: 35,
+    purchasable: true, levelReq: 35,
     image: 'rare_dopplehander',
     atk: [190], speed: [0.6], crit: [10], sell: [3500],
     cost: [], odds: [],
@@ -651,7 +671,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 126, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 3500, levelReq: 35,
+    purchasable: true, levelReq: 35,
     image: 'rare_saber',
     atk: [126], speed: [0.8], crit: [5], sell: [3500],
     cost: [], odds: [],
@@ -664,7 +684,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 76, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 3500, levelReq: 35,
+    purchasable: true, levelReq: 35,
     image: 'rare_guards_dagger',
     atk: [76], speed: [1.2], crit: [10], sell: [3500],
     cost: [], odds: [],
@@ -677,7 +697,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 308, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 10000, levelReq: 45,
+    purchasable: true, levelReq: 45,
     image: 'rare_claymore',
     atk: [308], speed: [0.6], crit: [10], sell: [10000],
     cost: [], odds: [],
@@ -690,7 +710,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 171, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 10000, levelReq: 45,
+    purchasable: true, levelReq: 45,
     image: 'rare_falchion',
     atk: [171], speed: [0.8], crit: [5], sell: [10000],
     cost: [], odds: [],
@@ -703,7 +723,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 124, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 10000, levelReq: 45,
+    purchasable: true, levelReq: 45,
     image: 'rare_mercenary_knife',
     atk: [124], speed: [1.2], crit: [10], sell: [10000],
     cost: [], odds: [],
@@ -716,7 +736,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 201, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 5000, levelReq: 40,
+    purchasable: true, levelReq: 40,
     image: 'common_longsword4', // 기존 이미지 재사용
     atk: [201], speed: [0.6], crit: [10], sell: [5000],
     cost: [], odds: [],
@@ -729,7 +749,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 134, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 5000, levelReq: 40,
+    purchasable: true, levelReq: 40,
     image: 'common_shortsword4', // 기존 이미지 재사용
     atk: [134], speed: [0.8], crit: [5], sell: [5000],
     cost: [], odds: [],
@@ -742,7 +762,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 80, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 5000, levelReq: 40,
+    purchasable: true, levelReq: 40,
     image: 'common_dagger4', // 기존 이미지 재사용
     atk: [80], speed: [1.2], crit: [10], sell: [5000],
     cost: [], odds: [],
@@ -755,7 +775,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'normal', // 일반
     attackPower: 328, attackSpeed: 0.6, critRate: 10,
-    purchasable: true, sellPrice: 12000, levelReq: 50,
+    purchasable: true, levelReq: 50,
     image: 'common_longsword2', // 기존 이미지 재사용
     atk: [328], speed: [0.6], crit: [10], sell: [12000],
     cost: [], odds: [],
@@ -768,7 +788,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 218, attackSpeed: 0.8, critRate: 5,
-    purchasable: true, sellPrice: 12000, levelReq: 50,
+    purchasable: true, levelReq: 50,
     image: 'common_shortsword4', // 원래 의도대로 은가검과 동일 이미지 재사용(사용자 확인 완료)
     atk: [218], speed: [0.8], crit: [5], sell: [12000],
     cost: [], odds: [],
@@ -781,7 +801,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'normal', // 일반
     attackPower: 131, attackSpeed: 1.2, critRate: 10,
-    purchasable: true, sellPrice: 12000, levelReq: 50,
+    purchasable: true, levelReq: 50,
     image: 'common_dagger2', // 기존 이미지 재사용
     atk: [131], speed: [1.2], crit: [10], sell: [12000],
     cost: [], odds: [],
@@ -796,7 +816,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 155, attackSpeed: 1.2, critRate: 12,
-    purchasable: false, sellPrice: 15000, levelReq: 45,
+    purchasable: false, levelReq: 45,
     image: 'epic_eight_knife',
     atk: [155], speed: [1.2], crit: [12], sell: [15000],
     cost: [], odds: [],
@@ -822,7 +842,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 352, attackSpeed: 0.8, critRate: 5,
-    purchasable: false, sellPrice: 33600, levelReq: 56,
+    purchasable: false, levelReq: 56,
     image: 'rare_moonsword',
     atk: [352], speed: [0.8], crit: [5], sell: [33600],
     cost: [], odds: [],
@@ -835,7 +855,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'rare', // 레어
     attackPower: 527, attackSpeed: 0.6, critRate: 10,
-    purchasable: false, sellPrice: 33600, levelReq: 56,
+    purchasable: false, levelReq: 56,
     image: 'rare_heavysword',
     atk: [527], speed: [0.6], crit: [10], sell: [33600],
     cost: [], odds: [],
@@ -848,7 +868,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'rare', // 레어
     attackPower: 211, attackSpeed: 1.2, critRate: 10,
-    purchasable: false, sellPrice: 33600, levelReq: 56,
+    purchasable: false, levelReq: 56,
     image: 'rare_heavysword', // 현철중검과 동일 이미지 재사용(사용자 확인 완료)
     atk: [211], speed: [1.2], crit: [10], sell: [33600],
     cost: [], odds: [],
@@ -863,7 +883,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 681, attackSpeed: 0.8, critRate: 8,
-    purchasable: false, sellPrice: 52000, levelReq: 65,
+    purchasable: false, levelReq: 65,
     image: 'epic_black_moonsword',
     atk: [681], speed: [0.8], crit: [8], sell: [52000],
     cost: [], odds: [],
@@ -884,7 +904,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검
     grade: 'epic', // 에픽
     attackPower: 1022, attackSpeed: 0.6, critRate: 10,
-    purchasable: false, sellPrice: 52000, levelReq: 65,
+    purchasable: false, levelReq: 65,
     image: 'epic_black_heavysword',
     atk: [1022], speed: [0.6], crit: [10], sell: [52000],
     cost: [], odds: [],
@@ -902,7 +922,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'epic', // 에픽
     attackPower: 408, attackSpeed: 1.2, critRate: 14,
-    purchasable: false, sellPrice: 52000, levelReq: 65,
+    purchasable: false, levelReq: 65,
     image: 'epic_black_heavysword', // 흑철중검과 동일 이미지 재사용(사용자 확인 완료)
     atk: [408], speed: [1.2], crit: [14], sell: [52000],
     cost: [], odds: [],
@@ -928,7 +948,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand', // 월도 계열과 동일하게 한손으로 배치(요청사항에 손수 명시 없음 — 확인 필요)
     grade: 'unique', // 유니크
     attackPower: 900, attackSpeed: 0.8, critRate: 5,
-    purchasable: false, sellPrice: 70000, levelReq: 70,
+    purchasable: false, levelReq: 70,
     image: 'unique_final_moonsword',
     atk: [900], speed: [0.8], crit: [5], sell: [70000],
     cost: [], odds: [],
@@ -952,7 +972,7 @@ const WEAPON_TYPES = {
     handType: 'two_hand', // 양손 검(요청사항 명시)
     grade: 'unique', // 유니크
     attackPower: 1400, attackSpeed: 0.6, critRate: 10,
-    purchasable: false, sellPrice: 70000, levelReq: 70,
+    purchasable: false, levelReq: 70,
     image: 'unique_final_bhsword',
     atk: [1400], speed: [0.6], crit: [10], sell: [70000],
     cost: [], odds: [],
@@ -972,7 +992,7 @@ const WEAPON_TYPES = {
     handType: 'one_hand',
     grade: 'unique', // 유니크
     attackPower: 550, attackSpeed: 1.2, critRate: 10,
-    purchasable: false, sellPrice: 70000, levelReq: 70,
+    purchasable: false, levelReq: 70,
     image: 'unique_final_bhsword', // 진혼검과 동일 이미지 사용(요청사항)
     atk: [550], speed: [1.2], crit: [10], sell: [70000],
     cost: [], odds: [],
@@ -1011,7 +1031,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -1,
-    purchasable: true, sellPrice: 100, levelReq: 1,
+    purchasable: true, levelReq: 1,
     image: '',
   },
   oldhelmet: {
@@ -1021,7 +1041,7 @@ const ARMOR_TYPES = {
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -1,
-    purchasable: true, sellPrice: 100, levelReq: 1,
+    purchasable: true, levelReq: 1,
     image: '',
   },
   linenarmor: {
@@ -1031,7 +1051,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'rare', // 레어
     defense: -3, hp: 100,
-    purchasable: true, sellPrice: 400, levelReq: 8,
+    purchasable: true, levelReq: 8,
     image: 'armorbase',
   },
   linenhelmet: {
@@ -1041,7 +1061,7 @@ const ARMOR_TYPES = {
     armorKind: 'helmet', // 투구
     grade: 'rare', // 레어
     defense: -1, hp: 50,
-    purchasable: true, sellPrice: 400, levelReq: 8,
+    purchasable: true, levelReq: 8,
     image: 'helmetbase',
   },
   leatherarmor: {
@@ -1051,7 +1071,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -5,
-    purchasable: true, sellPrice: 500, levelReq: 10,
+    purchasable: true, levelReq: 10,
     image: 'armorbase',
   },
   leatherhelmet: {
@@ -1061,7 +1081,7 @@ const ARMOR_TYPES = {
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -2,
-    purchasable: true, sellPrice: 500, levelReq: 10,
+    purchasable: true, levelReq: 10,
     image: 'helmetbase',
   },
   ironhelmet: {
@@ -1071,7 +1091,7 @@ const ARMOR_TYPES = {
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -3,
-    purchasable: true, sellPrice: 1250, levelReq: 20,
+    purchasable: true, levelReq: 20,
     image: '',
   },
   ironarmor: {
@@ -1081,7 +1101,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -8,
-    purchasable: true, sellPrice: 1250, levelReq: 20,
+    purchasable: true, levelReq: 20,
     image: '',
   },
   steelhelmet: {
@@ -1091,7 +1111,7 @@ const ARMOR_TYPES = {
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -5,
-    purchasable: true, sellPrice: 2250, levelReq: 30,
+    purchasable: true, levelReq: 30,
     image: '',
   },
   steelarmor: {
@@ -1101,7 +1121,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -12,
-    purchasable: true, sellPrice: 2250, levelReq: 30,
+    purchasable: true, levelReq: 30,
     image: '',
   },
   // 신규 방어구 4종(은 장식/금 장식). 일반 등급 방어구는 이번 작업부터 hp 옵션을 붙이지 않기로 해
@@ -1113,7 +1133,7 @@ const ARMOR_TYPES = {
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -7,
-    purchasable: true, sellPrice: 5000, levelReq: 40,
+    purchasable: true, levelReq: 40,
     image: '', // 이미지 미할당 — armorKind 기본 이미지(helmetbase) 재사용
   },
   silverarmor: {
@@ -1123,7 +1143,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -16,
-    purchasable: true, sellPrice: 5000, levelReq: 40,
+    purchasable: true, levelReq: 40,
     image: '', // 이미지 미할당 — armorKind 기본 이미지(armorbase) 재사용
   },
   goldhelmet: {
@@ -1133,7 +1153,7 @@ const ARMOR_TYPES = {
     armorKind: 'helmet', // 투구
     grade: 'normal', // 일반
     defense: -9,
-    purchasable: true, sellPrice: 12000, levelReq: 50,
+    purchasable: true, levelReq: 50,
     image: 'gold_helmet',
   },
   goldarmor: {
@@ -1143,7 +1163,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'normal', // 일반
     defense: -20,
-    purchasable: true, sellPrice: 12000, levelReq: 50,
+    purchasable: true, levelReq: 50,
     image: 'gold_armor',
   },
   // 신규 아이템 2종 사전 추가(2번: 백현갑) — 방어구 등급 중 첫 유니크 등급 사례. defense/hp/mana의
@@ -1158,7 +1178,7 @@ const ARMOR_TYPES = {
     armorKind: 'armor', // 갑옷
     grade: 'unique', // 유니크
     defense: -23, hp: 1000, mana: 200,
-    purchasable: false, sellPrice: 24000, levelReq: 50,
+    purchasable: false, levelReq: 50,
     image: 'unique_spider_armor',
     // 고유 옵션: "피격 시 확률로 중독 부여" 계열 — effectId(poison_on_taking_damage)로
     // armorUniqueOptionChance(formulas.js)가 인식해, 플레이어가 피해를 입을 때마다 공격한 몬스터
@@ -1232,7 +1252,7 @@ const ACCESSORY_TYPES = {
     grade: 'normal', // 일반
     defense: -1,
     mana: 50,
-    purchasable: true, sellPrice: 500, levelReq: 5,
+    purchasable: true, levelReq: 5,
     image: '',
   },
   agilityring: {
@@ -1242,7 +1262,7 @@ const ACCESSORY_TYPES = {
     accessoryKind: 'ring',
     grade: 'rare', // 레어
     defense: -2, hp: 30, mana: 30,
-    purchasable: true, sellPrice: 1400, levelReq: 15,
+    purchasable: true, levelReq: 15,
     image: '',
   },
   strengthring: {
@@ -1252,7 +1272,7 @@ const ACCESSORY_TYPES = {
     accessoryKind: 'ring',
     grade: 'rare', // 레어
     defense: -2, hp: 100,
-    purchasable: true, sellPrice: 1400, levelReq: 15,
+    purchasable: true, levelReq: 15,
     image: '',
   },
   wisdomring: {
@@ -1262,7 +1282,7 @@ const ACCESSORY_TYPES = {
     accessoryKind: 'ring',
     grade: 'rare', // 레어
     defense: -1, mana: 100,
-    purchasable: true, sellPrice: 1400, levelReq: 15,
+    purchasable: true, levelReq: 15,
     image: '',
   },
   // 상점 구매 여부가 원본 표에 비어있었으나, 이 정도 고가(30000)의 유니크 등급 확정 장비 드랍은
@@ -1275,7 +1295,7 @@ const ACCESSORY_TYPES = {
     accessoryKind: 'ring',
     grade: 'unique', // 유니크
     defense: -4, hp: 200, mana: 100, crit: 9,
-    purchasable: false, sellPrice: 30000, levelReq: 50,
+    purchasable: false, levelReq: 50,
     image: 'unique_wolfmoonring',
   },
 };
@@ -1333,7 +1353,7 @@ const SUB_TYPES = {
     subKind: 'shield', // 방패
     grade: 'normal', // 일반
     defense: -1,
-    purchasable: true, sellPrice: 500, levelReq: 5,
+    purchasable: true, levelReq: 5,
     image: 'wood_shield',
   },
   // 사각방패: 과거 아티팩트(ARTIFACTS.squareshield, zip117에서 삭제)와 이름이 같지만 완전히 별개의
@@ -1347,7 +1367,7 @@ const SUB_TYPES = {
     subKind: 'shield', // 방패
     grade: 'rare', // 레어
     defense: -3, hp: 200,
-    purchasable: false, sellPrice: 1500, levelReq: 26,
+    purchasable: false, levelReq: 26,
     image: 'square_shield',
   },
   ironshield: {
@@ -1357,7 +1377,7 @@ const SUB_TYPES = {
     subKind: 'shield', // 방패
     grade: 'rare', // 레어
     defense: -5, hp: 300,
-    purchasable: false, sellPrice: 3000, levelReq: 32,
+    purchasable: false, levelReq: 32,
     image: 'iron_shield',
     // 고유 옵션: 반월대도 등과 동일한 "고정형"(opt.text+opt.statBonus) 스키마 재사용 — 강화 자체가
     // 없는 보조 아이템이라 activateLevel:0으로 항상 활성화됨. statBonus.str은 armorUniqueOptionStatBonus
@@ -1375,7 +1395,7 @@ const SUB_TYPES = {
     subKind: 'shield', // 방패
     grade: 'epic', // 에픽
     defense: -4, hp: 100, mana: 300,
-    purchasable: false, sellPrice: 9000, levelReq: 42,
+    purchasable: false, levelReq: 42,
     image: 'purple_shield',
     uniqueOption: {
       text: '힘 +1, 지능 +1',
@@ -1388,7 +1408,9 @@ Object.values(SUB_TYPES).forEach(s => {
   if(s.defense != null) s.defArr = new Array(10).fill(s.defense);
   if(s.hp != null) s.hpArr = new Array(10).fill(s.hp);
   if(s.mana != null) s.manaArr = new Array(10).fill(s.mana);
-  s.sell = new Array(10).fill(s.sellPrice || 0); // 강화가 없어 판매가도 항상 고정(성장 공식 미적용)
+  // sell(판매가 배열)은 여기서 채우지 않음 — 이 시점엔 아직 s.sellPrice가 계산되기 전(항상 undefined)
+  // 이라 0으로 고정돼버리는 버그가 있었음. 실제 대입은 sellPrice가 확정된 뒤(등급별 판매가 공식 적용
+  // 직후)로 옮김 — 아래 "장비 기본 판매 가격 일괄 설정" 블록 바로 다음 참고.
 });
 
 // ---- 대장간 "강화 장비 선택" 팝업이 훑는 장비 보유 풀 목록 ----
@@ -1497,32 +1519,41 @@ Object.values(WEAPON_TYPES).forEach(w => {
 // 다음 단계에서 이 데이터로 배열을 계산하는 함수를 추가하고, 마지막 단계에서 WEAPON_TYPES에 연결할 예정.
 // ============================================================
 
-// 등급별 강화 확률 표. 각 배열의 index 0=+1, index 8=+9. 값 순서: [성공%, 유지%, 하락%, 파괴%]
-// 일반과 레어는 같은 표를 사용(같은 배열을 그대로 참조 — 데이터 중복 방지)
-const GRADE_ENHANCE_ODDS_NORMAL_RARE = [
-  [95, 5, 0, 0], [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [65, 30, 5, 0],
-  [50, 40, 10, 0], [40, 30, 29, 1], [25, 30, 40, 5], [20, 20, 50, 10],
+// 등급별 강화 확률 표(2단계 개편: 하락 결과 자체를 삭제해 3개 결과만 사용). 각 배열의 index 0=+1,
+// index 8=+9. 값 순서: [성공%, 유지%, 파괴%] — 일반/레어/에픽/유니크가 각각 독립된 표를 사용함
+// (기존엔 일반·레어가 같은 배열을 공유했으나 이번 개편에서 분리).
+const GRADE_ENHANCE_ODDS_NORMAL = [
+  [90, 10, 0], [80, 20, 0], [70, 30, 0], [60, 40, 0], [50, 50, 0],
+  [40, 60, 0], [30, 68, 2], [25, 70, 5], [20, 72, 8],
+];
+const GRADE_ENHANCE_ODDS_RARE = [
+  [90, 10, 0], [80, 20, 0], [70, 30, 0], [60, 40, 0], [42, 58, 0],
+  [32, 67, 1], [25, 72, 3], [20, 73, 7], [14, 74, 12],
 ];
 const GRADE_ENHANCE_ODDS_EPIC = [
-  [90, 10, 0, 0], [85, 15, 0, 0], [75, 25, 0, 0], [60, 40, 0, 0], [50, 40, 10, 0],
-  [40, 40, 20, 0], [30, 40, 28, 2], [20, 30, 40, 10], [15, 10, 60, 15],
+  [85, 15, 0], [75, 25, 0], [65, 35, 0], [55, 45, 0], [40, 60, 0],
+  [30, 67, 3], [25, 70, 5], [15, 75, 10], [10, 74, 16],
 ];
 const GRADE_ENHANCE_ODDS_UNIQUE = [
-  [80, 20, 0, 0], [75, 25, 0, 0], [65, 35, 0, 0], [55, 45, 0, 0], [45, 45, 10, 0],
-  [35, 35, 30, 0], [25, 20, 51, 4], [15, 10, 65, 10], [5, 5, 70, 20],
+  [80, 20, 0], [70, 30, 0], [60, 40, 0], [45, 55, 0], [35, 65, 0],
+  [25, 72, 3], [15, 78, 7], [10, 78, 12], [5, 75, 20],
 ];
 const GRADE_ENHANCE_ODDS = {
-  normal: GRADE_ENHANCE_ODDS_NORMAL_RARE,
-  rare: GRADE_ENHANCE_ODDS_NORMAL_RARE,
+  normal: GRADE_ENHANCE_ODDS_NORMAL,
+  rare: GRADE_ENHANCE_ODDS_RARE,
   epic: GRADE_ENHANCE_ODDS_EPIC,
   unique: GRADE_ENHANCE_ODDS_UNIQUE,
 };
 
 // 강화 비용 공식용 상수.
-// +0 강화비용(시드값) = 무기의 판매 가격(sellPrice) × 2 × 0.4
-// 이후 강화비용 = 이전 단계 강화비용 × 단계 배율 × 등급 보너스 (다음 단계에서 계산 함수로 구현 예정)
-// 단계 배율: index = 강화 단계(0~9)
-const ENHANCE_COST_STEP_MULT = [1, 1.5, 1.4, 1.5, 1.5, 1.5, 1.6, 1.6, 1.7, 1.7];
+// 시드값 = 해당 아이템의 기본 판매 가격(+0, sellPrice) × 시드 설정 배율 — "+1 강화비용"을 만들기
+// 위한 시작값일 뿐, 그 자체가 실제 강화 비용으로 저장/사용되지는 않음(강화 비용 단계 매핑 수정).
+// 이후 강화비용 = 이전 단계 강화비용 × 단계 배율 × 등급 보너스(+1부터 등급 보너스 적용 시작)
+// 시드 설정 배율: 언제든 이 값만 바꾸면 전체 시드값에 바로 반영되도록 별도 상수로 분리.
+const ENHANCE_COST_SEED_MULT = 0.25;
+// 단계 배율: index = 목표 강화 단계(1~9, 문서의 "단계" 표와 동일한 번호). index0은 코드상 절대
+// 참조되지 않는 자리채움값.
+const ENHANCE_COST_STEP_MULT = [1, 1, 1.05, 1.07, 1.09, 1.1, 1.2, 1.3, 1.4, 1.5];
 // 등급 보너스
 const GRADE_COST_MULT = { normal: 1, rare: 1.015, epic: 1.025, unique: 1.03 };
 
@@ -1532,24 +1563,30 @@ const GRADE_COST_MULT = { normal: 1, rare: 1.015, epic: 1.025, unique: 1.03 };
 // ============================================================
 
 // 무기 하나의 강화 비용 배열(길이 9)을 계산.
-// +0 강화비용(시드값)은 sellPrice가 아니라 "아이템 레벨(levelReq)"만으로 결정됨:
-//   아이템 레벨 = 1  → 시드값 = 100 × 2 × 0.4
-//   아이템 레벨 > 1  → 시드값 = (100 + 아이템 레벨 × 10) × 2 × 0.4
-// 이후 단계는 기존과 동일하게 "이전 단계 비용 × 단계배율 × 등급보너스"를 9단계 반복(그레이드 보너스는
-// 첫 단계(0→1)에는 적용되지 않고, 1→2 단계부터 적용됨 — 이후 단계 계산 방식 자체는 변경하지 않음).
+// 강화 비용은 반드시 "목표 강화 단계" 기준으로 관리함(강화 비용 단계 매핑 수정) — 즉 배열 index는
+// 여전히 "현재 레벨"(costFor(type,level)이 wpn(type).cost[level]을 그대로 읽는 기존 접근 방식은
+// 안 바뀜)이지만, 그 값 자체는 cost[0](0→1 시도)="+1 강화비용", ..., cost[8](8→9 시도)="+9 강화비용"이
+// 되도록 시드값에서부터 이미 첫 단계(+1) 배율×등급보너스를 적용해서 시작함(이전엔 cost[0]이 배율·
+// 등급보너스 미적용 시드값 그대로였음 — +0 강화비용이라는 별도의 실제 강화 단계 비용은 더 이상 만들지
+// 않고, 시드값은 오직 "+1 강화비용을 계산하기 위한 시작값"으로만 쓰임).
 // 반올림은 각 단계의 "표시값"에만 적용하고, 다음 단계 계산에는 반올림 전의 정밀한 값을 그대로 이어서 사용함
 // (매 단계마다 반올림된 값을 누적하면 오차가 쌓여 최종 단계에서 결과가 어긋나기 때문).
 // 등급 데이터가 없으면 null 반환.
-function computeGradeCost(itemLevel, grade){
+function computeGradeCost(sellPrice, grade){
   const gradeMult = GRADE_COST_MULT[grade];
   if(gradeMult == null) return null;
-  const base = itemLevel === 1 ? 100 : (100 + itemLevel * 10);
+  // 강화 비용 단계 매핑 수정: cost[level]은 "현재 level에서 시도하는 강화(0→1, 1→2, ... 8→9)에
+  // 드는 비용"으로 그대로 유지하되(costFor(type,level)의 기존 접근 방식은 안 바뀜), 그 "값" 자체는
+  // 반드시 "목표 강화 단계" 기준으로 계산함 — cost[0](0→1 시도)="+1 강화비용", ..., cost[8](8→9 시도)
+  // ="+9 강화비용"이 되도록, 시드값에서부터 이미 첫 단계(+1) 배율과 등급 보너스를 적용해서 시작함
+  // (이전에는 cost[0]이 배율/등급보너스 미적용 시드값 그대로였던 게 문제였음 — 이제 시드값 자체는
+  // "+1 강화비용을 계산하기 위한 시작값"으로만 쓰이고, 실제 강화 비용 배열에는 저장되지 않음).
+  const seed = (sellPrice || 0) * ENHANCE_COST_SEED_MULT;
   const cost = [];
-  let precise = base * 2 * 0.4; // +0 강화비용(시드값) — 0→1 단계 비용은 이 값 그대로(배율 미적용)
-  cost.push(Math.round(precise));
-  for(let lv = 1; lv <= 8; lv++){
-    precise = precise * ENHANCE_COST_STEP_MULT[lv] * gradeMult;
-    cost.push(Math.round(precise)); // index0 = 0→1 비용, ... index8 = 8→9 비용
+  let precise = seed;
+  for(let stage = 1; stage <= 9; stage++){
+    precise = precise * ENHANCE_COST_STEP_MULT[stage] * gradeMult;
+    cost.push(Math.round(precise)); // cost[0]="+1 강화비용"(0→1 시도), ... cost[8]="+9 강화비용"(8→9 시도)
   }
   return cost;
 }
@@ -1558,6 +1595,29 @@ function computeGradeCost(itemLevel, grade){
 function resolveGradeOdds(grade){
   return GRADE_ENHANCE_ODDS[grade] || null;
 }
+
+// 장비(무기/방어구/장신구/보조) 기본 판매 가격(sellPrice) 일괄 설정 — 개별 아이템에
+// sellPriceOverride가 있으면 그 값을 그대로 쓰고, 없으면 equipBaseSellPrice()(착용 제한 레벨×등급
+// 전역 공식)로 자동 계산. 장비 카테고리에 새 종류가 추가돼도 이 배열에 그 테이블만 추가하면 되므로
+// 아이템 종류를 하드코딩해 분기하지 않음. 아래 강화 비용(computeGradeCost)이 이 sellPrice를 시드값
+// 계산의 입력으로 바로 사용하므로, 이 대입 루프는 반드시 등급별 강화 비용 연결보다 먼저 실행돼야 함
+// (3단계 개편으로 여기로 위치를 옮김 — 원래는 판매가 연결 직전에 있었으나 시드값이 sellPrice를
+// 필요로 하게 되면서 순서가 앞으로 당겨짐).
+[WEAPON_TYPES, ARMOR_TYPES, ACCESSORY_TYPES, SUB_TYPES].forEach(table => {
+  Object.values(table).forEach(item => {
+    item.sellPrice = item.sellPriceOverride != null
+      ? item.sellPriceOverride
+      : equipBaseSellPrice(item.levelReq || 1, item.grade);
+  });
+});
+// 보조 장비(SUB_TYPES)는 강화 자체가 없어(항상 +0) computeWeaponSellPrices(강화 단계별 성장 공식)를
+// 거치지 않으므로, sellPrice가 방금 확정된 이 시점에 10칸 전부 같은 값으로 채운 flat 배열을 별도로
+// 만들어줌 — 판매가 계산·공통 처리 구조 자체는 무기/방어구/장신구와 동일(등급×착용레벨 공식 재사용),
+// 다만 강화로 성장하는 값이 없다는 보조 장비만의 특성 때문에 배열 채우는 방식만 다름(버그 수정: 이
+// 전엔 sellPrice가 아직 계산되기 전인 SUB_TYPES 선언 직후에 이 배열을 채워서 항상 0이 저장됐었음).
+Object.values(SUB_TYPES).forEach(s => {
+  s.sell = new Array(10).fill(s.sellPrice || 0);
+});
 
 // ============================================================
 // [3단계 - 최종] WEAPON_TYPES 전체에 등급별 강화 확률/비용 공식을 연결.
@@ -1571,7 +1631,7 @@ Object.values(WEAPON_TYPES).forEach(w => {
     return;
   }
   const gradeOdds = resolveGradeOdds(w.grade);
-  const gradeCost = computeGradeCost(w.levelReq || 1, w.grade);
+  const gradeCost = computeGradeCost(w.sellPrice, w.grade);
   if(gradeOdds) w.odds = gradeOdds;
   if(gradeCost) w.cost = gradeCost;
 });
@@ -1584,77 +1644,53 @@ Object.values(WEAPON_TYPES).forEach(w => {
 // ============================================================
 
 // 강화 단계별 판매 배율. index = 강화 단계(1~9). 무기 종류/등급과 무관하게 고정값.
-const ENHANCE_SELL_STEP_MULT = [null, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.20, 1.20, 1.20];
+const ENHANCE_SELL_STEP_MULT = [null, 1.00, 1.00, 1.03, 1.05, 1.07, 1.10, 1.10, 1.10, 1.10];
 
-// 선형연립방정식 Ax=b를 가우스 소거법(부분 피벗팅)으로 푸는 범용 함수.
-// 평균 기대비용 계산 전용으로 쓰지만, 그 자체로는 강화 시스템과 무관한 독립적인 수학 유틸리티.
-function solveLinearSystem(A, b){
-  const n = b.length;
-  const M = A.map((row, i) => [...row, b[i]]);
-  for(let col = 0; col < n; col++){
-    let pivot = col;
-    for(let r = col + 1; r < n; r++){
-      if(Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
-    }
-    [M[col], M[pivot]] = [M[pivot], M[col]];
-    const pv = M[col][col];
-    if(Math.abs(pv) < 1e-12) continue; // 특이 행렬 방지용 안전장치(정상적인 확률표에서는 발생하지 않음)
-    for(let c = col; c <= n; c++) M[col][c] /= pv;
-    for(let r = 0; r < n; r++){
-      if(r === col) continue;
-      const factor = M[r][col];
-      if(factor === 0) continue;
-      for(let c = col; c <= n; c++) M[r][c] -= factor * M[col][c];
-    }
-  }
-  return M.map(row => row[n]);
-}
+// 재획득 비용 등급별 배율(4단계 개편) — 재획득 비용 = 기본 판매가(+0) × 이 배율. 언제든 이 표의
+// 값만 바꾸면 전체 재획득 비용에 바로 반영되도록 별도 상수로 분리.
+const ENHANCE_REACQUIRE_GRADE_MULT = { normal: 1, rare: 1.5, epic: 2, unique: 3 };
 
-// 파괴 발생 시 "재획득비용(reacquireCost)을 내고 +0부터 같은 목표까지 다시 강화" 하는 재귀를 최대
-// 이 횟수만큼만 적용한다(4번째 파괴부터는 추가 재획득 비용을 기대비용에 포함하지 않음 — 7번 문서 참고).
-const ENHANCE_SELL_MAX_DESTROY_RECURSION = 3;
+// 강화 단계별 "평균 기대비용"을 +1~+9만 순차적으로 계산(4단계 개편 — 기존에 쓰던 "파괴→재획득→+0
+// 부터 다시 강화"를 무한 재귀(연립방정식)로 계산하던 방식은 완전히 폐기하고, 아래 단순 순차 점화식
+// 으로 전면 교체함). +0은 강화 목표 단계가 아니므로 기대비용을 만들지 않음(+0 초기 강화비용=시드값은
+// 강화 비용 시스템에서만 쓰이고, 이 함수가 반환하는 배열에는 포함되지 않음).
+//
+//   +1 기대비용 = (+1 강화비용 + +1 파괴확률×재획득비용) ÷ +1 성공확률                 (이전 단계 참조 없음)
+//   +n 기대비용 = (+n 강화비용 + +n 성공확률×(+n-1 기대비용) + +n 파괴확률×재획득비용) ÷ +n 성공확률  (n=2..9)
+//
+// 반환 배열은 index0=+1 ... index8=+9(총 9개, +0 없음). 유지 확률은 별도 항이 아니라 "성공확률로
+// 나누는" 과정 자체에 반영됨(유지 시 같은 단계를 다시 시도하는 것의 기대횟수가 1/성공확률이기 때문).
+// 다음 단계 계산에는 반올림 전의 정밀한 값을 그대로 이어서 쓰고, 반환 직전에만 각 단계를 반올림함.
+// (기존 강화 진행 로직과는 완전히 분리된 독립 계산 함수 — cost/odds/등급 데이터만 입력받아 결과만 반환함)
+function computeAverageExpectedCosts(cost, odds, sellPrice, grade){
+  const reacqMult = ENHANCE_REACQUIRE_GRADE_MULT[grade] != null ? ENHANCE_REACQUIRE_GRADE_MULT[grade] : 1;
+  const reacquireCost = (sellPrice || 0) * reacqMult; // 재획득 비용 = 기본 판매가 × 등급별 재획득 배율
+  const n = Math.min(cost.length, odds.length); // 보통 9(+1~+9)
 
-// 현재 강화 비용(cost)/강화 확률(odds)을 그대로 사용해, 목표 강화 단계(+1~+최대단계)까지 도달하는
-// "평균 기대비용"을 각각 계산. 파괴가 발생하면 재획득비용을 내고 +0부터 같은 목표까지 다시 강화하는
-// 전체 비용이 다시 더해지는 재귀 구조이되, 이 재귀는 최대 ENHANCE_SELL_MAX_DESTROY_RECURSION회까지만
-// 적용됨 — "파괴가 몇 번째로 발생했는가"를 레벨(j)로 두고, j=최대치(재귀 더 못 함) → j=0(최초 시도)
-// 순으로 각각 독립된 연립방정식을 풀어 내려간다(j=최대치 단계는 파괴 항 자체를 방정식에서 제외해
-// "추가 재획득 비용 없이 그대로 종료"를 표현, 그 이하 단계는 한 단계 위(j+1)에서 구한 E_0을 상수로
-// 대입해 사용 — 자기 자신을 참조하는 항이 사라지므로 단순 삼중대각 연립방정식이 됨).
-// (기존 강화 진행 로직과는 완전히 분리된 독립 계산 함수 — cost/odds 값만 입력받아 결과만 반환함)
-function computeAverageExpectedCosts(cost, odds, reacquireCost, maxDestroyRecursion = ENHANCE_SELL_MAX_DESTROY_RECURSION){
-  const maxLevel = Math.min(cost.length, odds.length);
+  // "+k 강화비용" 조회(k=1..n) — 강화 비용 단계 매핑 수정으로 cost[]가 이제 index0="+1 강화비용"
+  // (0→1 시도), ..., index n-1="+n 강화비용"이 되도록 저장돼 있으므로, 그냥 cost[k-1]을 그대로 쓰면
+  // 됨(예전엔 배열 마지막 한 단계가 실제 게임에 없어 "가상의 강화비용"을 별도로 만들어야 했으나,
+  // 이제 실제 강화 시스템이 쓰는 cost[] 배열과 완전히 같은 값을 그대로 참조함).
   const results = [];
-  for(let target = 1; target <= maxLevel; target++){
-    const n = target; // 미지수: 0부터 target까지, 각 단계(0~target-1)에서의 기대비용 E_0 ... E_(n-1)
-    let e0FromDeeperLevel = 0; // j=maxDestroyRecursion 단계에서 쓰일, "더 이상 재귀 없음"을 나타내는 값(0)
-    for(let j = maxDestroyRecursion; j >= 0; j--){
-      const A = Array.from({ length: n }, () => new Array(n).fill(0));
-      const b = new Array(n).fill(0);
-      const isCapLevel = j === maxDestroyRecursion; // 이 단계에서 파괴가 나면 그게 4번째(=cap+1번째) 파괴
-      for(let i = 0; i < n; i++){
-        const [ps, pt, pd, px] = odds[i].map(v => v / 100);
-        A[i][i] += 1 - pt;              // 유지: 같은 자리에 머무름
-        A[i][Math.max(i - 1, 0)] -= pd; // 하락: 한 단계 아래로 (0 밑으로는 안 내려감)
-        if(i + 1 < n) A[i][i + 1] -= ps; // 성공: 목표(n)에 도달하면 그 이후 비용은 0이라 항이 없음
-        // 파괴 항: cap 단계면 재획득 비용도, 더 아래 단계로의 재귀도 전혀 없음(추가 비용 0).
-        // cap이 아니면, 한 단계 아래(j+1)에서 이미 구해둔 E_0 상수를 그대로 더함(자기참조 항이 아니므로
-        // 좌변(A)에는 반영할 게 없고 우변(b)에만 더해짐).
-        b[i] = cost[i] + (isCapLevel ? 0 : px * (reacquireCost + e0FromDeeperLevel));
-      }
-      e0FromDeeperLevel = solveLinearSystem(A, b)[0]; // 이번 단계(j)의 E_0 = 0부터 target까지의 평균 기대비용
-    }
-    results.push(e0FromDeeperLevel); // j=0(최초 시도) 단계에서 구한 E_0이 최종 결과
+  let prev = 0; // +1 계산에는 쓰이지 않음(아래 k===1 분기에서 무시)
+  for(let k = 1; k <= n; k++){
+    const [ps, , pd] = odds[k - 1].map(v => v / 100); // 유지(가운데 값)는 이 공식에서 쓰지 않음
+    const Ck = cost[k - 1];
+    const numerator = (k === 1) ? (Ck + pd * reacquireCost) : (Ck + ps * prev + pd * reacquireCost);
+    const Ek = numerator / ps;
+    results.push(Ek);
+    prev = Ek;
   }
-  return results; // index0 = +1까지 기대비용, ... index(maxLevel-1) = +maxLevel까지 기대비용
+  return results.map(v => Math.round(v));
 }
 
 // 무기 하나의 강화 단계별 판매가 배열(길이 10, index=강화단계)을 계산.
 // 평균 기대비용은 w.avgExpectedCost에 캐시해서, 이후 같은 실행(세션) 동안 재계산 없이 재사용.
 function computeWeaponSellPrices(w){
   if(!w.cost || w.cost.length === 0 || !w.odds || w.odds.length === 0) return null; // 강화 데이터가 없으면 계산 불가(예: 강화 준비 중인 무기)
-  const reacquireCost = (w.sellPrice || 0) * 2; // 무기 재획득 비용 = 기본 판매 가격 × 2
-  const avgCosts = computeAverageExpectedCosts(w.cost, w.odds, reacquireCost);
+  // 4단계 개편: 재획득 비용은 이제 computeAverageExpectedCosts 내부에서 등급별 배율로 직접 계산함
+  // (기본 판매가×2 방식은 더 이상 쓰지 않음) — sellPrice/grade를 그대로 넘기기만 하면 됨.
+  const avgCosts = computeAverageExpectedCosts(w.cost, w.odds, w.sellPrice, w.grade);
   w.avgExpectedCost = avgCosts; // 계산 결과 저장(캐시) — 강화 비용/확률이 바뀌지 않는 한 다시 계산하지 않음
   const sell = [w.sellPrice]; // +0 판매가 = 기본 판매 가격 그대로
   for(let lv = 1; lv <= avgCosts.length; lv++){
@@ -1662,6 +1698,9 @@ function computeWeaponSellPrices(w){
   }
   return sell;
 }
+
+// 장비(무기/방어구/장신구/보조) 기본 판매 가격(sellPrice)은 위(강화 비용 연결 이전)에서 이미 일괄
+// 설정 완료됨 — 여기서는 그 값을 그대로 읽어 판매가만 계산.
 
 // WEAPON_TYPES 전체(롱소드/그레이트소드 포함)에 판매가 공식을 연결
 Object.values(WEAPON_TYPES).forEach(w => {
@@ -1676,7 +1715,7 @@ Object.values(WEAPON_TYPES).forEach(w => {
 // ============================================================
 Object.values(ARMOR_TYPES).forEach(a => {
   const gradeOdds = resolveGradeOdds(a.grade);
-  const gradeCost = computeGradeCost(a.levelReq || 1, a.grade);
+  const gradeCost = computeGradeCost(a.sellPrice, a.grade);
   if(gradeOdds) a.odds = gradeOdds;
   if(gradeCost) a.cost = gradeCost;
 });
@@ -1686,18 +1725,15 @@ Object.values(ARMOR_TYPES).forEach(a => {
 });
 
 // ============================================================
-// ACCESSORY_TYPES에 "장비 전역 설정" 연결 — 무기/방어구와 동일한 등급 기반 공식을 그대로 재사용하되,
-// "장신구 강화 비용 보정"(문서 7번) 요구사항에 따라 계산된 강화 비용 배열에 최종적으로 1.3배를 적용함.
-// 이 보정은 각 단계의 비용에 독립적으로(이전 단계의 보정된 값을 다시 사용하지 않고) 적용되므로,
-// computeGradeCost가 반환한 원래 배열을 그대로 각 원소별로 1.3배 해서 덮어쓰는 방식으로 구현함.
-// 기대비용(computeAverageExpectedCosts)과 판매가(computeWeaponSellPrices)는 이 보정된 cost 배열을
-// 그대로 입력받아 계산하는 기존 범용 함수라, 별도 처리 없이 "보정된 강화 비용 기준"이 자동으로 적용됨.
+// ACCESSORY_TYPES에 "장비 전역 설정" 연결 — 무기/방어구와 완전히 동일한 등급 기반 공식을 그대로
+// 재사용함. 기존에 있던 "장신구 강화 비용 보정"(×1.3)은 3단계 개편으로 삭제됨(장신구 자체의 강화
+// 비용까지 없애는 것이 아니라, 계산된 강화 비용에 추가로 곱하던 1.3배 보정값만 제거하는 것).
 // ============================================================
 Object.values(ACCESSORY_TYPES).forEach(a => {
   const gradeOdds = resolveGradeOdds(a.grade);
-  const gradeCost = computeGradeCost(a.levelReq || 1, a.grade);
+  const gradeCost = computeGradeCost(a.sellPrice, a.grade);
   if(gradeOdds) a.odds = gradeOdds;
-  if(gradeCost) a.cost = gradeCost.map(c => Math.round(c * 1.3)); // 장신구 강화 비용 보정(×1.3, 단계별 독립 적용)
+  if(gradeCost) a.cost = gradeCost;
 });
 Object.values(ACCESSORY_TYPES).forEach(a => {
   const sell = computeWeaponSellPrices(a);
@@ -2413,6 +2449,7 @@ const PAGE_SIZE = {
   craftArmor: 12,        // 제작소 "제작 > 방어구" 탭
   craftSub: 12,          // 제작소 "제작 > 보조" 탭
   craftAccessory: 12,    // 제작소 "제작 > 장신구" 탭
+  killRewardItems: 15,   // 던전 전투 종료 보상창 "획득 아이템" 그리드(5열×3행)
 };
 // 상점 탭 id → PAGE_SIZE/페이지 상태 키 매핑. 페이지네이션 미적용 탭(stone/misc)은 여기 없음.
 const SHOP_PAGE_KEY = {
@@ -3619,6 +3656,11 @@ const PLAYER_IMAGE_EXT = '.png';
 const PLAYER_IMAGE_FILE = 'player';
 const PLAYER_IMAGE_FALLBACK_EMOJI = '🧑'; // PNG 로드 실패 시 대체(몬스터 아이콘과 동일한 폴백 방식)
 
+// 11스테이지(숨겨진 장소) 보물상자 PNG. 다른 UI 단일 아이콘(PLAYER_IMAGE_*)과 동일하게 assets/ui/에
+// 파일명만 데이터로 관리 — #treasureChest는 그대로 두고 내부 표시(🎁 → 이 PNG)만 바꾸는 용도.
+const TREASURE_CHEST_IMAGE_PATH = 'assets/ui/treasure_chest.png';
+const TREASURE_CHEST_FALLBACK_EMOJI = '🎁'; // PNG 로드 실패 시 대체(기존 몬스터/플레이어 아이콘과 동일한 폴백 방식)
+
 // ---- 플레이어 전투 모션 이미지(신규) ----
 // 던전 전투 화면 플레이어를 "방향(direction) + 모션(motion)" 두 축으로만 표현함(요구사항 7번) — 화면
 // 코드에서 개별 조합을 하드코딩하지 않고, 이 두 상태값으로 파일명을 조립해서 고르기만 함. 파일명 규칙:
@@ -3719,15 +3761,19 @@ const DROP_GLOW_GRADE_LEVEL = { normal: 0, rare: 3, epic: 5, unique: 7 };
 // computeWeaponSellPrices)에는 전혀 관여하지 않음(별도 함수 enhanceCostBreakdown에서만 사용, formulas.js).
 const PRAYERS = {
   charm: {
-    key: 'charm', name: '끈기의 기도', desc: '적용 시 강화 단계 하락 방지', costMult: 2.5,
+    // 2단계 강화 확률 개편으로 하락 결과 자체가 삭제되어 끈기의 기도가 막아줄 대상이 사라짐 — 새 역할은
+    // 6단계에서 별도로 결정할 예정이라, 그 전까지는 desc도 임의로 새 효과를 지어내지 않고 비활성 상태만 안내.
+    key: 'charm', name: '끈기의 기도', desc: '현재 비활성화(추후 개편 예정)', costMult: 2.5,
     image: 'prayer_charm',
   },
   blessing: {
-    key: 'blessing', name: '보호의 기도', desc: '적용 시 아이템 파괴 방지', costMult: 3.0,
+    // 6단계 개편: 파괴 결과 자체를 사후에 유지로 가로채는 방식→강화 전에 파괴 확률 자체를 낮추는
+    // 방식으로 변경(아래 blessingAdjustedOdds). desc도 그에 맞춰 갱신.
+    key: 'blessing', name: '보호의 기도', desc: '적용 시 파괴 확률 30% 감소', costMult: 3.5,
     image: 'prayer_blessing',
   },
   focus: {
-    key: 'focus', name: '집중의 기도', desc: '적용 시 성공 확률 20% 증가', costMult: 2.0,
+    key: 'focus', name: '집중의 기도', desc: '적용 시 성공 확률 15% 증가', costMult: 2.0,
     image: 'prayer_focus',
   },
 };

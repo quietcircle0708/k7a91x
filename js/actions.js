@@ -55,7 +55,7 @@ function startEnhance(){
   stage.classList.add('charging');
   startEmbers();
 
-  const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[3] > 0; // 파괴 확률이 있는 단계는 긴장감 있게 연출을 더 길게
+  const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[2] > 0; // 파괴 확률이 있는 단계는 긴장감 있게 연출을 더 길게
   const delay = highRisk ? 1000 : 700;
   setTimeout(()=> resolveEnhance(equipped.id, level), delay);
 }
@@ -72,7 +72,7 @@ function resolveEnhance(itemId, level){
   const isArmorItem = equipTypeNow === 'armor';
   const isAccessoryItem = equipTypeNow === 'accessory';
 
-  const odds = effectivePrayerOdds(type, level); // 집중의 기도 반영(끈기/보호는 확률이 아니라 판정 결과를 가로챔, 아래)
+  const odds = effectivePrayerOdds(type, level); // 보호(파괴 확률 감소)+집중(성공 확률 증가) 전부 반영된 최종 확률
   let outcome = weightedOutcome(odds);
 
   const stage = el('swordStage');
@@ -80,21 +80,13 @@ function resolveEnhance(itemId, level){
   stage.classList.remove('shake','shake-hard','strike','charging');
   void stage.offsetWidth;
 
-  let blessingTriggered = false, charmTriggered = false, popLevelDisplay = false;
+  let popLevelDisplay = false;
 
-  // 끈기/보호의 기도는 더 이상 개수를 소모하는 소비 아이템이 아니라 ON/OFF 상태이므로, 발동해도
-  // 여기서 끄지 않음 — 다음 강화에서도 사용 조건(prayerCanUseCharm/Blessing)을 계속 만족하는 한
-  // render()가 알아서 ON 상태를 유지시키고, 조건이 깨지는 순간에만 자동으로 꺼짐(요구사항 17).
-  // 보호의 기도: "파괴 방지 → 현재 단계 유지"(요구사항 원문) — 파괴가 하락으로 완화되는 게 아니라
-  // 곧바로 유지(stay)로 전환됨. 끈기의 기도도 동일하게 하락→유지로 직접 전환.
-  if(outcome === 'destroy' && state.blessingActive){
-    outcome = 'stay';
-    blessingTriggered = true;
-  }
-  if(outcome === 'down' && state.charmActive){
-    outcome = 'stay';
-    charmTriggered = true;
-  }
+  // 6단계 개편: 보호의 기도는 더 이상 '파괴' 결과가 나온 뒤 사후적으로 '유지'로 가로채지 않음 —
+  // 위 odds 자체가 이미 보호 적용 후의 확률(blessingAdjustedOdds)이라, weightedOutcome이 내놓는
+  // 결과를 그대로 쓰면 됨(별도 가로채기 불필요). 끈기/보호 모두 개수를 소모하는 소비 아이템이 아닌
+  // ON/OFF 상태이므로 발동해도 여기서 끄지 않음 — 다음 강화에서도 사용 조건(prayerCanUseBlessing)을
+  // 계속 만족하는 한 render()가 알아서 ON 상태를 유지시키고, 조건이 깨지는 순간에만 자동으로 꺼짐.
 
   if(outcome === 'success'){
     item.level++;
@@ -117,21 +109,8 @@ function resolveEnhance(itemId, level){
       showMsg('강화 성공! +' + item.level, 'success');
     }
   } else if(outcome === 'stay'){
-    if(blessingTriggered){
-      vortexBurst('var(--forge-blue)');
-      showMsg('보호의 기도가 파괴를 막아냈습니다 (+' + item.level + ')', 'stay');
-    } else if(charmTriggered){
-      vortexBurst('var(--forge-green)');
-      showMsg('끈기의 기도가 하락을 막아냈습니다', 'stay');
-    } else {
-      smokePuff();
-      showMsg('실패... 레벨 유지', 'stay');
-    }
-  } else if(outcome === 'down'){
-    item.level = Math.max(0, level - 1);
-    stage.classList.add('shake');
-    smokePuff(8);
-    showMsg('실패! 레벨이 하락했습니다 (+' + item.level + ')', 'down');
+    smokePuff();
+    showMsg('실패... 레벨 유지', 'stay');
   } else if(outcome === 'destroy'){
     state.totalDestroys++;
     stage.classList.add('shake-hard');
@@ -157,7 +136,7 @@ function resolveEnhance(itemId, level){
 // 따라 파괴 보상(흔적/쇠조각/반짝이는 돌)을 판정해 지급함. level 파라미터는 파괴 판정이 발생한 강화
 // 시도의 "이전" 강화 단계(예: +7 강화 시도 중 파괴 = level 7)이며, 쇠조각/반짝이는 돌 개수 계산에서
 // "강화 단계에 따른 개수" 구간표 조회값으로 그대로 재사용됨(요구사항 4/5의 예시와 동일한 값). 강화
-// 성공/실패/하락 확률과 강화 비용 등 기존 강화 로직은 이 함수와 무관하게 전혀 건드리지 않음 — 파괴
+// 성공/유지/파괴 확률과 강화 비용 등 기존 강화 로직은 이 함수와 무관하게 전혀 건드리지 않음 — 파괴
 // 판정이 발생한 "이후"의 처리(소멸+보상)만 담당함. 반환값은 showMsg에 이어붙일 보상 안내 문구(보상이
 // 없으면 null — 일반 등급이거나, 등급별 확률 판정에서 재료 보상이 뽑혔는데 개수 구간표가 0인 경우도
 // 정상적으로 0개 획득 문구를 반환함, 별도로 숨기지 않음).

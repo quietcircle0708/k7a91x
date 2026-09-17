@@ -91,9 +91,10 @@ function render(){
 
     const noEnhanceData = !wpn(type).cost || wpn(type).cost.length === 0; // 아직 강화 단계별 데이터가 없는 장비(숏소드/대거 등)
     const atMax = noEnhanceData || level >= MAX_LEVEL;
-    // 화면에 보여줄 확률(끈기/보호가 막아주는 항목은 0%로 접어서 표시, 요구사항14) — 사용 가능 조건
-    // 판정(prayerCanUseCharm/Blessing)은 이 접힌 값이 아니라 effectivePrayerOdds(집중만 반영)를 내부에서
-    // 따로 조회하므로 순환 참조 없음(끈기를 켠 순간 하락이 0%로 보인다고 해서 끈기 자체가 꺼지지 않음).
+    // 화면에 보여줄 확률 — 이제 보호(파괴 확률 감소)/집중(성공 확률 증가) 전부 확률표 자체에 반영된
+    // 값이라 displayEnhanceOdds와 effectivePrayerOdds가 완전히 동일함(사후 가로채기 방식이었던 예전과
+    // 달리 표시와 실제 판정이 항상 일치). 사용 가능 조건 판정(prayerCanUseCharm/Blessing)은 이 값이
+    // 아니라 각자 내부에서 별도로 조회하므로 순환 참조 없음.
     const odds = atMax ? null : displayEnhanceOdds(type, level);
 
     if(!prayerCanUseCharm(type, level) && state.charmActive) state.charmActive = false;
@@ -116,12 +117,12 @@ function render(){
       el('enhanceBtn').textContent = '최대 강화 완료';
       el('costLine').innerHTML = '판매하여 새 장비를 시작하세요';
     } else {
-      // 성공 100%(집중의 기도로 상한에 도달)면 유지/하락/파괴 표시를 전부 숨김(요구사항 3).
+      // 성공 100%(집중의 기도로 상한에 도달)면 유지/파괴 표시를 전부 숨김(요구사항 3).
+      // 2단계 강화 확률 개편으로 하락 결과 자체가 삭제되어 하락 칩은 어떤 경우에도 출력하지 않음.
       let chips = `<span class="odds-chip success">성공 ${fmtOddsNum(odds[0])}%</span>`;
       if(odds[0] < 100){
         chips += `<span class="odds-chip stay">유지 ${fmtOddsNum(odds[1])}%</span>`;
-        if(odds[2] > 0) chips += `<span class="odds-chip down">하락 ${fmtOddsNum(odds[2])}%</span>`;
-        if(odds[3] > 0) chips += `<span class="odds-chip destroy">파괴 ${fmtOddsNum(odds[3])}%</span>`;
+        if(odds[2] > 0) chips += `<span class="odds-chip destroy">파괴 ${fmtOddsNum(odds[2])}%</span>`;
       }
       oddsRow.innerHTML = chips;
       const breakdown = enhanceCostBreakdown(type, level);
@@ -2008,6 +2009,13 @@ function renderHunt(){
 
   const isTreasureStage = hunt.stage === DUNGEON_TREASURE_STAGE;
   const chestEl = el('treasureChest');
+  // 보물상자 PNG(11스테이지 전용) — combatPlayerIcon과 동일하게 최초 1회만 채워 넣음(항상 동일한
+  // 그래픽이라 매번 다시 그릴 필요 없음). 이미지 로드 실패 시 monsterImgError가 즉시 이모지로 대체함
+  // (몬스터/플레이어 아이콘과 완전히 동일한 기존 폴백 방식 재사용, 새 아이콘 시스템 아님).
+  if(chestEl && !chestEl.dataset.filled){
+    chestEl.innerHTML = `<img src="${TREASURE_CHEST_IMAGE_PATH}" class="monster-icon-img" alt="" draggable="false" data-fallback-emoji="${TREASURE_CHEST_FALLBACK_EMOJI}" onerror="monsterImgError(this)">`;
+    chestEl.dataset.filled = '1';
+  }
   const hintEl = el('treasureHint');
   const combatPanel = el('huntCombatPanel');
   const playerSlot = el('combatPlayerSlot');
@@ -2220,6 +2228,46 @@ function buildInvPeekHtml(){
     return `${weaponIconHtml(it.type || 'longsword', 'inv-peek-icon-img', it.level)} ${weaponName(it.type || 'longsword')}${levelSuffix(it.level)}${eq}`;
   }).join('<br>');
   return `인벤토리 (${totalEquipInventoryCount()}/${INV_MAX})<br>${lines}`;
+}
+
+// ---- 던전 전투 종료 보상창 "획득 아이템" 아이콘 그리드 ----
+// 슬롯 1개의 HTML. 아이콘/툴팁은 buildRewardDisplayItems(formulas.js)가 이미 기존 인벤토리 아이콘·
+// 툴팁 함수로 만들어둔 것을 그대로 꽂아 쓰기만 함(여기서는 새 아이콘/툴팁 규칙을 만들지 않음).
+function rewardItemSlotHtml(slot){
+  const qtyHtml = slot.qty != null ? `<span class="reward-item-qty">${slot.qty}</span>` : '';
+  return `<span class="reward-item-slot" style="border-color:${slot.borderColor};">${slot.iconHtml}${qtyHtml}<span class="tooltip">${slot.tooltipHtml}</span></span>`;
+}
+// 4번 문서 "정렬 규칙": 슬롯을 5개씩 줄(row)로 나눠, 첫 번째 줄만 실제 개수에 맞춰 가운데 정렬하고
+// 두 번째 줄부터는 왼쪽 정렬한다 — flex-wrap 한 줄로는 이 두 정렬을 동시에 만들 수 없어(모든 줄이
+// 같은 justify-content를 공유하게 됨) 줄 단위 div로 직접 나눠 첫 줄에만 별도 클래스를 붙임.
+function buildKillRewardItemSectionHtml(rewards){
+  const items = buildRewardDisplayItems(rewards);
+  if(items.length === 0) return '<div id="krRewardItemSection" style="display:none;"></div>';
+  const pageSize = PAGE_SIZE.killRewardItems;
+  const totalPageCount = pageCount(items.length, pageSize);
+  pageState.killRewardItems = clampPage(pageState.killRewardItems, totalPageCount);
+  const pageItems = pageSlice(items, pageState.killRewardItems, pageSize);
+  const rowsHtml = [];
+  for(let i = 0; i < pageItems.length; i += 5){
+    const row = pageItems.slice(i, i + 5);
+    const rowClass = i === 0 ? 'reward-item-row reward-item-row-first' : 'reward-item-row';
+    rowsHtml.push(`<div class="${rowClass}">${row.map(rewardItemSlotHtml).join('')}</div>`);
+  }
+  const pagerHtmlOut = totalPageCount > 1
+    ? `<div class="reward-item-pager">${pagerHtml('killRewardItems', pageState.killRewardItems, totalPageCount)}</div>`
+    : '';
+  return `<div class="reward-item-section" id="krRewardItemSection">
+    <div class="reward-item-title">획득 아이템</div>
+    <div class="reward-item-grid">${rowsHtml.join('')}</div>
+    ${pagerHtmlOut}
+  </div>`;
+}
+// pagerHtml의 "이전/다음" 클릭(goPage, main.js)이 PAGE_RENDER_FN['killRewardItems']로 이 함수를 호출함
+// — 보상창 전체를 다시 그리지 않고 아이템 그리드 부분(#krRewardItemSection)만 다시 그림.
+function renderKillRewardItemSection(){
+  const wrap = el('krRewardItemSection');
+  if(!wrap) return; // 보상창이 닫혀있거나(11스테이지 보물상자 결과창 등) 아이템이 없던 경우
+  wrap.outerHTML = buildKillRewardItemSectionHtml(hunt.pendingRewards);
 }
 
 // ---- 공지사항(패치노트) 모달 ----

@@ -590,31 +590,11 @@ function openKillResultModal(rewards){
   if(rewards.levelsGained > 0){
     rewardsHtml += `<div class="reward-levelup">🎉 레벨업! Lv.${rewards.newPlayerLevel - rewards.levelsGained} → Lv.${rewards.newPlayerLevel}</div>`;
   }
-  rewards.weaponDrops.forEach(w => {
-    const itemName = `${weaponName(w.type)}${levelSuffix(w.level)}`;
-    rewardsHtml += `<div><span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
-  });
-  rewards.weaponIdDrops.forEach(w => {
-    const itemName = `${weaponName(w.type)}${levelSuffix(w.level)}`;
-    rewardsHtml += `<div><span style="color:${weaponGradeColor(w.type)}; font-weight:700;">${itemName}</span>${josaEulReul(itemName)} 획득했습니다!</div>`;
-  });
-  Object.keys(rewards.stoneDrops).forEach(itemId => {
-    const item = MISC_ITEMS[itemId];
-    rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${rewards.stoneDrops[itemId]} 획득</div>`;
-  });
-  Object.keys(rewards.flaskDrops).forEach(itemId => {
-    const item = CONSUMABLES[itemId];
-    rewardsHtml += `<div><span class="txt-shard">${itemIconHtml(item)} ${item.name}</span> +${rewards.flaskDrops[itemId]} 획득</div>`;
-  });
-  rewards.artifactDrops.forEach(artId => {
-    const art = ARTIFACTS[artId];
-    rewardsHtml += `<div><span class="reward-artifact">신비로운 ${art.name}${josaEulReul(art.name)} 획득했습니다!</span></div>`;
-  });
-  Object.keys(rewards.miscDrops).forEach(itemId => {
-    const drop = rewards.miscDrops[itemId];
-    const item = MISC_ITEMS[itemId];
-    rewardsHtml += `<div><span class="txt-shard">${itemIconHtml({ icon: drop.icon, image: item && item.image })} ${drop.name}</span> +${drop.qty} 획득</div>`;
-  });
+  // 획득 아이템 표시 영역: 기존 텍스트 나열 방식을 5열×3행 아이콘 그리드로 교체(실제 지급/드랍 로직은
+  // 그대로이며, buildRewardDisplayItems/buildKillRewardItemSectionHtml은 이미 지급된 rewards를 표시용
+  // 슬롯으로 변환만 함). 보상창을 새로 열 때마다 그리드는 항상 1페이지부터 시작.
+  pageState.killRewardItems = 1;
+  rewardsHtml += buildKillRewardItemSectionHtml(rewards);
   if(anyEquipInventoryFull()){
     rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;
   }
@@ -728,18 +708,28 @@ function openTreasureResultModal(result){
   el('krLevel').textContent = '';
 
   let rewardsHtml = `<div><span class="txt-gold">골드</span> +${result.gold.toLocaleString()}G</div>`;
-  if(result.weaponDrop){
-    const itemName = `${weaponName(result.weaponDrop.type)}${levelSuffix(result.weaponDrop.level)}`;
-    rewardsHtml += `<div><span class="txt-relic">모험가의 유해</span>를 발견했습니다!<br>${itemName}</div>`;
-  }
-  if(result.stoneDrop){
-    const item = MISC_ITEMS[result.stoneDrop.itemId];
-    rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${result.stoneDrop.qty} 획득</div>`;
-  }
-  if(result.miscDrop){
-    const item = MISC_ITEMS[result.miscDrop.itemId];
-    rewardsHtml += `<div><span style="color:${stoneNameColor(item.id)}; font-weight:700;">${item.name}</span> +${result.miscDrop.qty} 획득</div>`;
-  }
+  // 11스테이지는 기존 로직상 경험치 보상이 없으므로 경험치 줄은 추가하지 않음(요구사항 그대로 유지).
+
+  // 11스테이지 보상(gold/weaponDrop/stoneDrop/miscDrop 개별 값)을 일반 전투 보상창과 동일한
+  // buildKillRewardItemSectionHtml()에 그대로 넣을 수 있도록, hunt.pendingRewards와 같은 버킷
+  // 구조(weaponDrops/weaponIdDrops/stoneDrops/flaskDrops/artifactDrops/miscDrops)로 "표시용"
+  // 변환만 함 — grantTreasureRewards()의 실제 지급 로직이나 state는 전혀 건드리지 않음.
+  // (11스테이지 드랍은 모험가의 유해/마석/기타 각각 최대 1개뿐이라 15개를 넘을 일이 없어 페이지네이션이
+  // 실제로 동작하지는 않지만, 일반 전투 보상 누적치인 hunt.pendingRewards를 오염시키지 않기 위해
+  // 이 변환 객체는 hunt.pendingRewards에 쓰지 않고 이 함수 지역 변수로만 buildKillRewardItemSectionHtml에 전달함.)
+  const displayRewards = {
+    weaponDrops: result.weaponDrop ? [result.weaponDrop] : [],
+    weaponIdDrops: [],
+    stoneDrops: result.stoneDrop ? { [result.stoneDrop.itemId]: result.stoneDrop.qty } : {},
+    flaskDrops: {},
+    artifactDrops: [],
+    miscDrops: result.miscDrop
+      ? { [result.miscDrop.itemId]: { icon: MISC_ITEMS[result.miscDrop.itemId].icon, name: MISC_ITEMS[result.miscDrop.itemId].name, qty: result.miscDrop.qty } }
+      : {},
+  };
+  pageState.killRewardItems = 1;
+  rewardsHtml += buildKillRewardItemSectionHtml(displayRewards);
+
   if(anyEquipInventoryFull() && !result.weaponDrop){
     rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;
   }

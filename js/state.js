@@ -28,7 +28,8 @@ let state = {
                                                   // ARMOR_TYPES/ACCESSORY_TYPES 키. 강화 파괴 시 processDestroyReward가
                                                   // 지급하고, useTraceItem→confirmTraceRestore로 소모해 +0 장비로 복구함)
   // 보호 장치(기도) — 보유 개수/구매 개념 없이 ON/OFF 상태만 존재(강화 보호 장치 시스템 개편).
-  // charmActive="끈기의 기도"(하락 방지), blessingActive="보호의 기도"(파괴 방지), focusActive="집중의
+  // charmActive="끈기의 기도"(2단계 개편으로 하락 결과 삭제 → 현재 비활성, 6단계에서 새 역할 결정 예정),
+  // blessingActive="보호의 기도"(파괴 방지), focusActive="집중의
   // 기도"(성공률 20% 증가). 이름만 바뀌었을 뿐 charmActive/blessingActive 키 자체는 기존 그대로 재사용.
   charmActive: false,
   blessingActive: false,
@@ -131,6 +132,8 @@ let pageState = {
   craftWeapon: 1, craftArmor: 1, craftSub: 1, craftAccessory: 1,
   // 공지사항(패치노트) 팝업 — 자동 표시든 대장간 버튼으로 수동으로 열든 항상 1페이지부터 시작(요구사항).
   patchNote: 1,
+  // 던전 전투 종료 보상창 "획득 아이템" 그리드 — 보상창을 새로 열 때마다 항상 1페이지부터 시작.
+  killRewardItems: 1,
   // dungeonDrop 페이지는 던전마다 따로 관리해야 해서 고정 키 하나가 아니라, 던전 카드를 그릴 때
   // `dungeonDrop:<던전id>` 형태의 동적 키를 이 오브젝트에 필요할 때마다 추가해서 씀(goPage의 범용
   // "pageState[target] = ..." 로직을 그대로 재사용하기 위함, render.js buildDungeonDropIcons 참고).
