@@ -1852,16 +1852,18 @@ function nearestLevelCandidates(list, targetLevel){
 }
 // 모험가의 유해(장비) 드랍 판정.
 // 1) RELIC_DROP_CHANCE 확률로 드랍 판정 → 2) RELIC_EQUIP_TYPE_CHANCE로 장비 타입(무기/방어구/장신구)
-//    선택 → 3) 선택된 타입의 RELIC_GRADE_CHANCE로 등급 선택 → 4) 그 등급 중 아이템 레벨이
-//    [max(1, 몬스터레벨-RELIC_LEVEL_WINDOW), 몬스터레벨] 구간인 후보만 필터
-//    (후보가 없으면 폴백: ① 같은 등급 안에서 레벨 구간 제한 없이 몬스터 레벨과 가장 가까운 아이템
-//     레벨로 대체 ② 그래도 없으면(해당 등급 장비가 아예 없음) 등급 상관없이 몬스터 레벨과 가장 가까운
-//     장비로 대체) → 5) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계
-//    낮아질 때마다 ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨 → 6) 그 레벨(+같은 등급, 폴백된 경우는
-//    폴백된 등급)에 해당하는 장비 중 하나를 무작위로 선택 → 7) 강화 단계 결정: 무기는
-//    RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리)로 추첨(최종 선택된 장비의 등급 기준 — 폴백 ②로
-//    등급이 바뀌었을 수 있으므로 최초 추첨된 grade가 아니라 실제 지급 등급을 사용), 방어구/장신구는
-//    등급과 무관하게 항상 +0 고정.
+//    선택 → 3) 선택된 타입의 RELIC_GRADE_CHANCE로 등급 선택(이후 절대 바뀌지 않음 — 요구사항: "선택풀
+//    장비의 등급이 변하는 일은 없어야 한다") → 4) 그 등급 중 아이템 레벨이 RELIC_LEVEL_CAP(51레벨 이상
+//    장비 착용 불가 기준) 이하인 후보만 필터. 이 레벨 상한은 몬스터 레벨과 전혀 무관하게 항상 동일하게
+//    적용됨(요구사항: "아이템 레벨 제한 규칙과 몬스터 레벨은 상관이 없어야 한다" — 80레벨 몬스터를 잡아도
+//    캡 이하 후보에서만 추첨) — monsterLevel 인자는 더 이상 레벨 선택에 쓰이지 않음(호출부 시그니처만
+//    유지, 값 자체는 무시됨). 이 캡 이하에서 그 등급의 장비가 하나도 없으면(현재 데이터에서는 발생하지
+//    않음) 등급을 바꾸지 않고 그대로 드랍 무산(null) — 등급이 바뀌느니 안 주는 쪽을 선택함.
+//    → 5) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계 낮아질 때마다
+//    ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨(드랍되는 장비의 레벨이 몬스터보다 낮아도 상관없음 — 요구사항)
+//    → 6) 그 레벨(+처음 추첨된 그 등급 그대로)에 해당하는 장비 중 하나를 무작위로 선택 → 7) 강화 단계
+//    결정: 무기는 RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리)로 추첨, 방어구/장신구는 등급과 무관
+//    하게 항상 +0 고정.
 // 장비 타입별 도감은 EQUIP_INVENTORY_POOLS(data.js)의 typesTable을 그대로 재사용 — 새 방어구/장신구가
 // 거기에 등록되기만 하면 이 함수는 수정 없이 자동으로 후보에 포함시킴.
 function resolveWeaponRelicDrop(monsterLevel){
@@ -1873,20 +1875,10 @@ function resolveWeaponRelicDrop(monsterLevel){
 
   const grade = pickWeighted(Object.entries(RELIC_GRADE_CHANCE[equipType]));
 
-  const minLevel = Math.max(1, monsterLevel - RELIC_LEVEL_WINDOW);
-  const maxLevel = monsterLevel;
-  let candidates = Object.values(typesTable).filter(w =>
-    w.grade === grade && w.levelReq >= minLevel && w.levelReq <= maxLevel
-  );
-  if(candidates.length === 0){
-    // 폴백 ①: 레벨 구간 제한을 풀고, 같은 등급 안에서 몬스터 레벨 이하 중 가장 가까운 레벨로 대체
-    candidates = nearestLevelCandidates(Object.values(typesTable).filter(w => w.grade === grade), monsterLevel);
-  }
-  if(candidates.length === 0){
-    // 폴백 ②: 이 등급에 등록된 장비가 아예 없으면, 등급도 무시하고 몬스터 레벨 이하 중 가장 가까운 장비로 대체
-    candidates = nearestLevelCandidates(Object.values(typesTable), monsterLevel);
-  }
-  if(candidates.length === 0) return null; // 이 타입에 등록된 장비가 하나도 없는 극단적인 경우
+  // 처음 뽑힌 grade 그대로 유지 — 레벨 캡(RELIC_LEVEL_CAP) 이하인 그 등급 후보만 모음. 몬스터 레벨은
+  // 여기서 전혀 쓰이지 않음(요구사항: 캡 규칙과 몬스터 레벨은 무관).
+  const candidates = Object.values(typesTable).filter(w => w.grade === grade && w.levelReq <= RELIC_LEVEL_CAP);
+  if(candidates.length === 0) return null; // 이 등급에 캡 이하 장비가 하나도 없는 극단적인 경우 — 등급을 바꾸지 않고 드랍 무산
 
   const levels = [...new Set(candidates.map(w => w.levelReq))].sort((a, b) => b - a); // 높은 레벨부터
   let weight = 100;
