@@ -1385,6 +1385,7 @@ function buildCombatStatsHtml(){
     const baseSpeed = atkSpeedFor(type, level);
     const totalSpeed = effectiveAtkSpeed(type, level, durabilityZero);
     const totalCrit = effectiveCritChance(type, level, durabilityZero);
+    const defenseIgnore = playerDefenseIgnore();
     const hasSpeedBonus = isArtifactEquipped('batwing');
 
     html += `
@@ -1393,6 +1394,7 @@ function buildCombatStatsHtml(){
       <div class="char-stat-row big"><span>총 공격력</span><span class="v">${totalAtk}</span></div>
       <div class="char-stat-row big"><span>공격속도</span><span class="v">${totalSpeed.toFixed(2)}회/초</span></div>
       <div class="char-stat-row big"><span>치명타 확률</span><span class="v">${totalCrit}%</span></div>
+      <div class="char-stat-row big"><span>방어도 무시</span><span class="v">${defenseIgnore > 0 ? '+' + defenseIgnore : defenseIgnore}</span></div>
     `;
     if(hasSpeedBonus){
       html += `<div class="char-stat-note">공격속도 = 무기 기본 ${baseSpeed.toFixed(2)} + 박쥐 날개 5%</div>`;

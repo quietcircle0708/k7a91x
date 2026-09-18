@@ -803,6 +803,7 @@ function resolveSkillEffect(id){
   }
   targets.forEach(t => {
     if(!t) return;
+    let onceStatusApplied = false; // onceOnHitStatus:true인 스킬은 대상별로 최초 적중 타격에만 부여(파쇄격 등)
     for(let i = 0; i < hits; i++){
       if(t.hp <= 0) break;
       const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
@@ -817,7 +818,10 @@ function resolveSkillEffect(id){
       monsterHitEffect(t.instanceId, dmg, isCrit);
       // 적중(=피해를 입혀 대상이 생존)한 경우에만 상태 이상 부여(예: 소드 스트라이크의 기절). 처치되는
       // 순간의 히트에는 부여하지 않음 — s.onHitStatus가 없는 기존 스킬들은 전혀 영향받지 않음.
-      if(t.hp > 0 && s.onHitStatus) applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
+      if(t.hp > 0 && s.onHitStatus && !(s.onceOnHitStatus && onceStatusApplied)){
+        applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
+        onceStatusApplied = true;
+      }
     }
     if(t.hp <= 0) killMonsterInstance(t.instanceId);
     else updateMonsterSlot(t);
@@ -833,6 +837,10 @@ function resolveSkillEffect(id){
 function applyDelayedSkillHits(target, s, perHit, critChance){
   const instanceId = target.instanceId;
   const hits = s.hits || 1;
+  // onceOnHitStatus:true인 스킬(예: 파쇄격)은 이번 스킬 시전에서 적중(=생존)한 "최초의" 타격에만
+  // onHitStatus를 부여함 — 이 클로저 변수로 이미 부여했는지 추적함(스킬 시전 1회당 새로 생성되므로
+  // onceOnHitStatus가 없는 기존 스킬은 매 타격 부여 로직이 그대로 유지되어 전혀 영향받지 않음).
+  let onceStatusApplied = false;
   const applyOneHit = () => {
     const t = hunt.monsters.find(m => m.instanceId === instanceId);
     if(!t || t.hp <= 0) return;
@@ -846,7 +854,10 @@ function applyDelayedSkillHits(target, s, perHit, critChance){
     dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(t)));
     t.hp -= dmg;
     monsterHitEffect(t.instanceId, dmg, isCrit);
-    if(t.hp > 0 && s.onHitStatus) applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
+    if(t.hp > 0 && s.onHitStatus && !(s.onceOnHitStatus && onceStatusApplied)){
+      applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
+      onceStatusApplied = true;
+    }
     if(t.hp <= 0) killMonsterInstance(t.instanceId);
     else updateMonsterSlot(t);
   };

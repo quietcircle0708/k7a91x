@@ -1004,6 +1004,46 @@ const WEAPON_TYPES = {
       textTemplate: "기본 공격 적중 시 {chance}% 확률로 4초 동안 {term:curse}저주{/term} 부여",
     },
   },
+  // 신규 무기 2종(요청사항 그대로 데이터만 등록, 사해골/원령→태형도, 고급유령/불연→청현비 드랍 테이블
+  // 연결은 MONSTERS 쪽에서 별도 처리) — moongreatsword/tigersword와 동일한 "고정형"(opt.text+
+  // opt.statBonus) 고유 옵션 스키마 재사용, activateLevel:0이라 +0부터 바로 활성화되고 강화해도 옵션
+  // 수치는 오르지 않음(요청사항 "강화 단계별 성장 수치 없음").
+  taehyeongdo: {
+    id: 'taehyeongdo', name: '태형도', desc: '거대한 칼날에 묵직한 파괴력을 담은 양손 검',
+    equipType: 'weapon',
+    durability: 50000,
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손
+    grade: 'epic', // 에픽
+    attackPower: 491, attackSpeed: 0.6, critRate: 10,
+    purchasable: false, levelReq: 50,
+    image: 'epic_big_shape_sword',
+    atk: [491], speed: [0.6], crit: [10], sell: [],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +15',
+      statBonus: { str: 15 },
+    },
+  },
+  cheonghyeonbi: {
+    id: 'cheonghyeonbi', name: '청현비', desc: '푸른 칼날에 날카로운 살기를 담은 단검',
+    equipType: 'weapon',
+    durability: 25000,
+    weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
+    grade: 'epic', // 에픽
+    attackPower: 197, attackSpeed: 1.2, critRate: 10,
+    purchasable: false, levelReq: 50,
+    image: 'epic_blue_dagger',
+    atk: [197], speed: [1.2], crit: [10], sell: [],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '힘 +5<br>민첩 +5',
+      statBonus: { str: 5, agi: 5 },
+    },
+  },
 };
 
 
@@ -1190,6 +1230,119 @@ const ARMOR_TYPES = {
       textTemplate: "피해 입을 시 {chance}% 확률로 {term:poison}중독{/term} 부여",
     },
   },
+  // 신규 방어구 6종(갑옷 2종+투구 4종) — 이번 작업으로 처음 등장하는 "강화 단계별로 수치가 자라는 성장형
+  // 고유 옵션"(growthStat, formulas.js 참고)을 가진 방어구 3종(인형술사의 옷/흑령갑옷/매의 투구)과, 성장형+
+  // 고정형(statBonus)을 한 아이템에 함께 쓰는 흑령투구, 성장 없이 항상 같은 고정형(청사연투구), 고유 옵션이
+  // 아예 없는 제령은관장식까지 6가지 패턴을 전부 포함함.
+  puppeteercloth: {
+    id: 'puppeteercloth', name: '인형술사의 옷', desc: '인형술의 힘이 서려있는 옷',
+    equipType: 'armor',
+    durability: 50000,
+    armorKind: 'armor', // 갑옷
+    grade: 'epic', // 에픽
+    defense: -20, hp: 100, mana: 300,
+    purchasable: false, levelReq: 50,
+    image: 'epic_puppeteer_cloth',
+    // 고유 옵션: 강화 단계별로 자라는 지능 보너스(성장형) — growthStat:'int'로 등록해 artifactStatBonus가
+    // weaponUniqueOptionGrowthStat/armorUniqueOptionGrowthStat을 통해 자동 합산함(formulas.js 참고).
+    // "단계별 수치는 +0값에서 누적되는 게 아니라 해당 단계의 절대 수치"라는 요청사항 그대로, chanceByLevel에
+    // 각 단계의 절대값을 직접 채움(중간 단계는 다음 표기 단계 직전까지 이전 값 유지).
+    uniqueOption: {
+      growthStat: 'int',
+      activateLevel: 0,
+      chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 6, 4: 6, 5: 7, 6: 7, 7: 8, 8: 8, 9: 10 },
+      chanceSuffix: '', // %가 아닌 순수 수치라 단위 없음(forge/tooltip 표시용, formulas.js weaponUniqueOptionForgeHtml 참고)
+      textTemplate: '지능 +{chance}',
+    },
+  },
+  blackghostarmor: {
+    id: 'blackghostarmor', name: '흑령갑옷', desc: '검은 영혼의 힘이 깃든 갑옷',
+    equipType: 'armor',
+    durability: 35000,
+    armorKind: 'armor', // 갑옷
+    grade: 'epic', // 에픽
+    defense: -18, hp: 500,
+    purchasable: false, levelReq: 68,
+    image: 'epic_black_ghost_armor',
+    // 고유 옵션: 강화 단계별로 자라는 방어도 무시(성장형) — growthStat:'defenseIgnore'로 등록해
+    // playerDefenseIgnore가 자동 합산함(formulas.js 참고). 이 옵션을 가진 첫 실제 아이템.
+    uniqueOption: {
+      growthStat: 'defenseIgnore',
+      activateLevel: 0,
+      chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 6, 4: 6, 5: 7, 6: 7, 7: 8, 8: 8, 9: 10 },
+      chanceSuffix: '',
+      textTemplate: '방어도 무시 +{chance}',
+    },
+  },
+  silverghosthat: {
+    id: 'silverghosthat', name: '제령은관장식', desc: '정화의 힘을 품은 고대의 은빛 머리 장식',
+    equipType: 'armor',
+    durability: 20000,
+    armorKind: 'helmet', // 투구
+    grade: 'rare', // 레어
+    defense: -9, hp: 300,
+    purchasable: false, levelReq: 56,
+    image: 'rare_silver_ghost_hat',
+    // 고유 옵션 항목이 요청 표에 없음(공백) → 요청사항대로 옵션 없는 아이템으로 처리(uniqueOption 필드 자체를 생략).
+  },
+  hawkhelmet: {
+    id: 'hawkhelmet', name: '매의 투구', desc: '매의 용맹을 상징하는 투구',
+    equipType: 'armor',
+    durability: 30000,
+    armorKind: 'helmet', // 투구
+    grade: 'epic', // 에픽
+    defense: -5, hp: 200,
+    purchasable: false, levelReq: 56,
+    image: 'epic_hawk_helmet',
+    // 고유 옵션: 강화 단계별로 자라는 치명타 확률(성장형, 소수점 단위) — growthStat:'critRate'로 등록해
+    // effectiveCritChance가 armorUniqueOptionGrowthStat을 통해 자동 합산함. 4.2%/4.4%/4.6%처럼 소수점이
+    // 있어 chanceDecimals:1로 등록(기본값 0인 기존 %확률형 아이템들과 달리 이 아이템부터 처음 사용).
+    uniqueOption: {
+      growthStat: 'critRate',
+      activateLevel: 0,
+      chanceByLevel: { 0: 4, 1: 4, 2: 4, 3: 4.2, 4: 4.2, 5: 4.4, 6: 4.4, 7: 4.6, 8: 4.6, 9: 5 },
+      chanceDecimals: 1,
+      textTemplate: '치명타 확률 +{chance}%',
+    },
+  },
+  bluehelmet56: {
+    id: 'bluehelmet56', name: '청사연투구', desc: '푸른빛이 은은하게 감도는 신비로운 투구',
+    equipType: 'armor',
+    durability: 100000,
+    armorKind: 'helmet', // 투구
+    grade: 'epic', // 에픽
+    defense: -10, hp: 200, mana: 100,
+    purchasable: false, levelReq: 56,
+    image: 'epic_blue_helmet_lv56',
+    // 고유 옵션: moongreatsword/tigersword와 동일한 "고정형"(opt.text+opt.statBonus) — activateLevel:0이라
+    // +0부터 바로 활성화되고, 강화해도 옵션 수치는 오르지 않음(요청사항).
+    uniqueOption: {
+      activateLevel: 0,
+      text: '민첩 +5<br>지능 +3',
+      statBonus: { agi: 5, int: 3 },
+    },
+  },
+  blackghosthelmet: {
+    id: 'blackghosthelmet', name: '흑령투구', desc: '검은 영혼의 기운이 서린 어두운 투구',
+    equipType: 'armor',
+    durability: 35000,
+    armorKind: 'helmet', // 투구
+    grade: 'epic', // 에픽
+    defense: -4, hp: 400,
+    purchasable: false, levelReq: 66,
+    image: 'epic_black_ghost_helmet',
+    // 고유 옵션: 고정형(statBonus.str=5, 강화해도 불변)과 성장형(growthStat:'defenseIgnore')을 한 옵션에
+    // 함께 등록한 첫 사례 — opt.text 대신 opt.textTemplate을 쓰고, "힘 +5" 부분은 강화해도 변하지 않는
+    // 고정 문구로 템플릿에 직접 적어두고 "{chance}" 자리만 방어도 무시 성장 수치로 치환되게 함.
+    uniqueOption: {
+      growthStat: 'defenseIgnore',
+      activateLevel: 0,
+      statBonus: { str: 5 },
+      chanceByLevel: { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 5, 6: 5, 7: 6, 8: 6, 9: 7 },
+      chanceSuffix: '',
+      textTemplate: '힘 +5<br>방어도 무시 +{chance}',
+    },
+  },
 };
 
 // ---- 방어구 강화 단계별 체력/마나 증가 공식 ----
@@ -1297,6 +1450,102 @@ const ACCESSORY_TYPES = {
     defense: -4, hp: 200, mana: 100, crit: 9,
     purchasable: false, levelReq: 50,
     image: 'unique_wolfmoonring',
+  },
+  // 신규 장신구 9종(상점 구매 가능 5종 + 구매 불가 4종). 구매 불가 4종(grassring/defensering/silverring/
+  // morionring)은 몬스터 드랍 테이블에 별도로 연결됨(해당 몬스터 데이터 drops 배열 참고).
+  bluering: {
+    id: 'bluering', name: '파란색반지', desc: '파란색의 반지',
+    equipType: 'accessory',
+    durability: 1000,
+    accessoryKind: 'ring',
+    grade: 'normal', // 일반
+    defense: -1, hp: 20, mana: 20,
+    purchasable: true, levelReq: 10,
+    image: 'common_blue_ring',
+  },
+  purplering: {
+    id: 'purplering', name: '보라색반지', desc: '보라색의 반지',
+    equipType: 'accessory',
+    durability: 1000,
+    accessoryKind: 'ring',
+    grade: 'normal', // 일반
+    defense: -1, hp: 50, mana: 50,
+    purchasable: true, levelReq: 19,
+    image: 'common_purple_ring',
+  },
+  blackmindring: {
+    id: 'blackmindring', name: '흑심반지', desc: '어두운 색을 띄고 있는 반지',
+    equipType: 'accessory',
+    durability: 2400,
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -2, hp: 80,
+    purchasable: true, levelReq: 24,
+    image: 'rare_blackmind_ring',
+  },
+  exorcismring: {
+    id: 'exorcismring', name: '퇴마반지', desc: '마력을 거부하는 힘을 지닌 반지',
+    equipType: 'accessory',
+    durability: 3600,
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -3, hp: 200,
+    purchasable: true, levelReq: 36,
+    image: 'rare_red_ring',
+  },
+  // 진마반지와 퇴마반지는 요청사항대로 같은 이미지(rare_red_ring)를 그대로 공유해서 사용함.
+  truemagicring: {
+    id: 'truemagicring', name: '진마반지', desc: '마력 향상에 도움이 되는 신기한 반지',
+    equipType: 'accessory',
+    durability: 5000,
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -4, mana: 350,
+    purchasable: true, levelReq: 50,
+    image: 'rare_red_ring',
+  },
+  grassring: {
+    id: 'grassring', name: '풀잎반지', desc: '풀잎을 엮어 만든 소박한 반지',
+    equipType: 'accessory',
+    durability: 3600,
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -2, mana: 250,
+    purchasable: false, levelReq: 36,
+    image: 'rare_flower_ring',
+  },
+  defensering: {
+    id: 'defensering', name: '방어의 반지', desc: '착용자의 몸을 보호하는 마법의 반지',
+    equipType: 'accessory',
+    durability: 3600,
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -5, hp: 50, mana: 20,
+    purchasable: false, levelReq: 36,
+    image: 'rare_defense_ring',
+  },
+  silverring: {
+    id: 'silverring', name: '은반지', desc: '은으로 만들어진 반지',
+    equipType: 'accessory',
+    durability: 4000,
+    accessoryKind: 'ring',
+    grade: 'rare', // 레어
+    defense: -4, hp: 150, mana: 50,
+    purchasable: false, levelReq: 40,
+    image: 'rare_silver_ring',
+  },
+  // 흑수정 반지: crit 필드를 등록하면 아래 후처리(Object.values(ACCESSORY_TYPES).forEach)가
+  // computeAccessoryCritArray로 현랑반지와 동일한 강화 단계별 치명타 증가 공식을 자동 적용함
+  // (전용 코드 없음 — crit 필드가 있는 장신구라면 무엇이든 동일하게 처리되는 기존 범용 로직 재사용).
+  morionring: {
+    id: 'morionring', name: '흑수정 반지', desc: '검은 수정에 신비로운 힘이 깃든 반지',
+    equipType: 'accessory',
+    durability: 10000,
+    accessoryKind: 'ring',
+    grade: 'epic', // 에픽
+    defense: -4, hp: 200, mana: 100, crit: 1,
+    purchasable: false, levelReq: 50,
+    image: 'epic_morion_ring',
   },
 };
 
@@ -2619,9 +2868,9 @@ const SKILLS = {
   },
   quad_strike: {
     name: '사연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 {hits}번 공격.',
-    grade: 'rare', category: 'common', target: 'single', levelReq: 50,
+    grade: 'rare', category: 'common', target: 'single', levelReq: 40,
     cooldown: 5.1, resourceType: 'mp', resourceAmount: 200, castTime: 0,
-    damagePercent: 120, hits: 4, icon: 'lv50atk',
+    damagePercent: 100, hits: 4, icon: 'lv50atk',
     // 이연격/삼연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
     // hits 값에 따라 자동 반복하므로 4타도 별도 처리 없이 1타(즉시)→2타(0.1초)→3타(0.2초)→4타(0.3초) 순으로 동작).
     hitDelayMs: 0.1,
@@ -2631,25 +2880,42 @@ const SKILLS = {
     name: '참격 4성', desc: '{dp}%의 데미지로 모든 적을 공격.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 55,
     cooldown: 7, resourceType: 'mp', resourceAmount: 300, castTime: 0.1,
-    damagePercent: 600, hits: 1, icon: 'lv35atk', // 요청대로 참격 1~3성과 동일한 lv35atk 아이콘 재사용
+    damagePercent: 480, hits: 1, icon: 'lv35atk', // 요청대로 참격 1~3성과 동일한 lv35atk 아이콘 재사용
     upgradeFrom: 'cleave3', // 스킬 업그레이드: 참격 3성 보유해야 습득 가능, 습득시 참격3성→4성으로 교체
   },
   jin_cleave: {
     name: "진'참격", desc: '{dp}%의 데미지로 모든 적을 공격.', // 이름에 아포스트로피(')가 포함된 것은 오타가 아니라 요청 그대로임
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 65,
     cooldown: 6.7, resourceType: 'mp', resourceAmount: 400, castTime: 0.1,
-    damagePercent: 900, hits: 1, icon: 'lv35atk', // 요청대로 참격 1~4성과 동일한 lv35atk 아이콘 재사용
+    damagePercent: 700, hits: 1, icon: 'lv35atk', // 요청대로 참격 1~4성과 동일한 lv35atk 아이콘 재사용
     upgradeFrom: 'cleave4', // 스킬 업그레이드: 참격 4성 보유해야 습득 가능, 습득시 참격4성→진'참격으로 교체
+  },
+  geukjin_cleave: {
+    name: '극진참격', desc: '검기를 날려 {dp}%의 데미지로<br>모든 적을 공격',
+    grade: 'rare', category: 'common', target: 'aoe', levelReq: 80,
+    cooldown: 5, resourceType: 'mp', resourceAmount: 600, castTime: 0.1,
+    damagePercent: 870, hits: 1, icon: 'lv80atk',
+    upgradeFrom: 'jin_cleave', // 스킬 업그레이드: 진'참격 보유해야 습득 가능, 습득시 진'참격→극진참격으로 교체
   },
   five_strike: {
     name: '오연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 다섯 번 공격.',
-    grade: 'rare', category: 'common', target: 'single', levelReq: 60,
+    grade: 'rare', category: 'common', target: 'single', levelReq: 50,
     cooldown: 5, resourceType: 'mp', resourceAmount: 250, castTime: 0,
-    damagePercent: 180, hits: 5, icon: 'lv50atk', // 요청대로 사연격과 동일한 lv50atk 아이콘 재사용
+    damagePercent: 100, hits: 5, icon: 'lv50atk', // 요청대로 사연격과 동일한 lv50atk 아이콘 재사용
     // 이연격/삼연격/사연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
     // hits 값에 따라 자동 반복하므로 5타도 별도 처리 없이 1타(즉시)→2타(0.1초)→3타(0.2초)→4타(0.3초)→5타(0.4초) 순으로 동작).
     hitDelayMs: 0.1,
     upgradeFrom: 'quad_strike', // 스킬 업그레이드: 사연격 보유해야 습득 가능, 습득시 사연격→오연격으로 교체
+  },
+  seven_strike: {
+    name: '칠연격', desc: '맹렬하게 움직여<br>{dp}% 데미지로 일곱 번 베어낸다.',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 60,
+    cooldown: 5, resourceType: 'mp', resourceAmount: 300, castTime: 0,
+    damagePercent: 100, hits: 7, icon: 'lv60atk',
+    // 이연격~오연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
+    // hits 값에 따라 자동 반복하므로 7타도 별도 처리 없이 순차 적용됨).
+    hitDelayMs: 0.1,
+    upgradeFrom: 'five_strike', // 스킬 업그레이드: 오연격 보유해야 습득 가능, 습득시 오연격→칠연격으로 교체
   },
   sky_vigor: {
     // 대지의 기운(earth_vigor)/바다의 기운(sea_vigor)과 완전히 동일한 스킴(target:'buff'+healFlat)의 회복 스킬.
@@ -2708,12 +2974,14 @@ const SKILLS = {
   shred_strike: {
     name: '파쇄격', desc: "무기를 휘둘러 {dp}%의 데미지로 적을 {hits}번 공격.<br>적중한 적에게 {duration}초 동안 '{term:shredding}파쇄{/term}' 부여.",
     grade: 'rare', category: 'common', target: 'single', levelReq: 74,
-    cooldown: 4, resourceType: 'mp', resourceAmount: 250, castTime: 0,
+    cooldown: 6, resourceType: 'mp', resourceAmount: 250, castTime: 0,
     damagePercent: 280, hits: 2, icon: 'lv74atk', // 업로드 파일명은 lv75atk.svg였으나 요청 표의 icon 필드값·레벨제한(74)과
     // 일치시키기 위해 lv74atk.svg로 저장함(기존 lvNN접두 아이콘 명명 규칙과도 일치) — 파일명 오탈자로 보여 이 자리에 알려드림.
     hitDelayMs: 0.3, // 1타 즉시, 2타는 0.3초 뒤(이연격 등과 동일한 hitDelayMs 방식)
-    onHitStatus: { key: 'shredding', durationMs: 8000 }, // 적중(=피해를 입혀 대상이 생존)한 타격마다 파쇄 부여 —
-    // 2타 모두 적중하면 파쇄(zip164, stackDurationAdditive)가 두 번 적용되어 남은시간이 가산됨(기존 설계 그대로 재사용).
+    onHitStatus: { key: 'shredding', durationMs: 4000 }, // 적중(=피해를 입혀 대상이 생존)한 "최초의" 타격에만 파쇄 부여 —
+    // onceOnHitStatus:true(actions.js applyDelayedSkillHits)로 2타 모두 적중해도 파쇄가 두 번 적용되지 않도록 함
+    // (수정 전에는 타격마다 부여되어 stackDurationAdditive로 남은시간이 가산됐었음).
+    onceOnHitStatus: true,
     upgradeFrom: 'crushing_sword2', // 스킬 업그레이드: 압쇄검 보유해야 습득 가능(zip165 등록 당시 중압검으로 잘못
     // 전달됐던 것을 사용자가 정정 — 원래 의도한 체인은 내려베기→중압검→압쇄검→파쇄격 단일 직선 체인),
     // 습득시 압쇄검→파쇄격으로 교체
@@ -3157,6 +3425,7 @@ const MONSTERS = {
       { name: '여우 모피', chance: 40 },
       { name: '제령도', chance: 2, weaponId: 'ninetaildagger' },
       { name: '흑철', chance: 7 },
+      { name: '풀잎반지', chance: 4, weaponId: 'grassring' },
     ],
   },
   // 이미지 파일명 참고: 기획서상 image 필드는 'ninetailfox'였으나 실제 업로드된 파일명은
@@ -3171,6 +3440,7 @@ const MONSTERS = {
       { name: '제령도', chance: 8, weaponId: 'ninetaildagger' },
       { name: '사각방패', chance: 10, weaponId: 'squareshield' },
       { name: '흑철', chance: 10 },
+      { name: '풀잎반지', chance: 8, weaponId: 'grassring' },
     ],
   },
   tiger1: {
@@ -3195,6 +3465,7 @@ const MONSTERS = {
       { name: '강철 투구', chance: 5, weaponId: 'steelhelmet' },
       { name: '척호검', chance: 5, weaponId: 'tigersword' },
       { name: '자호의 송곳니', chance: 7 },
+      { name: '방어의 반지', chance: 3, weaponId: 'defensering' },
     ],
   },
   tiger4: {
@@ -3210,6 +3481,7 @@ const MONSTERS = {
       // 없고 "혈호대검"만 정의되어 있어 동일 아이템으로 간주해 반영함(확인 필요 — 응답에 플래그함).
       { name: '혈호대검', chance: 5, weaponId: 'bloodtigerlongsword' },
       { name: '자호의 송곳니', chance: 10 },
+      { name: '방어의 반지', chance: 7, weaponId: 'defensering' },
     ],
   },
   mantis: {
@@ -3230,6 +3502,8 @@ const MONSTERS = {
       { name: '진호박', chance: 20 },
       { name: '현랑반지', chance: 1, weaponId: 'wolfmoonring' },
       { name: '철방패', chance: 5, weaponId: 'ironshield' },
+      { name: '은반지', chance: 2, weaponId: 'silverring' },
+      { name: '매의 투구', chance: 2, weaponId: 'hawkhelmet' },
     ],
   },
   epicmantis2: {
@@ -3240,6 +3514,8 @@ const MONSTERS = {
       { name: '진호박', chance: 30 },
       { name: '현랑반지', chance: 2, weaponId: 'wolfmoonring' },
       { name: '철방패', chance: 7, weaponId: 'ironshield' },
+      { name: '은반지', chance: 4, weaponId: 'silverring' },
+      { name: '매의 투구', chance: 3.5, weaponId: 'hawkhelmet' },
     ],
   },
   // 거미굴 신규 몬스터 4종. 서현거미/백현귀는 이번 던전에 처음 등록되는 2종째 에픽 몬스터쌍이라
@@ -3295,6 +3571,8 @@ const MONSTERS = {
     drops: [
       { name: '진호박', chance: 20 },
       { name: '현랑반지', chance: 1.5, weaponId: 'wolfmoonring' },
+      { name: '은반지', chance: 3, weaponId: 'silverring' },
+      { name: '청사연투구', chance: 2.5, weaponId: 'bluehelmet56' },
     ],
   },
   epicscorpion2: {
@@ -3305,6 +3583,8 @@ const MONSTERS = {
       { name: '진호박', chance: 30 },
       { name: '보라방패', chance: 7, weaponId: 'purpleshield' },
       { name: '현랑반지', chance: 2.5, weaponId: 'wolfmoonring' },
+      { name: '은반지', chance: 4, weaponId: 'silverring' },
+      { name: '청사연투구', chance: 3.8, weaponId: 'bluehelmet56' },
     ],
   },
   woodpuppet: {
@@ -3324,6 +3604,7 @@ const MONSTERS = {
     drops: [
       { name: '진호박', chance: 20 },
       { name: '쇠조각', chance: 10 },
+      { name: '인형술사의 옷', chance: 3, weaponId: 'puppeteercloth' },
     ],
   },
   puppeteer: {
@@ -3334,6 +3615,7 @@ const MONSTERS = {
       { name: '진호박', chance: 30 },
       { name: '쇠조각', chance: 20 },
       { name: '백화검', chance: 5, weaponId: 'firesword' },
+      { name: '인형술사의 옷', chance: 5.5, weaponId: 'puppeteercloth' },
     ],
   },
   // 유령굴 신규 몬스터 4종. 고급유령/불연은 자호굴·사마귀굴·거미굴·전갈굴·인형굴과 동일한 방식으로
@@ -3364,6 +3646,9 @@ const MONSTERS = {
       { name: '현철', chance: 10 },
       { name: '흑철', chance: 10 },
       { name: '월도', chance: 5, weaponId: 'moonsword' },
+      { name: '청현비', chance: 2.5, weaponId: 'cheonghyeonbi' },
+      { name: '흑수정 반지', chance: 1, weaponId: 'morionring' },
+      { name: '제령은관장식', chance: 3, weaponId: 'silverghosthat' },
     ],
   },
   epicghost2: {
@@ -3376,6 +3661,10 @@ const MONSTERS = {
       { name: '흑철', chance: 15 },
       { name: '현철중검', chance: 10, weaponId: 'heavysword' },
       { name: '현철단검', chance: 10, weaponId: 'heavydagger' },
+      { name: '청현비', chance: 3.5, weaponId: 'cheonghyeonbi' },
+      { name: '흑수정 반지', chance: 2, weaponId: 'morionring' },
+      { name: '제령은관장식', chance: 4, weaponId: 'silverghosthat' },
+      { name: '흑령갑옷', chance: 3, weaponId: 'blackghostarmor' },
     ],
   },
   // 흑령굴 신규 몬스터 4종. 원령은 유령굴의 불연과 동일한 방식(epicSpawnWeight+epicSpawnStages:[10])으로
@@ -3409,6 +3698,10 @@ const MONSTERS = {
       { name: '현철', chance: 10 },
       { name: '흑철', chance: 10 },
       { name: '현철단검', chance: 5, weaponId: 'heavydagger' },
+      { name: '태형도', chance: 2.5, weaponId: 'taehyeongdo' },
+      { name: '흑수정 반지', chance: 3, weaponId: 'morionring' },
+      { name: '흑령갑옷', chance: 3, weaponId: 'blackghostarmor' },
+      { name: '흑령투구', chance: 2.2, weaponId: 'blackghosthelmet' },
     ],
   },
   epicblackghost2: {
@@ -3419,6 +3712,10 @@ const MONSTERS = {
       { name: '진호박', chance: 30 },
       { name: '반짝이는 돌', chance: 5 },
       { name: '현철', chance: 15 },
+      { name: '태형도', chance: 3.5, weaponId: 'taehyeongdo' },
+      { name: '흑수정 반지', chance: 4, weaponId: 'morionring' },
+      { name: '흑령갑옷', chance: 4.5, weaponId: 'blackghostarmor' },
+      { name: '흑령투구', chance: 3, weaponId: 'blackghosthelmet' },
     ],
   },
   // 해골굴 신규 몬스터 4종. 사해골/불산은 흑령굴 사령/원령과 완전히 동일한 구조(epicSpawnWeight+
@@ -3454,6 +3751,7 @@ const MONSTERS = {
       { name: '현철', chance: 10 },
       { name: '흑철', chance: 10 },
       { name: '원한이 담긴 유서', chance: 5 },
+      { name: '흑령투구', chance: 2.5, weaponId: 'blackghosthelmet' },
     ],
   },
   epicskeleton2: {
@@ -3468,6 +3766,7 @@ const MONSTERS = {
       { name: '흑철중검', chance: 0.5, weaponId: 'heavysword_black' },
       { name: '흑철비도', chance: 0.5, weaponId: 'heavydagger_black' },
       { name: '원한이 담긴 유서', chance: 10 },
+      { name: '흑령투구', chance: 3.2, weaponId: 'blackghosthelmet' },
     ],
   },
 };

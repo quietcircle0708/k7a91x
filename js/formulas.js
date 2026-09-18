@@ -437,10 +437,13 @@ function defenseDamageMultiplier(defense){
 // 방어도가 등록되지 않은 몬스터는 0으로 처리(몬스터 방어도 시스템 — 방어도 기본값 규칙).
 // 파쇄(shredding)·저주(curse) 등 defenseBoost 타입 상태이상이 적용 중이면 피해 계산에 사용할 방어도에만
 // statusDefenseBonusFor를 더함 — MONSTERS[].defense(실제 데이터)는 전혀 변경하지 않음(요구사항 4·6번).
+// 방어도 무시(playerDefenseIgnore, 신규)도 같은 방식으로 "피해 계산용" 방어도에만 더함 — 이 함수는
+// 플레이어가 몬스터를 공격할 때만 쓰이므로(actions.js/dungeon.js), 몬스터가 플레이어를 공격할 때 쓰는
+// playerTotalDefense에는 영향을 주지 않음.
 function monsterDefenseFor(instance){
   const def = MONSTERS[instance.monsterId];
   const base = (def && def.defense) || 0;
-  return base + statusDefenseBonusFor(instance);
+  return base + statusDefenseBonusFor(instance) + playerDefenseIgnore();
 }
 // 상태이상으로 인한 방어도 보너스(요구사항 6번) — 특정 상태이상(예: 파쇄)만 직접 확인하던 기존 구조를
 // 일반화해, 대상에게 걸린 상태이상 중 STATUS_EFFECTS의 type이 'defenseBoost'인 것을 전부 훑어 그
@@ -832,21 +835,29 @@ function weaponUniqueOptionForgeHtml(type, level){
 
   const chanceNow = weaponUniqueOptionChance(type, level);
   const chanceNext = hasNext ? weaponUniqueOptionChance(type, level+1) : null;
+  // 성장형 고유 옵션의 표시 단위(suffix)와 소수 자릿수(decimals) — 등록하지 않으면 기존과 완전히 동일하게
+  // '%'/정수(0자리)로 처리됨(blacksword/firesword/spiderarmor 등 기존 %확률형 전부 무변화).
+  // 방어도 무시/지능처럼 %가 아닌 순수 수치형 성장 옵션(흑령갑옷/흑령투구/인형술사의 옷)은
+  // opt.chanceSuffix:''로, 매의 투구처럼 소수점이 필요한 %는 opt.chanceDecimals:1로 등록해 이 자리에서만
+  // 분기됨 — 값 자체를 계산/합산하는 로직(weaponUniqueOptionChance 등)은 전혀 바뀌지 않음.
+  const suffix = opt.chanceSuffix != null ? opt.chanceSuffix : '%';
+  const decimals = opt.chanceDecimals != null ? opt.chanceDecimals : 0;
+  const fmtChance = v => v.toFixed(decimals);
 
   if(activeNow){
     // 이미 활성화된 상태 — 다음 단계에서 수치가 오르면 값 자리에 화살표+증가량만 표시하고(안내 문구 없음),
     // 수치가 그대로면 평소 무기 툴팁과 동일하게 안내 문구 없이 고정 수치만 표시함.
     const changed = chanceNext != null && chanceNext !== chanceNow;
     const valueHtml = changed
-      ? formatStatDelta(chanceNow, chanceNext, 0, '%')
-      : (chanceNow + '%');
-    const rawText = opt.textTemplate.replace('{chance}%', valueHtml);
+      ? formatStatDelta(chanceNow, chanceNext, decimals, suffix)
+      : (fmtChance(chanceNow) + suffix);
+    const rawText = opt.textTemplate.replace('{chance}' + suffix, valueHtml);
     const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
     return `<div style="color:var(--forge-cream);">${text}</div>`;
   }
 
   // 아직 비활성화 상태 — 활성화 조건 시점의 미리보기 수치를 회색으로 보여줌(무기 툴팁과 동일한 값).
-  const rawText = opt.textTemplate.replace('{chance}', chanceNow);
+  const rawText = opt.textTemplate.replace('{chance}', fmtChance(chanceNow));
   const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
   const note = activeNext
     ? '고유 옵션 활성화' // 지금 강화하면(다음 단계에서) 바로 활성화되는 경우
@@ -1338,14 +1349,62 @@ function weaponUniqueOptionStatBonus(stat){
 // (힘+1,지능+1)처럼 강화 없이 항상 활성화되는 고정형 고유 옵션을 가진 방어구/보조 아이템이 처음
 // 등장해 신설함. 이후 방어구/보조 아이템이 statBonus를 갖는 고유 옵션을 추가로 등록해도 이 함수
 // 하나로 자동 반영됨(개별 아이템 코드 없음).
+// 착용 중인 방어구(투구/갑옷)+보조+장신구(반지 등)의 고유 옵션 중 "고정 스탯 보너스"(statBonus)를 갖고
+// 있으면 해당 스탯 보너스를 전부 합산. weaponUniqueOptionStatBonus(무기 전용)와 armorUniqueOptionChance
+// (effectId 발동 확률 전용, 방어구+보조 그룹핑 동일)를 참고해 만든 대응 함수 — 철방패(힘+1)/보라방패
+// (힘+1,지능+1)처럼 강화 없이 항상 활성화되는 고정형 고유 옵션을 가진 방어구/보조 아이템이 처음
+// 등장해 신설함. 이후 방어구/보조/장신구 아이템이 statBonus를 갖는 고유 옵션을 추가로 등록해도 이 함수
+// 하나로 자동 반영됨(개별 아이템 코드 없음). 장신구(반지)는 현재 uniqueOption을 등록한 아이템이 없어
+// 이 함수의 실제 동작에는 아직 영향이 없지만(합산해도 항상 0), 방어도 무시 옵션처럼 향후 반지에 등록될
+// statBonus도 코드 수정 없이 자동 반영되도록 wornAccessoryItems()도 함께 포함해 확장함.
 function armorUniqueOptionStatBonus(stat){
-  return wornArmorItems().concat(wornSubItems()).reduce((sum, item) => {
+  return wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()).reduce((sum, item) => {
     const opt = wpn(item.type).uniqueOption;
     if(opt && opt.statBonus && weaponUniqueOptionActive(item.type, item.level) && !isEquipDurabilityZero(item)){
       return sum + (opt.statBonus[stat] || 0);
     }
     return sum;
   }, 0);
+}
+// ---- 강화 단계별로 수치가 성장하는 고유 옵션의 스탯 반영(신규) ----
+// 지금까지의 statBonus는 강화해도 값이 오르지 않는 "고정형" 전용이었음(반월대도 힘+5 등). 인형술사의
+// 옷(지능)/흑령갑옷·흑령투구(방어도 무시)처럼 강화 단계별로 값이 오르는 "성장형" 고유 옵션을 stat
+// 시스템에 연결하기 위해 신설 — chanceByLevel(원래 백현갑/블랙소드 등이 %확률 발동 수치를 담던 필드,
+// weaponUniqueOptionChance가 "현재 강화 단계의 절대 수치"를 반환)을 그대로 재사용하고, 그 수치가
+// "어떤 스탯으로 들어갈지"만 opt.growthStat(신규 필드)으로 지정함. 즉 opt.effectId가 발동형 효과를
+// 가리키는 것과 완전히 동일한 방식으로, opt.growthStat이 스탯 키를 가리킴 — 값 자체를 저장/계산하는
+// 기존 로직(chanceByLevel/weaponUniqueOptionActive/weaponUniqueOptionChance, 강화해도 데이터에 누적
+// 저장하지 않고 매번 그 강화 단계의 절대값을 그대로 읽는 방식)은 단 1줄도 바꾸지 않음.
+function weaponUniqueOptionGrowthStat(stat){
+  const equipped = getEquippedWeapon();
+  if(!equipped) return 0;
+  if(isEquipDurabilityZero(equipped)) return 0;
+  const opt = wpn(equipped.type).uniqueOption;
+  if(!opt || opt.growthStat !== stat) return 0;
+  if(!weaponUniqueOptionActive(equipped.type, equipped.level)) return 0;
+  return weaponUniqueOptionChance(equipped.type, equipped.level) || 0;
+}
+function armorUniqueOptionGrowthStat(stat){
+  return wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()).reduce((sum, item) => {
+    const opt = wpn(item.type).uniqueOption;
+    if(opt && opt.growthStat === stat && weaponUniqueOptionActive(item.type, item.level) && !isEquipDurabilityZero(item)){
+      return sum + (weaponUniqueOptionChance(item.type, item.level) || 0);
+    }
+    return sum;
+  }, 0);
+}
+// ---- 방어도 무시 ----
+// 무기/방어구/보조/장신구의 고유 옵션에 statBonus.defenseIgnore(고정형) 또는 growthStat:'defenseIgnore'
+// (성장형, 흑령갑옷/흑령투구)를 등록하면 자동으로 합산되는 "피해 계산용 방어도 보정치".
+// weaponUniqueOptionStatBonus/armorUniqueOptionStatBonus(고정형)+weaponUniqueOptionGrowthStat/
+// armorUniqueOptionGrowthStat(성장형)를 그대로 재사용하므로 특정 아이템을 하드코딩하지 않음 — 앞으로
+// 어떤 장비든 두 방식 중 하나로 defenseIgnore 값을 등록하기만 하면 이 함수 수정 없이 자동으로 반영됨.
+// 대상의 실제 방어도 데이터는 전혀 변경하지 않고(요구사항 2번), 호출될 때마다 매번 새로 계산되므로
+// 공격을 반복해도 값이 누적되지 않음 — monsterDefenseFor에서만 사용(요구사항: 플레이어가 공격하는
+// 경우에만 적용, 몬스터가 플레이어를 공격할 때 쓰는 playerTotalDefense에는 관여하지 않음).
+function playerDefenseIgnore(){
+  return weaponUniqueOptionStatBonus('defenseIgnore') + armorUniqueOptionStatBonus('defenseIgnore')
+    + weaponUniqueOptionGrowthStat('defenseIgnore') + armorUniqueOptionGrowthStat('defenseIgnore');
 }
 // 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
 // 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
@@ -1367,6 +1426,8 @@ function artifactStatBonus(stat){
   }
   bonus += weaponUniqueOptionStatBonus(stat);
   bonus += armorUniqueOptionStatBonus(stat); // 방어구/보조 아이템의 고정 스탯 보너스(예: 철방패 힘+1) 합산
+  bonus += weaponUniqueOptionGrowthStat(stat); // 무기의 강화 단계별 성장형 스탯 보너스(현재 사례 없음, 향후 대비)
+  bonus += armorUniqueOptionGrowthStat(stat); // 방어구/보조/장신구의 강화 단계별 성장형 스탯 보너스(예: 인형술사의 옷 지능)
   return bonus;
 }
 // 레벨업으로 투자한 기본 스탯 + 현재 장착 중인 무기/방어구/장신구/아티팩트의 스탯 보너스(artifactStatBonus,
@@ -1449,6 +1510,9 @@ function effectiveCritChance(type, level, durabilityZero){
   // 처음 등장. 아래 effectId:'crit_chance_bonus'(blacksword류, chanceByLevel 성장형)와는 별개 경로이며,
   // artifactStatBonus 등과 동일하게 weaponUniqueOptionStatBonus 하나로 앞으로 추가되는 무기도 자동 반영됨.
   bonus += weaponUniqueOptionStatBonus('critRate');
+  // 방어구/보조/장신구의 강화 단계별 성장형 치명타 확률 고유 옵션(예: 매의 투구) 합산 — 무기의
+  // weaponUniqueOptionGrowthStat과 대응되는 방어구 쪽 경로. 소수점 단위(4.2%처럼)도 그대로 더해짐.
+  bonus += armorUniqueOptionGrowthStat('critRate');
   // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
   // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
   // 내구도 0(durabilityZero)이면 이 옵션도 비활성화됨(요구사항 7번).
