@@ -2232,6 +2232,31 @@ function buildInvPeekHtml(){
   return `인벤토리 (${totalEquipInventoryCount()}/${INV_MAX})<br>${lines}`;
 }
 
+// ---- 보상창 "경험치/골드 줄 아래" 조건부 안내 문구 (확장 가능한 구조) ----
+// 아이콘 그리드로 바뀌면서 사라졌던 "모험가의 유해에서 장비를 발견했습니다!" 같은 텍스트 안내를 별도
+// 줄로 복원함. 새 조건을 추가하려면 KILL_REWARD_MESSAGE_RULES 배열에 { check, className, text } 한
+// 항목만 추가하면 되고, 이 함수(buildKillRewardMessagesHtml)나 호출부는 손댈 필요 없음.
+// className은 기존에 있었지만(아이콘 그리드 전환 후 아무 데서도 안 쓰이고 남아있던) .kill-rewards
+// .reward-sword(초록, 모험가의 유해)/.reward-artifact(보라, 아티팩트) CSS를 그대로 재사용함 — 새
+// 색상/스타일을 추가하지 않음.
+const KILL_REWARD_MESSAGE_RULES = [
+  {
+    check: rewards => rewards.weaponDrops && rewards.weaponDrops.length > 0,
+    className: 'reward-sword',
+    text: '모험가의 유해에서 장비를 발견했습니다!',
+  },
+  {
+    check: rewards => rewards.artifactDrops && rewards.artifactDrops.length > 0,
+    className: 'reward-artifact',
+    text: '신비한 아티팩트를 획득했습니다!',
+  },
+];
+function buildKillRewardMessagesHtml(rewards){
+  return KILL_REWARD_MESSAGE_RULES
+    .filter(rule => rule.check(rewards))
+    .map(rule => `<div class="${rule.className}">${rule.text}</div>`)
+    .join('');
+}
 // ---- 던전 전투 종료 보상창 "획득 아이템" 아이콘 그리드 ----
 // 슬롯 1개의 HTML. 아이콘/툴팁은 buildRewardDisplayItems(formulas.js)가 이미 기존 인벤토리 아이콘·
 // 툴팁 함수로 만들어둔 것을 그대로 꽂아 쓰기만 함(여기서는 새 아이콘/툴팁 규칙을 만들지 않음).

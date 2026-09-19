@@ -590,6 +590,8 @@ function openKillResultModal(rewards){
   if(rewards.levelsGained > 0){
     rewardsHtml += `<div class="reward-levelup">🎉 레벨업! Lv.${rewards.newPlayerLevel - rewards.levelsGained} → Lv.${rewards.newPlayerLevel}</div>`;
   }
+  // 경험치/골드(및 레벨업) 줄 바로 아래 조건부 안내 문구(모험가의 유해/아티팩트 등, render.js 참고).
+  rewardsHtml += buildKillRewardMessagesHtml(rewards);
   // 획득 아이템 표시 영역: 기존 텍스트 나열 방식을 5열×3행 아이콘 그리드로 교체(실제 지급/드랍 로직은
   // 그대로이며, buildRewardDisplayItems/buildKillRewardItemSectionHtml은 이미 지급된 rewards를 표시용
   // 슬롯으로 변환만 함). 보상창을 새로 열 때마다 그리드는 항상 1페이지부터 시작.
@@ -728,6 +730,7 @@ function openTreasureResultModal(result){
       : {},
   };
   pageState.killRewardItems = 1;
+  rewardsHtml += buildKillRewardMessagesHtml(displayRewards);
   rewardsHtml += buildKillRewardItemSectionHtml(displayRewards);
 
   if(anyEquipInventoryFull() && !result.weaponDrop){

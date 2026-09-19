@@ -973,11 +973,15 @@ function monsterExp(level){
   return Math.round(1000 * Math.pow(1.08, level - 1));
 }
 function requiredKills(level){
+  // 레벨 구간별 지수(요청사항 표 그대로). Lv99는 다음 레벨이 없어 레벨업 경험치 계산 대상이 아니며,
+  // 실제로 이 함수를 호출하는 모든 곳(render.js/state.js)이 이미 `lv >= PLAYER_MAX_LEVEL`일 때
+  // requiredExp를 아예 호출하지 않도록 가드하고 있어 level 인자로 99가 들어오는 경우는 없음.
   let exponent;
   if(level <= 49) exponent = 1.05;
-  else if(level <= 79) exponent = 1.10;
-  else if(level <= 89) exponent = 1.12;
-  else exponent = 1.30;
+  else if(level <= 79) exponent = 1.08;
+  else if(level <= 89) exponent = 1.2;
+  else if(level <= 94) exponent = 1.3;
+  else exponent = 1.4; // Lv95~98
   return Math.round(10 + Math.pow(level - 1, exponent));
 }
 function requiredExp(level){
@@ -1852,15 +1856,15 @@ function nearestLevelCandidates(list, targetLevel){
 }
 // 모험가의 유해(장비) 드랍 판정.
 // 1) RELIC_DROP_CHANCE 확률로 드랍 판정 → 2) RELIC_EQUIP_TYPE_CHANCE로 장비 타입(무기/방어구/장신구)
-//    선택 → 3) 선택된 타입의 RELIC_GRADE_CHANCE로 등급 선택(이후 절대 바뀌지 않음 — 요구사항: "선택풀
-//    장비의 등급이 변하는 일은 없어야 한다") → 4) 그 등급 중 아이템 레벨이 RELIC_LEVEL_CAP(51레벨 이상
-//    장비 착용 불가 기준) 이하인 후보만 필터. 이 레벨 상한은 몬스터 레벨과 전혀 무관하게 항상 동일하게
-//    적용됨(요구사항: "아이템 레벨 제한 규칙과 몬스터 레벨은 상관이 없어야 한다" — 80레벨 몬스터를 잡아도
-//    캡 이하 후보에서만 추첨) — monsterLevel 인자는 더 이상 레벨 선택에 쓰이지 않음(호출부 시그니처만
-//    유지, 값 자체는 무시됨). 이 캡 이하에서 그 등급의 장비가 하나도 없으면(현재 데이터에서는 발생하지
-//    않음) 등급을 바꾸지 않고 그대로 드랍 무산(null) — 등급이 바뀌느니 안 주는 쪽을 선택함.
+//    선택 → 3) 선택된 타입의 RELIC_GRADE_CHANCE로 등급 선택(이후 절대 바뀌지 않음 — "선택풀 장비의 등급이
+//    변하는 일은 없어야 한다") → 4) 그 등급 중 아이템 레벨이 maxDropLevel 이하인 후보만 필터.
+//    maxDropLevel = min(몬스터 레벨 + 10, RELIC_LEVEL_CAP) — 몬스터보다 최대 10레벨 높은 장비까지는
+//    허용하되, 전체 상한은 RELIC_LEVEL_CAP(51레벨 이상 장비 착용 불가 기준)을 넘지 않음(레벨10 몬스터→
+//    장비 20 이하, 레벨30→40 이하, 레벨40→50 이하, 레벨80→50 이하로 캡됨). 이 등급의 캡 이하 장비가
+//    하나도 없으면(현재 데이터에서는 발생하지 않음) 등급을 바꾸지 않고 그대로 드랍 무산(null) — 등급이
+//    바뀌느니 안 주는 쪽을 선택함.
 //    → 5) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계 낮아질 때마다
-//    ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨(드랍되는 장비의 레벨이 몬스터보다 낮아도 상관없음 — 요구사항)
+//    ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨(드랍되는 장비의 레벨이 몬스터보다 낮아도 상관없음)
 //    → 6) 그 레벨(+처음 추첨된 그 등급 그대로)에 해당하는 장비 중 하나를 무작위로 선택 → 7) 강화 단계
 //    결정: 무기는 RELIC_ENHANCE_LEVEL_CHANCE 확률표(등급별로 분리)로 추첨, 방어구/장신구는 등급과 무관
 //    하게 항상 +0 고정.
@@ -1875,10 +1879,11 @@ function resolveWeaponRelicDrop(monsterLevel){
 
   const grade = pickWeighted(Object.entries(RELIC_GRADE_CHANCE[equipType]));
 
-  // 처음 뽑힌 grade 그대로 유지 — 레벨 캡(RELIC_LEVEL_CAP) 이하인 그 등급 후보만 모음. 몬스터 레벨은
-  // 여기서 전혀 쓰이지 않음(요구사항: 캡 규칙과 몬스터 레벨은 무관).
-  const candidates = Object.values(typesTable).filter(w => w.grade === grade && w.levelReq <= RELIC_LEVEL_CAP);
-  if(candidates.length === 0) return null; // 이 등급에 캡 이하 장비가 하나도 없는 극단적인 경우 — 등급을 바꾸지 않고 드랍 무산
+  // 처음 뽑힌 grade 그대로 유지 — 몬스터 레벨+10과 전체 상한(RELIC_LEVEL_CAP) 중 더 작은 값(maxDropLevel)
+  // 이하인 그 등급 후보만 모음.
+  const maxDropLevel = Math.min(monsterLevel + 10, RELIC_LEVEL_CAP);
+  const candidates = Object.values(typesTable).filter(w => w.grade === grade && w.levelReq <= maxDropLevel);
+  if(candidates.length === 0) return null; // 이 등급에 maxDropLevel 이하 장비가 하나도 없는 극단적인 경우 — 등급을 바꾸지 않고 드랍 무산
 
   const levels = [...new Set(candidates.map(w => w.levelReq))].sort((a, b) => b - a); // 높은 레벨부터
   let weight = 100;
