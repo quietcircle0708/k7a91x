@@ -256,7 +256,16 @@
      지정됨(resolveGlossaryTermsHtml, formulas.js). 밑줄로 "클릭 가능"임을 표시(색상만으로는
      클릭 가능 여부가 구분되지 않으므로). */
   .glossary-term{ cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
-  /* 용어 클릭 시 뜨는 팝업(hover 전용인 위 .tooltip과 별개의 클릭 전용 UI, main.js가 표시/위치 담당) */
+  /* 장비·소비 아이템 툴팁 최하단 "현재 판매 가격"(tooltipSellPriceHtml, formulas.js) — 위 항목과 점선으로 구분,
+   중앙 정렬. 기본 노란색(기존 툴팁 값 색상과 동일한 --forge-gold), 내구도가 감소한 장비만 .reduced로 빨간색.
+   부모 .tooltip이 text-align:left로 덮여 있는 화면에서도 항상 중앙에 오도록 여기서도 명시함. */
+.tooltip-sell-price{
+    margin-top:5px; padding-top:4px; border-top:1px dashed var(--forge-iron);
+    text-align:center; font-weight:700; color: var(--forge-gold);
+  }
+.tooltip-sell-price.reduced{ color:#ff6a6a; }
+
+/* 용어 클릭 시 뜨는 팝업(hover 전용인 위 .tooltip과 별개의 클릭 전용 UI, main.js가 표시/위치 담당) */
   .glossary-popup{
     display:none; z-index:50; max-width:240px; background:#0e0b09; border:1px solid var(--forge-line);
     border-radius:8px; padding:10px 12px; font-size:11.5px; font-weight:400; color: var(--forge-cream-dim);
@@ -436,6 +445,7 @@
   }
   .craft-slot-icon-box{ cursor:pointer; }
   .craft-slot-icon-box:hover{ border-color: var(--forge-gold); }
+  .craft-slot-auto, .craft-slot-auto .craft-slot-icon-box{ cursor:default; } /* 일반 재료(보유 수량 자동 인식) — 클릭 동작 없음 */
   .craft-slot-plus{ font-size:20px; font-weight:700; color: var(--forge-cream-dim); }
   .craft-slot-name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
   .craft-slot-qty-short{ color:#ff6a6a; font-weight:700; font-family:'JetBrains Mono', monospace; }
@@ -1075,16 +1085,20 @@
   .equip-slots-grid{
     display:grid; grid-template-columns:repeat(3, 58px); grid-template-rows:repeat(4, 58px);
     grid-template-areas:
-      "art1   art2   art3"
-      ".      helmet ."
-      "weapon armor  sub"
-      "accessories accessories accessories";
+      "art1     art2   art3"
+      "necklace helmet ."
+      "weapon   armor  sub"
+      "ring1    shoes  ring2";
     gap:8px;
   }
   .area-weapon{ grid-area:weapon; }
   .area-helmet{ grid-area:helmet; }
   .area-armor{ grid-area:armor; }
   .area-sub{ grid-area:sub; }
+  .area-necklace{ grid-area:necklace; }
+  .area-shoes{ grid-area:shoes; }
+  .area-ring1{ grid-area:ring1; }
+  .area-ring2{ grid-area:ring2; }
   /* 아티팩트 칸은 다른 슬롯과 같은 58px 그리드 칸 안에 있되, 슬롯 자체(.eq-slot-artifact)만 30% 작은
      정사각형(41px)으로 만들고 칸 중앙에 배치함 — 그리드 칸 크기를 바꾸면 다른 행(투구/무기/갑옷/보조)
      칸까지 함께 눌리므로, 칸 크기는 그대로 두고 그 안의 슬롯 크기만 줄이는 방식으로 처리.
@@ -1092,8 +1106,6 @@
   .area-art1{ grid-area:art1; justify-self:center; align-self:center; }
   .area-art2{ grid-area:art2; justify-self:center; align-self:center; }
   .area-art3{ grid-area:art3; justify-self:center; align-self:center; }
-  .area-accessories{ grid-area:accessories; display:flex; gap:8px; justify-content:center; }
-  .area-accessories .eq-slot{ flex:0 0 58px; }
   .eq-slot-artifact{ width:41px; height:41px; font-size:14px; }
   .eq-slot{
     width:58px; height:58px;
@@ -1104,7 +1116,13 @@
   .eq-slot-empty-label{ font-size:10.5px; color: var(--forge-cream-dim); text-align:center; padding:0 2px; }
   .eq-slot-artifact .eq-slot-empty-label{ font-size:8.5px; } /* 30% 축소된 슬롯 크기에 맞춰 라벨도 축소 */
   .eq-slot-icon-img{ width:44px; height:auto; max-height:44px; object-fit:contain; }
-  .eq-slot-artifact .eq-slot-icon-img, .eq-slot-artifact .item-icon-img{ width:24px; max-height:31px; } /* 30% 축소 */
+  .eq-slot-artifact .eq-slot-icon-img{ width:24px; max-height:31px; } /* 30% 축소 */
+  /* 아티팩트 PNG 아이콘: 이전엔 width만 24px로 덮어쓰고 height는 .item-icon-img의 1em(=14px)이 그대로 남아 실제로는
+     14px 정사각형으로 그려져 너무 작았음 — width/height를 함께 35.2px로 지정함. 35.2px은 방어구/장신구/보조 아이콘이
+     장비창에서 실제로 그려지는 크기(44px × 0.8, .weapon-icon-equip-small의 20% 축소)와 동일한 값이라 장비창 안에서
+     방어구·장신구와 크기가 맞음(무기 아이콘만 44px 그대로).
+     참고: 바로 위 .eq-slot-artifact 41px 규칙은 뒤에 오는 .eq-slot 58px 규칙에 덮여 실제 슬롯은 58px로 그려짐. */
+  .eq-slot-artifact .item-icon-img{ width:35.2px; height:35.2px; max-height:none; }
   .eq-slot .tooltip{ width:220px; left:50%; transform:translateX(-50%); bottom:112%; }
   .eq-slot:hover .tooltip{ visibility:visible; opacity:1; }
   .equipped-item-info{ margin-top:6px; }
@@ -1368,6 +1386,16 @@
   .icon-grade-bg.grade-rare{   background: rgba(143,208,255,0.20); }
   .icon-grade-bg.grade-epic{   background: rgba(160,102,214,0.24); }
   .icon-grade-bg.grade-unique{ background: rgba(255,138,61,0.24); }
+  /* 텍스트 줄 안에 이름 앞에 인라인으로 붙는 아티팩트 아이콘(캐릭터 정보의 "장착 아이템 정보"/"적용 중인 아티팩트
+     효과")은 아이콘 슬롯 박스가 아니라 글자 흐름 안에 들어가므로, 슬롯 전용 규칙(.icon-grade-bg의 width/height 100%와
+     .item-icon-img의 1em 블록)을 그대로 쓰면 줄 전체를 가로로 채우는 띠가 됨 — 이 두 영역 안에서만 기존 이모지처럼
+     글자 옆의 작은 인라인 아이콘으로 표시되도록 덮어씀(다른 화면의 아이콘 규칙은 건드리지 않음). */
+  .char-equip-info-line .icon-grade-bg, .char-stat-artifact .icon-grade-bg{
+    width:auto; height:auto; background:transparent; vertical-align:middle;
+  }
+  .char-equip-info-line .item-icon-img, .char-stat-artifact .item-icon-img{
+    display:inline-block; width:1.3em; height:1.3em; vertical-align:middle;
+  }
   /* 강화 단계별 아이콘 효과(신규) — 등급 배경과 완전히 독립적인 세 번째 레이어. 강화 화면(applySwordGlow)이
      쓰는 ENHANCE_LEVEL_EFFECTS[level].glow 값을 formulas.js의 weaponIconHtml이 그대로 가져와 이 span의
      인라인 style.filter로 넘겨줌(색상/판정 기준을 CSS에서 새로 정의하지 않고 기존 규칙을 그대로 재사용) —

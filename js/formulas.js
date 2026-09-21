@@ -60,14 +60,20 @@ function durabilityTooltipLine(type, currentDurability){
   const pct = durabilityPercent(cur, max);
   return wtipRow('내구도', `${cur}/${max} (${pct}%)`);
 }
-// 판매가에 내구도 비율을 곱하는 마지막 보정 단계(요구사항 14번) — 기존 강화 판매가 공식(sellValueFor)
-// 계산이 끝난 뒤에만 적용함. 내구도 시스템이 없는 종류는 보정 없이 원래 값 그대로 반환.
+// 판매가에 내구도 보정을 적용하는 마지막 단계 — 기존 강화 판매가 공식(sellValueFor) 계산이 끝난 뒤에만 적용함.
+//   내구도 비율 = 현재 내구도 / 최대 내구도
+//   내구도 보정 비율 = 0.5 + (내구도 비율 × 0.5)   (내구도 100% → 100%, 50% → 75%, 0% → 50%)
+//   최종 판매가 = 기존 최종 판매가 × 내구도 보정 비율(정수 반올림)
+// 즉 내구도가 1% 줄 때마다 판매가가 0.5%씩 줄고, 내구도가 0이어도 기존 최종 판매가의 50%는 유지됨.
+// 내구도 시스템이 없는 종류는 보정 없이 원래 값 그대로 반환. 인벤토리 판매가/판매 확인창/실제 지급액/강화 화면
+// 판매가 미리보기/툴팁 판매가가 전부 이 함수 하나를 거치므로 여기서만 바꾸면 모든 곳에 동일하게 적용됨.
+const DURABILITY_SELL_FLOOR_RATE = 0.5; // 내구도 0%일 때 남는 판매가 비율(나머지 절반이 내구도 비율에 비례)
 function durabilityAdjustedSellValue(baseValue, item){
   const max = maxDurabilityFor(item.type);
   if(max == null) return baseValue;
   const cur = item.currentDurability != null ? item.currentDurability : max;
-  if(cur <= 0) return 0;
-  return Math.round(baseValue * (cur / max));
+  const ratio = Math.min(1, Math.max(0, cur / max)); // 범위를 벗어난 값(음수/초과)이 있어도 0~100%로 제한
+  return Math.round(baseValue * (DURABILITY_SELL_FLOOR_RATE + ratio * (1 - DURABILITY_SELL_FLOOR_RATE)));
 }
 // 내구도 1당 수리 비용(요구사항 12번) — 장비 데이터에 고유 수리비(repairCostPerPoint)가 있으면 그 값을
 // 최우선 사용하고, 없으면 등급별 기본값을 사용함. 이번 작업에서는 실제 수리 기능(버튼/골드 차감)은
@@ -233,7 +239,8 @@ function playerCombatIconHtml(direction, motion){
   return `<img src="${path}" class="monster-icon-img" alt="" draggable="false" data-fallback-emoji="${PLAYER_IMAGE_FALLBACK_EMOJI}" onerror="monsterImgError(this)">`;
 }
 
-// 기타/아티팩트/소비 아이템 아이콘 HTML 생성(monsterIconHtml과 완전히 동일한 구조 재사용). image 필드가
+// 기타/아티팩트/소비 아이템 아이콘 HTML 생성(monsterIconHtml과 완전히 동일한 구조 재사용). 이미지 폴더는
+// 아티팩트(equipType === 'artifact')만 전용 폴더(ARTIFACT_IMAGE_DIR), 그 외는 기존 ITEM_IMAGE_DIR을 그대로 씀. image 필드가
 // 있으면 PNG를 출력하고, 없으면 기존과 동일하게 icon(이모지)을 그대로 반환함. className은 화면별 크기
 // 클래스를 넘겨받지만, item-icon-img 자체가 부모 요소의 font-size를 1em 기준으로 그대로 물려받으므로
 // 대부분의 화면(equip-slot/inv-icon/artifact-icon-box/quickslot-icon 등)은 클래스 없이도 기존 이모지가
@@ -243,7 +250,9 @@ function playerCombatIconHtml(direction, motion){
 function itemIconHtml(itemDefLike, className){
   if(!itemDefLike || !itemDefLike.image) return itemDefLike ? itemDefLike.icon : '';
   const cls = 'item-icon-img' + (className ? ' ' + className : '');
-  const path = ITEM_IMAGE_DIR + itemDefLike.image + ITEM_IMAGE_EXT;
+  const path = itemDefLike.equipType === 'artifact'
+    ? ARTIFACT_IMAGE_DIR + itemDefLike.image + ARTIFACT_IMAGE_EXT
+    : ITEM_IMAGE_DIR + itemDefLike.image + ITEM_IMAGE_EXT;
   const img = `<img src="${path}" class="${cls}" alt="" draggable="false" data-fallback-emoji="${itemDefLike.icon}" onerror="itemImgError(this)">`;
   const bgCls = gradeIconBgClass(itemDefLike.grade);
   return bgCls ? `<span class="${bgCls}">${img}</span>` : img;
@@ -322,6 +331,35 @@ function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
 function wtipRow(label, value){
   return `<div>${label ? `<span style="color:var(--forge-cream-dim);">${label}</span> ` : ''}<span style="color:var(--forge-gold);">${value}</span></div>`;
 }
+
+// ---- 툴팁 최하단 "현재 판매 가격" 공통 블록(장비 5종 중 아티팩트 제외 + 소비 아이템 공용) ----
+// 새로운 판매 가격 공식을 만들지 않고 기존 sellValueFor(강화 단계별 판매가) → durabilityAdjustedSellValue
+// (내구도 비율 보정) 순서를 그대로 재사용함(실제 판매 로직 actions.js와 동일한 호출). 각 buildXxxTooltipHtml은
+// 자기 마지막 항목을 전부 출력한 뒤 </div>로 닫기 직전에 이 함수의 결과를 이어붙이기만 하면 되므로, 항목이
+// 추가/변경되어도 판매 가격은 항상 최하단에 위치함. 항목명("판매 가격")은 표시하지 않고 금액+🪙만 출력.
+// 스타일은 style.css의 .tooltip-sell-price(노란색)/.reduced(빨간색) 클래스로 관리(중앙 정렬·점선 구분선 포함).
+function tooltipSellPriceHtml(value, reduced){
+  if(value == null || isNaN(value)) return '';
+  return `<div class="tooltip-sell-price${reduced ? ' reduced' : ''}">${Math.round(value).toLocaleString()}🪙</div>`;
+}
+// 장비(무기/방어구/장신구/보조) 툴팁용. currentDurability를 넘기지 않는 화면(상점/도감/미리보기 등 실제
+// 인스턴스가 없는 곳)은 다른 내구도 표시와 동일하게 항상 최대 내구도(=감소 없음)로 취급함. 내구도 감소 여부는
+// damaged 플래그가 아니라 현재/최대 내구도를 직접 비교해서 판단(내구도 시스템이 없는 종류는 항상 노란색).
+function equipTooltipSellPriceHtml(type, level, currentDurability){
+  const w = wpn(type);
+  if(!w || !Array.isArray(w.sell) || w.sell[level] == null) return ''; // 판매 데이터가 없는 항목은 표시 생략
+  const value = durabilityAdjustedSellValue(sellValueFor(type, level), { type, currentDurability });
+  const max = maxDurabilityFor(type);
+  const cur = currentDurability != null ? currentDurability : max;
+  return tooltipSellPriceHtml(value, max != null && cur < max);
+}
+// 소비 아이템 툴팁용 — 기존 등록된 판매 가격(sellPrice)만 사용하며 구매 가격(buyPrice)과 혼동하지 않음.
+// 내구도 시스템이 없으므로 항상 노란색.
+function consumableTooltipSellPriceHtml(id){
+  const item = CONSUMABLES[id];
+  if(!item || item.sellPrice == null) return '';
+  return tooltipSellPriceHtml(item.sellPrice, false);
+}
 function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   const w = wpn(type);
   const grade = WEAPON_GRADES[w.grade];
@@ -366,6 +404,8 @@ function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   const reqText = weaponRequirementText(type);
   if(reqText) html += wtipRow('착용 제한 :', reqText);
 
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
+
   html += `</div>`;
   return html;
 }
@@ -406,6 +446,8 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('레벨 제한 :', `레벨 ${a.levelReq} 이상`);
 
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
+
   html += `</div>`;
   return html;
 }
@@ -421,6 +463,7 @@ function buildConsumableTooltipHtml(id){
   // 소비 아이템 툴팁의 "효과" 문구도 무기/방어구/아티팩트와 동일하게 용어사전 용어를 클릭 가능하게 처리
   if(item.effectText) html += wtipRow('효과', resolveGlossaryTermsHtml(item.effectText));
   if(item.buyPrice != null) html += wtipRow('구매 가격', item.buyPrice);
+  html += consumableTooltipSellPriceHtml(id); // 최하단 판매 가격(점선 구분) — 위 구매 가격 항목은 그대로 유지
   html += `</div>`;
   return html;
 }
@@ -560,6 +603,8 @@ function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
 
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
+
   html += `</div>`;
   return html;
 }
@@ -594,6 +639,8 @@ function buildSubTooltipHtml(type, level, damaged, currentDurability){
   html += subUniqueOptionTooltipHtml(type, lvl); // 보조 아이템 전용: 고정 옵션 여러 개는 쉼표 기준 한 줄씩 출력(요청사항)
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
+
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
 
   html += `</div>`;
   return html;
@@ -986,6 +1033,41 @@ function requiredKills(level){
 }
 function requiredExp(level){
   return monsterExp(level) * requiredKills(level);
+}
+
+// ---- Lv99(만렙) 경험치 표시 ----
+// 큰 숫자를 "1051387" 대신 "105만 1387"처럼 억/만 단위로 표시함. 저장되는 실제 값(state.playerExp)은
+// 전혀 건드리지 않고 화면 표시 문자열만 만듦. 억/만 각 자리는 정수로, 단위 뒤에 남는 나머지는 그대로
+// 붙이고, 값이 0인 단위는 표시하지 않음(요구사항 4번 규칙 그대로).
+function formatKoreanNumber(n){
+  n = Math.floor(n);
+  if(n < 10000) return String(n);
+  const eok = Math.floor(n / 100000000);
+  const rest1 = n % 100000000;
+  const man = Math.floor(rest1 / 10000);
+  const rest2 = rest1 % 10000;
+  const parts = [];
+  if(eok > 0) parts.push(eok + '억');
+  if(man > 0) parts.push(man + '만');
+  if(rest2 > 0) parts.push(String(rest2));
+  return parts.join(' ');
+}
+// 경험치바/경험치 텍스트에 쓸 표시 정보를 한 곳에서 계산 — 던전 화면(huntExpText/huntExpBar)과 캐릭터
+// 정보 화면(player-bar-label)이 이 함수 하나를 공유해서 쓰므로, 표시 규칙이 바뀌면 여기만 고치면 됨.
+// text는 <span> 안에 들어갈 값(그 앞의 "경험치 " 라벨은 index.html/렌더 템플릿에 이미 있음), pct는
+// 경험치 바의 채움 비율(0~100).
+function expDisplayInfo(lv){
+  if(lv < PLAYER_MAX_LEVEL){
+    const expReq = requiredExp(lv);
+    const pct = Math.min(100, Math.round(state.playerExp / expReq * 1000) / 10);
+    return { text: pct.toFixed(1) + '%', pct };
+  }
+  if(!ENABLE_MAX_LEVEL_EXP_SYSTEM){
+    // 기존 방식(기본값) — Lv99 경험치는 gainExp()에서 항상 0으로 유지되므로 늘 꽉 찬 'MAX' 표시.
+    return { text: 'MAX', pct: 100 };
+  }
+  // Lv99 누적 시스템(활성화됨) — 퍼센트 대신 누적 경험치를 한글 단위로 표시하고, 바는 항상 0% 채움으로 둠.
+  return { text: formatKoreanNumber(state.playerExp), pct: 0 };
 }
 
 // ---- 스킬 시스템 — 포인트 공식 ----
@@ -1577,7 +1659,8 @@ function shopBuyItemDisplay(action, typeId){
   }
   if(action === 'buy-artifact'){
     const a = ARTIFACTS[typeId];
-    return { iconHtml: a.icon, tooltipHtml: buildArtifactTooltipHtml(typeId), borderColor: null };
+    // 아티팩트 이미지(assets/ARTIFACTS/, 없거나 실패하면 이모지)를 소비 아이템 분기와 동일하게 itemIconHtml로 출력
+    return { iconHtml: itemIconHtml(a, 'shop-icon-img'), tooltipHtml: buildArtifactTooltipHtml(typeId), borderColor: null };
   }
   return { iconHtml: '', tooltipHtml: '', borderColor: null };
 }
@@ -2422,6 +2505,13 @@ function craftResourceOwnedCount(resource){
   return state[resource.def.stateKey] || 0;
 }
 
+// 장비가 아닌 일반 재료(현재는 MISC_ITEMS)는 제작 팝업에서 직접 투입하지 않고 "현재 보유 수량"만으로 자동 인식함
+// (장비 재료는 기존처럼 슬롯을 눌러 투입 개수를 직접 정해야 함). 장비/일반 구분은 findCraftResource가 돌려주는
+// resource.kind(기존 데이터 구조)를 그대로 사용하므로 아이템 이름을 하드코딩하지 않음.
+function craftResourceIsAutoMaterial(resource){
+  return !!resource && resource.kind !== 'equip';
+}
+
 // 제작 최종 확인 UI의 "제작 실패" 영역용 HTML — item.failReturns가 없거나 빈 배열이면 빈 문자열을
 // 반환해 그 영역이 통째로 표시되지 않게 함. 등록된 반환 후보를 전부(확률 미리보기 목적) 나열하며,
 // "없음" 항목(none:true)은 보여줄 아이콘이 없으므로 건너뜀.
@@ -2575,6 +2665,10 @@ function craftPopupCanCraft(popup){
   const item = findCraftItem(popup.category, popup.itemId);
   if(!item) return false;
   const materialsOk = item.materials.every(m => {
+    // 일반 재료: 투입 개수(slot.qty)와 무관하게 "현재 보유 수량 >= 필요 수량"이면 충족(실제 소모는 openCraftAnim에서 기존 그대로)
+    const resource = findCraftResource(m.name);
+    if(craftResourceIsAutoMaterial(resource)) return craftResourceOwnedCount(resource) >= m.need;
+    // 장비 재료: 기존 투입 조건 그대로 유지
     const slot = popup.slots.find(s => s.name === m.name);
     return slot && slot.qty === m.need;
   });

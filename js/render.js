@@ -614,6 +614,19 @@ function renderCraftPopup(){
     const resource = findCraftResource(material.name);
     if(!resource) return '';
     const matColor = craftResourceColor(resource);
+    // 일반 재료(장비 제외)는 직접 투입하지 않고 현재 보유 수량으로 자동 인식: "+" 대신 재료 아이콘(+툴팁)을 항상
+    // 표시하고, 보유수량/필요수량을 기존 서식(craft-slot-qty-ok=노랑 / craft-slot-qty-short=빨강)으로 보여줌.
+    // 클릭해도 아무 동작이 없도록 data-action 없는 일반 요소로 렌더링(레이아웃은 기존 .craft-slot 그대로).
+    if(craftResourceIsAutoMaterial(resource)){
+      const owned = craftResourceOwnedCount(resource);
+      const autoQtyCls = owned >= material.need ? 'craft-slot-qty-ok' : 'craft-slot-qty-short';
+      return `
+      <div class="craft-slot craft-slot-auto">
+        <span class="inv-icon craft-slot-icon-box weapon-name-wrap" style="border-color:${matColor};">${craftResourceIconHtml(resource, 'inv-icon-img')}<span class="tooltip">${craftResourceTooltipHtml(resource)}</span></span>
+        <span class="${autoQtyCls}">${owned}/${material.need}</span>
+        <span class="craft-slot-name" style="color:${matColor};">${resource.def.name}</span>
+      </div>`;
+    }
     const qtyCls = slot.qty < material.need ? 'craft-slot-qty-short' : 'craft-slot-qty-ok';
     // 요청사항 3-3: 아이콘 / 투입개수 / 이름을 하나의 슬롯에 뭉치지 않고 각각 분리된 줄로 표시.
     // 투입 개수가 0(아직 손대지 않음)일 때는 "+" 아이콘, 1 이상 투입했으면 실제 재료 아이콘으로 전환.
@@ -919,8 +932,7 @@ function renderHuntCharPanel(){
   const maxMp = effectiveMaxMp(lv);
   const hp = Math.min(state.playerHp, maxHp);
   const mp = Math.min(state.playerMp, maxMp);
-  const expReq = lv >= PLAYER_MAX_LEVEL ? 0 : requiredExp(lv);
-  const expPct = lv >= PLAYER_MAX_LEVEL ? 100 : Math.min(100, Math.round(state.playerExp / expReq * 1000) / 10);
+  const expInfo = expDisplayInfo(lv);
 
   elLv.textContent = 'Lv.' + lv;
   // 던전 전투 화면(상단 패널 + 전투 영역)에서는 요청에 따라 체력/마나 텍스트에 현재 수치만 표시함
@@ -929,8 +941,8 @@ function renderHuntCharPanel(){
   el('huntHpBar').style.width = (hp / maxHp * 100) + '%';
   el('huntMpText').textContent = mp.toLocaleString();
   el('huntMpBar').style.width = (mp / maxMp * 100) + '%';
-  el('huntExpText').textContent = lv >= PLAYER_MAX_LEVEL ? 'MAX' : expPct.toFixed(1) + '%';
-  el('huntExpBar').style.width = expPct + '%';
+  el('huntExpText').textContent = expInfo.text;
+  el('huntExpBar').style.width = expInfo.pct + '%';
 
   // 전투 화면 중앙(플레이어 슬롯)의 체력/마나 바도 동일한 값으로 함께 갱신(기존 몬스터 체력바와 같은
   // .hp-bar-wrap/.hp-bar-fill 구조를 재사용하므로, 감소 시 자연스러운 전환 애니메이션도 그대로 적용됨).
@@ -1176,10 +1188,12 @@ function equippedItemInfoLinesHtml(){
 function buildEquipPanelHtml(includeInfo){
   if(includeInfo === undefined) includeInfo = true;
   const byKey = key => EQUIPMENT_SLOTS.find(s => s.key === key);
+  // 배치는 전부 CSS 그리드 영역(area-*)이 결정하므로 아래 순서는 논리적 순서일 뿐임(style.css .equip-slots-grid 참고):
+  //   [아티팩트1][아티팩트2][아티팩트3] / [목걸이][투구][ ] / [무기][갑옷][보조] / [장신구1][신발][장신구2]
   const gridHtml = equipArtifactSlotsHtml()
-    + equipSlotHtml(byKey('helmet'))
+    + equipSlotHtml(byKey('necklace')) + equipSlotHtml(byKey('helmet'))
     + equipSlotHtml(byKey('weapon')) + equipSlotHtml(byKey('armor')) + equipSlotHtml(byKey('sub'))
-    + `<div class="eq-slot-accessories area-accessories">${equipSlotHtml(byKey('accessory1'))}${equipSlotHtml(byKey('accessory2'))}</div>`;
+    + equipSlotHtml(byKey('accessory1')) + equipSlotHtml(byKey('shoes')) + equipSlotHtml(byKey('accessory2'));
   const panelHtml = `
     <div class="equip-panel">
       <div class="equip-slots-grid">${gridHtml}</div>
@@ -1343,8 +1357,7 @@ function buildCharLevelStatsHtml(){
   const maxMp = effectiveMaxMp(lv);
   const hp = Math.min(state.playerHp, maxHp);
   const mp = Math.min(state.playerMp, maxMp);
-  const expReq = lv >= PLAYER_MAX_LEVEL ? 0 : requiredExp(lv);
-  const expPct = lv >= PLAYER_MAX_LEVEL ? 100 : Math.min(100, Math.round(state.playerExp / expReq * 1000) / 10);
+  const expInfo = expDisplayInfo(lv);
 
   return `
     <div class="char-stat-row big"><span>캐릭터 레벨</span><span class="v">Lv.${lv}</span></div>
@@ -1352,8 +1365,8 @@ function buildCharLevelStatsHtml(){
     <div class="player-bar-wrap"><div class="player-bar-fill hp" style="width:${(hp/maxHp*100)}%;"></div></div>
     <div class="player-bar-label">마나 <span>${mp.toLocaleString()} / ${maxMp.toLocaleString()}</span></div>
     <div class="player-bar-wrap"><div class="player-bar-fill mp" style="width:${(mp/maxMp*100)}%;"></div></div>
-    <div class="player-bar-label">경험치 <span>${lv >= PLAYER_MAX_LEVEL ? 'MAX' : expPct.toFixed(1) + '%'}</span></div>
-    <div class="player-bar-wrap"><div class="player-bar-fill exp" style="width:${expPct}%;"></div></div>
+    <div class="player-bar-label">경험치 <span>${expInfo.text}</span></div>
+    <div class="player-bar-wrap"><div class="player-bar-fill exp" style="width:${expInfo.pct}%;"></div></div>
     <div class="char-stat-divider"></div>
     <div class="char-stat-row"><span>사용 가능 포인트</span><span class="v" style="color:var(--forge-gold);">${draftStatPoints || 0}</span></div>
     ${renderStatAllocRow('str', '힘', (draftStats || state.stats).str)}

@@ -120,8 +120,13 @@ const MONSTER_IMAGE_EXT = '.png';
 // MISC_ITEMS 항목에 선택 필드 image(파일명만, 확장자/경로 제외)를 등록하면 이모지(icon) 대신 PNG가
 // 출력됨(itemIconHtml/itemImgError, formulas.js). image 필드가 없거나 파일 로드에 실패하면 항상
 // 기존처럼 icon(이모지)이 그대로 출력됨 — 새로 추가되는 기타/아티팩트/소비 아이템도 동일하게 동작함.
+// 단, 아티팩트(equipType === 'artifact')의 이미지는 기타/소비 아이템과 폴더를 분리해서 관리함 —
+// 아래 ARTIFACT_IMAGE_DIR(assets/ARTIFACTS/)에서만 불러오며, itemIconHtml이 equipType으로 자동 구분함.
 const ITEM_IMAGE_DIR = 'assets/MiscItems/';
 const ITEM_IMAGE_EXT = '.png';
+// 아티팩트 전용 이미지 폴더. 대소문자 그대로 assets/ARTIFACTS/ (대소문자를 구분하는 서버에서도 동일하게 동작).
+const ARTIFACT_IMAGE_DIR = 'assets/ARTIFACTS/';
+const ARTIFACT_IMAGE_EXT = '.png';
 
 // 무기 종류 도감. 새로운 옵션(필드)이 필요해지면 이 객체에 항목만 추가하면 됨 — 언제든 확장 가능한 구조.
 // ---- 항목 설명 ----
@@ -1991,6 +1996,11 @@ Object.values(ACCESSORY_TYPES).forEach(a => {
 
 // ---- 캐릭터 레벨 시스템 ----
 const PLAYER_MAX_LEVEL = 99;
+// Lv99(만렙) 경험치 누적 시스템 활성화 스위치. false(기본값)면 기존 방식(Lv99 도달/유지 시 경험치를
+// 항상 0으로 초기화, 표시도 'MAX' 고정) 그대로 동작하고, true로 바꾸면 Lv99에서도 레벨업 없이 경험치를
+// 계속 누적하고 한글 단위로 표시함(state.js gainExp, formulas.js expDisplayInfo/formatKoreanNumber 참고).
+// 다른 레벨/경험치 로직에는 전혀 영향 없음 — 이 스위치는 오직 "Lv99에 있을 때"의 동작만 바꿈.
+const ENABLE_MAX_LEVEL_EXP_SYSTEM = false;
 const STAT_POINTS_PER_LEVEL = 4;
 
 // 몬스터 등급
@@ -2007,11 +2017,11 @@ const ACCESSORY_SLOT_MAX = 2; // 장신구1/장신구2 — 반지는 같은 아�
 // desc: 장비 설명 / equipType: 장비 타입(EQUIPMENT_TYPES 참고, 항상 'artifact') / grade: 아티팩트 등급(WEAPON_GRADES와 동일한 키 체계 재사용) /
 // effect: 장착 효과(장착 시 실제로 적용되는 효과 — 게임 로직 설명용) / effectText: 효과 설명(아이템 툴팁에 "효과"로 표시되는 문구) /
 // buyPrice: 상점 구매 가격(비어있으면=null, 상점 구매 불가 + 상점 목록에서 제외됨) / icon: 아티팩트 아이콘
-// (이모지) / image: 선택 필드. PNG 이미지 파일명(확장자/경로 제외, assets/MiscItems/<image>.png)을 등록하면
-// icon 대신 PNG가 출력됨(itemIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 그대로 출력됨.
+// (이모지) / image: 선택 필드. PNG 이미지 파일명(확장자/경로 제외, assets/ARTIFACTS/<image>.png)을 등록하면
+// icon 대신 PNG가 출력됨(itemIconHtml, formulas.js). 등록하지 않거나 파일 로드에 실패하면 기존처럼 icon(이모지)이 출력됨.
 const ARTIFACTS = {
   ring: {
-    id: 'ring', name: '아주르의 강아지풀 반지', icon: '🌾',
+    id: 'ring', name: '아주르의 강아지풀 반지', icon: '🌾', image: 'af_ring',
     desc: '마법사 아주르가 마력을 불어넣어 만든 반지',
     equipType: 'artifact',
     grade: 'normal',
@@ -2020,7 +2030,7 @@ const ARTIFACTS = {
     buyPrice: 10000,
   },
   batwing: {
-    id: 'batwing', name: '박쥐 날개', icon: '🦇',
+    id: 'batwing', name: '박쥐 날개', icon: '🦇', image: 'af_batwing',
     desc: '흡혈 박쥐의 날개로 만든 견갑',
     equipType: 'artifact',
     grade: 'epic',
@@ -2029,7 +2039,7 @@ const ARTIFACTS = {
     buyPrice: null,
   },
   poisonflask: {
-    id: 'poisonflask', name: '독 플라스크', icon: '🍾',
+    id: 'poisonflask', name: '독 플라스크', icon: '🍾', image: 'af_poisonflask',
     desc: '방울뱀의 극독이 담긴 플라스크',
     equipType: 'artifact',
     grade: 'rare',
@@ -2041,7 +2051,7 @@ const ARTIFACTS = {
     buyPrice: null,
   },
   antlerflag: {
-    id: 'antlerflag', name: '사슴 뿔 깃발', icon: '🏴',
+    id: 'antlerflag', name: '사슴 뿔 깃발', icon: '🏴', image: 'af_antlerflag',
     desc: '사슴의 뿔로 장식한 깃발',
     equipType: 'artifact',
     grade: 'normal',
@@ -2052,7 +2062,7 @@ const ARTIFACTS = {
     buyPrice: null,
   },
   oldarmguard: {
-    id: 'oldarmguard', name: '낡은 팔 보호대', icon: '🛡️',
+    id: 'oldarmguard', name: '낡은 팔 보호대', icon: '🛡️', image: 'af_oldarmguard',
     desc: '빛바랜 보호구에 주인의 흔적이 남아 있다',
     equipType: 'artifact',
     grade: 'normal',
@@ -2063,7 +2073,7 @@ const ARTIFACTS = {
     buyPrice: null,
   },
   blackarmguard: {
-    id: 'blackarmguard', name: '흑색 팔 보호대', icon: '🛡️',
+    id: 'blackarmguard', name: '흑색 팔 보호대', icon: '🛡️', image: 'af_blackarmguard',
     desc: '흑곰의 질긴 가죽으로 제작한 견고한 장비',
     equipType: 'artifact',
     grade: 'epic',
@@ -2073,7 +2083,7 @@ const ARTIFACTS = {
     buyPrice: null,
   },
   foxorb: {
-    id: 'foxorb', name: '빛나는 여우 구슬', icon: '🔮',
+    id: 'foxorb', name: '빛나는 여우 구슬', icon: '🔮', image: 'af_foxorb',
     desc: '희미한 푸른빛을 머금은 신비로운 구슬<br>밤이 깊어질수록 더욱 강하게 빛난다',
     equipType: 'artifact',
     grade: 'epic',
@@ -3050,13 +3060,19 @@ const SKILL_QUICK_SLOT_COUNT = 10; // 2줄 × 5칸(요구사항: 기존 1줄 5�
 // renderCharStats(render.js)가 이 목록을 그대로 순회해 슬롯을 그림. 새 장비 타입(방어구 등)이 실제로
 // 추가되면 이 배열에 항목만 추가하고 equippedItemForSlot(render.js)에 조회 로직 한 줄만 이어주면 되며,
 // 나머지 렌더링 코드는 수정할 필요가 없음. cellClass는 장비창 그리드에서 이 슬롯이 위치할 CSS 그리드 영역.
+// necklace(목걸이)/shoes(신발)는 장비창에 자리만 먼저 마련한 신규 슬롯임 — 아직 이 슬롯에 착용되는 아이템 데이터/
+// 착용 로직이 없으므로 equippedItemForSlot(render.js)/equippedInstanceForSlot(state.js)이 항상 null을 반환해
+// 빈 슬롯(라벨만)으로 표시되고, 장착 아이템 정보·수리 대상 목록에서도 자동으로 제외됨. 나중에 아이템이 생기면 두 함수에
+// 이 key의 조회 로직만 이어주면 됨(레이아웃 수정 불필요). 배열 순서는 "모두 수리" 대상 순서와 같으므로 뒤에 추가함.
 const EQUIPMENT_SLOTS = [
   { key: 'weapon', label: '무기', cellClass: 'area-weapon' },
   { key: 'helmet', label: '투구', cellClass: 'area-helmet' },
   { key: 'armor', label: '갑옷', cellClass: 'area-armor' },
   { key: 'sub', label: '보조', cellClass: 'area-sub' },
-  { key: 'accessory1', label: '장신구1', cellClass: '' },
-  { key: 'accessory2', label: '장신구2', cellClass: '' },
+  { key: 'accessory1', label: '장신구1', cellClass: 'area-ring1' },
+  { key: 'accessory2', label: '장신구2', cellClass: 'area-ring2' },
+  { key: 'necklace', label: '목걸이', cellClass: 'area-necklace' },
+  { key: 'shoes', label: '신발', cellClass: 'area-shoes' },
 ];
 
 // ---- 상태 이상(디버프) 클래스 ----

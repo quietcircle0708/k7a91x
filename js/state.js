@@ -266,7 +266,17 @@ function clampPlayerVitals(){
 // 경험치 획득 처리. 레벨업하면 몇 레벨이 올랐는지 반환(안 올랐으면 0)
 function gainExp(amount){
   ensurePlayerVitals();
-  if(state.playerLevel >= PLAYER_MAX_LEVEL){ state.playerExp = 0; return 0; }
+  if(state.playerLevel >= PLAYER_MAX_LEVEL){
+    if(ENABLE_MAX_LEVEL_EXP_SYSTEM){
+      // Lv99 누적 시스템(활성화됨): 레벨업은 없지만 경험치를 0으로 초기화하지 않고 계속 누적함.
+      // 레벨업이 발생하지 않으므로 레벨업 보상(체력/마나 회복, 스탯/스킬/기연 포인트)도 지급되지 않음.
+      state.playerExp += amount;
+      return 0;
+    }
+    // 기존 방식(비활성화, 기본값): Lv99에서는 경험치를 계속 0으로 유지함.
+    state.playerExp = 0;
+    return 0;
+  }
   state.playerExp += amount;
   let levelsGained = 0;
   while(state.playerLevel < PLAYER_MAX_LEVEL && state.playerExp >= requiredExp(state.playerLevel)){
@@ -281,10 +291,16 @@ function gainExp(amount){
     state.skillPoints = (state.skillPoints || 0) + skillPointsGrantedAtLevel(state.playerLevel);
     state.awakeningPoints = (state.awakeningPoints || 0) + awakeningPointsGrantedAtLevel(state.playerLevel);
   }
-  if(state.playerLevel >= PLAYER_MAX_LEVEL){
-    state.playerLevel = PLAYER_MAX_LEVEL;
+  if(state.playerLevel >= PLAYER_MAX_LEVEL && !ENABLE_MAX_LEVEL_EXP_SYSTEM){
+    // 기존 방식(비활성화, 기본값): Lv98→Lv99처럼 이 루프로 막 Lv99에 도달했다면, 위 while 루프가 이미
+    // requiredExp(98)만큼만 정확히 차감하고 나머지를 state.playerExp에 남겨둔 상태이지만, 기존 동작을
+    // 그대로 유지하기 위해 여기서 다시 0으로 초기화함.
     state.playerExp = 0;
   }
+  // ENABLE_MAX_LEVEL_EXP_SYSTEM이 true면 이 초기화를 건너뛰어, 루프가 남겨둔 나머지 경험치가 그대로
+  // Lv99의 시작 경험치로 유지됨(요구사항: "차감하고 남은 경험치는 Lv99 경험치로 유지"). 루프 조건
+  // (state.playerLevel < PLAYER_MAX_LEVEL) 자체가 레벨을 99에서 멈추게 하므로 100 이상으로 올라가는
+  // 일은 두 경우 모두 없음.
   return levelsGained;
 }
 

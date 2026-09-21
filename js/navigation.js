@@ -312,6 +312,7 @@ function openCraftMaterialQty(name){
   const slot = craftPopup.slots.find(s => s.name === name);
   const material = item.materials.find(m => m.name === name);
   const resource = findCraftResource(name);
+  if(craftResourceIsAutoMaterial(resource)) return; // 일반 재료는 보유 수량으로 자동 인식 — 투입 수량 팝업 없음
   // 버그 수정: 이전엔 maxQty를 "필요 개수"로만 잡아서, 실제로 보유하지 않은 개수까지도 투입 개수를
   // 계속 올릴 수 있었음(보유량 검증 없이 슬롯 숫자만 늘어남). 이제 "필요 개수"와 "실제 보유량" 중
   // 더 작은 값으로 제한해서, 가진 만큼만 투입할 수 있도록 함.
