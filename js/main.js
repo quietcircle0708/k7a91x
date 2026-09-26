@@ -50,6 +50,31 @@ el('repairSelectPager').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
+// ---- 수리 탭: [손상 복구] ----
+el('restoreBtn').addEventListener('click', openRestorePopup);
+el('restorePopupCancelBtn').addEventListener('click', closeRestorePopup);
+el('restorePopupMakeBtn').addEventListener('click', openRestoreConfirm);
+el('restorePopupModal').addEventListener('click', (e)=>{
+  const target = e.target.closest('[data-action]');
+  if(!target) return;
+  if(target.dataset.action === 'open-restore-select') openRestoreSelectPopup();
+  else if(target.dataset.action === 'open-craft-catalyst') openCraftCatalystSelect(); // 촉매 UI는 제작소와 동일(아직 미구현 안내만)
+});
+el('closeRestoreSelectBtn').addEventListener('click', closeRestoreSelectPopup);
+el('restoreSelectList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="select-restore-target"]');
+  if(!btn) return;
+  selectRestoreTarget(btn.dataset.kind, Number(btn.dataset.id));
+});
+el('restoreSelectPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
+});
+el('restoreConfirmCancelBtn').addEventListener('click', closeRestoreConfirm);
+el('restoreConfirmProceedBtn').addEventListener('click', proceedRestoreConfirm);
+el('restoreResultConfirmBtn').addEventListener('click', closeRestoreResult);
 // ---- 수리 탭: 개별 수리 팝업 ----
 el('repairIndivCancelBtn').addEventListener('click', closeRepairIndividualPopup);
 el('repairIndivConfirmBtn').addEventListener('click', openRepairConfirmFromIndividual);
@@ -141,12 +166,6 @@ el('shopPager').addEventListener('click', (e)=>{
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
-el('charStatsPager').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action]');
-  if(!btn) return;
-  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
-  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
-});
 document.addEventListener('click', (e)=>{
   if(!shopFilterMenuOpen) return;
   if(e.target.closest('.shop-filter-wrap')) return;
@@ -163,9 +182,11 @@ el('shopItemsList').addEventListener('click', (e)=>{
   switch(btn.dataset.action){
     case 'buy-weapon': openBuyQtyModal('buy-weapon', type); break;
     case 'buy-consumable': openBuyQtyModal('buy-consumable', type); break;
-    case 'sell-consumable': sellAllFlask(type, btn); break;
+    // 판매(소비/마석·기타)도 즉시 전부 판매하지 않고, 같은 개수 지정 팝업을 "판매 모드"로 먼저 띄움 —
+    // 실제 판매는 팝업의 [판매] → 판매 확인창 → [판매]에서 이뤄짐(confirmBuyQty, actions.js).
+    case 'sell-consumable': openBuyQtyModal('sell-consumable', type); break;
     case 'buy-artifact': openBuyQtyModal('buy-artifact', type); break;
-    case 'sell-misc': sellAllMisc(type, btn); break;
+    case 'sell-misc': openBuyQtyModal('sell-misc', type); break;
   }
 });
 el('skipToggleBtn').addEventListener('click', toggleSkip);
@@ -193,8 +214,6 @@ el('monsterRow').addEventListener('click', (e)=>{
 });
 el('leaveConfirmStopBtn').addEventListener('click', confirmLeaveBattle);
 el('leaveConfirmContinueBtn').addEventListener('click', cancelLeaveBattle);
-el('openStatsBtn').addEventListener('click', openCharStats);
-el('closeStatsBtn').addEventListener('click', closeCharStats);
 el('openBlacksmithBtn').addEventListener('click', openForgeSelect);
 el('closeForgeSelectBtn').addEventListener('click', closeForgeSelect);
 el('forgeSelectList').addEventListener('click', (e)=>{
@@ -231,22 +250,6 @@ el('settingsBody').addEventListener('click', (e)=>{
   const radioBtn = e.target.closest('button[data-radio]');
   if(radioBtn && !radioBtn.disabled){ selectSettingRadio(radioBtn.dataset.radio, radioBtn.dataset.value); }
 });
-el('charStatsBody').addEventListener('click', (e)=>{
-  const statBtn = e.target.closest('button[data-stat]');
-  if(statBtn && !statBtn.disabled){
-    const statKey = statBtn.dataset.stat;
-    const statAction = statBtn.dataset.statAction;
-    if(statAction === 'add-bulk') allocateStatBulk(statKey);
-    else if(statAction === 'sub') deallocateStat(statKey);
-    else allocateStat(statKey);
-    return;
-  }
-  const actionBtn = e.target.closest('button[data-action]');
-  if(!actionBtn || actionBtn.disabled) return;
-  if(actionBtn.dataset.action === 'apply-stats') applyStatAlloc();
-  else if(actionBtn.dataset.action === 'reset-stats') resetStatAlloc();
-  else if(actionBtn.dataset.action === 'reset-stats-full') resetStatAllocFull();
-});
 // ---- 캐릭터 메뉴 ----
 el('charTabsRow').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-char-tab]');
@@ -255,12 +258,19 @@ el('charTabsRow').addEventListener('click', (e)=>{
 });
 // 캐릭터 메뉴(정보 탭 + 스킬 탭)와 던전 우측 카드(같은 [캐릭터 정보]/[스킬] 콘텐츠를 재사용하는 화면)
 // 양쪽 안에서 일어나는 클릭을 전부 이 한 함수로 위임 처리함(둘 다 페이지 전체가 매번 다시 그려지는
-// 구조라 charStatsBody/charStatsPager처럼 따로 나눌 필요가 없고, 두 화면이 완전히 동일한 콘텐츠/버튼
-// 구조를 재사용하므로 핸들러도 공유함 — 요구사항: "기존 캐릭터 메뉴의 기능을 그대로 재사용").
-// - 캐릭터 정보 탭: 스탯 배분 버튼 + 페이지 이동
+// 구조라 화면마다 따로 나눌 필요가 없고, 두 화면이 완전히 동일한 콘텐츠/버튼 구조를 재사용하므로
+// 핸들러도 공유함 — 요구사항: "기존 캐릭터 메뉴의 기능을 그대로 재사용").
+// - 캐릭터 정보 탭: 소분류 전환([정보]/[착용 장비]/[세부 능력치]) + 스탯 배분 버튼 + 페이지 이동
 // - 스킬 탭: 하위 탭 전환 + 스킬 습득 + 스킬 퀵슬롯(배정/사용/제거) + 플라스크 퀵슬롯(기존 로직 그대로,
 //   skillTabFlaskRow가 quickSlotRow와 동일한 data-action 이름을 그대로 씀) + 퀵슬롯 초기화 + 페이지 이동
 function handleCharPanelClick(e){
+  // [캐릭터 정보] 탭 소분류([정보]/[착용 장비]/[세부 능력치]) 전환 — 캐릭터 메뉴/던전 우측 패널이 서로
+  // 다른 data 속성을 쓰므로(switchCharInfoSubtab/switchHuntCharInfoSubtab) 각자 독립적으로 갱신됨.
+  const charInfoSubtabBtn = e.target.closest('button[data-char-info-subtab]');
+  if(charInfoSubtabBtn){ switchCharInfoSubtab(charInfoSubtabBtn.dataset.charInfoSubtab); return; }
+  const huntCharInfoSubtabBtn = e.target.closest('button[data-hunt-char-info-subtab]');
+  if(huntCharInfoSubtabBtn){ switchHuntCharInfoSubtab(huntCharInfoSubtabBtn.dataset.huntCharInfoSubtab); return; }
+
   const skillCatBtn = e.target.closest('button[data-skill-cat]');
   if(skillCatBtn){ switchSkillCategory(skillCatBtn.dataset.skillCat); return; }
 
@@ -321,6 +331,12 @@ el('buyQtyConfirmBtn').addEventListener('click', confirmBuyQty);
 el('buyQtyUpBtn').addEventListener('click', ()=> adjustBuyQty('up'));
 el('buyQtyDownBtn').addEventListener('click', ()=> adjustBuyQty('down'));
 el('buyQtyInput').addEventListener('input', (e)=> setBuyQty(e.target.value));
+el('buyQtyResetBtn').addEventListener('click', resetBuyQty);
+el('buyQtyAdd5Btn').addEventListener('click', ()=> addBuyQty(5));
+el('buyQtyAdd10Btn').addEventListener('click', ()=> addBuyQty(10));
+el('buyQtyAdd50Btn').addEventListener('click', ()=> addBuyQty(50));
+el('buyQtyAdd100Btn').addEventListener('click', ()=> addBuyQty(100));
+el('buyQtyMaxBtn').addEventListener('click', maxBuyQty);
 el('skillLearnCancelBtn').addEventListener('click', cancelSkillLearn);
 el('skillLearnConfirmBtn').addEventListener('click', confirmSkillLearn);
 el('traceRestoreCancelBtn').addEventListener('click', closeTraceRestoreConfirm);

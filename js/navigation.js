@@ -21,8 +21,8 @@ function showView(name){
     if(wrapEl) wrapEl.classList.remove('hunt-panel-open');
   }
   if(currentView === 'character' && name !== 'character'){
-    // 캐릭터 메뉴를 벗어날 때는 캐릭터 정보 모달을 닫을 때(closeCharStats)와 동일하게
-    // 적용하지 않은 임시 스탯 배분을 버림(둘이 draftStats를 공유하는 데이터이므로 규칙도 동일해야 함).
+    // 캐릭터 메뉴를 벗어날 때는 적용하지 않은 임시 스탯 배분을 버림(던전 우측 패널과 draftStats를
+    // 공유하는 데이터이므로, 두 화면 모두 같은 규칙으로 정리함).
     draftStats = null;
     draftStatPoints = null;
     statAllocActive = { str: false, agi: false, int: false };
@@ -55,6 +55,13 @@ function showView(name){
     el('repairAllModal').style.display = 'none';
     el('repairConfirmModal').style.display = 'none';
     el('repairSelectModal').style.display = 'none';
+    // [손상 복구] 팝업/선택/확인/결과창도 같은 이유로 함께 정리
+    restorePopup = null;
+    restoreResult = null;
+    el('restorePopupModal').style.display = 'none';
+    el('restoreSelectModal').style.display = 'none';
+    el('restoreConfirmModal').style.display = 'none';
+    el('restoreResultModal').style.display = 'none';
   }
   el('forgeView').style.display = name === 'forge' ? 'block' : 'none';
   el('shopView').style.display = name === 'shop' ? 'block' : 'none';
@@ -68,13 +75,15 @@ function showView(name){
   if(name === 'hunt') renderHunt();
   if(name === 'craft'){ renderCraftTabs(); renderCraftList(craftUI.tab); }
   if(name === 'character'){
-    // 캐릭터 정보 모달을 열 때(openCharStats)와 동일한 초기화 규칙: 매번 진입할 때마다
-    // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·1페이지부터 보여줌.
+    // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
+    // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
     draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
     draftStatPoints = state.statPoints || 0;
     statAllocActive = { str: false, agi: false, int: false };
-    pageState.charMenuInfo = 1;
     activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
+    activeCharInfoSubtab = CHAR_INFO_SUBTABS.length > 0 ? CHAR_INFO_SUBTABS[0].id : null; // 캐릭터 메뉴 진입할 때마다 항상 첫 소분류탭부터
+    pageState.charInfoEquip = 1;
+    pageState.charInfoStats = 1;
     // 스킬 탭 상태도 캐릭터 정보 탭과 동일하게 진입할 때마다 첫 하위탭·1페이지로 초기화
     activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
     activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null; // 요구사항 3번: 진입할 때마다 항상 "공격" 탭부터
@@ -178,7 +187,7 @@ function applyRepairQuickAmount(kind){
   if(!repairIndividualPopup) return;
   const found = resolveRepairTarget(repairIndividualPopup);
   if(!found) return;
-  const max = maxDurabilityFor(found.type);
+  const max = maxDurabilityForItem(found.item); // 손상 아이템이면 10%/1% 단위도 손상 최대 내구도 기준
   let raw = 0;
   if(kind === 'max') raw = repairAmountToFull(found.item);
   else if(kind === '10pct') raw = Math.floor(max * 0.1);
@@ -275,6 +284,68 @@ function confirmRepairProceed(){
   el('repairAllModal').style.display = 'none';
   // executeIndividualRepair/executeRepairAll이 이미 render()를 호출해 renderForgeTabs()→renderRepairTab()
   // 체인으로 장비창/모두수리 버튼 상태가 갱신됨(요구사항 21번) — 별도 재호출 불필요.
+}
+
+// ---- 수리 탭: [손상 복구] ----
+// 흐름: [손상 복구] 버튼 → 복구 팝업(장비 미선택) → [+]로 복구 장비 선택 → (재료/골드 충족 시) [복구] → 최종 확인 →
+// [진행] → 실제 복구 처리 + 결과창 즉시 표시(제작 연출 없음) → [확인]. 선택한 장비는 종류+고유 id만 저장함.
+function openRestorePopup(){
+  restorePopup = { target: null };
+  renderRestorePopup();
+  el('restorePopupModal').style.display = 'flex';
+}
+function closeRestorePopup(){
+  restorePopup = null;
+  el('restorePopupModal').style.display = 'none';
+  el('restoreSelectModal').style.display = 'none';
+}
+function openRestoreSelectPopup(){
+  pageState.restoreSelect = 1; // 열 때마다 항상 1페이지부터(다른 장비 선택 팝업과 동일한 관례)
+  renderRestoreSelectList();
+  el('restoreSelectModal').style.display = 'flex';
+}
+function closeRestoreSelectPopup(){
+  el('restoreSelectModal').style.display = 'none';
+}
+// 선택 목록에서 장비를 클릭 — 그 장비의 종류+고유 id를 복구 대상으로 저장하고 복구 팝업으로 돌아감.
+function selectRestoreTarget(kind, itemId){
+  if(!restorePopup) return;
+  restorePopup.target = { kind, itemId };
+  closeRestoreSelectPopup();
+  renderRestorePopup();
+}
+function openRestoreConfirm(){
+  if(!restorePopup || !restoreCanProceed(restorePopup.target)) return;
+  el('restorePopupModal').style.display = 'none';
+  renderRestoreConfirmModal();
+  el('restoreConfirmModal').style.display = 'flex';
+}
+// [취소] → 확인창만 닫고 복구 팝업으로 복귀(선택해둔 장비 그대로).
+function closeRestoreConfirm(){
+  el('restoreConfirmModal').style.display = 'none';
+  el('restorePopupModal').style.display = 'flex';
+  renderRestorePopup();
+}
+// [진행] → 실제 복구 처리(executeRestore, actions.js) 후 결과창을 바로 띄움. 대상이 사라졌거나 조건이 바뀌어 처리에
+// 실패하면(null) 아무것도 소모하지 않고 복구 팝업으로 돌아감.
+function proceedRestoreConfirm(){
+  if(!restorePopup) return;
+  const result = executeRestore(restorePopup.target);
+  el('restoreConfirmModal').style.display = 'none';
+  if(!result){
+    el('restorePopupModal').style.display = 'flex';
+    renderRestorePopup();
+    return;
+  }
+  restoreResult = result;
+  restorePopup = null;
+  el('restorePopupModal').style.display = 'none';
+  renderRestoreResultModal();
+  el('restoreResultModal').style.display = 'flex';
+}
+function closeRestoreResult(){
+  restoreResult = null;
+  el('restoreResultModal').style.display = 'none';
 }
 
 // ---- 제작소: [제작 재료] 안내 토글(요청사항 1~2번) ----
@@ -561,14 +632,16 @@ const PAGE_RENDER_FN = {
   invAccessory: renderAccessoryInventoryList,
   forgeSelect: renderForgeSelectList,
   repairSelect: renderRepairSelectList,
+  restoreSelect: renderRestoreSelectList,
   shopWeapon: renderShopTab, shopArmor: renderShopTab, shopSub: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
-  charStats: renderCharStats,
-  charMenuInfo: renderCharacterMenu,
+  charInfoEquip: renderCharacterMenu,
+  charInfoStats: renderCharacterMenu,
+  huntInfoEquip: renderHuntSidePanel,
+  huntInfoStats: renderHuntSidePanel,
   // skillPage(공용/특화/기연 스킬 목록의 레벨 구간 페이지)는 캐릭터 메뉴 스킬 탭과 던전 우측 카드 스킬
   // 탭 2페이지가 공용 state로 함께 쓰므로, 페이지를 넘기면 둘 다 갱신함(둘 중 실제 존재하는 쪽만 반영됨).
   skillPage: () => { renderCharacterMenu(); renderHuntSidePanel(); },
-  huntCharInfo: renderHuntSidePanel,
   huntCharSkill: renderHuntSidePanel,
   craftWeapon: () => renderCraftList('weapon'),
   craftArmor: () => renderCraftList('armor'),
@@ -663,12 +736,11 @@ function pendingStatPoints(key){
   if(!draftStats) return 0;
   return (draftStats[key] || 0) - (state.stats[key] || 0);
 }
-// 캐릭터 정보 모달(charStatsModal)과 캐릭터 메뉴("캐릭터" 탭)는 draftStats 등 동일한 데이터를 공유하며,
-// 항상 둘 중 하나만 화면에 보이지만("모달은 대장간 화면에서만, 캐릭터 메뉴는 그 화면을 벗어나야 열림")
-// 요구사항대로 "한쪽에서 바뀌면 다른 쪽도 즉시 반영"되도록 스탯이 바뀌는 모든 지점에서 항상 둘 다 다시 그림
-// (둘 다 숨겨진 화면을 다시 그리는 건 비용이 거의 없음 — render()가 매번 상점/인벤토리를 다시 그리는 것과 동일한 방식).
+// 캐릭터 메뉴("캐릭터" 탭)와 던전 우측 카드는 draftStats 등 동일한 데이터를 공유하며(대장간 전용 캐릭터
+// 정보 팝업은 구조 통합으로 제거됨), 요구사항대로 "한쪽에서 바뀌면 다른 쪽도 즉시 반영"되도록 스탯이
+// 바뀌는 모든 지점에서 항상 둘 다 다시 그림(둘 중 숨겨진 화면을 다시 그리는 건 비용이 거의 없음 —
+// render()가 매번 상점/인벤토리를 다시 그리는 것과 동일한 방식).
 function refreshCharDisplays(){
-  renderCharStats();
   renderCharacterMenu();
   renderHuntSidePanel(); // 던전 우측 카드에 재사용 중인 캐릭터 정보 UI도 함께 갱신
 }
@@ -733,22 +805,6 @@ function resetStatAllocFull(){
   draftStatPoints = totalPoints;
   refreshCharDisplays();
 }
-function openCharStats(){
-  draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
-  draftStatPoints = state.statPoints || 0;
-  statAllocActive = { str: false, agi: false, int: false };
-  pageState.charStats = 1; // 모달을 열 때는 항상 1페이지(장비창+캐릭터 정보)부터 보여줌
-  refreshCharDisplays();
-  el('charStatsModal').style.display = 'flex';
-}
-function closeCharStats(){
-  // 적용하지 않은 임시 배분은 버림
-  draftStats = null;
-  draftStatPoints = null;
-  statAllocActive = { str: false, agi: false, int: false };
-  el('charStatsModal').style.display = 'none';
-}
-
 // ---- 대장간 "강화 장비 선택" 팝업 ----
 function openForgeSelect(){
   if(isEnhancing) return;
@@ -773,6 +829,18 @@ function switchCharTab(tabId){
 let huntCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
 function switchHuntCharTab(tabId){
   huntCharTab = tabId;
+  renderHuntSidePanel();
+}
+// [캐릭터 정보] 탭 내부 소분류([정보]/[착용 장비]/[세부 능력치]) 전환 — 위 상위 탭 전환과 완전히 같은
+// 패턴(캐릭터 메뉴/던전 우측 카드가 각자 독립된 상태를 가지고, 같은 공용 state를 보여줌).
+let activeCharInfoSubtab = CHAR_INFO_SUBTABS.length > 0 ? CHAR_INFO_SUBTABS[0].id : null;
+function switchCharInfoSubtab(subtabId){
+  activeCharInfoSubtab = subtabId;
+  renderCharacterMenu();
+}
+let huntCharInfoSubtab = CHAR_INFO_SUBTABS.length > 0 ? CHAR_INFO_SUBTABS[0].id : null;
+function switchHuntCharInfoSubtab(subtabId){
+  huntCharInfoSubtab = subtabId;
   renderHuntSidePanel();
 }
 
@@ -1145,14 +1213,17 @@ function adjustSetting(id, dir){
 // ---- 판매 확인 모달 ----
 // 장비/소비 아이템 판매 시 공통으로 쓰는 확인창. openSellConfirm(라벨, 가격, 확정시 실행할 함수)로 호출.
 let pendingSellAction = null;
-function openSellConfirm(itemLabel, price, onConfirm){
+let pendingSellCancel = null; // 선택 인자 — 상점 판매 수량창처럼 "취소하면 이전 팝업으로 돌아가야" 하는 호출부만 넘김
+function openSellConfirm(itemLabel, price, onConfirm, onCancel){
   pendingSellAction = onConfirm;
+  pendingSellCancel = onCancel || null;
   el('sellConfirmBody').textContent = `정말 ${itemLabel}을(를) ${price.toLocaleString()}G에 판매하시겠습니까? 판매 후 재구매 불가능합니다!`;
   el('sellConfirmModal').style.display = 'flex';
 }
 function closeSellConfirm(){
   el('sellConfirmModal').style.display = 'none';
   pendingSellAction = null;
+  pendingSellCancel = null;
 }
 function confirmSell(){
   const action = pendingSellAction;
@@ -1160,7 +1231,9 @@ function confirmSell(){
   if(action) action();
 }
 function cancelSell(){
+  const onCancel = pendingSellCancel;
   closeSellConfirm();
+  if(onCancel) onCancel();
 }
 
 // ---- 상점 "개수 지정 구매" 팝업 ----
@@ -1193,6 +1266,20 @@ function adjustBuyQty(dir){
   if(!buyQtyState) return;
   setBuyQty(buyQtyState.qty + (dir === 'up' ? 1 : -1));
 }
+// 소비 아이템 구매창의 빠른 수량 버튼 — 새 정규화 로직을 만들지 않고 setBuyQty(1~maxQty, maxQty는 보유 골드/최대
+// 구매 개수로 이미 제한됨)를 그대로 거쳐서 직접 입력/▲▼ 버튼과 항상 같은 제한이 적용됨.
+function addBuyQty(amount){
+  if(!buyQtyState) return;
+  setBuyQty(buyQtyState.qty + amount);
+}
+function maxBuyQty(){
+  if(!buyQtyState) return;
+  setBuyQty(buyQtyState.maxQty); // 판매 창의 [최대]: 현재 보유 수량 자체로 설정
+}
+function resetBuyQty(){
+  if(!buyQtyState) return;
+  setBuyQty(1); // 초기 구매 수량(1개)으로 되돌림
+}
 function renderBuyQtyModal(){
   if(!buyQtyState) return;
   const { action, typeId, qty, unitPrice, maxQty } = buyQtyState;
@@ -1207,5 +1294,19 @@ function renderBuyQtyModal(){
   el('buyQtyTotalGold').textContent = '🪙 ' + (unitPrice * qty).toLocaleString();
   el('buyQtyUpBtn').disabled = qty >= maxQty;
   el('buyQtyDownBtn').disabled = qty <= 1;
+  // 판매 모드(상점 소비/마석/기타 판매)면 문구를 판매용으로 바꾸고, 구매 모드면 항상 기존 문구로 되돌림(같은 모달 재사용)
+  const sellMode = isShopSellAction(action);
+  el('buyQtyTitle').textContent = sellMode ? '아이템 판매' : '아이템 구매';
+  el('buyQtyLabel').textContent = sellMode ? '판매 개수' : '구매 개수';
+  el('buyQtyGoldLabel').textContent = sellMode ? '🪙 개당 판매 가격' : '🪙 현재 보유 골드';
+  el('buyQtyTotalLabel').textContent = sellMode ? '🪙 총 지급 골드' : '🪙 총 지불 골드';
+  el('buyQtyCancelBtn').textContent = sellMode ? '판매 취소' : '구매 취소';
+  el('buyQtyConfirmBtn').textContent = sellMode ? '판매' : '구매';
+  if(sellMode) el('buyQtyCurrentGold').textContent = '🪙 ' + unitPrice.toLocaleString(); // 판매 모드: 보유 골드 대신 개당 판매 가격
+  // 빠른 수량 버튼: 소비 아이템 구매창=[초기화][10][50][100], 판매창=[초기화][5][10][100][최대], 그 외 구매창은 숨김
+  el('buyQtyQuickBtns').style.display = (action === 'buy-consumable' || sellMode) ? 'flex' : 'none';
+  el('buyQtyAdd5Btn').style.display = sellMode ? '' : 'none';
+  el('buyQtyAdd50Btn').style.display = sellMode ? 'none' : '';
+  el('buyQtyMaxBtn').style.display = sellMode ? '' : 'none';
 }
 

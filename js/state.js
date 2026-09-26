@@ -111,6 +111,12 @@ let craftMaterialQtyState = null;
 //   결과 확정 후 소모/반환 처리되면서 비워짐), tickInterval/orbInterval(setInterval id, 정리용) }
 // — 저장 대상 아님(craftPopup 등과 동일한 화면 상태).
 let craftAnim = null;
+// 대장간 [손상 복구] 상태(저장 대상 아님, 화면 상태). restorePopup: null이면 팝업 닫힘, { target: null | { kind, itemId } } —
+// target은 "선택한 손상 장비"를 종류(kind)와 인스턴스 고유 id로만 저장함(이름/typeId로 식별하지 않음 — 같은 이름·같은
+// 강화 단계의 장비가 여러 개여도 정확히 그 개체만 복구되도록). restoreResult: 결과창에 보여줄 마지막 복구 결과
+// { success, kind, itemId, type, level }. restorePopup은 확인창/결과창이 열려 있는 동안에도 값이 유지됨(취소 시 복귀용).
+let restorePopup = null;
+let restoreResult = null;
 // 페이지네이션: 화면(또는 탭)별 "현재 페이지" 번호(1부터 시작). PAGE_SIZE(data.js)와 키를 공유함 —
 // 새 화면을 추가할 때 여기 초기값 1과 PAGE_SIZE에 같은 키만 추가하면 동일한 페이지 시스템을 그대로 재사용함.
 let pageState = {
@@ -120,14 +126,18 @@ let pageState = {
   invAccessory: 1,
   forgeSelect: 1,
   repairSelect: 1,
+  restoreSelect: 1,
   shopWeapon: 1, shopArmor: 1, shopSub: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
-  charStats: 1,
-  charMenuInfo: 1,
   skillPage: 1,
-  // 던전 우측 카드 전용 페이지 상태 — [캐릭터 정보] 3페이지(장비창/레벨~스탯/전투능력치), [스킬] 2페이지
-  // (퀵슬롯 설정/목록). charMenuInfo와는 페이지 구성이 달라 별도 키로 관리함(요구사항).
-  huntCharInfo: 1,
+  // [캐릭터 정보] 탭 안에서 자체 페이지를 갖는 소분류("착용 장비"의 1p 장비창/2p 아티팩트 효과, "세부
+  // 능력치"의 1p 전투 능력치/2p 최종 스탯)용 페이지 상태 — 캐릭터 메뉴/던전 우측 패널이 각자 "지금 보고
+  // 있는 페이지"를 독립적으로 관리함(실제 수치는 공용 state를 그대로 읽으므로 항상 서로 일치함).
+  charInfoEquip: 1,
+  charInfoStats: 1,
+  huntInfoEquip: 1,
+  huntInfoStats: 1,
+  // 던전 우측 카드 [스킬] 탭 전용 페이지 상태(퀵슬롯 설정/스킬 목록) — 이번 작업과 무관, 그대로 유지.
   huntCharSkill: 1,
   craftWeapon: 1, craftArmor: 1, craftSub: 1, craftAccessory: 1,
   // 공지사항(패치노트) 팝업 — 자동 표시든 대장간 버튼으로 수동으로 열든 항상 1페이지부터 시작(요구사항).
@@ -523,7 +533,11 @@ function applyLoadedRaw(raw){
   EQUIP_INVENTORY_POOLS.forEach(pool => {
     pool.items().forEach(item => {
       if(item.currentDurability == null && hasDurabilitySystem(item.type)){
-        item.currentDurability = maxDurabilityFor(item.type);
+        item.currentDurability = maxDurabilityForItem(item);
+      } else if(hasDurabilitySystem(item.type) && item.currentDurability > maxDurabilityForItem(item)){
+        // 손상 최대 내구도(정상의 50%) 규칙 도입 이전에 만들어진 손상 아이템은 현재 내구도가 정상 최대치(예: 5000/2500)로
+        // 저장되어 있을 수 있음 — 새 최대치를 넘지 않도록 잘라냄(100% 상태였다면 그대로 새 최대치의 100%가 됨).
+        item.currentDurability = maxDurabilityForItem(item);
       }
     });
   });

@@ -161,6 +161,7 @@ function startHuntLoop(){
 
   hunt.monsters.forEach(startMonsterAttackTimer);
   startStatusTicker();
+  startAutoHealTicker(); // 몬스터 피해가 없어도 체력/마나가 설정 비율 이하이면 자동 회복이 판정되도록 주기 검사 시작
 }
 // 몬스터 개체 하나의 공격 타이머 시작: 전투 시작 1초 후 첫 공격, 이후 이 몬스터의 공격속도 주기로 반복
 function startMonsterAttackTimer(instance){
@@ -246,6 +247,7 @@ function stopHuntLoop(flaskEndMode = 'flush'){
   hunt.deathAnimTimeouts = [];
   if(hunt.rewardModalTimeout){ clearTimeout(hunt.rewardModalTimeout); hunt.rewardModalTimeout = null; }
   stopStatusTicker();
+  stopAutoHealTicker(); // 전투 종료/사망/던전 이탈/새 전투 시작 시 항상 정리 — 타이머가 남거나 중복 생성되지 않음
   if(flaskEndMode === 'discard') resetFlaskStateOnDeath();
   else stopFlaskHealTimers();
 }
@@ -327,7 +329,7 @@ function attackTick(){
 // 비활성화가 바로 반영되도록 함("즉시 반영" 요구사항 11번) — 장착 해제/전투 강제 종료는 하지 않음.
 function decreaseEquippedWeaponDurability(equipped){
   if(!equipped || !hasDurabilitySystem(equipped.type)) return;
-  const cur = equipped.currentDurability != null ? equipped.currentDurability : maxDurabilityFor(equipped.type);
+  const cur = equipped.currentDurability != null ? equipped.currentDurability : maxDurabilityForItem(equipped);
   if(cur <= 0) return;
   equipped.currentDurability = cur - 1;
   if(equipped.currentDurability === 0) refreshPlayerAttackTimer();
@@ -339,7 +341,7 @@ function decreaseEquippedWeaponDurability(equipped){
 function decreaseWornDefensiveDurability(){
   wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()).forEach(item => {
     if(!hasDurabilitySystem(item.type)) return;
-    const cur = item.currentDurability != null ? item.currentDurability : maxDurabilityFor(item.type);
+    const cur = item.currentDurability != null ? item.currentDurability : maxDurabilityForItem(item);
     if(cur <= 0) return;
     item.currentDurability = cur - 1;
   });
@@ -447,6 +449,26 @@ function startStatusTicker(){
 }
 function stopStatusTicker(){
   if(statusTickInterval){ clearInterval(statusTickInterval); statusTickInterval = null; }
+}
+
+// ---- 자동 회복 주기 판정 ----
+// 원래 checkAutoHeal()은 몬스터에게 피해를 받은 직후(monsterAttackTick)에만 호출돼서, 전투 시작 시점에 이미 설정 비율
+// 이하였거나 스킬 사용으로 마나가 줄었거나 지속 회복이 끝났는데도 아직 비율 이하인 경우 "다음 피해"를 기다려야 했음.
+// 그래서 전투 루프(startHuntLoop)와 같은 생명주기로 이 타이머를 하나만 돌려 체력/마나를 주기적으로 검사함(체력/마나가
+// 바뀌는 지점마다 호출을 흩어 놓지 않아도 됨). 실제 사용 조건(회복 설정 ON, 설정 비율, 퀵슬롯 등록, 보유 수량, 쿨타임,
+// 전투 중 화면/시작/몬스터 존재 여부, 종류별 1개 제한)은 전부 기존 checkAutoHeal/autoHealTry/useFlask가 그대로 판단함.
+// 주기는 가장 짧은 플라스크 쿨타임(1.5초)보다 훨씬 짧으면서 100ms 단위 다른 전투 타이머보다는 여유 있게 250ms로 정함.
+const AUTO_HEAL_CHECK_INTERVAL_MS = 250;
+let autoHealCheckInterval = null;
+function startAutoHealTicker(){
+  stopAutoHealTicker(); // 중복 타이머 방지
+  autoHealCheckInterval = setInterval(() => {
+    if(hunt.paused) return; // 전투 일시정지(보상창/사망 모달 등) 중에는 플라스크를 자동 사용하지 않음
+    checkAutoHeal();
+  }, AUTO_HEAL_CHECK_INTERVAL_MS);
+}
+function stopAutoHealTicker(){
+  if(autoHealCheckInterval){ clearInterval(autoHealCheckInterval); autoHealCheckInterval = null; }
 }
 
 // ---- 몬스터 개체 처치 ----

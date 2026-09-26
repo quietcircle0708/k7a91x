@@ -592,6 +592,19 @@ function renderCraftList(kind){
 }
 
 // ---- 제작소: 제작 진행 팝업(요청사항 3~10번) ----
+// 일반 재료(장비 제외) 슬롯 HTML — 재료 아이콘(+툴팁) / 보유수량/필요수량(충족=노랑, 부족=빨강) / 이름. 제작 팝업과
+// 손상 복구 팝업이 같은 함수를 써서 완전히 같은 모양으로 표시됨(클릭 동작 없는 일반 요소).
+function craftAutoMaterialSlotHtml(resource, need){
+  const matColor = craftResourceColor(resource);
+  const owned = craftResourceOwnedCount(resource);
+  const autoQtyCls = owned >= need ? 'craft-slot-qty-ok' : 'craft-slot-qty-short';
+  return `
+      <div class="craft-slot craft-slot-auto">
+        <span class="inv-icon craft-slot-icon-box weapon-name-wrap" style="border-color:${matColor};">${craftResourceIconHtml(resource, 'inv-icon-img')}<span class="tooltip">${craftResourceTooltipHtml(resource)}</span></span>
+        <span class="${autoQtyCls}">${owned}/${need}</span>
+        <span class="craft-slot-name" style="color:${matColor};">${resource.def.name}</span>
+      </div>`;
+}
 function renderCraftPopup(){
   if(!craftPopup) return;
   const item = findCraftItem(craftPopup.category, craftPopup.itemId);
@@ -617,16 +630,7 @@ function renderCraftPopup(){
     // 일반 재료(장비 제외)는 직접 투입하지 않고 현재 보유 수량으로 자동 인식: "+" 대신 재료 아이콘(+툴팁)을 항상
     // 표시하고, 보유수량/필요수량을 기존 서식(craft-slot-qty-ok=노랑 / craft-slot-qty-short=빨강)으로 보여줌.
     // 클릭해도 아무 동작이 없도록 data-action 없는 일반 요소로 렌더링(레이아웃은 기존 .craft-slot 그대로).
-    if(craftResourceIsAutoMaterial(resource)){
-      const owned = craftResourceOwnedCount(resource);
-      const autoQtyCls = owned >= material.need ? 'craft-slot-qty-ok' : 'craft-slot-qty-short';
-      return `
-      <div class="craft-slot craft-slot-auto">
-        <span class="inv-icon craft-slot-icon-box weapon-name-wrap" style="border-color:${matColor};">${craftResourceIconHtml(resource, 'inv-icon-img')}<span class="tooltip">${craftResourceTooltipHtml(resource)}</span></span>
-        <span class="${autoQtyCls}">${owned}/${material.need}</span>
-        <span class="craft-slot-name" style="color:${matColor};">${resource.def.name}</span>
-      </div>`;
-    }
+    if(craftResourceIsAutoMaterial(resource)) return craftAutoMaterialSlotHtml(resource, material.need);
     const qtyCls = slot.qty < material.need ? 'craft-slot-qty-short' : 'craft-slot-qty-ok';
     // 요청사항 3-3: 아이콘 / 투입개수 / 이름을 하나의 슬롯에 뭉치지 않고 각각 분리된 줄로 표시.
     // 투입 개수가 0(아직 손대지 않음)일 때는 "+" 아이콘, 1 이상 투입했으면 실제 재료 아이콘으로 전환.
@@ -1161,17 +1165,17 @@ function equipArtifactSlotsHtml(){
   }).join('');
 }
 // 장비창 아래 "장착 아이템 정보" — 현재 장착 중인 장비만 한 줄씩 출력(EQUIPMENT_SLOTS 기반이라
-// 새 장비 타입이 추가돼도 자동으로 반영됨). 무기(및 향후 강화 가능한 장비)는 이름+강화 단계를,
-// 아티팩트는 강화 개념이 없으므로 이름만 출력함.
+// 새 장비 타입이 추가돼도 자동으로 반영됨. 슬롯 종류/이름을 하드코딩하지 않음). 각 줄 맨 앞에 장착
+// 슬롯 이름(흰 텍스트, 예: "무기 : ")을 붙이고 그 뒤에 기존과 동일한 등급 색 아이템 이름을 이어서 표시함.
+// 아티팩트는 여기 표시하지 않음 — 장착 아티팩트 효과(buildArtifactEffectsHtml)에서 별도로 출력하므로
+// 중복 표시를 피함(캐릭터 정보 구조 통합).
 function equippedItemInfoLinesHtml(){
   const lines = [];
   EQUIPMENT_SLOTS.forEach(slot => {
     const item = equippedItemForSlot(slot.key);
-    if(item) lines.push(`<div class="char-equip-info-line" style="color:${item.color};">${item.name}${levelSuffix(item.level)}</div>`);
-  });
-  state.equippedArtifacts.forEach(id => {
-    const a = ARTIFACTS[id];
-    lines.push(`<div class="char-equip-info-line" style="color:${artifactNameColor(id)};">${itemIconHtml(a)} ${a.name}</div>`);
+    if(item){
+      lines.push(`<div class="char-equip-info-line"><span class="char-equip-info-slot">${slot.label} : </span><span style="color:${item.color};">${item.name}${levelSuffix(item.level)}</span></div>`);
+    }
   });
   return lines.length > 0 ? lines.join('') : `<div class="char-stat-empty">장착 중인 장비가 없습니다.</div>`;
 }
@@ -1221,7 +1225,7 @@ function renderRepairIndividualModal(){
   if(!found){ closeRepairIndividualPopup(); return; } // 팝업이 열려있는 사이 대상 장비가 사라진 예외 상황 방어
   const { item, type } = found;
   const display = equipInstanceDisplayInfo(item, type);
-  const max = maxDurabilityFor(type);
+  const max = maxDurabilityForItem(item);
   const cur = item.currentDurability != null ? item.currentDurability : max;
   const pct = durabilityPercent(cur, max);
   const costPerPoint = repairCostPerPointFor(type);
@@ -1249,7 +1253,7 @@ function renderRepairAllList(targets){
   if(targets.length === 0) return `<div class="inv-empty">수리가 필요한 장비가 없습니다.</div>`;
   return targets.map(entry => {
     const display = equipInstanceDisplayInfo(entry.item, entry.type);
-    const max = maxDurabilityFor(entry.type);
+    const max = maxDurabilityForItem(entry.item);
     const cur = entry.item.currentDurability != null ? entry.item.currentDurability : max;
     const pct = durabilityPercent(cur, max);
     return `
@@ -1310,6 +1314,120 @@ function renderRepairSelectList(){
       </button>`;
   }).join('')}</div>`;
 }
+// ---- 수리 탭: [손상 복구] ----
+// 복구 팝업 — 제작 팝업(renderCraftPopup)과 같은 DOM 구조/클래스를 쓰고, 재료 슬롯은 제작 팝업의 일반 재료 슬롯 함수를
+// 그대로 재사용함. 선택한 장비는 종류(kind)+고유 id(restorePopup.target)로만 식별하며 매번 인벤토리에서 다시 조회함.
+function restoreItemLabel(item, display){
+  return `${display.name}${item.damaged ? '(손상)' : ''}${levelSuffix(display.level)}`;
+}
+function renderRestorePopup(){
+  if(!restorePopup) return;
+  let found = resolveRestoreTarget(restorePopup.target);
+  if(restorePopup.target && !found) restorePopup.target = null; // 선택해둔 장비가 사라졌거나 더 이상 손상이 아니면 선택 해제
+  const iconBox = el('restorePopupIconBox');
+  const nameWrap = el('restorePopupNameWrap');
+  if(!found){
+    iconBox.innerHTML = '<span class="craft-slot-plus">+</span>';
+    iconBox.style.borderColor = '';
+    nameWrap.innerHTML = '<span class="inv-name" style="color:var(--forge-cream-dim);">복구할 손상 장비를 선택하세요</span>';
+    el('restorePopupSlots').innerHTML = '<div class="inv-empty">장비를 선택하면 필요한 재료가 표시됩니다.</div>';
+    el('restorePopupSuccessRate').textContent = '복구 확률 -';
+    el('restorePopupCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
+    el('restorePopupCost').textContent = '🪙 0';
+    el('restorePopupMakeBtn').disabled = true;
+    return;
+  }
+  const { item, type } = found;
+  const display = equipInstanceDisplayInfo(item, type);
+  iconBox.innerHTML = display.iconHtml;
+  iconBox.style.borderColor = display.color;
+  nameWrap.innerHTML =
+    `<span class="inv-name" style="color:${display.color};">${restoreItemLabel(item, display)}</span>` +
+    `<span class="tooltip">${display.tooltipHtml}</span>`;
+  const materials = craftMaterialsSortedByGradeDesc(restoreMaterialsFor(type));
+  el('restorePopupSlots').innerHTML = materials.length === 0
+    ? '<div class="inv-empty">필요한 재료가 없습니다.</div>'
+    : materials.map(m => {
+        const resource = findCraftResource(m.name);
+        return resource ? craftAutoMaterialSlotHtml(resource, m.need) : '';
+      }).join('');
+  el('restorePopupSuccessRate').textContent = `복구 확률 ${restoreChanceFor(type)}%`;
+  el('restorePopupCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
+  el('restorePopupCost').textContent = '🪙 ' + restoreCostFor(type).toLocaleString();
+  el('restorePopupMakeBtn').disabled = !restoreCanProceed(restorePopup.target);
+}
+// 복구 장비 선택 목록 — 수리 장비 선택 목록(renderRepairSelectList)과 같은 마크업/페이지네이션. 손상 장비만 나옴.
+function renderRestoreSelectList(){
+  const wrap = el('restoreSelectList');
+  if(!wrap) return;
+  const pagerWrap = el('restoreSelectPager');
+  const entries = restoreSelectableItems();
+  if(entries.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">복구 가능한 손상 장비가 없습니다.</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
+    return;
+  }
+  const pageSize = PAGE_SIZE.restoreSelect;
+  const totalPageCount = pageCount(entries.length, pageSize);
+  pageState.restoreSelect = clampPage(pageState.restoreSelect, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('restoreSelect', pageState.restoreSelect, totalPageCount);
+  const pageEntries = pageSlice(entries, pageState.restoreSelect, pageSize);
+  wrap.innerHTML = `<div class="forge-select-list">${pageEntries.map(entry => {
+    const itemColor = weaponNameColor(entry.type, entry.level);
+    const display = equipInstanceDisplayInfo(entry.item, entry.type);
+    return `
+      <button class="forge-select-item" data-action="select-restore-target" data-kind="${entry.kind}" data-id="${entry.id}">
+        <span class="inv-icon weapon-name-wrap" style="border-color:${itemColor};">${weaponIconHtml(entry.type, 'inv-icon-img', entry.level)}<span class="tooltip">${display.tooltipHtml}</span></span>
+        <span class="forge-select-info">
+          <span class="forge-select-name" style="color:${itemColor};">${restoreItemLabel(entry.item, display)}</span>
+          ${entry.worn ? '<span class="inv-badge">장착 중</span>' : ''}
+        </span>
+      </button>`;
+  }).join('')}</div>`;
+}
+// 복구 최종 확인 — 성공하면 "정상 상태의 그 장비", 실패하면 "지금 그대로의 손상 장비"가 되는 것을 아이콘+이름으로 보여줌.
+function renderRestoreConfirmModal(){
+  if(!restorePopup) return;
+  const found = resolveRestoreTarget(restorePopup.target);
+  if(!found) return;
+  const { item, type } = found;
+  const restoredPreview = Object.assign({}, item, { damaged: false, currentDurability: freshCurrentDurability(type) });
+  const okDisplay = equipInstanceDisplayInfo(restoredPreview, type);
+  const failDisplay = equipInstanceDisplayInfo(item, type);
+  el('restoreConfirmSuccessIconBox').innerHTML = okDisplay.iconHtml;
+  el('restoreConfirmSuccessIconBox').style.borderColor = okDisplay.color;
+  el('restoreConfirmSuccessName').innerHTML =
+    `<span style="color:${okDisplay.color};">${restoreItemLabel(restoredPreview, okDisplay)}</span>` +
+    `<span class="tooltip">${okDisplay.tooltipHtml}</span>`;
+  el('restoreConfirmFailIconBox').innerHTML = failDisplay.iconHtml;
+  el('restoreConfirmFailIconBox').style.borderColor = failDisplay.color;
+  el('restoreConfirmFailName').innerHTML =
+    `<span style="color:${failDisplay.color};">${restoreItemLabel(item, failDisplay)}</span>` +
+    `<span class="tooltip">${failDisplay.tooltipHtml}</span>`;
+  el('restoreConfirmCost').textContent = '🪙 ' + restoreCostFor(type).toLocaleString();
+}
+// 복구 결과 — 제작 결과 UI(craftAnimModal revealed 단계)와 같은 구성. 제작 연출 없이 처리 직후 바로 표시됨.
+function renderRestoreResultModal(){
+  if(!restoreResult) return;
+  const found = inventoryInstanceByKindAndId(restoreResult.kind, restoreResult.itemId);
+  if(!found) return;
+  const { item, type } = found;
+  const display = equipInstanceDisplayInfo(item, type);
+  const success = restoreResult.success;
+  el('restoreResultIcons').innerHTML = `
+    <div class="craft-anim-result-item">
+      <span class="inv-icon craft-anim-result-icon weapon-name-wrap" style="border-color:${display.color};">
+        ${display.iconHtml}
+        <span class="tooltip">${display.tooltipHtml}</span>
+      </span>
+      <div class="craft-anim-result-name" style="color:${display.color};">${restoreItemLabel(item, display)}</div>
+    </div>`;
+  const headline = el('restoreResultHeadline');
+  headline.textContent = success ? '복구 성공!' : '복구 실패';
+  headline.classList.toggle('success', success);
+  headline.classList.toggle('fail', !success);
+  el('restoreResultText').textContent = `${display.name}${josaIGa(display.name)} 인벤토리로 지급되었습니다${success ? '!' : '.'}`;
+}
 // ---- 수리 탭: 최종 확인 UI(요구사항 19~21번) ----
 function renderRepairConfirmModal(){
   if(!repairConfirmState) return;
@@ -1319,38 +1437,8 @@ function renderRepairConfirmModal(){
 
 // 캐릭터 정보 모달 — 인벤토리와 동일한 페이지네이션 시스템(pageState/pagerHtml/goPage)을 그대로 재사용해
 // 1페이지(장비창+캐릭터 정보) / 2페이지(적용 중인 아티팩트 효과)를 전환함.
-function renderCharStats(){
-  ensurePlayerVitals();
-  // 모바일 UI 개편 2단계(수정판): 데스크톱 전용 renderCharacterMenu()가 아니라 대장간 [캐릭터 정보]
-  // 팝업(#charStatsModal) 쪽에 모바일 분기를 둠 — 상단/마을 "캐릭터" 메뉴(renderCharacterMenu)와 던전
-  // 우측 패널(renderHuntSidePanel)은 이 변경과 완전히 무관하게 기존 그대로 동작한다.
-  const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
-  const totalPages = isMobile ? CHAR_STATS_MOBILE_PAGE_COUNT : CHAR_STATS_PAGE_COUNT;
-  pageState.charStats = clampPage(pageState.charStats, totalPages);
-  const pagerWrap = el('charStatsPager');
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('charStats', pageState.charStats, totalPages);
-
-  if(isMobile){
-    // 던전 우측 카드([캐릭터 정보])와 완전히 같은 콘텐츠 빌더를 그대로 재사용(buildEquipPanelHtml/
-    // buildCharLevelStatsHtml/buildCombatStatsHtml) — HTML을 새로 복사하지 않음. 장착 아이템 상세
-    // 정보·아티팩트 정보는 던전 우측 패널과 동일하게 1페이지에서 제외함(buildEquipPanelHtml(false)).
-    const page = pageState.charStats;
-    el('charStatsBody').innerHTML = page === 1 ? buildEquipPanelHtml(false)
-      : page === 2 ? buildCharLevelStatsHtml()
-      : buildCombatStatsHtml();
-    return;
-  }
-
-  if(pageState.charStats === 2){
-    renderCharStatsPage2();
-  } else {
-    renderCharStatsPage1();
-  }
-}
-// 캐릭터 정보(레벨/체력/마나/경험치 → 스탯 배분 → 전투 능력치) HTML 조립. 캐릭터 정보 모달(1페이지 우측)과
-// 캐릭터 메뉴(신규, "캐릭터 정보" 탭 1페이지)가 이 함수를 그대로 공유해서 쓰므로, 기능/데이터가 항상 동일함.
-// 캐릭터 정보 중 "레벨~스탯 배분" 구간만(요구사항: 던전 우측 카드 2페이지). 캐릭터 레벨/체력/마나/
-// 경험치 + 스탯 포인트 배분 UI까지 — buildCharStatsInfoHtml()의 앞부분을 그대로 뺀 것.
+// 캐릭터 정보(레벨/체력/마나/경험치 → 스탯 배분) HTML 조립. "정보" 소분류 탭이 이 함수를 그대로 씀
+// (캐릭터 메뉴/던전 우측 패널 공용).
 function buildCharLevelStatsHtml(){
   const lv = state.playerLevel;
   const maxHp = effectiveMaxHp(lv);
@@ -1382,77 +1470,64 @@ function buildCharLevelStatsHtml(){
     <div class="char-stat-divider"></div>
   `;
 }
-// 캐릭터 정보 중 "전투 능력치" 구간만(요구사항: 던전 우측 카드 3페이지). 장착 무기/총 공격력~치명타 +
-// 총 방어도~장신구 요약까지 — buildCharStatsInfoHtml()의 뒷부분을 그대로 뺀 것.
-function buildCombatStatsHtml(){
+// [세부 능력치] 1페이지 — 총 공격력/공격속도/치명타 확률/방어도 무시 + 총 방어도/회피/재생력.
+// 장착 무기 텍스트·투구/갑옷/보조/장신구 요약·공격속도 계산 참고 문구 등 중복 정보는 표시하지 않음
+// (그 정보는 [착용 장비] 소분류 탭의 "장착 아이템 정보"에서 이미 슬롯별로 보여줌).
+// 회피/재생력은 아직 실제 계산 함수·데이터가 없으므로 임의의 수치를 만들지 않고, 프로젝트에서 이미 쓰는
+// "준비 중" 표기(예: js/render.js의 강화 버튼 문구)와 같은 방식으로 항목명과 자리만 마련해둠 — 실제
+// 옵션이 추가되면 이 값만 실 수치로 바꾸면 되는 구조.
+// 각 최종 수치에 계산 내역 툴팁을 붙이는 공용 헬퍼(combatStatTooltipHtml 재사용) — 기존 ".v" 값
+// 표시 자체는 전혀 바꾸지 않고, 그 값을 감싸는 span에 기존 툴팁 시스템과 동일한 패턴(부모에 직계
+// 자식으로 .tooltip을 두는 방식, main.js의 범용 위치 보정이 그대로 적용됨)으로 ".tooltip"만 추가함.
+function charStatValueWithTip(key, ctx, titleLabel, displayText){
+  const tip = combatStatTooltipHtml(key, ctx, titleLabel, displayText);
+  return `<span class="v char-stat-tip">${displayText}<span class="tooltip">${tip}</span></span>`;
+}
+function buildCharCombatStatsHtml(){
   const equipped = getEquippedWeapon();
-  let html = '';
-
   if(!equipped){
-    html += `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
-  } else {
-    const type = equipped.type || 'longsword';
-    const level = equipped.level;
-    const durabilityZero = isEquipDurabilityZero(equipped);
-    const totalAtk = effectiveAtk(type, level, equipped.damaged, durabilityZero);
-    const baseSpeed = atkSpeedFor(type, level);
-    const totalSpeed = effectiveAtkSpeed(type, level, durabilityZero);
-    const totalCrit = effectiveCritChance(type, level, durabilityZero);
-    const defenseIgnore = playerDefenseIgnore();
-    const hasSpeedBonus = isArtifactEquipped('batwing');
-
-    html += `
-      <div class="char-stat-row"><span>장착 무기</span><span class="v">${weaponName(type)}${equipped.damaged ? '(손상)' : ''}${levelSuffix(level)}</span></div>
-      <div class="char-stat-divider"></div>
-      <div class="char-stat-row big"><span>총 공격력</span><span class="v">${totalAtk}</span></div>
-      <div class="char-stat-row big"><span>공격속도</span><span class="v">${totalSpeed.toFixed(2)}회/초</span></div>
-      <div class="char-stat-row big"><span>치명타 확률</span><span class="v">${totalCrit}%</span></div>
-      <div class="char-stat-row big"><span>방어도 무시</span><span class="v">${defenseIgnore > 0 ? '+' + defenseIgnore : defenseIgnore}</span></div>
-    `;
-    if(hasSpeedBonus){
-      html += `<div class="char-stat-note">공격속도 = 무기 기본 ${baseSpeed.toFixed(2)} + 박쥐 날개 5%</div>`;
-    }
+    return `<div class="char-stat-empty">장착한 무기가 없습니다.</div>`;
   }
-
-  // 착용 중인 방어구(투구/갑옷)+보조+장신구(반지 등) 요약 — 아무것도 착용하지 않았으면 이 블록 자체를 표시하지 않음.
-  const wornHelmet = state.equippedArmor && state.equippedArmor.helmet
-    ? (state.armorInventory || []).find(i => i.id === state.equippedArmor.helmet) : null;
-  const wornBody = state.equippedArmor && state.equippedArmor.armor
-    ? (state.armorInventory || []).find(i => i.id === state.equippedArmor.armor) : null;
-  const wornSub = wornSubItems()[0] || null;
-  const wornAccessories = wornAccessoryItems();
-  if(wornHelmet || wornBody || wornSub || wornAccessories.length > 0){
-    html += `<div class="char-stat-divider"></div>`;
-    html += `<div class="char-stat-row big"><span>총 방어도</span><span class="v">${playerTotalDefense()}</span></div>`;
-    if(wornHelmet) html += `<div class="char-stat-row"><span>투구</span><span class="v">${ARMOR_TYPES[wornHelmet.type].name}${levelSuffix(wornHelmet.level)}</span></div>`;
-    if(wornBody) html += `<div class="char-stat-row"><span>갑옷</span><span class="v">${ARMOR_TYPES[wornBody.type].name}${levelSuffix(wornBody.level)}</span></div>`;
-    if(wornSub) html += `<div class="char-stat-row"><span>보조</span><span class="v">${SUB_TYPES[wornSub.type].name}${levelSuffix(wornSub.level)}</span></div>`;
-    wornAccessories.forEach(acc => {
-      const accDef = ACCESSORY_TYPES[acc.type];
-      html += `<div class="char-stat-row"><span>${accDef ? ACCESSORY_KINDS[accDef.accessoryKind] || '장신구' : '장신구'}</span><span class="v">${accDef ? accDef.name : acc.type}${levelSuffix(acc.level)}</span></div>`;
-    });
-  }
-
-  return html;
+  const type = equipped.type || 'longsword';
+  const level = equipped.level;
+  const durabilityZero = isEquipDurabilityZero(equipped);
+  const ctx = { type, level, damaged: equipped.damaged, durabilityZero };
+  const totalAtk = effectiveAtk(type, level, equipped.damaged, durabilityZero);
+  const totalSpeed = effectiveAtkSpeed(type, level, durabilityZero);
+  const totalCrit = effectiveCritChance(type, level, durabilityZero);
+  const defenseIgnore = playerDefenseIgnore();
+  const defenseIgnoreText = defenseIgnore > 0 ? '+' + defenseIgnore : `${defenseIgnore}`;
+  const totalDef = playerTotalDefense();
+  return `
+    <div class="char-stat-row big"><span>총 공격력</span>${charStatValueWithTip('atk', ctx, '총 공격력', `${totalAtk}`)}</div>
+    <div class="char-stat-row big"><span>공격속도</span>${charStatValueWithTip('atkSpeed', ctx, '공격속도', `${totalSpeed.toFixed(2)}회/초`)}</div>
+    <div class="char-stat-row big"><span>치명타 확률</span>${charStatValueWithTip('crit', ctx, '치명타 확률', `${totalCrit}%`)}</div>
+    <div class="char-stat-row big"><span>방어도 무시</span>${charStatValueWithTip('defenseIgnore', ctx, '방어도 무시', defenseIgnoreText)}</div>
+    <div class="char-stat-divider"></div>
+    <div class="char-stat-row big"><span>총 방어도</span>${charStatValueWithTip('defense', ctx, '총 방어도', `${totalDef}`)}</div>
+    <div class="char-stat-row big"><span>회피</span><span class="v" style="color:var(--forge-cream-dim);">준비 중</span></div>
+    <div class="char-stat-row big"><span>재생력</span><span class="v" style="color:var(--forge-cream-dim);">준비 중</span></div>
+  `;
 }
-// 캐릭터 정보 모달/캐릭터 메뉴 1페이지가 쓰는 공용 함수 — 위 두 함수를 그대로 이어붙인 것과 완전히
-// 동일한 결과를 냄(기존 호출부는 전혀 수정하지 않아도 됨).
-function buildCharStatsInfoHtml(){
-  return buildCharLevelStatsHtml() + buildCombatStatsHtml();
-}
-// 1페이지 — 좌: 장비창, 우: 캐릭터 정보(buildCharStatsInfoHtml 공용 함수).
-function renderCharStatsPage1(){
-  const body = el('charStatsBody');
-  body.innerHTML = `
-    <div class="char-stats-page1">
-      <div class="char-stats-left">${buildEquipPanelHtml()}</div>
-      <div class="char-stats-right">${buildCharStatsInfoHtml()}</div>
-    </div>
+// [세부 능력치] 2페이지 — 최대 체력/최대 마나/힘/민첩/지능의 "최종 스탯"만(모두 기존 계산 함수 그대로
+// 재사용). (+보너스) 표기는 하지 않음 — 스탯 배분 화면(정보 탭)에서 이미 그 표기를 보여주고 있으므로
+// 여기서는 아티팩트 등 모든 보너스가 합산된 최종 값 하나만 보여줌.
+function buildCharFinalStatsHtml(){
+  const lv = state.playerLevel;
+  const maxHp = effectiveMaxHp(lv);
+  const maxMp = effectiveMaxMp(lv);
+  const s = effectiveStats();
+  return `
+    <div class="char-stat-row big"><span>최대 체력</span>${charStatValueWithTip('maxHp', {}, '최대 체력', maxHp.toLocaleString())}</div>
+    <div class="char-stat-row big"><span>최대 마나</span>${charStatValueWithTip('maxMp', {}, '최대 마나', maxMp.toLocaleString())}</div>
+    <div class="char-stat-row big"><span>힘</span>${charStatValueWithTip('str', {}, '힘', `${s.str}`)}</div>
+    <div class="char-stat-row big"><span>민첩</span>${charStatValueWithTip('agi', {}, '민첩', `${s.agi}`)}</div>
+    <div class="char-stat-row big"><span>지능</span>${charStatValueWithTip('int', {}, '지능', `${s.int}`)}</div>
   `;
 }
 // "적용 중인 아티팩트 효과" HTML 조립. 기존에는 무기가 장착돼 있을 때만 표시되던 블록이라 그 조건은 그대로
 // 유지하고(무기 미장착 시 동일한 안내 문구), 장착 아티팩트가 0개일 때만 기존에는 아무것도 출력되지 않았던 것을
-// 빈 페이지로 보이지 않도록 동일한 안내 문구 스타일로 보완함. 캐릭터 정보 모달 2페이지와 캐릭터 메뉴 3페이지가 공유.
+// 빈 페이지로 보이지 않도록 동일한 안내 문구 스타일로 보완함. [착용 장비] 소분류 탭이 이 함수를 그대로 씀.
 function buildArtifactEffectsHtml(){
   const equipped = getEquippedWeapon();
   if(!equipped){
@@ -1468,15 +1543,59 @@ function buildArtifactEffectsHtml(){
   }).join('');
   return html;
 }
-// 2페이지 — 기존 "적용 중인 아티팩트 효과" 화면 그대로(buildArtifactEffectsHtml 공용 함수).
-function renderCharStatsPage2(){
-  el('charStatsBody').innerHTML = buildArtifactEffectsHtml();
+// 소분류별 페이지 수(1보다 크면 그 소분류 안에 자체 페이저가 붙음). 'info'는 목록에 없으므로 항상 1페이지.
+//   equip → 1p 장비창+장착 아이템 정보 / 2p 적용 중인 아티팩트 효과(요구사항: 아티팩트 효과는 2페이지에서만)
+//   stats → 1p 전투 능력치 / 2p 최종 스탯
+const CHAR_INFO_SUBTAB_PAGE_COUNT = { equip: 2, stats: CHAR_INFO_STATS_PAGE_COUNT };
+// [캐릭터 정보] 탭의 소분류([정보]/[착용 장비]/[세부 능력치]) 공통 콘텐츠 빌더 — 캐릭터 메뉴와 던전 우측
+// 패널이 이 함수 하나를 그대로 공유해서 쓰므로, 두 화면이 같은 수치를 각자 따로 계산하지 않음(구조 통합
+// 요구사항). page는 그 소분류가 CHAR_INFO_SUBTAB_PAGE_COUNT에 있을 때만 의미 있음(1 또는 2).
+//   info  → 캐릭터 레벨/체력/마나/경험치 + 스탯 투자(buildCharLevelStatsHtml)
+//   equip → 1p 장비창(buildEquipPanelHtml, 장착 아이템 정보 포함) / 2p 적용 중인 아티팩트 효과
+//   stats → 1p 전투 능력치(buildCharCombatStatsHtml) / 2p 최종 스탯(buildCharFinalStatsHtml)
+function buildCharInfoSubtabBodyHtml(subtabId, page){
+  if(subtabId === 'equip'){
+    return page === 2 ? buildArtifactEffectsHtml() : buildEquipPanelHtml(true);
+  }
+  if(subtabId === 'stats'){
+    return page === 2 ? buildCharFinalStatsHtml() : buildCharCombatStatsHtml();
+  }
+  return buildCharLevelStatsHtml();
+}
+// 소분류탭이 자체 페이지(1보다 큰 경우)를 가질 때 캐릭터 메뉴/던전 우측 패널이 각자 독립적으로 쓰는
+// pageState 키 이름. dataAttr로 화면을 구분함(캐릭터 메뉴="char-info-subtab", 던전 우측 패널=
+// "hunt-char-info-subtab").
+function charInfoSubtabPageStateKey(subtabId, dataAttr){
+  const screen = dataAttr === 'char-info-subtab' ? 'char' : 'hunt';
+  return screen + 'Info' + subtabId.charAt(0).toUpperCase() + subtabId.slice(1); // 'charInfoEquip'/'huntInfoStats' 등
+}
+// 소분류 탭 버튼 + 본문을 함께 조립 — subtab이 CHAR_INFO_SUBTABS 기준으로 자동 생성되므로 소분류가
+// 늘어나도(요구사항: 확장 가능한 구조) 이 함수는 수정할 필요 없음. dataAttr로 화면별 클릭 대상을
+// 구분함(캐릭터 메뉴="char-info-subtab", 던전 우측 패널="hunt-char-info-subtab").
+function buildCharInfoBlockHtml(activeSubtab, dataAttr){
+  const tabsHtml = CHAR_INFO_SUBTABS.map(t =>
+    `<button class="inv-tab-btn${t.id === activeSubtab ? ' active' : ''}" data-${dataAttr}="${t.id}">${t.label}</button>`
+  ).join('');
+  const pageCount = CHAR_INFO_SUBTAB_PAGE_COUNT[activeSubtab];
+  let bodyHtml;
+  if(pageCount > 1){
+    const pageKey = charInfoSubtabPageStateKey(activeSubtab, dataAttr);
+    pageState[pageKey] = clampPage(pageState[pageKey], pageCount);
+    const page = pageState[pageKey];
+    bodyHtml = `<div class="char-menu-info-head">${pagerHtml(pageKey, page, pageCount)}</div><div>${buildCharInfoSubtabBodyHtml(activeSubtab, page)}</div>`;
+  } else {
+    bodyHtml = buildCharInfoSubtabBodyHtml(activeSubtab, null);
+  }
+  return `<div class="inv-tabs char-info-subtabs">${tabsHtml}</div><div class="char-info-subtab-body">${bodyHtml}</div>`;
 }
 
 // ---- 캐릭터 메뉴(좌측 상단바 "캐릭터") ----
 // CHARACTER_TABS(data.js)를 그대로 순회해 탭 버튼을 그리므로, 새 탭이 추가돼도 이 함수는 수정할 필요 없음
 // (설정 화면 renderSettings와 동일한 방식). "info"(캐릭터 정보)와 "skill"(스킬)만 실제 내용이 있고,
 // 그 외 탭이 추가되면 기본적으로 빈 화면만 출력함.
+// "info" 탭은 소분류([정보]/[착용 장비]/[세부 능력치], CHAR_INFO_SUBTABS)로 다시 나뉘며, 던전 우측
+// 패널(renderHuntSidePanel)의 "info" 탭과 완전히 동일한 공통 콘텐츠 빌더(buildCharInfoBlockHtml)를
+// 공유함(구조 통합 — 대장간 전용 캐릭터 정보 팝업은 더 이상 없음).
 function renderCharacterMenu(){
   const tabsRow = el('charTabsRow');
   const panelsWrap = el('charTabPanels');
@@ -1502,19 +1621,11 @@ function renderCharacterMenu(){
     return;
   }
 
-  // "캐릭터 정보" 탭 — 캐릭터 정보 모달과 동일한 데이터를 쓰되, 화면 폭이 좁아 1페이지(캐릭터 정보) /
-  // 2페이지(장비창) / 3페이지(아티팩트 효과)로 완전히 분리함(모달은 1페이지에 장비창+캐릭터 정보를 좌우 배치).
   ensurePlayerVitals();
-  pageState.charMenuInfo = clampPage(pageState.charMenuInfo, CHAR_MENU_INFO_PAGE_COUNT);
-  const page = pageState.charMenuInfo;
-  const pageBodyHtml = page === 2 ? buildEquipPanelHtml()
-    : page === 3 ? buildArtifactEffectsHtml()
-    : buildCharStatsInfoHtml();
-
+  const subtab = CHAR_INFO_SUBTABS.find(t => t.id === activeCharInfoSubtab) || CHAR_INFO_SUBTABS[0];
   panelsWrap.innerHTML = `
     <div class="inv-tab-panel">
-      <div class="char-menu-info-head">${pagerHtml('charMenuInfo', page, CHAR_MENU_INFO_PAGE_COUNT)}</div>
-      <div>${pageBodyHtml}</div>
+      ${buildCharInfoBlockHtml(subtab.id, 'char-info-subtab')}
     </div>
   `;
 }
@@ -1948,15 +2059,23 @@ function toggleHuntTopUi(){
 // 던전 우측 카드 — 기존 캐릭터 메뉴(#characterView)와 완전히 동일한 [캐릭터 정보]/[스킬] 탭 구조를
 // 그대로 재사용하되(CHARACTER_TABS 그대로 순회), 카드 크기가 정해져 있어 내용을 더 잘게 페이지로
 // 나눔(요구사항). 사용하는 콘텐츠 빌더는 전부 기존 것 그대로:
-//   [캐릭터 정보] 1p=buildEquipPanelHtml, 2p=buildCharLevelStatsHtml, 3p=buildCombatStatsHtml
+//   [캐릭터 정보] buildCharInfoBlockHtml 공용(정보/착용 장비/세부 능력치 소분류)
 //   [스킬]        1p=buildSkillQuickSlotSectionHtml, 2p=buildSkillListSectionHtml
-// 탭 선택(huntCharTab)과 정보 탭의 페이지(pageState.huntCharInfo/huntCharSkill)는 캐릭터 메뉴 쪽
-// 상태(activeCharTab/pageState.charMenuInfo)와 별개로 관리함(화면마다 독립적인 "지금 보고 있는 페이지"
-// 이며, 스탯/스킬 같은 실제 데이터는 전부 공용 state를 그대로 읽으므로 두 화면 값은 항상 자동으로
-// 일치함 — 예: 던전에서 스탯을 적용하면 캐릭터 메뉴도 다음에 열었을 때 곧바로 반영되어 있음).
+// 탭 선택(huntCharTab)과 소분류/페이지 상태(huntCharInfoSubtab, pageState.huntInfoEquip/huntInfoStats/huntCharSkill)는
+// 캐릭터 메뉴 쪽 상태(activeCharTab/activeCharInfoSubtab/pageState.charInfoStats)와 별개로 관리함(화면마다
+// 독립적인 "지금 보고 있는 화면"이며, 스탯/스킬 같은 실제 데이터는 전부 공용 state를 그대로 읽으므로 두
+// 화면 값은 항상 자동으로 일치함 — 예: 던전에서 스탯을 적용하면 캐릭터 메뉴도 다음에 열었을 때 곧바로 반영되어 있음).
 // 이름 주의: 던전 화면 좌상단 상시 HUD(레벨/체력/마나바)는 별도의 renderHuntCharPanel()(위쪽에 먼저
 // 정의됨)이 담당함 — 이 함수는 그 오른쪽에 붙는 카드 전체를 가리키는 별개 함수라 이름을 다르게 둠
 // (두 함수가 한때 이름이 같아서 이 함수가 저 함수를 덮어써 좌상단 HUD가 갱신되지 않는 버그가 있었음).
+// 던전 우측 카드 — 캐릭터 메뉴(#characterView)와 완전히 동일한 [캐릭터 정보]/[스킬] 탭 구조를 그대로
+// 재사용함(CHARACTER_TABS 그대로 순회). [캐릭터 정보] 탭은 캐릭터 메뉴와 동일하게 소분류([정보]/[착용
+// 장비]/[세부 능력치])로 나뉘며, 같은 공통 콘텐츠 빌더(buildCharInfoBlockHtml)를 공유하므로 두 화면의
+// 수치를 각자 따로 계산하지 않음(구조 통합 요구사항). 카드 높이가 고정(overflow-y:auto, style.css
+// .hunt-side-panel)이라 내용이 늘어나도 카드 자체 크기는 바뀌지 않고 내부에서만 스크롤됨.
+// 탭 선택(huntCharTab)과 소분류/페이지 상태(huntCharInfoSubtab, pageState.huntInfoEquip/huntInfoStats/huntCharSkill)는
+// 캐릭터 메뉴 쪽 상태와 완전히 독립적으로 관리함("지금 보고 있는 화면"만 다를 뿐 실제 데이터는 전부 공용
+// state를 그대로 읽으므로 두 화면 값은 항상 자동으로 일치함).
 function renderHuntSidePanel(){
   const tabsRow = el('huntCharTabsRow');
   const panelsWrap = el('huntCharTabPanels');
@@ -1992,17 +2111,10 @@ function renderHuntSidePanel(){
   }
 
   ensurePlayerVitals();
-  pageState.huntCharInfo = clampPage(pageState.huntCharInfo, HUNT_CHAR_INFO_PAGE_COUNT);
-  const page = pageState.huntCharInfo;
-  // 1페이지는 "장비창 레이아웃"만(요구사항: 장착 아이템 정보·아티팩트 정보 생략) — includeInfo=false.
-  const pageBodyHtml = page === 1 ? buildEquipPanelHtml(false)
-    : page === 2 ? buildCharLevelStatsHtml()
-    : buildCombatStatsHtml();
-
+  const subtab = CHAR_INFO_SUBTABS.find(t => t.id === huntCharInfoSubtab) || CHAR_INFO_SUBTABS[0];
   panelsWrap.innerHTML = `
     <div class="inv-tab-panel">
-      <div class="char-menu-info-head">${pagerHtml('huntCharInfo', page, HUNT_CHAR_INFO_PAGE_COUNT)}</div>
-      <div>${pageBodyHtml}</div>
+      ${buildCharInfoBlockHtml(subtab.id, 'hunt-char-info-subtab')}
     </div>
   `;
 }
@@ -2558,7 +2670,7 @@ function buildConsumableShopCardHtml(id){
       </div>
       <div class="scroll-body">
         <button class="scroll-buy" data-action="buy-consumable" data-type="${id}" style="flex:1;" ${state.gold < item.buyPrice ? 'disabled' : ''}>구매 (${item.buyPrice} G)</button>
-        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>전부 판매 (개당 ${item.sellPrice} G)</button>
+        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice} G)</button>
       </div>
     </div>`;
 }
@@ -2603,7 +2715,7 @@ function buildMiscShopCardHtml(id){
         <span class="scroll-count">보유 ${owned}개</span>
       </div>
       <div class="scroll-body">
-        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>전부 판매 (개당 ${item.sellPrice} G)</button>
+        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice} G)</button>
       </div>
     </div>`;
 }
@@ -2626,7 +2738,7 @@ function buildStoneShopCardHtml(id){
         <span class="scroll-count">보유 ${owned}개</span>
       </div>
       <div class="scroll-body">
-        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>전부 판매 (개당 ${item.sellPrice} G)</button>
+        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice} G)</button>
       </div>
     </div>`;
 }

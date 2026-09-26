@@ -1657,6 +1657,60 @@ const SUB_TYPES = {
       statBonus: { str: 1, int: 1 },
     },
   },
+  // 불길한 검은색 방패: 방어도/체력이 모두 음수인 "체력 페널티" 방패 — 기존 방패와 같은 hp 필드를 그대로 쓰며(체력이
+  // 음수여도 armorStatBonus('hp')가 그대로 합산해 착용 시 최대 체력이 1500 감소함), 힘 +3은 철방패와 같은
+  // 고정형 statBonus 그대로. 이미지 파일명은 첨부 파일 이름 그대로.
+  // 내구도 10000(사용자 확정값).
+  cursedblackshield: {
+    id: 'cursedblackshield', name: '불길한 검은색 방패', desc: '사악한 기운이 서린 방패<br>착용 시, 체력이 감소한다',
+    equipType: 'sub',
+    durability: 10000,
+    subKind: 'shield', // 방패
+    grade: 'epic', // 에픽
+    defense: -8, hp: -1500,
+    purchasable: false, levelReq: 56,
+    image: 'epic_cursed_black_shield',
+    uniqueOption: {
+      text: '힘 +3',
+      activateLevel: 0,
+      statBonus: { str: 3 },
+    },
+  },
+  // 보조 무기 2종(그림자 비수/세컨드 어템프트): 방어도가 "양수"인 것이 트레이드오프(방어도 수치가 높을수록 받는
+  // 피해가 커짐 — defenseDamageMultiplier). 고유 옵션의 공격력 +N / 치명타 확률 +N%는 statBonus의
+  // atkFlat / critRate 키로 등록하며, 착용 중일 때만 적용됨(armorUniqueOptionStatBonus — effectiveAtk /
+  // effectiveCritChance가 이번에 이 키를 읽도록 확장됨, formulas.js).
+  // 내구도: 그림자 비수 30000 / 세컨드 어템프트 20000(사용자 확정값).
+  shadowdagger: {
+    id: 'shadowdagger', name: '그림자 비수', desc: '어둠 속에서 빈틈을 노리는 날카로운 무기',
+    equipType: 'sub',
+    durability: 30000,
+    subKind: 'sub_weapon', // 보조 무기
+    grade: 'epic', // 에픽
+    defense: 6,
+    purchasable: false, levelReq: 50,
+    image: 'epic_shadow_dagger_a_',
+    uniqueOption: {
+      text: '공격력 +50, 치명타 확률 +4%',
+      activateLevel: 0,
+      statBonus: { atkFlat: 50, critRate: 4 },
+    },
+  },
+  secondattempt: {
+    id: 'secondattempt', name: '세컨드 어템프트', desc: '긴급 상황에 소매에서 꺼내 사용하는 단검',
+    equipType: 'sub',
+    durability: 20000,
+    subKind: 'sub_weapon', // 보조 무기
+    grade: 'rare', // 레어
+    defense: 4,
+    purchasable: false, levelReq: 30,
+    image: 'rare_second_attempt_a_',
+    uniqueOption: {
+      text: '공격력 +20',
+      activateLevel: 0,
+      statBonus: { atkFlat: 20 },
+    },
+  },
 };
 Object.values(SUB_TYPES).forEach(s => {
   if(s.defense != null) s.defArr = new Array(10).fill(s.defense);
@@ -2684,6 +2738,20 @@ const SHOP_SORT_FIELDS = [
   { id: 'levelReq', label: '착용 제한 레벨' },
 ];
 
+// ---- 손상 복구 시스템(대장간 수리 탭 [손상 복구]) ----
+// 복구 비용 = 아이템 데이터의 "기본 판매 가격"(강화 단계/내구도/손상 상태가 반영되지 않은 등급 공식 결과값,
+// wpn(type).sellPrice) × RESTORE_COST_MULTIPLIER. 복구 확률과 필요 재료는 등급별로 아래 표에 하드코딩함.
+// 재료는 제작 데이터와 같은 방식으로 "이름"으로 등록하며(findCraftResource가 MISC_ITEMS에서 찾음), 일반 재료라서
+// 제작 팝업과 똑같이 "현재 보유 수량 >= 필요 수량"으로 자동 인식됨(직접 투입 없음).
+const RESTORE_COST_MULTIPLIER = 2;
+const RESTORE_CHANCE_BY_GRADE = { normal: 95, rare: 50, epic: 20, unique: 15 }; // 복구 성공 확률(%) — 사용자 확정값
+const RESTORE_MATERIALS_BY_GRADE = {
+  normal: [],
+  rare: [{ name: '쇠조각', need: 3 }],
+  epic: [{ name: '쇠조각', need: 5 }, { name: '반짝이는 돌', need: 1 }],
+  unique: [{ name: '쇠조각', need: 10 }, { name: '반짝이는 돌', need: 3 }],
+};
+
 // ---- 페이지네이션(공통 시스템) ----
 // 화면(또는 탭)마다 페이지당 최대 출력 개수를 여기서 독립적으로 관리함 — 지금은 전부 6(던전만 3)이지만,
 // 나중에 탭별로 다른 값을 쓰고 싶으면 이 숫자만 바꾸면 됨(다른 코드 수정 불필요).
@@ -2696,6 +2764,7 @@ const PAGE_SIZE = {
   invAccessory: 6,       // 인벤토리 장신구 탭
   forgeSelect: 6,       // 대장간 "강화 장비 선택" 팝업
   repairSelect: 6,      // 수리 탭 "인벤토리에서 선택" 팝업
+  restoreSelect: 6,     // 수리 탭 "손상 복구" 장비 선택 팝업
   shopWeapon: 6,        // 상점 무기 탭
   shopArmor: 6,          // 상점 방어구 탭
   shopSub: 6,             // 상점 보조 탭
@@ -2717,29 +2786,27 @@ const SHOP_PAGE_KEY = {
 // 캐릭터 정보창 페이지 수. 이 화면은 아이템 목록을 잘라서 보여주는 게 아니라 "1페이지(장비창+캐릭터 정보) /
 // 2페이지(적용 중인 아티팩트 효과)"처럼 완전히 다른 내용을 페이지로 나눈 것이라 PAGE_SIZE(개수 기반 분할)는
 // 쓰지 않지만, pageState·pagerHtml·goPage·clampPage 등 페이지 이동 시스템 자체는 그대로 재사용함.
-const CHAR_STATS_PAGE_COUNT = 2;
-// 대장간 [캐릭터 정보] 팝업(#charStatsModal)의 모바일 프리셋 전용 페이지 수 — 데스크톱(장비창+정보 좌우
-// 배치/아티팩트효과 2페이지)과 콘텐츠 구성이 달라(모바일은 던전 우측 카드 [캐릭터 정보]와 동일하게
-// 1p=장비창/2p=레벨·스탯/3p=전투스탯) renderCharStats()가 screenPreset에 따라 이 값과
-// CHAR_STATS_PAGE_COUNT 중 하나를 골라 씀(모바일 UI 개편 2단계 수정).
-const CHAR_STATS_MOBILE_PAGE_COUNT = 3;
-
 // ---- 캐릭터 메뉴(좌측 상단바 메뉴) — 탭 구성 ----
 // 데이터 기반 목록이라 새 탭을 추가하려면 이 배열에 { id, label } 항목만 추가하면 됨(renderCharacterMenu가
 // 이 목록을 그대로 순회해 탭 버튼을 자동 생성함, SETTINGS_SCHEMA→renderSettings와 동일한 방식).
-// 'info'(캐릭터 정보) id는 renderCharacterMenu에서 특별히 다뤄지는 값이라 이름을 바꾸면 안 됨.
+// 'info'(캐릭터 정보) id는 renderCharacterMenu/renderHuntSidePanel에서 특별히 다뤄지는 값이라 이름을 바꾸면 안 됨.
 const CHARACTER_TABS = [
   { id: 'info', label: '캐릭터 정보' },
   { id: 'skill', label: '스킬' },
 ];
-// 캐릭터 메뉴 "캐릭터 정보" 탭의 페이지 수. 캐릭터 정보창(모달, CHAR_STATS_PAGE_COUNT=2, 1페이지에
-// 장비창+캐릭터 정보를 좌우로 함께 배치)과 동일한 데이터를 쓰지만, 캐릭터 메뉴는 화면 폭이 좁아
-// 1페이지(캐릭터 정보) / 2페이지(장비창) / 3페이지(적용 중인 아티팩트 효과)로 완전히 분리함.
-const CHAR_MENU_INFO_PAGE_COUNT = 3;
-// 던전 화면 우측 카드 전용 페이지 수 — 캐릭터 메뉴와 콘텐츠 구성 자체가 다름(요구사항):
-//   [캐릭터 정보] 1p=장비창 레이아웃 / 2p=캐릭터 레벨~스탯 가능 포인트 / 3p=총 공격력~총 방어도
-//   [스킬] 1p=퀵슬롯 설정~초기화 버튼 / 2p=공용·특화·기연 탭~스킬 목록
-const HUNT_CHAR_INFO_PAGE_COUNT = 3;
+// [캐릭터 정보] 탭의 소분류 탭 — 캐릭터 메뉴/던전 우측 패널이 완전히 동일하게 이 목록을 그대로 순회해
+// 탭 버튼을 만듦(구조 통합: 대장간 전용 캐릭터 정보 팝업은 더 이상 없고, 이 두 화면이 하나의 공통 콘텐츠
+// 빌더 buildCharInfoSubtabBodyHtml를 공유함). 'equip'/'stats' id는 렌더 함수에서 특별히 다뤄지므로 이름을
+// 바꾸면 안 됨.
+const CHAR_INFO_SUBTABS = [
+  { id: 'info', label: '정보' },
+  { id: 'equip', label: '착용 장비' },
+  { id: 'stats', label: '세부 능력치' },
+];
+// [세부 능력치] 소분류의 페이지 수(1페이지: 전투 능력치, 2페이지: 최종 스탯).
+const CHAR_INFO_STATS_PAGE_COUNT = 2;
+// 던전 화면 우측 카드 [스킬] 탭 전용 페이지 수(캐릭터 메뉴 스킬 탭과 달리 카드가 작아 1p=퀵슬롯 설정,
+// 2p=공용·특화·기연 탭~스킬 목록으로 나눔) — 이번 작업 대상이 아니라 그대로 유지.
 const HUNT_CHAR_SKILL_PAGE_COUNT = 2;
 
 // ---- 스킬 시스템 — 기반 구조 ----
@@ -2775,9 +2842,9 @@ const HUNT_CHAR_SKILL_PAGE_COUNT = 2;
 // }
 const SKILLS = {
   adventurer_will: {
-    name: '모험가의 의지', desc: '[패시브] 체력 +100',
+    name: '건신', desc: '[패시브] 체력 +{hpFlat}',
     grade: 'normal', category: 'common', target: 'passive', levelReq: 1,
-    passiveEffect: { hpFlat: 100 },
+    passiveEffect: { hpFlat: 50 },
   },
   slash: {
     name: '내려베기', desc: '무기를 휘둘러 {dp}%의 데미지로 적을 공격한다.',
@@ -2805,9 +2872,99 @@ const SKILLS = {
     buffEffect: { atkSpeedPercent: 20, durationMs: 15000 }, icon: 'lv10buff',
   },
   guardian_will: {
-    name: '수호자의 의지', desc: '[패시브] 체력 +500',
+    name: '강신', desc: '[패시브] 체력 +{hpFlat}',
     grade: 'normal', category: 'common', target: 'passive', levelReq: 10,
-    passiveEffect: { hpFlat: 500 }, icon: 'lv10passive',
+    passiveEffect: { hpFlat: 150 }, icon: 'lv10passive', upgradeFrom: 'adventurer_will',
+  },
+  iron_body: {
+    name: '철신', desc: '[패시브] 체력 +{hpFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 26,
+    passiveEffect: { hpFlat: 500 }, icon: 'lv10passive', upgradeFrom: 'guardian_will',
+  },
+  golden_body: {
+    name: '금신', desc: '[패시브] 체력 +{hpFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 40,
+    passiveEffect: { hpFlat: 1000 }, icon: 'lv10passive', upgradeFrom: 'iron_body',
+  },
+  diamond_body: {
+    name: '금강체', desc: '[패시브] 체력 +{hpPercent}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 62,
+    passiveEffect: { hpPercent: 5 }, icon: 'lv10passive', upgradeFrom: 'golden_body',
+  },
+  indestructible_body: {
+    name: '불괴체', desc: '[패시브] 체력 +{hpPercent}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 98,
+    passiveEffect: { hpPercent: 10 }, icon: 'lv10passive', upgradeFrom: 'diamond_body',
+  },
+  muscle_training: {
+    name: '단련', desc: '[패시브] 공격력 +{atkFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 5,
+    passiveEffect: { atkFlat: 15 }, icon: 'lv5_atk_passive',
+  },
+  brawn: {
+    name: '강력', desc: '[패시브] 공격력 +{atkFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 19,
+    passiveEffect: { atkFlat: 40 }, icon: 'lv5_atk_passive', upgradeFrom: 'muscle_training',
+  },
+  iron_strength: {
+    name: '철력', desc: '[패시브] 공격력 +{atkFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 33,
+    passiveEffect: { atkFlat: 80 }, icon: 'lv5_atk_passive', upgradeFrom: 'brawn',
+  },
+  overwhelming_force: {
+    name: '패력', desc: '[패시브] 공격력 +{atkFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 47,
+    passiveEffect: { atkFlat: 120 }, icon: 'lv5_atk_passive', upgradeFrom: 'iron_strength',
+  },
+  extreme_strength: {
+    name: '극력', desc: '[패시브] 공격력 +{atkPercent}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 61,
+    passiveEffect: { atkPercent: 5 }, icon: 'lv5_atk_passive', upgradeFrom: 'overwhelming_force',
+  },
+  divine_strength: {
+    name: '신력', desc: '[패시브] 공격력 +{atkPercent}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 75,
+    passiveEffect: { atkPercent: 8 }, icon: 'lv75_atk_passive', upgradeFrom: 'extreme_strength',
+  },
+  limitless_strength: {
+    name: '무극', desc: '[패시브] 공격력 +{atkPercent}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 99,
+    passiveEffect: { atkPercent: 10 }, icon: 'lv75_atk_passive', upgradeFrom: 'divine_strength',
+  },
+  mind_cultivation: {
+    name: '수심', desc: '[패시브] 지능 +{intFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 7,
+    passiveEffect: { intFlat: 3 }, icon: 'lv7_int_passive',
+  },
+  righteous_mind: {
+    name: '정심', desc: '[패시브] 지능 +{intFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 22,
+    passiveEffect: { intFlat: 6 }, icon: 'lv7_int_passive', upgradeFrom: 'mind_cultivation',
+  },
+  clear_mind: {
+    name: '명심', desc: '[패시브] 지능 +{intFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 37,
+    passiveEffect: { intFlat: 9 }, icon: 'lv7_int_passive', upgradeFrom: 'righteous_mind',
+  },
+  wisdom_eye: {
+    name: '혜안', desc: '[패시브] 지능 +{intFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 52,
+    passiveEffect: { intFlat: 14 }, icon: 'lv7_int_passive', upgradeFrom: 'clear_mind',
+  },
+  insight: {
+    name: '통찰', desc: '[패시브] 지능 +{intFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 67,
+    passiveEffect: { intFlat: 20 }, icon: 'lv7_int_passive', upgradeFrom: 'wisdom_eye',
+  },
+  great_awakening: {
+    name: '대오', desc: '[패시브] 지능 +{intFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 82,
+    passiveEffect: { intFlat: 27 }, icon: 'lv7_int_passive', upgradeFrom: 'insight',
+  },
+  ultimate_insight: {
+    name: '극의', desc: '[패시브] 지능 +{intFlat}',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 97,
+    passiveEffect: { intFlat: 35 }, icon: 'lv7_int_passive', upgradeFrom: 'great_awakening',
   },
   cleave: {
     name: '참격 1성', desc: '{dp}%의 데미지로 모든 적을 공격.',
@@ -3040,7 +3197,7 @@ const SKILL_KIND_TABS = [
 ];
 // 스킬 탭 페이지 구성(레벨 구간). "8. 페이지" 요구사항 표를 그대로 데이터화한 것으로, 페이지네이션은
 // 기존 공용 시스템(pageState/pagerHtml/goPage/clampPage)을 그대로 재사용함(개수 기반 분할이 아니라
-// 레벨 구간 기준 분할이라는 점은 CHAR_STATS_PAGE_COUNT와 동일한 방식).
+// 레벨 구간 기준 분할이라는 점은 다른 공용 페이지네이션과 동일한 방식).
 // 스킬 탭 페이지 구간(요구사항: 1p 1~25 / 2p 30~55 / 3p 60~85 / 4p 90~99, 5p 삭제 — 페이지 경계가 전부
 // skillMilestoneLevels 값과 일치하므로 levelsForSkillPage의 min/max 필터링이 그대로 정확히 맞물림).
 const SKILL_PAGES = [
@@ -3057,7 +3214,7 @@ const SKILL_QUICK_SLOT_COUNT = 10; // 2줄 × 5칸(요구사항: 기존 1줄 5�
 
 
 // ---- 캐릭터 정보창 — 장비창 슬롯 구성 (데이터 기반) ----
-// renderCharStats(render.js)가 이 목록을 그대로 순회해 슬롯을 그림. 새 장비 타입(방어구 등)이 실제로
+// buildEquipPanelHtml(render.js)가 이 목록을 그대로 순회해 슬롯을 그림. 새 장비 타입(방어구 등)이 실제로
 // 추가되면 이 배열에 항목만 추가하고 equippedItemForSlot(render.js)에 조회 로직 한 줄만 이어주면 되며,
 // 나머지 렌더링 코드는 수정할 필요가 없음. cellClass는 장비창 그리드에서 이 슬롯이 위치할 CSS 그리드 영역.
 // necklace(목걸이)/shoes(신발)는 장비창에 자리만 먼저 마련한 신규 슬롯임 — 아직 이 슬롯에 착용되는 아이템 데이터/
@@ -3581,7 +3738,7 @@ const MONSTERS = {
   scorpion2: {
     id: 'scorpion2', name: '전갈장', icon: '🦂', grade: 'normal', level: 46, image: 'scorpion2',
     defense: -10, hpMult: 1.1, atkMult: 2.0, speedMult: 0.6,
-    drops: [ { name: '호박', chance: 20 } ],
+    drops: [ { name: '호박', chance: 20 }, { name: '세컨드 어템프트', chance: 1, weaponId: 'secondattempt' } ],
   },
   epicscorpion: {
     id: 'epicscorpion', name: '현랑전갈', icon: '🦂', grade: 'epic', level: 53, image: 'epicscorpion',
@@ -3592,6 +3749,7 @@ const MONSTERS = {
       { name: '현랑반지', chance: 1.5, weaponId: 'wolfmoonring' },
       { name: '은반지', chance: 3, weaponId: 'silverring' },
       { name: '청사연투구', chance: 2.5, weaponId: 'bluehelmet56' },
+      { name: '세컨드 어템프트', chance: 3, weaponId: 'secondattempt' },
     ],
   },
   epicscorpion2: {
@@ -3788,6 +3946,47 @@ const MONSTERS = {
       { name: '흑령투구', chance: 3.2, weaponId: 'blackghosthelmet' },
     ],
   },
+  // 흑해골굴 신규 몬스터 4종. 해골굴(해골/칼든 해골/사해골/불산)과 완전히 동일한 구조 — 주해골(45)/원각(55)은
+  // epicSpawnWeight로 가중치 추첨하고, 원각만 epicSpawnStages:[10]이라 10굴에서만 후보에 들어감. 10굴이 아닌
+  // 굴에서는 원각이 후보에서 빠져 항상 주해골만 등장하며, 10굴에서만 주해골 45 : 원각 55 추첨이 실제로 작동함
+  // (pickEpicMonsterId, formulas.js).
+  blackskeleton: {
+    id: 'blackskeleton', name: '흑해골', icon: '💀', grade: 'normal', level: 75, image: 'monster_black_skeleton',
+    defense: -25, hpMult: 1.2, atkMult: 1.0, speedMult: 1.0,
+    drops: [
+      { name: '호박', chance: 15 },
+      { name: '원한이 담긴 유서', chance: 1 },
+    ],
+  },
+  blackskeleton2: {
+    id: 'blackskeleton2', name: '자해골', icon: '💀', grade: 'normal', level: 76, image: 'monster_black_skeleton2',
+    defense: -30, hpMult: 1.2, atkMult: 2.0, speedMult: 0.5,
+    drops: [
+      { name: '호박', chance: 20 },
+      { name: '쇠조각', chance: 2 },
+      { name: '원한이 담긴 유서', chance: 1 },
+    ],
+  },
+  epicblackskeleton: {
+    id: 'epicblackskeleton', name: '주해골', icon: '💀', grade: 'epic', level: 81, image: 'epic_black_skeleton',
+    defense: -30, hpMult: 1.1, atkMult: 1.1, speedMult: 1.0,
+    epicSpawnWeight: 45, // 흑해골굴 전용 — 원각과 합쳐 100%(10굴 기준. 그 외 스테이지는 원각이 후보에서 빠져 항상 주해골)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '원한이 담긴 유서', chance: 5 },
+    ],
+  },
+  epicblackskeleton2: {
+    id: 'epicblackskeleton2', name: '원각', icon: '💀', grade: 'epic', level: 82, image: 'epic_black_skeleton2',
+    defense: -30, hpMult: 1.1, atkMult: 0.6, speedMult: 2.0,
+    epicSpawnWeight: 55, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '원한이 담긴 유서', chance: 5 },
+      { name: '불길한 검은색 방패', chance: 3, weaponId: 'cursedblackshield' },
+      { name: '그림자 비수', chance: 3, weaponId: 'shadowdagger' },
+    ],
+  },
 };
 
 
@@ -3919,6 +4118,14 @@ const DUNGEONS = [
     icon: '',
     desc: '해골이 잠든 저주받은 지하 동굴',
     monsters: ['skeleton', 'skeleton2', 'epicskeleton', 'epicskeleton2'],
+    levelRange: 5,
+  },
+  {
+    id: 'black_skeleton_den',
+    name: '흑해골굴',
+    icon: '',
+    desc: '해골이 잠든 저주받은 지하 동굴의 깊은 곳',
+    monsters: ['blackskeleton', 'blackskeleton2', 'epicblackskeleton', 'epicblackskeleton2'],
     levelRange: 5,
   },
 ];

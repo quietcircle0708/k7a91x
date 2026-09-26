@@ -10,6 +10,7 @@
 // 매번 render/saveState/구매 이펙트를 띄우지 않다가, 전부 끝난 뒤 한 번만 갱신·저장하고 팝업을 닫음.
 function confirmBuyQty(){
   if(!buyQtyState) return;
+  if(isShopSellAction(buyQtyState.action)){ requestSellQty(); return; } // 판매 모드는 즉시 처리하지 않고 판매 확인창을 먼저 띄움
   const { action, typeId, qty } = buyQtyState;
   let bought = 0;
   for(let i = 0; i < qty; i++){
@@ -25,6 +26,46 @@ function confirmBuyQty(){
     render();
     saveState();
   }
+}
+
+// ---- 상점 개수 지정 판매(소비/마석/기타) ----
+// 같은 개수 지정 팝업(buyQtyModal)의 "판매 모드". [판매]를 누르면 아이템/수량을 다시 검증하고 기존 판매 확인창
+// (openSellConfirm)을 띄우며(팝업은 잠시 숨김, 확인창에서 취소하면 그대로 다시 나타남), 확인창의 [판매]에서만
+// performSellQty가 실제로 설정한 수량만큼만 차감하고 골드를 지급함. 기존 sellAllFlask/sellAllMisc(전부 판매)는 호출하지 않음.
+function requestSellQty(){
+  if(!buyQtyState || !isShopSellAction(buyQtyState.action)) return;
+  const { action, typeId, qty } = buyQtyState;
+  const item = shopSellItemDef(action, typeId);
+  const owned = shopSellOwnedCount(action, typeId);
+  if(!item || qty < 1 || qty > owned){ // 팝업이 열려 있는 사이 보유 수량이 줄었다면 판매하지 않고 팝업만 갱신
+    if(!item || owned <= 0){ closeBuyQtyModal(); render(); return; }
+    setBuyQty(Math.min(qty, owned));
+    return;
+  }
+  const total = (item.sellPrice || 0) * qty;
+  el('buyQtyModal').style.display = 'none';
+  openSellConfirm(`${item.name} ${qty}개`, total, performSellQty, () => {
+    // 확인창 [취소] — 아이템/골드는 그대로, 판매 수량창으로 복귀(설정해둔 수량 유지)
+    if(!buyQtyState) return;
+    renderBuyQtyModal();
+    el('buyQtyModal').style.display = 'flex';
+  });
+}
+function performSellQty(){
+  const s = buyQtyState;
+  if(!s || !isShopSellAction(s.action)) return;
+  const { action, typeId, qty } = s;
+  const item = shopSellItemDef(action, typeId);
+  const owned = shopSellOwnedCount(action, typeId);
+  if(!item || qty < 1 || qty > owned){ closeBuyQtyModal(); render(); return; } // 보유 수량 초과 → 판매 중단
+  const total = (item.sellPrice || 0) * qty;
+  if(action === 'sell-consumable') state.consumables[typeId] = owned - qty;
+  else state[item.stateKey] = owned - qty;
+  state.gold += total;
+  const anchor = document.querySelector(`#shopItemsList button[data-action="${action}"][data-type="${typeId}"]`);
+  closeBuyQtyModal(); // 판매 수량창 상태 정리(확인창은 confirmSell이 이미 닫음)
+  purchaseEffect(anchor);
+  render(); saveState();
 }
 
 // ---- 강화 ----
@@ -651,26 +692,38 @@ function checkAutoHeal(){
   // 체력 회복류(healHp/healHpInstant)/마나 회복류(healMp/healMpInstant)인지만 판별함 — 회복 방식
   // (지속/즉시)과 무관하게 동일한 자동 사용 조건이 적용되며, 앞으로 새 회복 방식이 추가돼도
   // effect.type 분류만 맞으면 이 함수 수정 없이 자동으로 대상에 포함됨.
+  // 이 함수는 몬스터 피해 직후(monsterAttackTick)뿐 아니라 전투 중 주기적으로도 호출됨(startAutoHealTicker, dungeon.js).
+  // 같은 종류(체력/마나) 플라스크가 퀵슬롯 여러 칸에 등록돼 있어도 "1회 판정에서는 종류별로 최대 1개"만 사용함 —
+  // 이미 그 종류를 사용했으면 나머지 같은 종류 칸은 건너뜀. 앞 칸 플라스크가 쿨타임/수량 부족 등으로 사용되지 못했다면
+  // (autoHealTry가 false) 뒤 칸의 같은 종류 플라스크가 대신 사용될 수 있음. 체력/마나는 서로 독립적으로 판정.
+  // 종류(체력/마나)별로 "이번 판정에서 이미 시도했는지"만 기록 — 시도한 칸이 쿨타임 중이었어도 같은 종류의
+  // 다른 칸으로 넘어가지 않고 그 종류는 이번 판정을 건너뜀(요청사항: 같은 종류가 쿨타임 중이면 그 종류는 스킵).
+  // 다음 250ms 주기 판정에서 쿨타임이 풀려 있으면 다시 정상적으로 사용됨.
+  let hpAttempted = false;
+  let mpAttempted = false;
   (state.quickSlots || []).forEach(id => {
     const item = CONSUMABLES[id];
     if(!item || !item.effect) return;
     const type = item.effect.type;
     if(type === 'healHp' || type === 'healHpInstant'){
-      autoHealTry(id, 'autoHealThreshold', state.playerHp, effectiveMaxHp(state.playerLevel));
+      if(!hpAttempted){ hpAttempted = true; autoHealTry(id, 'autoHealThreshold', state.playerHp, effectiveMaxHp(state.playerLevel)); }
     } else if(type === 'healMp' || type === 'healMpInstant'){
-      autoHealTry(id, 'autoManaThreshold', state.playerMp, effectiveMaxMp(state.playerLevel));
+      if(!mpAttempted){ mpAttempted = true; autoHealTry(id, 'autoManaThreshold', state.playerMp, effectiveMaxMp(state.playerLevel)); }
     }
   });
 }
 // checkAutoHeal 전용 공통 체크 헬퍼 (체력/마나 각각에 대해 동일한 판단 로직을 재사용 — 중복 코드 방지)
+// 반환값: 실제로 플라스크를 1개 사용했으면 true(보유 수량이 줄어든 것으로 판단), 아니면 false.
 function autoHealTry(flaskId, thresholdKey, current, max){
   const thresholdPct = state.settings[thresholdKey] != null ? state.settings[thresholdKey] : 50;
-  if(current > max * (thresholdPct / 100)) return; // 아직 발동 비율 이상이면 동작 안 함
+  if(current > max * (thresholdPct / 100)) return false; // 아직 발동 비율 이상이면 동작 안 함
   const inQuickSlot = Array.isArray(state.quickSlots) && state.quickSlots.includes(flaskId);
-  if(!inQuickSlot) return; // 퀵슬롯에 등록돼 있지 않으면 동작 안 함
-  if(!(state.consumables && state.consumables[flaskId] > 0)) return; // 보유 수량이 없으면 동작 안 함
+  if(!inQuickSlot) return false; // 퀵슬롯에 등록돼 있지 않으면 동작 안 함
+  if(!(state.consumables && state.consumables[flaskId] > 0)) return false; // 보유 수량이 없으면 동작 안 함
+  const before = state.consumables[flaskId];
   useFlask(flaskId); // 기존 사용 함수 재사용 — 1회 호출 = 1개만 사용, 수동 사용과 동일한 경로.
   // 쿨타임 중이면 useFlask 내부에서 조용히 무시되므로, 자동 회복도 쿨타임이 끝날 때까지 자연히 대기하게 됨.
+  return (state.consumables[flaskId] || 0) < before;
 }
 
 // ---- 플라스크 공통 사용 쿨타임 ----
@@ -1009,7 +1062,7 @@ function executeIndividualRepair(target, amount){
   const cost = repairCostForAmount(found.type, clamped);
   if(state.gold < cost) return false; // 골드 부족(요구사항 23번) — 차감/내구도 변경 전혀 없이 그대로 반환
   state.gold -= cost;
-  const max = maxDurabilityFor(found.type);
+  const max = maxDurabilityForItem(found.item); // 손상 아이템은 정상의 50%로 줄어든 최대 내구도가 상한
   const cur = found.item.currentDurability != null ? found.item.currentDurability : max;
   found.item.currentDurability = Math.min(max, cur + clamped); // 최대 내구도 초과 방지(요구사항 21번)
   saveState();
@@ -1022,8 +1075,38 @@ function executeRepairAll(){
   const totalCost = repairAllTotalCost(targets);
   if(state.gold < totalCost) return false; // 골드 부족 — 전부 미실행(요구사항 23번)
   state.gold -= totalCost;
-  targets.forEach(entry => { entry.item.currentDurability = maxDurabilityFor(entry.type); }); // 전부 100%로(요구사항 21번)
+  targets.forEach(entry => { entry.item.currentDurability = maxDurabilityForItem(entry.item); }); // 전부 100%로(요구사항 21번)
   saveState();
   render();
   return true;
+}
+
+// ---- 손상 복구 실행(대장간 수리 탭 [손상 복구]) ----
+// 선택해둔 장비의 고유 id로 인벤토리 원본 인스턴스를 다시 찾아서(없거나 손상이 아니면 아무것도 하지 않고 null)
+// 골드와 복구 재료를 차감한 뒤 확률(등급별 RESTORE_CHANCE_BY_GRADE)로 성공/실패를 정함.
+//  - 성공: 그 인스턴스의 damaged를 false로 바꾸고 현재 내구도를 정상 최대 내구도로 채움. 강화 단계/종류 등 나머지 데이터는
+//          같은 객체를 그대로 쓰므로 그대로 유지됨(공격력도 손상 보정이 빠진 정상 값으로 자동 계산됨).
+//  - 실패: 골드/재료는 돌려주지 않고, 인스턴스는 아무것도 바뀌지 않음(손상 상태·강화 단계·내구도 모두 그대로).
+// 인벤토리에서 아이템을 빼거나 새로 만들지 않고 "같은 인스턴스"를 그대로 두므로, 실패 시 반환/성공 시 지급 과정에서
+// 동일 장비가 중복 지급되거나 다른 동일 장비가 건드려질 수 없음(새 id를 만들 필요도 없음).
+function executeRestore(target){
+  const found = resolveRestoreTarget(target);
+  if(!found) return null;
+  const { item, type } = found;
+  if(!restoreCanProceed(target)) return null;
+  const cost = restoreCostFor(type);
+  const materials = restoreMaterialsFor(type);
+  state.gold -= cost;
+  materials.forEach(m => {
+    const resource = findCraftResource(m.name);
+    state[resource.def.stateKey] = (state[resource.def.stateKey] || 0) - m.need;
+  });
+  const success = Math.random() * 100 < restoreChanceFor(type);
+  if(success){
+    item.damaged = false;
+    item.currentDurability = freshCurrentDurability(type); // 정상 최대 내구도의 100%
+  }
+  saveState();
+  render();
+  return { success, kind: target.kind, itemId: item.id, type, level: item.level, cost };
 }

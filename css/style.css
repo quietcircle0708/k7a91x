@@ -256,11 +256,13 @@
      지정됨(resolveGlossaryTermsHtml, formulas.js). 밑줄로 "클릭 가능"임을 표시(색상만으로는
      클릭 가능 여부가 구분되지 않으므로). */
   .glossary-term{ cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px; }
-  /* 장비·소비 아이템 툴팁 최하단 "현재 판매 가격"(tooltipSellPriceHtml, formulas.js) — 위 항목과 점선으로 구분,
-   중앙 정렬. 기본 노란색(기존 툴팁 값 색상과 동일한 --forge-gold), 내구도가 감소한 장비만 .reduced로 빨간색.
-   부모 .tooltip이 text-align:left로 덮여 있는 화면에서도 항상 중앙에 오도록 여기서도 명시함. */
+  /* 장비·소비 아이템 툴팁 최하단 "현재 판매 가격"(tooltipSellPriceHtml, formulas.js) — 중앙 정렬. 기본 노란색
+   (기존 툴팁 값 색상과 동일한 --forge-gold), 내구도가 감소한 장비만 .reduced로 빨간색. 부모 .tooltip이
+   text-align:left로 덮여 있는 화면에서도 항상 중앙에 오도록 여기서도 명시함.
+   위 항목과의 점선 구분선은 제거했지만, 툴팁 전체 높이와 상하 여백이 예전과 완전히 같도록 선 자리(1px)는
+   투명한 테두리로 그대로 남겨둠(border-top을 지우면 이 블록이 1px 짧아져 여백이 미세하게 달라짐). */
 .tooltip-sell-price{
-    margin-top:5px; padding-top:4px; border-top:1px dashed var(--forge-iron);
+    margin-top:5px; padding-top:4px; border-top:1px solid transparent;
     text-align:center; font-weight:700; color: var(--forge-gold);
   }
 .tooltip-sell-price.reduced{ color:#ff6a6a; }
@@ -1056,8 +1058,9 @@
     display:flex; align-items:center; justify-content:center;
   }
   .stat-peek-btn:hover{ border-color: var(--forge-gold); }
-  /* 대장간(강화 장비 선택) 버튼: 캐릭터 정보 버튼(openStatsBtn, top:16px) 바로 아래에 같은 크기로 배치 */
-  .blacksmith-peek-btn{ top:60px; right:16px; }
+  /* 대장간(강화 장비 선택) 버튼 — 이전엔 캐릭터 정보 버튼(openStatsBtn) 바로 아래(top:60px)에 배치했으나,
+     캐릭터 정보 버튼이 제거되면서(캐릭터 메뉴로 통합) 우측 상단 칸이 이 버튼 하나만 남음 — 빈 자리 없이
+     기본 위치(top:16px, .stat-peek-btn과 동일)를 그대로 씀. */
   .blacksmith-icon-fallback{ font-size:16px; line-height:1; }
   .blacksmith-icon-img{ width:20px; height:20px; object-fit:contain; }
 
@@ -1130,6 +1133,12 @@
     font-size:12.5px; padding:3px 0; text-align:center; font-weight:700;
     font-family:'JetBrains Mono', monospace;
   }
+  /* "장착 아이템 정보" 각 줄 맨 앞의 슬롯 이름(예: "무기 : ") — 흰 텍스트, 뒤이어 오는 아이템 이름은
+     기존처럼 등급 색(인라인 style)을 그대로 씀. */
+  .char-equip-info-slot{ color:#fff; }
+  /* [캐릭터 정보] 탭 소분류([정보]/[착용 장비]/[세부 능력치]) — 기존 상위 탭(.inv-tabs/.inv-tab-btn)과
+     같은 스타일을 그대로 재사용하되, 바로 위 상위 탭 아래라 여백만 살짝 좁힘. */
+  .char-info-subtabs{ margin-top:2px; }
   .char-stats-body{ margin: 14px 0 18px; }
   .char-stat-row{
     display:flex; justify-content:space-between; align-items:baseline;
@@ -1162,6 +1171,13 @@
   }
   .char-stat-artifact b{ color: var(--forge-gold); }
   .char-stat-empty{ text-align:center; font-size:13px; color: var(--forge-cream-dim); padding:12px 0; }
+  /* 세부 능력치 최종 수치(총 공격력/공격속도/치명타 확률/방어도 무시/총 방어도) 계산 내역 툴팁 —
+     값이 패널 오른쪽 끝에 붙어있어 .tooltip 기본 위치(left:0)로는 화면 밖으로 나가기 쉬우므로
+     .curse-badge 등과 같은 방식으로 오른쪽 정렬로 펼침. 실제 최종 위치는 기존과 동일하게
+     main.js의 adjustTooltipPosition이 화면 경계에 맞춰 보정함(요구사항 9번: 기존 방식 재활용). */
+  .char-stat-tip{ position:relative; cursor:help; }
+  .char-stat-tip .tooltip{ left:auto; right:0; bottom:135%; text-align:left; }
+  .char-stat-tip:hover .tooltip{ visibility:visible; opacity:1; }
   .player-bar-label{
     display:flex; justify-content:space-between; font-size:11.5px; color: var(--forge-cream-dim);
     margin:8px 0 3px; font-family:'JetBrains Mono', monospace;
@@ -1326,7 +1342,14 @@
   /* 「모두 수리」 버튼 전용 축소 CSS(요구사항 2번) — 공용 .btn/.btn-main 크기는 그대로 두고 이 버튼에만
      적용. 신규 버튼인 「인벤토리에서 선택」도 같은 줄에서 짝을 이루므로 동일한 크기를 씀(요구사항 3번
      "같은 줄에 배치"). */
-  .repair-all-btn, .repair-select-btn{ padding:8px 14px; font-size:13px; border-radius:9px; }
+  .repair-all-btn, .repair-select-btn, .repair-restore-btn{ padding:8px 14px; font-size:13px; border-radius:9px; }
+  /* [손상 복구] 팝업의 복구 대상 선택([+]/장비 아이콘) 박스 — 클릭하면 장비 선택 목록이 열림 */
+  .restore-target-box{ cursor:pointer; }
+  .restore-target-box:hover{ border-color: var(--forge-gold); }
+  /* [손상 복구] 결과창: 제작 결과 아이콘 라벨은 64px 폭에 말줄임이라 "낡은 그레이트소드(손상) +7" 같은 긴 이름이 잘려서,
+     이 모달 안에서만 라벨을 전체 이름이 보이도록(줄바꿈 허용) 덮어씀. 다른 화면의 제작 결과 라벨은 그대로. */
+  #restoreResultModal .craft-anim-result-item{ width:auto; max-width:226px; }
+  #restoreResultModal .craft-anim-result-name{ white-space:normal; overflow:visible; text-overflow:clip; font-size:13px; }
   .repair-hint{ text-align:center; font-style:italic; color: var(--forge-cream-dim); font-size:12px; margin:0 0 14px; }
   .repair-title{ color: var(--forge-ember); } /* 주황색(요구사항 3·10번) — 기존 modal-title(가운데정렬/폰트)은 그대로 상속 */
   .repair-all-desc{ text-align:center; font-style:italic; color: var(--forge-cream-dim); font-size:12px; margin:0 0 14px; }
@@ -1336,6 +1359,7 @@
   .repair-amount-row{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; }
   .repair-quick-btns{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:4px; }
   .repair-quick-btns .nav-btn{ padding:6px 12px; font-size:12px; }
+  .buy-qty-quick-btns{ margin-bottom:10px; } /* 소비 아이템 구매창의 빠른 수량 버튼 — 아래 골드 표시와 간격만 확보(스타일은 .repair-quick-btns 재사용) */
   .repair-confirm-cost{ color: var(--forge-gold); font-weight:700; } /* 노란색(요구사항 19번) — 기존 비용 강조색 재사용 */
   #repairAllList .inv-card:last-child{ margin-bottom:0; }
 

@@ -26,7 +26,6 @@
   <div id="forgeView">
     <div id="townToast" class="town-toast"></div>
     <div class="forge-card" id="forgeCard">
-      <button class="stat-peek-btn" id="openStatsBtn" title="캐릭터 정보"><svg class="icon-svg" viewBox="0 0 24 24" width="16" height="16" style="margin-right:0;"><circle cx="12" cy="7.5" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></button>
       <button class="stat-peek-btn blacksmith-peek-btn" id="openBlacksmithBtn" title="강화 장비 선택"><img src="assets/ui/blacksmith.png" class="blacksmith-icon-img" alt="대장간" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'blacksmith-icon-fallback',textContent:'🔨'}))"></button>
       <button class="stat-peek-btn patchnote-peek-btn" id="openPatchNoteBtn" title="공지사항"><img src="assets/ui/patchnote_icon.png" class="patchnote-icon-img" alt="공지사항" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'patchnote-icon-fallback',textContent:'📣'}))"></button>
       <button class="stat-peek-btn settings-peek-btn" id="openSettingsBtn" title="설정">⚙️</button>
@@ -104,6 +103,7 @@
         <div class="repair-topbar">
           <button class="btn btn-main repair-select-btn" id="repairSelectBtn" style="width:auto;">인벤토리에서 선택</button>
           <button class="btn btn-main repair-all-btn" id="repairAllBtn" style="width:auto;">모두 수리</button>
+          <button class="btn btn-main repair-restore-btn" id="restoreBtn" style="width:auto;">손상 복구</button>
         </div>
         <div class="repair-hint">*슬롯을 클릭하여 개별 장비 수리*</div>
         <div id="repairEquipPanel"></div>
@@ -422,14 +422,14 @@
 
   <div id="buyQtyModal" class="modal-overlay" style="display:none;">
     <div class="modal-box">
-      <div class="modal-title">아이템 구매</div>
+      <div class="modal-title" id="buyQtyTitle">아이템 구매</div>
       <div class="buy-qty-icon-row">
         <span class="artifact-icon-box buy-qty-icon-box weapon-name-wrap" id="buyQtyIconBox">
           <span class="tooltip" id="buyQtyTooltip"></span>
         </span>
       </div>
       <div class="buy-qty-field-row">
-        <span class="settings-item-label">구매 개수</span>
+        <span class="settings-item-label" id="buyQtyLabel">구매 개수</span>
         <div class="settings-stepper">
           <input type="number" id="buyQtyInput" class="buy-qty-input" min="1" value="1" inputmode="numeric" />
           <div class="settings-stepper-arrows">
@@ -438,13 +438,23 @@
           </div>
         </div>
       </div>
+      <!-- 빠른 수량 버튼 — 소비 아이템 구매창(초기화/10/50/100)과 상점 판매창(초기화/5/10/100/최대)에서만 표시
+           (renderBuyQtyModal이 모드별로 필요한 버튼만 보이게 함). 대장간 개별 수리 UI의 .repair-quick-btns 스타일 재사용 -->
+      <div class="repair-quick-btns buy-qty-quick-btns" id="buyQtyQuickBtns" style="display:none;">
+        <button class="nav-btn" id="buyQtyResetBtn">초기화</button>
+        <button class="nav-btn" id="buyQtyAdd5Btn" style="display:none;">5</button>
+        <button class="nav-btn" id="buyQtyAdd10Btn">10</button>
+        <button class="nav-btn" id="buyQtyAdd50Btn">50</button>
+        <button class="nav-btn" id="buyQtyAdd100Btn">100</button>
+        <button class="nav-btn" id="buyQtyMaxBtn" style="display:none;">최대</button>
+      </div>
       <div class="buy-qty-gold-row">
-        <span>🪙 현재 보유 골드</span>
+        <span id="buyQtyGoldLabel">🪙 현재 보유 골드</span>
         <span id="buyQtyCurrentGold"></span>
       </div>
       <div class="buy-qty-divider"></div>
       <div class="buy-qty-gold-row total">
-        <span>🪙 총 지불 골드</span>
+        <span id="buyQtyTotalLabel">🪙 총 지불 골드</span>
         <span id="buyQtyTotalGold"></span>
       </div>
       <div class="modal-actions">
@@ -540,19 +550,6 @@
       <div class="modal-body">남은 인벤토리 슬롯을 확인해 주세요</div>
       <div class="modal-actions">
         <button class="btn btn-main" id="traceSlotFullOkBtn" style="width:auto; padding:10px 24px;">확인</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="charStatsModal" class="modal-overlay" style="display:none;">
-    <div class="modal-box char-stats-modal">
-      <div class="char-stats-title-row">
-        <div class="modal-title">캐릭터 정보</div>
-        <div class="pager" id="charStatsPager"></div>
-      </div>
-      <div id="charStatsBody" class="char-stats-body"></div>
-      <div class="modal-actions">
-        <button class="btn btn-main" id="closeStatsBtn" style="width:auto; padding:10px 24px;">닫기</button>
       </div>
     </div>
   </div>
@@ -663,6 +660,61 @@
     </div>
   </div>
 
+
+  <!-- 대장간 [손상 복구] 팝업 — 제작 진행 팝업(craftPopupModal)과 같은 레이아웃/클래스를 그대로 재사용함(별도 그리드·
+       아이콘·텍스트 시스템을 만들지 않음). 다른 점은 제작 결과 아이콘 자리가 "복구할 손상 장비 선택([+]) 버튼"이라는 것뿐. -->
+  <div id="restorePopupModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-popup-box">
+      <div class="modal-title">손상 복구</div>
+      <div class="buy-qty-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box restore-target-box" id="restorePopupIconBox" data-action="open-restore-select"></span>
+      </div>
+      <div class="craft-popup-name weapon-name-wrap" id="restorePopupNameWrap"></div>
+
+      <div class="craft-section-label">소모 재료</div>
+      <div class="craft-slots-row" id="restorePopupSlots"></div>
+
+      <div class="craft-section-label">촉매 추가</div>
+      <div class="craft-slots-row">
+        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
+        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
+        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
+      </div>
+
+      <div class="craft-success-rate" id="restorePopupSuccessRate"></div>
+
+      <div class="buy-qty-gold-row">
+        <span>🪙 현재 보유 골드</span>
+        <span id="restorePopupCurrentGold"></span>
+      </div>
+      <div class="buy-qty-divider"></div>
+      <div class="buy-qty-gold-row total">
+        <span>🪙 복구 비용</span>
+        <span id="restorePopupCost"></span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="nav-btn" id="restorePopupCancelBtn">취소</button>
+        <button class="btn btn-main" id="restorePopupMakeBtn" style="width:auto; padding:10px 18px;" disabled>복구</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [손상 복구] 장비 선택 팝업 — 강화 장비 선택(forgeSelectModal)/수리 장비 선택(repairSelectModal)과 같은 구조. 목록에는
+       손상 상태인 장비만 나옴. -->
+  <div id="restoreSelectModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box forge-select-modal">
+      <div class="char-stats-title-row">
+        <div class="modal-title">복구 장비 선택</div>
+        <div class="pager" id="restoreSelectPager"></div>
+      </div>
+      <div id="restoreSelectList"></div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="closeRestoreSelectBtn">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 촉매 선택창(요청사항 4번) — 출력까지만 구현, 실제 촉매 등록/효과는 미구현 -->
   <div id="craftCatalystModal" class="modal-overlay" style="display:none;">
     <div class="modal-box">
@@ -705,6 +757,39 @@
     </div>
   </div>
 
+
+  <!-- [손상 복구] 최종 확인 UI — 제작 최종 확인 UI(craftConfirmModal)와 같은 구조(모든 요소 중앙 정렬, 아이콘/이름 별도
+       요소). 성공 시/실패 시 각각 어떤 아이템이 되는지를 아이콘+이름으로 보여줌. -->
+  <div id="restoreConfirmModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-confirm-box">
+      <div class="modal-title">복구 확인</div>
+
+      <div class="craft-confirm-section-label">복구 성공</div>
+      <div class="craft-confirm-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box" id="restoreConfirmSuccessIconBox"></span>
+      </div>
+      <div class="craft-confirm-item-name weapon-name-wrap" id="restoreConfirmSuccessName"></div>
+
+      <div class="craft-confirm-section-label">복구 실패</div>
+      <div class="craft-confirm-icon-row">
+        <span class="artifact-icon-box buy-qty-icon-box" id="restoreConfirmFailIconBox"></span>
+      </div>
+      <div class="craft-confirm-item-name weapon-name-wrap" id="restoreConfirmFailName"></div>
+
+      <div class="craft-confirm-warning">복구 실패 시,<br>골드와 재료 아이템을 돌려받을 수 없습니다.</div>
+
+      <div class="buy-qty-gold-row">
+        <span>🪙 복구 비용</span>
+        <span id="restoreConfirmCost"></span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="nav-btn" id="restoreConfirmCancelBtn">취소</button>
+        <button class="btn btn-main" id="restoreConfirmProceedBtn" style="width:auto; padding:10px 18px;">진행</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 제작 연출 UI + 결과 확인 UI(제작 연출 UI 및 제작 결과 확인 기능 작업 요청) — 하나의 모달 안에서
        phase(애니메이션 중/클릭 대기/결과 공개)에 따라 요소 표시만 바뀜. 모든 요소 중앙 정렬. -->
   <div id="craftAnimModal" class="modal-overlay" style="display:none;">
@@ -728,6 +813,23 @@
 
       <div class="modal-actions" id="craftAnimConfirmWrap" style="display:none;">
         <button class="btn btn-main" id="craftAnimConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- [손상 복구] 결과 UI — 제작 결과 UI(craftAnimModal의 revealed 단계)와 같은 구성(아이콘+이름, 성공/실패 한 줄,
+       결과 문구, [확인]). 제작 연출(실루엣/로딩바/클릭 대기/플래시)은 쓰지 않고 진행 직후 바로 표시됨. -->
+  <div id="restoreResultModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box craft-anim-box">
+      <div class="modal-title">복구 결과</div>
+      <div class="craft-anim-stage">
+        <div class="craft-anim-result-icons" id="restoreResultIcons"></div>
+      </div>
+      <div class="craft-anim-result-headline" id="restoreResultHeadline"></div>
+      <div class="craft-anim-result-text" id="restoreResultText"></div>
+      <div class="modal-actions">
+        <button class="btn btn-main" id="restoreResultConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
       </div>
     </div>
   </div>

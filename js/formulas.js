@@ -32,12 +32,34 @@ function maxDurabilityFor(type){
 function hasDurabilitySystem(type){ return maxDurabilityFor(type) != null; }
 // 신규 생성(구매/드랍/제작/흔적 복구 등)되는 장비 인스턴스의 초기 현재 내구도 — 항상 최대 내구도(100%)로
 // 시작함(요구사항 4번). 내구도 시스템이 없는 종류는 null(필드 자체를 의미 없이 두지 않기 위함).
-function freshCurrentDurability(type){ return maxDurabilityFor(type); }
+// 손상(damaged) 아이템의 최대 내구도 = 정상 아이템 최대 내구도 × 0.5, 백의 자리 미만 버림
+// (예: 5000→2500, 6000→3000, 15000→7500, 33333→16600, 1200→600). 손상 여부는 아이템 인스턴스의
+// damaged 플래그로 판단하고 최대치는 항상 여기서 계산하므로 저장 데이터에 별도 필드를 추가하지 않음
+// (나중에 손상 복구가 damaged를 해제하면 자동으로 정상 최대 내구도로 돌아감).
+const DAMAGED_DURABILITY_RATE = 0.5;
+function damagedMaxDurability(normalMax){
+  return Math.floor((normalMax * DAMAGED_DURABILITY_RATE) / 100) * 100;
+}
+// 장비 "인스턴스"의 최대 내구도 — 손상 상태면 위 규칙(정상의 50%), 아니면 종류(type)의 최대 내구도 그대로.
+// 내구도 시스템이 없는 종류는 null. 인스턴스가 있는 모든 내구도 계산(현재/최대 비교, 판매가 보정, 수리,
+// 툴팁 표시, 재료 사용 가능 여부 등)은 maxDurabilityFor(type) 대신 이 함수를 써야 손상 아이템에도 동일 규칙이 적용됨.
+function maxDurabilityForItem(item){
+  if(!item) return null;
+  const normalMax = maxDurabilityFor(item.type);
+  if(normalMax == null) return null;
+  return item.damaged ? damagedMaxDurability(normalMax) : normalMax;
+}
+// damaged=true를 넘기면 손상 아이템으로 새로 생성될 때의 초기 내구도(=손상 최대 내구도, 즉 100%)를 반환함.
+function freshCurrentDurability(type, damaged){
+  const max = maxDurabilityFor(type);
+  if(max == null) return null;
+  return damaged ? damagedMaxDurability(max) : max;
+}
 // 장비 인스턴스({type, currentDurability, ...})가 내구도 0 상태인지 — true면 해당 장비의 능력치/옵션이
 // 전부 비활성화되어야 함(요구사항 7번). 내구도 시스템이 없는 종류는 항상 false(정상 적용).
 function isEquipDurabilityZero(item){
   if(!item) return false;
-  const max = maxDurabilityFor(item.type);
+  const max = maxDurabilityForItem(item);
   if(max == null) return false;
   const cur = item.currentDurability != null ? item.currentDurability : max;
   return cur <= 0;
@@ -53,8 +75,8 @@ function durabilityPercent(current, max){
 // 각 buildXxxTooltipHtml에서 종류 행 다음, 첫 스탯 행 앞에 이어붙여 사용함. currentDurability를
 // 넘기지 않으면(카탈로그/상점/미리보기 등 실제 인스턴스가 없는 화면) 항상 최대 내구도(100%)로 표시함.
 // 내구도 시스템이 없는 종류는 빈 문자열을 반환해 기존 툴팁과 완전히 동일하게 유지됨.
-function durabilityTooltipLine(type, currentDurability){
-  const max = maxDurabilityFor(type);
+function durabilityTooltipLine(type, currentDurability, damaged){
+  const max = maxDurabilityForItem({ type, damaged }); // 손상 아이템이면 최대 내구도가 정상의 50%로 표시됨
   if(max == null) return '';
   const cur = currentDurability != null ? currentDurability : max;
   const pct = durabilityPercent(cur, max);
@@ -69,7 +91,7 @@ function durabilityTooltipLine(type, currentDurability){
 // 판매가 미리보기/툴팁 판매가가 전부 이 함수 하나를 거치므로 여기서만 바꾸면 모든 곳에 동일하게 적용됨.
 const DURABILITY_SELL_FLOOR_RATE = 0.5; // 내구도 0%일 때 남는 판매가 비율(나머지 절반이 내구도 비율에 비례)
 function durabilityAdjustedSellValue(baseValue, item){
-  const max = maxDurabilityFor(item.type);
+  const max = maxDurabilityForItem(item);
   if(max == null) return baseValue;
   const cur = item.currentDurability != null ? item.currentDurability : max;
   const ratio = Math.min(1, Math.max(0, cur / max)); // 범위를 벗어난 값(음수/초과)이 있어도 0~100%로 제한
@@ -90,7 +112,7 @@ function repairCostPerPointFor(type){
 
 // 해당 인스턴스가 최대치까지 회복하는 데 필요한 내구도량(0 이상). 내구도 시스템이 없는 종류는 0.
 function repairAmountToFull(item){
-  const max = maxDurabilityFor(item.type);
+  const max = maxDurabilityForItem(item);
   if(max == null) return 0;
   const cur = item.currentDurability != null ? item.currentDurability : max;
   return Math.max(0, max - cur);
@@ -142,6 +164,54 @@ function repairSelectableInventoryItems(){
     });
   });
   return list;
+}
+
+// ---- 손상 복구 시스템(대장간 수리 탭 [손상 복구]) ----
+// 복구 비용 계산에는 강화 단계/내구도 보정/손상 상태가 반영된 판매가(sellValueFor/durabilityAdjustedSellValue)를
+// 절대 쓰지 않고, 아이템 데이터의 "기본 판매 가격"(등급 공식으로 결정된 sellPrice)만 사용함.
+function restoreBaseSellPrice(type){
+  const w = wpn(type);
+  if(w.sellPrice != null) return w.sellPrice;
+  return Array.isArray(w.sell) ? (w.sell[0] || 0) : 0;
+}
+function restoreCostFor(type){ return restoreBaseSellPrice(type) * RESTORE_COST_MULTIPLIER; }
+function restoreChanceFor(type){ return RESTORE_CHANCE_BY_GRADE[wpn(type).grade] || 0; }
+// 등급별 필요 재료 [{ name, need }] (복사본 — 호출부가 수정해도 원본 표는 그대로)
+function restoreMaterialsFor(type){
+  return (RESTORE_MATERIALS_BY_GRADE[wpn(type).grade] || []).map(m => ({ name: m.name, need: m.need }));
+}
+// 복구 대상 후보 — 손상 상태인 장비 인스턴스만(정상 장비/비장비는 애초에 장비 풀에 없거나 damaged가 아님).
+// 인벤토리 인스턴스를 고유 id로 식별하므로 같은 이름/강화 단계의 장비가 여러 개여도 각각 별개 항목임.
+function restoreSelectableItems(){
+  const list = [];
+  EQUIP_INVENTORY_POOLS.forEach(pool => {
+    const items = (typeof pool.items === 'function' ? pool.items() : pool.items) || [];
+    items.forEach(item => {
+      if(!item.damaged) return;
+      list.push({ kind: pool.kind, id: item.id, type: item.type, level: item.level, item, worn: isEquipInstanceWorn(pool.kind, item.id) });
+    });
+  });
+  return list;
+}
+// 선택해둔 대상(target = { kind, itemId }) → { item, type } — 인벤토리에서 고유 id로 다시 조회하며, 이미 없어졌거나
+// 더 이상 손상 상태가 아니면 null(복구 진행 불가).
+function resolveRestoreTarget(target){
+  if(!target || target.itemId == null) return null;
+  const found = inventoryInstanceByKindAndId(target.kind, target.itemId);
+  if(!found || !found.item.damaged) return null;
+  return found;
+}
+// 재료 충족 여부(일반 재료 자동 인식 — craftResourceOwnedCount) + 골드 충족 여부
+function restoreMaterialsSatisfied(type){
+  return restoreMaterialsFor(type).every(m => {
+    const resource = findCraftResource(m.name);
+    return !!resource && craftResourceOwnedCount(resource) >= m.need;
+  });
+}
+function restoreCanProceed(target){
+  const found = resolveRestoreTarget(target);
+  if(!found) return false;
+  return state.gold >= restoreCostFor(found.type) && restoreMaterialsSatisfied(found.type);
 }
 
 // ---- 무기 스탯 조회 ----
@@ -328,6 +398,11 @@ function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
 
 // ---- 무기 툴팁(인벤토리/상점/던전 등 모든 화면 공통) ----
 // 플레이어 스탯/버프는 전혀 반영하지 않고, 무기 데이터에 저장된 기본값만 표시함.
+// 툴팁의 방어도처럼 "양수는 + 기호를 붙이고 음수는 - 기호 그대로" 표시해야 하는 수치 문구(0은 기호 없이 0).
+// 예) 6 → "+6", -8 → "-8", 0 → "0". 방어도가 양수인 보조 무기(그림자 비수 +6 등)가 생기면서 신설함.
+function signedStatText(n){
+  return (typeof n === 'number' && n > 0) ? '+' + n : String(n);
+}
 function wtipRow(label, value){
   return `<div>${label ? `<span style="color:var(--forge-cream-dim);">${label}</span> ` : ''}<span style="color:var(--forge-gold);">${value}</span></div>`;
 }
@@ -345,11 +420,11 @@ function tooltipSellPriceHtml(value, reduced){
 // 장비(무기/방어구/장신구/보조) 툴팁용. currentDurability를 넘기지 않는 화면(상점/도감/미리보기 등 실제
 // 인스턴스가 없는 곳)은 다른 내구도 표시와 동일하게 항상 최대 내구도(=감소 없음)로 취급함. 내구도 감소 여부는
 // damaged 플래그가 아니라 현재/최대 내구도를 직접 비교해서 판단(내구도 시스템이 없는 종류는 항상 노란색).
-function equipTooltipSellPriceHtml(type, level, currentDurability){
+function equipTooltipSellPriceHtml(type, level, currentDurability, damaged){
   const w = wpn(type);
   if(!w || !Array.isArray(w.sell) || w.sell[level] == null) return ''; // 판매 데이터가 없는 항목은 표시 생략
-  const value = durabilityAdjustedSellValue(sellValueFor(type, level), { type, currentDurability });
-  const max = maxDurabilityFor(type);
+  const value = durabilityAdjustedSellValue(sellValueFor(type, level), { type, currentDurability, damaged });
+  const max = maxDurabilityForItem({ type, damaged });
   const cur = currentDurability != null ? currentDurability : max;
   return tooltipSellPriceHtml(value, max != null && cur < max);
 }
@@ -382,7 +457,7 @@ function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   if(kindLabel) html += wtipRow('무기 종류', kindLabel);
 
   // 3-2. 내구도 — 무기 종류 아래, 공격력 위(요구사항 6번)
-  html += durabilityTooltipLine(type, currentDurability);
+  html += durabilityTooltipLine(type, currentDurability, damaged);
 
   // 4. 공격력 — 손상된 아이템은 해당 강화단계 공격력의 80%로 표시(요청사항 12번, 다른 수치는 그대로 유지)
   const rawAtk = atkFor(type, lvl);
@@ -404,7 +479,7 @@ function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   const reqText = weaponRequirementText(type);
   if(reqText) html += wtipRow('착용 제한 :', reqText);
 
-  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
   html += `</div>`;
   return html;
@@ -431,10 +506,10 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
   const kindLabel = armorKindLabel(type);
   if(kindLabel) html += wtipRow('', kindLabel);
 
-  html += durabilityTooltipLine(type, currentDurability);
+  html += durabilityTooltipLine(type, currentDurability, damaged);
 
   const def = defenseFor(type, lvl);
-  if(def != null) html += wtipRow('방어도', def);
+  if(def != null) html += wtipRow('방어도', signedStatText(def)); // 양수면 +6처럼 + 기호 표시
   const hp = armorHpFor(type, lvl);
   if(hp != null) html += wtipRow('체력', hp);
   const mana = armorManaFor(type, lvl);
@@ -446,7 +521,7 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('레벨 제한 :', `레벨 ${a.levelReq} 이상`);
 
-  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
   html += `</div>`;
   return html;
@@ -554,8 +629,9 @@ function canEquipTwoHandedWeapon(){ return state.equippedSubId == null; }
 function wornEquipmentItems(){ return wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()); }
 // 착용 중인 방어구+장신구+아티팩트 전체의 방어도 합산.
 function playerTotalDefense(){
-  return wornEquipmentItems().reduce((sum, item) => sum + (isEquipDurabilityZero(item) ? 0 : (defenseFor(item.type, item.level) || 0)), 0)
+  const flat = wornEquipmentItems().reduce((sum, item) => sum + (isEquipDurabilityZero(item) ? 0 : (defenseFor(item.type, item.level) || 0)), 0)
     + artifactDefenseBonus(); // 사각 방패 등 방어도를 갖는 아티팩트 합산
+  return applyPercentBonus(flat, 'defense');
 }
 // 착용 중인 방어구+장신구 전체의 체력/마나/치명타 보너스 합산. key: 'hp' | 'mana' | 'crit'
 function armorStatBonus(key){
@@ -588,10 +664,10 @@ function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
   const kindLabel = accessoryKindLabel(type);
   if(kindLabel) html += wtipRow('', kindLabel);
 
-  html += durabilityTooltipLine(type, currentDurability);
+  html += durabilityTooltipLine(type, currentDurability, damaged);
 
   const def = defenseFor(type, lvl);
-  if(def != null) html += wtipRow('방어도', def);
+  if(def != null) html += wtipRow('방어도', signedStatText(def)); // 양수면 +6처럼 + 기호 표시
   const hp = armorHpFor(type, lvl);
   if(hp != null) html += wtipRow('체력', hp);
   const mana = armorManaFor(type, lvl);
@@ -603,7 +679,7 @@ function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
 
-  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
   html += `</div>`;
   return html;
@@ -627,10 +703,10 @@ function buildSubTooltipHtml(type, level, damaged, currentDurability){
   const kindLabel = subKindLabel(type);
   if(kindLabel) html += wtipRow('', kindLabel);
 
-  html += durabilityTooltipLine(type, currentDurability);
+  html += durabilityTooltipLine(type, currentDurability, damaged);
 
   const def = defenseFor(type, lvl);
-  if(def != null) html += wtipRow('방어도', def);
+  if(def != null) html += wtipRow('방어도', signedStatText(def)); // 양수면 +6처럼 + 기호 표시
   const hp = armorHpFor(type, lvl);
   if(hp != null) html += wtipRow('체력', hp);
   const mana = armorManaFor(type, lvl);
@@ -640,7 +716,7 @@ function buildSubTooltipHtml(type, level, damaged, currentDurability){
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
 
-  html += equipTooltipSellPriceHtml(type, lvl, currentDurability); // 최하단 판매 가격(점선 구분)
+  html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
   html += `</div>`;
   return html;
@@ -1260,21 +1336,13 @@ function skillVerticalTabOf(skill){
   if(skill.target === 'buff') return 'buff';
   return 'attack';
 }
-// 공용/특화가 스킬 포인트를 공유하기 때문에 생기는 습득 제한(요구사항 4번, 기획문서 20-6 갱신):
-// 같은 레벨 제한 + 같은 종류(공격/버프/패시브)의 스킬은 하나만 습득 가능 — 단, 사용자 요청으로 이 제한은
-// 이제 패시브에만 적용됨(같은 레벨의 패시브 스킬끼리만 하나 선택). 공격/버프는 레벨이 같고 종류가 같아도
-// 전부 습득 가능하도록 완화됨(예: 사연격/발목 가르기처럼 같은 레벨의 공격 스킬 2종을 동시에 배울 수 있음).
-// 기연(awakening)은 별도 포인트를 쓰므로 애초에 이 제한 자체가 적용되지 않음(kind 무관하게 항상 false).
+// 공용/특화가 스킬 포인트를 공유하기 때문에 있었던 습득 제한(기획문서 20-6): 같은 레벨 제한 + 같은
+// 종류(공격/버프/패시브)의 패시브 스킬은 하나만 습득 가능하게 막던 규칙. 사용자 요청으로 이 제한 자체를
+// 완전히 삭제 — 이제 패시브도 같은 레벨의 공격/버프 스킬(예: 사연격/발목 가르기)과 동일하게 같은 레벨에
+// 여러 개를 동시에 습득할 수 있음(공용/특화 모두 동일하게 적용). 기연(awakening)은 원래부터 이 제한이
+// 적용되지 않았으므로(별도 포인트 사용) 세 분류 모두 지금은 같은 방식(제한 없음)으로 동작함.
 function hasConflictingLearnedSkill(id){
-  const s = SKILLS[id];
-  if(!s || s.category === 'awakening') return false;
-  const kind = skillKindOf(s);
-  if(kind !== 'passive') return false;
-  return (state.learnedSkills || []).some(otherId => {
-    if(otherId === id) return false;
-    const other = SKILLS[otherId];
-    return other && other.levelReq === s.levelReq && skillKindOf(other) === kind;
-  });
+  return false;
 }
 // ---- 스킬 설명(desc) 변수 자동 치환 ----
 // skill 객체 안에서 fieldName 값을 찾음. 최상위 필드(damagePercent, hits 등)를 먼저 보고, 없으면
@@ -1522,12 +1590,62 @@ function artifactStatBonus(stat){
 // 않은 장비의 스탯은 포함되지 않으며(artifactStatBonus가 isArtifactEquipped/weaponUniqueOptionActive로
 // "착용/활성화 중"인 것만 골라 더하므로 자동 보장됨), 방어구/장신구가 나중에 원시 스탯 보너스를 갖게
 // 되더라도 artifactStatBonus 안에 이어서 추가하기만 하면 이 함수도 코드 수정 없이 자동 반영됨.
+// ---- 능력치 % 보정 공통 구조 ----
+// 목적: 앞으로 총 공격력/최대 체력/최대 마나/힘/민첩/지능/방어도처럼 "플랫 수치를 그대로 더하는" 능력치에
+// 패시브 스킬/장비/아티팩트/칭호 등 어떤 시스템에서든 "%N 증가" 옵션이 추가될 수 있도록, 계산의 마지막
+// 단계(플랫 합계 산출 이후)를 공통 함수로 분리해둔 것. 공격속도/치명타 확률/회피%처럼 이미 자체적으로
+// %로만 계산되는 능력치는 이 구조를 적용하지 않고 각자의 기존 계산 방식을 그대로 유지함(설계 문서 3번).
+//
+// 사용법: 각 능력치 함수는 "플랫 기여분을 전부 더한 값(flatTotal)"을 구한 뒤 곧바로 반환하지 않고
+// applyPercentBonus(flatTotal, '능력치 키')를 거쳐서 반환한다. PERCENT_BONUS_SOURCES에 등록된 함수들이
+// 그 키에 해당하는 % 값(없으면 0)을 각각 반환하고, 그 값들을 전부 "합연산"한 뒤 딱 한 번 곱해서 적용한다
+// (문서 1번: 여러 %가 있어도 서로 곱하지 않고 먼저 더한 뒤 한 번만 적용). 새 시스템이 % 보정을 추가하려면
+// 이 배열에 소스 함수 하나만 추가하면 되고, applyPercentBonus를 이미 거치는 능력치 함수들은 손댈 필요가
+// 전혀 없음(문서 4, 5번).
+//
+// 현재는 실제 % 옵션을 가진 패시브/장비가 하나도 없어 아래 두 소스 함수가 항상 0을 반환하므로, applyPercentBonus는
+// 항상 flatTotal을 그대로 반환한다 — 즉 이번 작업 전후로 기존 능력치 계산 결과는 완전히 동일함(문서 6번).
+// 다음 단계에서 실제 %패시브가 추가되면 이 두 함수 중 하나(주로 learnedPassiveSkillPercentBonus)의 내부
+// 로직만 채우면 되고, 아래에서 applyPercentBonus를 호출하는 effectiveAtk 등은 전혀 수정할 필요가 없다.
+//
+// 능력치 키: 'atk'(총 공격력) / 'maxHp'(최대 체력) / 'maxMp'(최대 마나) / 'str'/'agi'/'int'(힘/민첩/지능) /
+// 'defense'(총 방어도) — 캐릭터 정보창 계산 내역 툴팁(combatStatBreakdown)에서 쓰는 키와 동일하게 맞춤.
+const PERCENT_BONUS_SOURCES = [
+  learnedPassiveSkillPercentBonus, // 패시브 스킬의 %증가 옵션(예: 극력/신력/무극의 공격력%, 금강체/불괴체의 체력%)
+  equipmentPercentBonus,           // 장비/아티팩트 고유 옵션의 %증가 옵션 — 아직 실제 데이터 없어 항상 0
+];
+// 능력치 키(combatStatBreakdown과 동일) → 패시브 스킬 passiveEffect에서 조회할 필드명. 새 %패시브를
+// 추가할 때 이 표에 statKey가 이미 있으면(atk/maxHp 등) SKILLS 데이터에 그 필드만 채우면 자동 반영되고,
+// 완전히 새로운 능력치라면 여기에 한 줄만 추가하면 됨(learnedPassiveSkillPercentBonus 등은 수정 불필요).
+const PERCENT_EFFECT_KEY_BY_STAT = {
+  atk: 'atkPercent', maxHp: 'hpPercent', maxMp: 'manaPercent',
+  str: 'strPercent', agi: 'agiPercent', int: 'intPercent', defense: 'defensePercent',
+};
+function learnedPassiveSkillPercentBonus(statKey){
+  const effectKey = PERCENT_EFFECT_KEY_BY_STAT[statKey];
+  // 실제 %패시브 데이터를 이 자리에서 조회 — learnedPassiveSkillBonus를 그대로 재사용(새 효과 키만 추가된
+  // 것이므로 별도 합산 로직을 새로 만들지 않음). 아직 해당 키의 %패시브가 없는 statKey는 항상 0.
+  return effectKey ? learnedPassiveSkillBonus(effectKey) : 0;
+}
+function equipmentPercentBonus(statKey){
+  return 0; // 아직 %옵션을 가진 장비/아티팩트 고유 옵션이 없음 — 생기면 여기에 채움
+}
+function totalPercentBonus(statKey){
+  return PERCENT_BONUS_SOURCES.reduce((sum, fn) => sum + (fn(statKey) || 0), 0);
+}
+function applyPercentBonus(flatTotal, statKey){
+  const pct = totalPercentBonus(statKey);
+  // %가 실제로 적용될 때만 반올림 — 이 능력치들은 원래 전부 정수이므로(총 공격력/체력/마나/힘/민첩/지능/
+  // 방어도), % 적용으로 생기는 소수점만 정리함. %가 0(현재 %패시브가 없는 능력치는 항상 이쪽)이면 기존과
+  // 완전히 동일한 값을 그대로 반환(회귀 없음).
+  return pct ? Math.round(flatTotal * (1 + pct / 100)) : flatTotal;
+}
 function effectiveStats(){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
   return {
-    str: (s.str || 0) + artifactStatBonus('str'),
-    agi: (s.agi || 0) + artifactStatBonus('agi'),
-    int: (s.int || 0) + artifactStatBonus('int'),
+    str: applyPercentBonus((s.str || 0) + artifactStatBonus('str') + learnedPassiveSkillBonus('strFlat'), 'str'),
+    agi: applyPercentBonus((s.agi || 0) + artifactStatBonus('agi') + learnedPassiveSkillBonus('agiFlat'), 'agi'),
+    int: applyPercentBonus((s.int || 0) + artifactStatBonus('int') + learnedPassiveSkillBonus('intFlat'), 'int'),
   };
 }
 // 착용 중인 방어구+장신구+아티팩트 전체의 방어도 합산. 아티팩트는 방어형 장비 목록(wornEquipmentItems)에
@@ -1548,7 +1666,7 @@ function effectiveMaxHp(level){
   hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
   hp += armorStatBonus('hp'); // 착용 중인 방어구의 체력 보너스 합산
   hp += weaponUniqueOptionStatBonus('maxHp'); // 착용 무기의 고유 옵션 중 고정 체력 보너스(예: 반월대도, 제령도) 합산
-  return hp;
+  return applyPercentBonus(hp, 'maxHp');
 }
 function effectiveMaxMp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
@@ -1558,7 +1676,7 @@ function effectiveMaxMp(level){
   if(isArtifactEquipped('foxorb')) mp += 500; // 지능 보너스와 별개로 적용되는 고정 마나 보너스
   mp += armorStatBonus('mana'); // 착용 중인 방어구의 마나 보너스 합산
   mp += weaponUniqueOptionStatBonus('maxMana'); // 착용 무기의 고유 옵션 중 고정 마나 보너스(예: 제령도) 합산
-  return mp;
+  return applyPercentBonus(mp, 'maxMp');
 }
 function effectiveAtkSpeed(type, level, durabilityZero){
   if(durabilityZero) return 0; // 내구도 0 — 무기 자체의 공격속도 비활성화(요구사항 7번)
@@ -1580,7 +1698,11 @@ function effectiveAtk(type, level, damaged, durabilityZero){
   // 힘/민첩/버프 보너스는 손상과 마찬가지로 영향받지 않음.
   const baseAtk = atkFor(type, level);
   const itemAtk = durabilityZero ? 0 : (damaged ? Math.round(baseAtk * 0.8) : baseAtk);
-  return itemAtk + str * 4 + agi * 1 + activeBuffBonus('atkFlat');
+  // 착용 중인 방어구/보조/장신구 고유 옵션의 고정 공격력 보너스(statBonus.atkFlat, 예: 그림자 비수 +50)도 버프의
+  // atkFlat과 같은 방식(아이템 공격력 + 스탯 보너스 뒤에 그대로 더함)으로 합산 — 착용 중일 때만 적용됨.
+  // learnedPassiveSkillBonus('atkFlat'): 습득한 패시브 스킬(단련/강력/철력/패력 등)의 고정 공격력 보너스.
+  const flat = itemAtk + str * 4 + agi * 1 + activeBuffBonus('atkFlat') + armorUniqueOptionStatBonus('atkFlat') + learnedPassiveSkillBonus('atkFlat');
+  return applyPercentBonus(flat, 'atk');
 }
 // 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
 // 미리보기에서 그대로 쓰이고(무기 하나만의 값을 보여줘야 하므로), 실제 전투 판정과 캐릭터 정보창의
@@ -1599,6 +1721,9 @@ function effectiveCritChance(type, level, durabilityZero){
   // 방어구/보조/장신구의 강화 단계별 성장형 치명타 확률 고유 옵션(예: 매의 투구) 합산 — 무기의
   // weaponUniqueOptionGrowthStat과 대응되는 방어구 쪽 경로. 소수점 단위(4.2%처럼)도 그대로 더해짐.
   bonus += armorUniqueOptionGrowthStat('critRate');
+  // 방어구/보조/장신구의 "고정형" 치명타 확률 고유 옵션(statBonus.critRate, 예: 그림자 비수 +4%)도 합연산 —
+  // 위 성장형과 별개 경로이며, 착용 중이고 내구도가 0이 아닐 때만 armorUniqueOptionStatBonus가 값을 돌려줌.
+  bonus += armorUniqueOptionStatBonus('critRate');
   // 무기 자체의 "치명타 확률 증가" 계열 고유 옵션(effectId: crit_chance_bonus)도 합연산 적용.
   // 다른 무기가 같은 effectId로 고유 옵션을 등록해도 이 함수를 수정할 필요 없이 자동으로 반영됨.
   // 내구도 0(durabilityZero)이면 이 옵션도 비활성화됨(요구사항 7번).
@@ -1610,24 +1735,203 @@ function effectiveCritChance(type, level, durabilityZero){
   return (durabilityZero ? 0 : critChanceFor(type, level)) + bonus;
 }
 
+// ---- 캐릭터 정보창 [세부 능력치] 계산 내역 툴팁 ----
+// 총 공격력/공격속도/치명타 확률/방어도 무시/총 방어도 각 최종 수치가 어디서 왔는지 "스탯/장비/
+// 스킬 패시브/기타" 4가지 고정 분류로 보여주기 위한 것. 새로운 계산식을 만들지 않고, 위 effectiveAtk/
+// effectiveAtkSpeed/effectiveCritChance/playerDefenseIgnore/playerTotalDefense가 실제로 더하는 항목
+// (artifactStatBonus/activeBuffBonus/armorUniqueOptionStatBonus 등, 전부 기존 함수 그대로 재호출)에
+// 이름표만 붙인다 — 그래서 여기서 반환하는 parts의 합은 항상 저 함수들의 실제 반환값과 정확히 같다
+// (atk/critChance/defenseIgnore/defense) 또는 각 항목이 실제로 곱해지는 순서 그대로다(atkSpeed, 아래 참고).
+// 분류 기준: 스탯=state.stats에 직접 투자한 원시 스탯 자체의 기여분 / 장비=착용 중인 무기·방어구·보조·
+// 장신구·아티팩트(그 자체 수치+고유 옵션+장비가 늘려준 스탯분 포함) / 스킬 패시브=버프 스킬·패시브 스킬
+// 효과. 현재 프로젝트에는 위 세 분류에 속하지 않는 기여 요소가 없어 "기타"가 실제로 표시되는 경우는
+// 아직 없지만, 앞으로 칭호·세트 효과 등 새 시스템이 추가되면 그 항목만 category:'기타'로 이 목록에 한
+// 줄 추가하면 되도록 열어둠 — 기존 항목들의 계산 방식·순서는 전혀 건드리지 않음.
+// ctx: { type, level, damaged, durabilityZero } — buildCharCombatStatsHtml에서 이미 구한 착용 무기
+// 정보를 그대로 넘겨받아 사용(별도로 다시 구하지 않음).
+function combatStatBreakdown(key, ctx){
+  ctx = ctx || {};
+  const type = ctx.type, level = ctx.level, damaged = ctx.damaged, durabilityZero = ctx.durabilityZero;
+  const parts = [];
+  // text가 지정된 항목(공격속도처럼 값이 서로 다른 단위라 하나로 합산할 수 없는 경우)은 값이 0이어도
+  // 호출부에서 이미 조건문으로 걸렀으므로 그대로 표시하고, 그 외(합산 가능한 수치형 항목)는 기여값이
+  // 0이면 표시하지 않는다(요구사항 4번 "기여한 분류만 표시").
+  const push = (category, label, value, text, isPercent) => {
+    if(text === undefined && !value) return;
+    parts.push({ category, label, value, text, isPercent: !!isPercent });
+  };
+  if(key === 'atk'){
+    const str = (state.stats && state.stats.str) || 0;
+    const agi = (state.stats && state.stats.agi) || 0;
+    const baseAtk = atkFor(type, level);
+    const itemAtk = durabilityZero ? 0 : (damaged ? Math.round(baseAtk * 0.8) : baseAtk);
+    push('장비', damaged && !durabilityZero ? '무기 공격력(손상)' : '무기 공격력', itemAtk);
+    push('스탯', '힘', str * 4);
+    push('스탯', '민첩', agi * 1);
+    push('장비', '장비 스탯 보너스(힘)', artifactStatBonus('str') * 4);
+    push('장비', '장비 스탯 보너스(민첩)', artifactStatBonus('agi') * 1);
+    push('장비', '장비 고유 옵션', armorUniqueOptionStatBonus('atkFlat'));
+    push('스킬/패시브', '전투 버프', activeBuffBonus('atkFlat'));
+    push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus('atkFlat'));
+  } else if(key === 'atkSpeed'){
+    // 곱연산 체인이라 하나의 숫자로 합산해 표시할 수 없으므로(요구사항 5번), 실제 effectiveAtkSpeed와
+    // 완전히 동일한 순서로 각 항목을 그대로 나열함 — 값 대신 그 항목이 실제로 적용하는 배율/증가율 텍스트.
+    if(durabilityZero) return parts; // 내구도 0 — 공격속도 자체가 0으로 고정되어 세부 항목이 의미 없음
+    push('장비', '무기 기본 공격속도', null, `${atkSpeedFor(type, level).toFixed(2)}회/초`);
+    if(isArtifactEquipped('batwing')) push('장비', '박쥐 날개(아티팩트)', null, '+5%');
+    const agi = (state.stats && state.stats.agi) || 0;
+    if(agi) push('스탯', '민첩', null, `+${(agi * 0.15).toFixed(2)}%`);
+    const agiBonus = artifactStatBonus('agi');
+    if(agiBonus) push('장비', '장비 스탯 보너스(민첩)', null, `+${(agiBonus * 0.15).toFixed(2)}%`);
+    const buffPct = activeBuffBonus('atkSpeedPercent');
+    if(buffPct) push('스킬/패시브', '전투 버프', null, `+${buffPct}%`);
+    const optPct = weaponUniqueOptionStatBonus('atkSpeedPercent');
+    if(optPct) push('장비', '무기 고유 옵션', null, `+${optPct}%`);
+  } else if(key === 'crit'){
+    const agi = (state.stats && state.stats.agi) || 0;
+    push('장비', '무기 기본 치명타 확률', durabilityZero ? 0 : critChanceFor(type, level));
+    push('장비', '아티팩트 치명타 보너스', (isArtifactEquipped('oldarmguard') ? 3 : 0) + (isArtifactEquipped('blackarmguard') ? 8 : 0));
+    push('스탯', '민첩', agi * 0.1);
+    push('장비', '장비 스탯 보너스(민첩)', artifactStatBonus('agi') * 0.1);
+    push('장비', '방어구/보조/장신구 치명타 확률', armorStatBonus('crit'));
+    push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('critRate'));
+    push('장비', '방어구 고유 옵션(성장형)', armorUniqueOptionGrowthStat('critRate'));
+    push('장비', '방어구 고유 옵션', armorUniqueOptionStatBonus('critRate'));
+    const opt = wpn(type).uniqueOption;
+    if(!durabilityZero && opt && opt.effectId === 'crit_chance_bonus' && weaponUniqueOptionActive(type, level)){
+      push('장비', '무기 고유 옵션(성장형)', weaponUniqueOptionChance(type, level) || 0);
+    }
+  } else if(key === 'defenseIgnore'){
+    push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('defenseIgnore'));
+    push('장비', '무기 고유 옵션(성장형)', weaponUniqueOptionGrowthStat('defenseIgnore'));
+    push('장비', '방어구/보조/장신구 고유 옵션', armorUniqueOptionStatBonus('defenseIgnore'));
+    push('장비', '방어구/보조/장신구 고유 옵션(성장형)', armorUniqueOptionGrowthStat('defenseIgnore'));
+  } else if(key === 'defense'){
+    wornEquipmentItems().forEach(item => {
+      if(isEquipDurabilityZero(item)) return;
+      const def = defenseFor(item.type, item.level);
+      if(def) push('장비', wpn(item.type).name, def);
+    });
+    push('장비', '아티팩트 방어도 보정', artifactDefenseBonus());
+  } else if(key === 'str' || key === 'agi' || key === 'int'){
+    // [세부 능력치] 2페이지 힘/민첩/지능 — effectiveStats()의 각 스탯이 정확히 이 두 항목의 합이므로
+    // (state.stats[stat] + artifactStatBonus(stat)), 그 두 항목에만 이름표를 붙임. artifactStatBonus
+    // 자체가 아티팩트 고정 보너스+무기/방어구 고유 옵션(고정형·성장형)을 이미 전부 합산해 반환하므로
+    // (위 effectiveAtk 등과 동일한 함수를 그대로 재사용) 여기서 다시 그 내부를 쪼개 하드코딩하지 않음.
+    push('스탯', '투자한 스탯', (state.stats && state.stats[key]) || 0);
+    push('장비', '장비 스탯 보너스', artifactStatBonus(key));
+    push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus(key + 'Flat'));
+  } else if(key === 'maxHp'){
+    const lv = state.playerLevel;
+    const str = (state.stats && state.stats.str) || 0;
+    push('기타', '레벨 기본 체력', playerBaseHp(lv));
+    push('스탯', '힘', str * 20);
+    push('장비', '장비 스탯 보너스(힘)', artifactStatBonus('str') * 20);
+    if(isArtifactEquipped('antlerflag')) push('장비', `${ARTIFACTS.antlerflag.name}(아티팩트)`, 200);
+    // squareshield: 과거 아티팩트가 zip117에서 삭제되어 isArtifactEquipped('squareshield')는 항상
+    // false로만 평가됨(effectiveMaxHp의 해당 분기와 완전히 동일한, 이미 알려진 죽은 코드 — data.js의
+    // SUB_TYPES.squareshield 주석 참고) — 그래서 이 줄은 실제로는 절대 표시되지 않지만, 실제 계산
+    // 함수와 100% 동일한 조건을 그대로 옮겨왔다는 원칙(요구사항 1번)을 지키기 위해 그대로 둠.
+    if(isArtifactEquipped('squareshield')) push('장비', '사각방패(아티팩트)', 300);
+    push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus('hpFlat'));
+    push('장비', '방어구/보조/장신구 체력 보너스', armorStatBonus('hp'));
+    push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('maxHp'));
+  } else if(key === 'maxMp'){
+    const lv = state.playerLevel;
+    const int = (state.stats && state.stats.int) || 0;
+    push('기타', '레벨 기본 마나', playerBaseMp(lv));
+    push('스탯', '지능', int * 30);
+    push('장비', '장비 스탯 보너스(지능)', artifactStatBonus('int') * 30);
+    if(isArtifactEquipped('ring')) push('장비', `${ARTIFACTS.ring.name}(아티팩트)`, 150);
+    if(isArtifactEquipped('foxorb')) push('장비', `${ARTIFACTS.foxorb.name}(아티팩트)`, 500);
+    push('장비', '방어구/보조/장신구 마나 보너스', armorStatBonus('mana'));
+    push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('maxMana'));
+  }
+  // 플랫 항목을 전부 나열한 뒤, 이 능력치에 실제로 % 보정이 붙어있으면(현재는 패시브 스킬만 실제 데이터가
+  // 있음) 그 출처를 그대로 한 줄씩 더 보여줌 — applyPercentBonus가 실제로 곱하는 것과 동일한 값이라
+  // "위 항목 합계 → 최종 수치"가 실제 계산과 정확히 일치한다(사용자 확인 요청 사항).
+  if(PERCENT_EFFECT_KEY_BY_STAT[key]){
+    const pctPassive = learnedPassiveSkillPercentBonus(key);
+    if(pctPassive) push('스킬/패시브', '패시브 스킬(%)', null, `${pctPassive > 0 ? '+' : ''}${pctPassive}%`, true);
+    const pctEquip = equipmentPercentBonus(key);
+    if(pctEquip) push('장비', '장비 옵션(%)', null, `${pctEquip > 0 ? '+' : ''}${pctEquip}%`, true);
+  }
+  return parts;
+}
+// 위 combatStatBreakdown(key, ctx)의 결과를 실제 툴팁 HTML로 그려줌 — 기여한 분류만(요구사항 4번)
+// "스탯→장비→스킬 패시브→기타" 고정 순서로, 각 분류 안에서는 항목별 라벨+수치를 그대로 나열함.
+function formatSignedBreakdownValue(v){
+  const rounded = Math.round(v * 100) / 100;
+  const sign = rounded > 0 ? '+' : '';
+  return sign + (Number.isInteger(rounded) ? rounded : rounded.toFixed(2));
+}
+function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
+  const parts = combatStatBreakdown(key, ctx);
+  const order = ['스탯', '장비', '스킬/패시브', '기타'];
+  const grouped = order.map(cat => ({ cat, items: parts.filter(p => p.category === cat) })).filter(g => g.items.length);
+  let html = `<div style="text-align:center; color:var(--forge-gold); font-weight:700; margin-bottom:6px;">${titleLabel} ${totalText}</div>`;
+  if(grouped.length === 0){
+    html += `<div style="text-align:center; color:var(--forge-cream-dim);">기여 항목 없음</div>`;
+    return html;
+  }
+  grouped.forEach(g => {
+    html += `<div style="color:var(--forge-cream-dim); font-size:10.5px; letter-spacing:1px; margin-top:6px;">${g.cat}</div>`;
+    g.items.forEach(p => {
+      const valueText = p.text !== undefined ? p.text : formatSignedBreakdownValue(p.value);
+      html += `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${p.label}</span><span style="color:var(--forge-cream);">${valueText}</span></div>`;
+    });
+  });
+  if(key === 'atkSpeed'){
+    html += `<div style="margin-top:6px; font-size:10.5px; color:var(--forge-cream-dim);">각 항목이 순서대로 곱해져 계산됩니다.</div>`;
+  } else if(parts.some(p => p.isPercent)){
+    // % 보정이 실제로 붙은 경우에만: 위에서 나열한 플랫 항목들의 합계에 % 항목이 한 번에 곱해져 최종
+    // 수치가 나온다는 것을 안내(applyPercentBonus와 완전히 동일한 순서 — 요구사항: % 적용이 정확히
+    // 이루어지는지 확인 가능하도록).
+    html += `<div style="margin-top:6px; font-size:10.5px; color:var(--forge-cream-dim);">위 플랫 항목의 합계에 %가 적용된 값이 최종 수치입니다.</div>`;
+  }
+  return html;
+}
+
 // ---- 상점 "개수 지정 구매" 팝업 공용 헬퍼 ----
 // 상점의 모든 구매 가능 아이템은 buy-weapon(무기/방어구/장신구 공용) / buy-consumable / buy-artifact
 // 세 data-action 중 하나로 처리되므로(buildShopCardHtml 참고), 이 action 값 + typeId만으로 단가·최대
 // 구매 가능 개수·아이콘/툴팁을 구하는 범용 함수만 두면 됨 — 새 무기/방어구/장신구/소비 아이템/아티팩트가
 // 추가돼도(즉, 이 세 카테고리 중 하나로 등록되는 한) 별도 코드 없이 개수 지정 구매 UI가 자동으로 적용됨.
+// ---- 상점 판매(소비/마석/기타) — 같은 팝업(buyQtyModal)을 "판매 모드"로 재사용함 ----
+// 판매 모드는 buyQtyState.action이 sell-consumable(소비 아이템) / sell-misc(마석·기타 아이템)일 때이며, 이 값은 상점 카드의
+// data-action과 동일함(마석/기타는 둘 다 sell-misc — 실제 분류는 MISC_ITEMS[id].itemClass로 구분).
+function isShopSellAction(action){ return action === 'sell-consumable' || action === 'sell-misc'; }
+// 판매 대상 아이템 데이터(없으면 null) — 소비: CONSUMABLES, 마석/기타: MISC_ITEMS(stateKey로 보유 수량 조회)
+function shopSellItemDef(action, typeId){
+  if(action === 'sell-consumable') return CONSUMABLES[typeId] || null;
+  if(action === 'sell-misc') return MISC_ITEMS[typeId] || null;
+  return null;
+}
+// 현재 보유 수량(= 최대 판매 가능 수량) — 실제 저장 위치에서 매번 다시 읽음
+function shopSellOwnedCount(action, typeId){
+  const item = shopSellItemDef(action, typeId);
+  if(!item) return 0;
+  if(action === 'sell-consumable') return (state.consumables && state.consumables[typeId]) || 0;
+  return state[item.stateKey] || 0;
+}
 function shopBuyUnitPrice(action, typeId){
+  if(isShopSellAction(action)){ const it = shopSellItemDef(action, typeId); return it ? (it.sellPrice || 0) : 0; } // 판매 모드: 개당 판매 가격(장비 내구도 보정 없음)
   if(action === 'buy-weapon') return weaponBuyPrice(typeId); // wpn()이 무기/방어구/장신구 세 테이블을 모두 조회
   if(action === 'buy-consumable') return (CONSUMABLES[typeId] || {}).buyPrice || 0;
   if(action === 'buy-artifact') return (ARTIFACTS[typeId] || {}).buyPrice || 0;
   return 0;
 }
 // 지금 상태(보유 골드/장비 공용 슬롯 여유분/아티팩트 보유 여부) 기준으로 실제 구매 가능한 최대 개수.
-// "최대 100개 / 보유 골드로 가능한 수량 / (장비라면) 남은 인벤토리 슬롯" 중 가장 작은 값.
+// "최대 100개(소비 아이템은 999개) / 보유 골드로 가능한 수량 / (장비라면) 남은 인벤토리 슬롯" 중 가장 작은 값.
+const SHOP_BUY_MAX_QTY = 100;             // 무기/방어구/장신구/아티팩트 구매창의 기존 최대 구매 개수
+const SHOP_BUY_MAX_QTY_CONSUMABLE = 999;  // 소비 아이템(buy-consumable) 구매창 전용 최대 구매 개수
 function shopBuyMaxQty(action, typeId){
+  if(isShopSellAction(action)) return shopSellOwnedCount(action, typeId); // 판매 모드: 최대 = 현재 보유 수량
   const price = shopBuyUnitPrice(action, typeId);
   if(price <= 0) return 0;
   const goldMax = Math.floor(state.gold / price);
-  let cap = 100;
+  const hardMax = action === 'buy-consumable' ? SHOP_BUY_MAX_QTY_CONSUMABLE : SHOP_BUY_MAX_QTY;
+  let cap = hardMax;
   if(action === 'buy-weapon'){
     // 무기/방어구/장신구는 공용 장비 인벤토리 슬롯(INV_MAX)을 공유함(totalEquipInventoryCount 참고).
     cap = INV_MAX - totalEquipInventoryCount();
@@ -1637,7 +1941,7 @@ function shopBuyMaxQty(action, typeId){
     if(ownsArtifact(typeId)) return 0;
     cap = 1;
   }
-  return Math.max(0, Math.min(100, goldMax, cap));
+  return Math.max(0, Math.min(hardMax, goldMax, cap));
 }
 // 개수 지정 구매 팝업 상단에 표시할 아이콘/툴팁 — 기존 상점 카드가 쓰는 아이콘 출력 규칙·툴팁 함수를
 // 그대로 재사용함(무기/방어구/장신구는 buildWeaponShopCardHtml과 동일한 분기, 소비 아이템/아티팩트도
@@ -1651,11 +1955,21 @@ function shopBuyItemDisplay(action, typeId){
       : buildWeaponTooltipHtml(typeId, 0);
     return { iconHtml: weaponIconHtml(typeId, 'shop-icon-img'), tooltipHtml, borderColor: weaponNameColor(typeId, 0) };
   }
-  if(action === 'buy-consumable'){
+  if(action === 'buy-consumable' || action === 'sell-consumable'){
     const item = CONSUMABLES[typeId];
     // 실제 아이템 아이콘(PNG 등록시 자동 대체)과 기존 아이템 툴팁 서식(buildConsumableTooltipHtml)을
     // 그대로 재사용함 — 사용 효과(desc)만 단독으로 보여주던 기존 방식은 여기서 교체됨.
     return { iconHtml: itemIconHtml(item, 'shop-icon-img'), tooltipHtml: buildConsumableTooltipHtml(typeId), borderColor: '#c13c3c' };
+  }
+  if(action === 'sell-misc'){
+    // 마석/기타 상점 카드(buildStoneShopCardHtml/buildMiscShopCardHtml)와 같은 아이콘·툴팁·테두리색을 그대로 재사용
+    const item = MISC_ITEMS[typeId];
+    const isStone = item.itemClass === 'stone';
+    return {
+      iconHtml: isStone ? item.icon : itemIconHtml(item, 'shop-icon-img'),
+      tooltipHtml: isStone ? buildStoneTooltipHtml(typeId) : buildMiscTooltipHtml(typeId),
+      borderColor: '#4fa3d1',
+    };
   }
   if(action === 'buy-artifact'){
     const a = ARTIFACTS[typeId];
@@ -2492,7 +2806,7 @@ function craftEligibleEquipInstances(resource){
 // 내구도가 "완전히 온전한(현재 내구도 === 최대 내구도)" 상태인지 — 내구도 시스템이 없는 종류는 항상
 // true(제한 없음).
 function isEquipDurabilityFull(item){
-  const max = maxDurabilityFor(item.type);
+  const max = maxDurabilityForItem(item);
   if(max == null) return true;
   const cur = item.currentDurability != null ? item.currentDurability : max;
   return cur === max;
@@ -2637,7 +2951,7 @@ function craftGrantResultItems(item){
   const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
   if(heldIdx !== -1){
     const held = craftAnim.heldEquip.splice(heldIdx, 1)[0];
-    pool.items().push({ id: state.nextItemId++, type: held.typeId, level: held.level, damaged: true, currentDurability: freshCurrentDurability(held.typeId) }); // 손상 지급(요청사항 10·11번). 새로 지급되는 인스턴스이므로 내구도는 최대치(100%)로 시작(요구사항 4번) — damaged(공격력80%)와는 별개 개념.
+    pool.items().push({ id: state.nextItemId++, type: held.typeId, level: held.level, damaged: true, currentDurability: freshCurrentDurability(held.typeId, true) }); // [내구도 연동] 손상 최대 내구도(정상의 50%, 백의 자리 미만 버림)의 100%로 지급 — 손상 지급(요청사항 10·11번). 새로 지급되는 인스턴스이므로 내구도는 최대치(100%)로 시작(요구사항 4번) — damaged(공격력80%)와는 별개 개념.
   } else {
     // 문서에 명시되지 않은 경우(반환 아이템이 이번에 투입한 재료와 다른 종류의 장비인 경우) — 홀딩해둔
     // "그 개체"가 없으므로 새 +0 장비로 지급(성공 지급과 동일한 방식).
