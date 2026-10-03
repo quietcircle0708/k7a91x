@@ -205,6 +205,23 @@ function playerHitEffect(dmg){
   spawnDmgPopupIn(el('combatPlayerSlot'), dmg, false);
 }
 
+// 회피 성공 시 연출 — playerHitEffect와 완전히 동일한 두 위치(좌측 캐릭터 패널 + 전투 화면 중앙)에 같은
+// dmg-float 애니메이션으로 "회피!" 문구만 띄움. 정상 피격 때와 달리 화면 흔들림(.player-hit)과 캐릭터
+// 아이콘 피격 모션(.hit)은 재생하지 않음 — 실제로 맞지 않았으므로(요구사항 5·6번: 새 연출 시스템을 만들지
+// 않고 기존 피해 숫자 출력 구조만 재활용, 정상 피격 처리와는 분리).
+function playerDodgeEffect(){
+  const panel = document.querySelector('.hunt-char-panel');
+  if(panel){
+    const p = document.createElement('div');
+    p.className = 'dmg-popup float player-dmg dodge';
+    p.textContent = '회피!';
+    p.style.left = (42 + Math.random() * 16) + '%';
+    panel.appendChild(p);
+    setTimeout(() => p.remove(), 850);
+  }
+  spawnDmgPopupIn(el('combatPlayerSlot'), 0, false, true);
+}
+
 // 플레이어 사망 시 전투 화면 중앙 아이콘에 몬스터와 동일한 사망 애니메이션(.dead, monster-dead 키프레임)을
 // 재생함. 새로 만들지 않고 기존 클래스/키프레임을 그대로 재사용(요구사항: 플레이어 전용 기능 신규 제작 지양).
 function playerDeathEffect(){
@@ -274,11 +291,13 @@ function renderPlayerPose(){
 // 피해량 숫자를 특정 컨테이너(위치 기준 요소, position:relative 필요) 안에 띄우는 공용 로직.
 // 실제 피해 계산(hp -= dmg)과 화면 표시값은 완전히 분리되어 있음 — 여기서 받는 dmg는 이미 양수이므로
 // 그대로 숫자만 표시함('-' 기호·'치명타!' 문구 없이). monsterHitEffect·playerHitEffect가 공통으로 사용.
-function spawnDmgPopupIn(container, dmg, isCrit){
+// isDodge: 회피 시 숫자 대신 "회피!" 문구를 같은 위치·타이밍(dmg-float 애니메이션)으로 띄움(dmg 인자는
+// 이때 쓰이지 않음) — 회피 전용 팝업을 새로 만들지 않고 기존 피해 숫자 출력 구조를 그대로 재활용.
+function spawnDmgPopupIn(container, dmg, isCrit, isDodge){
   if(!container) return;
   const p = document.createElement('div');
-  p.className = 'dmg-popup float' + (isCrit ? ' crit' : '');
-  p.textContent = String(dmg);
+  p.className = 'dmg-popup float' + (isCrit ? ' crit' : '') + (isDodge ? ' dodge' : '');
+  p.textContent = isDodge ? '회피!' : String(dmg);
   p.style.left = (42 + Math.random() * 16) + '%';
   container.appendChild(p);
   setTimeout(() => p.remove(), 850);

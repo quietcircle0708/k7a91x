@@ -161,11 +161,7 @@ function render(){
   if(el('invCountArmor')) el('invCountArmor').textContent = totalEquipInventoryCount() + ' / ' + INV_MAX;
   if(el('invCountSub')) el('invCountSub').textContent = totalEquipInventoryCount() + ' / ' + INV_MAX;
   if(el('invCountAccessory')) el('invCountAccessory').textContent = totalEquipInventoryCount() + ' / ' + INV_MAX;
-  renderInvTabs();
-  renderInventoryList();
-  renderArmorInventoryList();
-  renderSubInventoryList();
-  renderAccessoryInventoryList();
+  renderInventoryByUiVariant(); // 인벤토리 UI 형식(설정)에 따라 분기 — 탭 + 무기/방어구/보조/장신구 목록
   renderArtifactList();
   renderConsumableList();
   renderStoneList();
@@ -227,19 +223,47 @@ function renderForgeSelectList(){
   }).join('')}</div>`;
 }
 
+// ---- 인벤토리 UI 형식 분기(인벤토리 개편 1단계) ----
+// 구버전(세로)은 지금까지 쓰던 인벤토리 렌더링 그대로(탭 + 무기/방어구/보조/장신구 목록)이며 코드 변경 없음.
+// 신버전(박스)은 아직 구현되지 않았으므로 INVENTORY_UI_RENDERERS에 등록돼 있지 않고, 이 경우 구버전 렌더러로
+// 안전하게 대체됨(기존 인벤토리/기능은 그대로). 이후 단계에서 신버전이 만들어지면 여기에 'box' 렌더러를 등록하면 됨.
+function renderInventoryLegacy(){
+  renderInvTabs();
+  renderInventoryList();
+  renderArmorInventoryList();
+  renderSubInventoryList();
+  renderAccessoryInventoryList();
+}
+const INVENTORY_UI_RENDERERS = {
+  legacy: renderInventoryLegacy,
+};
+function renderInventoryByUiVariant(){
+  const renderer = INVENTORY_UI_RENDERERS[currentInventoryUiVariant()] || INVENTORY_UI_RENDERERS.legacy;
+  renderer();
+}
+
+// 구버전 인벤토리 정렬 드롭다운 채우기 — 신버전과 같은 공용 정렬(formulas.js의 invSort*)을 씀. 탭별(tab id)로 독립된 정렬 상태이며
+// HTML이 같으면 다시 그리지 않아 열려 있는 드롭다운이 렌더링 때문에 닫히지 않음. 정렬 변경 처리는 main.js의 change 리스너 참고.
+function renderInvSortControl(tab){
+  const html = invSortSelectHtml(tab);
+  document.querySelectorAll('.inv-sort-wrap[data-sort-tab="' + tab + '"]').forEach(w => {
+    if(w.dataset.sortHtml !== html){ w.innerHTML = html; w.dataset.sortHtml = html; }
+  });
+}
 function renderInventoryList(){
+  renderInvSortControl('weapon');
   const wrap = el('inventoryList');
   const pagerWrap = el('invWeaponPager');
   if(state.inventory.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 무기가 없습니다.<br>상점에서 <b>검</b>을 구매해보세요 (100 G).</div>`;
-    if(pagerWrap) pagerWrap.innerHTML = '';
+    if(pagerWrap) pagerWrap.innerHTML = `<div class="pager">${invLockButtonHtml()}</div>`; // 잠금 모드를 끌 수 있도록 잠금 버튼은 항상 표시
     return;
   }
   const pageSize = PAGE_SIZE.invWeapon;
-  const sorted = sortEquippedFirst(state.inventory, item => item.id === state.equippedId);
+  const sorted = sortEquippedFirst(invSortList('weapon', state.inventory, it => invSortInfoEquip('weapon', it)), item => item.id === state.equippedId);
   const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invWeapon = clampPage(pageState.invWeapon, totalPageCount);
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invWeapon', pageState.invWeapon, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invWeapon', pageState.invWeapon, totalPageCount, invLockButtonHtml());
   const pageItems = pageSlice(sorted, pageState.invWeapon, pageSize);
   wrap.innerHTML = pageItems.map(item=>{
     const type = item.type || 'longsword';
@@ -249,19 +273,24 @@ function renderInventoryList(){
     const isEquipped = item.id === state.equippedId;
     const sellVal = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
-    // 양손 무기는 보조 아이템을 착용 중이면 장착(강화 선택)할 수 없음(문서 3번 상호 배타 조건).
+    // 양손 무기는 보조 아이템을 착용 중이면 착용할 수 없음(문서 3번 상호 배타 조건).
     // 양손이 아닌 무기는 이 조건과 무관하게 항상 착용 가능. handType 기준 판정(요청사항 10번).
     const blockedByTwoHandedRule = !isEquipped && wpn(type).handType === 'two_hand' && !canEquipTwoHandedWeapon();
-    const equipDisabled = isEquipped || !reqOk || blockedByTwoHandedRule;
-    const equipBtnHtml = `<button class="inv-btn equip ${isEquipped?'active':''}" data-action="equip" data-id="${item.id}" ${equipDisabled?'disabled':''}>${isEquipped?'장착 중':'강화 선택'}</button>`;
+    // 착용/착용 해제와 강화 선택은 서로 독립된 버튼(방어구/장신구 카드와 같은 구성): 착용은 실제 착용 무기(equippedId)만,
+    // 강화 선택은 대장간 표시 대상(forgeTargetId)만 바꾸고 대장간으로 이동함.
+    const equipBtnHtml = isEquipped
+      ? `<button class="inv-btn equip active" data-action="unwear-weapon" data-id="${item.id}">착용 해제</button>`
+      : `<button class="inv-btn equip" data-action="wear-weapon" data-id="${item.id}" ${(!reqOk || blockedByTwoHandedRule)?'disabled':''}>착용</button>`;
+    const isForgeTarget = item.id === state.forgeTargetId;
+    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget?'active':''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk || item.locked)?'disabled':''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>${isForgeTarget?'강화 대상':'강화 선택'}</button>`;
     const equipBtnFinal = (!isEquipped && !reqOk)
       ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">착용 조건을 만족해야 장착할 수 있습니다.${weaponRequirementText(type) ? `<br>(${weaponRequirementText(type)})` : ''}</span></span>`
       : (blockedByTwoHandedRule
         ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">보조 아이템을 장착 중에는 양손 무기를 장착할 수 없습니다.</span></span>`
         : equipBtnHtml);
     return `
-      <div class="inv-card ${isEquipped?'equipped':''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
+      <div class="inv-card ${isEquipped?'equipped':''} ${item.locked?'locked':''}" data-lock-src="weapon" data-lock-id="${item.id}">
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}${invLockBadgeHtml(item.locked)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${weaponName(type)}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isEquipped?'<span class="inv-badge">장착 중</span>':''}
@@ -271,7 +300,8 @@ function renderInventoryList(){
         </div>
         <div class="inv-actions">
           ${equipBtnFinal}
-          <button class="inv-btn sell" data-action="sell" data-id="${item.id}">판매 (${sellVal.toLocaleString()}G)</button>
+          ${forgeBtnHtml}
+          <button class="inv-btn sell" data-action="sell" data-id="${item.id}" ${item.locked?'disabled':''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>판매 (${sellVal.toLocaleString()}G)</button>
         </div>
       </div>`;
   }).join('');
@@ -286,23 +316,24 @@ function renderInventoryList(){
 // - "강화": 대장간 swordStage 화면을 거치지 않고 카드에서 바로 강화(startEnhanceArmor, actions.js) —
 //   swordStage는 공격력/공격속도 등 무기 전용 필드 기반이라 방어구를 그 화면으로 보내지 않음.
 function renderArmorInventoryList(){
+  renderInvSortControl('armor');
   const wrap = el('armorInventoryList');
   if(!wrap) return;
   const pagerWrap = el('invArmorPager');
   const items = state.armorInventory || [];
   if(items.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 방어구가 없습니다.<br>상점에서 <b>방어구</b>를 구매해보세요.</div>`;
-    if(pagerWrap) pagerWrap.innerHTML = '';
+    if(pagerWrap) pagerWrap.innerHTML = `<div class="pager">${invLockButtonHtml()}</div>`;
     return;
   }
   const pageSize = PAGE_SIZE.invArmor;
-  const sorted = sortEquippedFirst(items, item => {
+  const sorted = sortEquippedFirst(invSortList('armor', items, it => invSortInfoEquip('armor', it)), item => {
     const def = ARMOR_TYPES[item.type];
     return !!(def && state.equippedArmor && state.equippedArmor[def.armorKind] === item.id);
   });
   const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invArmor = clampPage(pageState.invArmor, totalPageCount);
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invArmor', pageState.invArmor, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invArmor', pageState.invArmor, totalPageCount, invLockButtonHtml());
   const pageItems = pageSlice(sorted, pageState.invArmor, pageSize);
   wrap.innerHTML = pageItems.map(item => {
     const type = item.type;
@@ -321,10 +352,10 @@ function renderArmorInventoryList(){
     // "강화 선택" — 대장간 화면(swordStage)에 이 방어구를 강화 대상으로 올림(무기 인벤토리 카드의
     // "강화 선택" 버튼과 동일한 equipItem() 재사용). 실제 강화는 대장간 화면의 "강화하기" 버튼에서 진행.
     const isForgeTarget = item.id === state.forgeTargetId;
-    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk) ? 'disabled' : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
+    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk || item.locked) ? 'disabled' : ''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
     return `
-      <div class="inv-card ${isWorn ? 'equipped' : ''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
+      <div class="inv-card ${isWorn ? 'equipped' : ''} ${item.locked ? 'locked' : ''}" data-lock-src="armor" data-lock-id="${item.id}">
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}${invLockBadgeHtml(item.locked)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
@@ -335,7 +366,7 @@ function renderArmorInventoryList(){
         <div class="inv-actions">
           ${wearBtnFinal}
           ${forgeBtnHtml}
-          <button class="inv-btn sell" data-action="sell-armor" data-id="${item.id}">판매 (${sellVal.toLocaleString()}G)</button>
+          <button class="inv-btn sell" data-action="sell-armor" data-id="${item.id}" ${item.locked ? 'disabled' : ''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>판매 (${sellVal.toLocaleString()}G)</button>
         </div>
       </div>`;
   }).join('');
@@ -348,20 +379,21 @@ function renderArmorInventoryList(){
 //   함께 검사함 — 이미 보조 아이템을 착용 중인 경우는 항상 "착용 해제" 버튼이 뜨므로 그 경우는 이
 //   조건과 무관(해제는 항상 가능).
 function renderSubInventoryList(){
+  renderInvSortControl('sub');
   const wrap = el('subInventoryList');
   if(!wrap) return;
   const pagerWrap = el('invSubPager');
   const items = state.subInventory || [];
   if(items.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 보조 아이템이 없습니다.<br>아직 준비 중인 아이템 분류입니다.</div>`;
-    if(pagerWrap) pagerWrap.innerHTML = '';
+    if(pagerWrap) pagerWrap.innerHTML = `<div class="pager">${invLockButtonHtml()}</div>`;
     return;
   }
   const pageSize = PAGE_SIZE.invSub;
-  const sorted = sortEquippedFirst(items, item => state.equippedSubId === item.id);
+  const sorted = sortEquippedFirst(invSortList('sub', items, it => invSortInfoEquip('sub', it)), item => state.equippedSubId === item.id);
   const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invSub = clampPage(pageState.invSub, totalPageCount);
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invSub', pageState.invSub, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invSub', pageState.invSub, totalPageCount, invLockButtonHtml());
   const pageItems = pageSlice(sorted, pageState.invSub, pageSize);
   wrap.innerHTML = pageItems.map(item => {
     const type = item.type;
@@ -382,8 +414,8 @@ function renderSubInventoryList(){
       ? `<span class="equip-req-wrap">${wearBtnHtml}<span class="tooltip">${wearTooltipText}</span></span>`
       : wearBtnHtml;
     return `
-      <div class="inv-card ${isWorn ? 'equipped' : ''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
+      <div class="inv-card ${isWorn ? 'equipped' : ''} ${item.locked ? 'locked' : ''}" data-lock-src="sub" data-lock-id="${item.id}">
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}${invLockBadgeHtml(item.locked)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
@@ -393,7 +425,7 @@ function renderSubInventoryList(){
         </div>
         <div class="inv-actions">
           ${wearBtnFinal}
-          <button class="inv-btn sell" data-action="sell-sub" data-id="${item.id}">판매 (${sellVal.toLocaleString()}G)</button>
+          <button class="inv-btn sell" data-action="sell-sub" data-id="${item.id}" ${item.locked ? 'disabled' : ''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>판매 (${sellVal.toLocaleString()}G)</button>
         </div>
       </div>`;
   }).join('');
@@ -403,21 +435,24 @@ function renderSubInventoryList(){
 // 동시 착용 가능 — 문서 1번 규칙). isWorn 판정도 armorKind 매칭이 아니라 state.equippedAccessories
 // 배열에 이 아이템 id가 포함되어 있는지로 확인함.
 function renderAccessoryInventoryList(){
+  renderInvSortControl('accessory');
   const wrap = el('accessoryInventoryList');
   if(!wrap) return;
   const pagerWrap = el('invAccessoryPager');
   const items = state.accessoryInventory || [];
   if(items.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 장신구가 없습니다.<br>상점에서 <b>장신구</b>를 구매해보세요.</div>`;
-    if(pagerWrap) pagerWrap.innerHTML = '';
+    if(pagerWrap) pagerWrap.innerHTML = `<div class="pager">${invLockButtonHtml()}</div>`;
     return;
   }
   const pageSize = PAGE_SIZE.invAccessory;
   const wornList = Array.isArray(state.equippedAccessories) ? state.equippedAccessories : [];
-  const sorted = sortEquippedFirst(items, item => wornList.includes(item.id));
+  // 목걸이는 장신구1/2 슬롯이 아니라 전용 슬롯(state.equippedNecklaceId)에 착용되므로 착용 여부를 함께 확인함.
+  const isWornAccessory = item => wornList.includes(item.id) || (state.equippedNecklaceId != null && state.equippedNecklaceId === item.id);
+  const sorted = sortEquippedFirst(invSortList('accessory', items, it => invSortInfoEquip('accessory', it)), isWornAccessory);
   const totalPageCount = pageCount(sorted.length, pageSize);
   pageState.invAccessory = clampPage(pageState.invAccessory, totalPageCount);
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invAccessory', pageState.invAccessory, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('invAccessory', pageState.invAccessory, totalPageCount, invLockButtonHtml());
   const pageItems = pageSlice(sorted, pageState.invAccessory, pageSize);
   const slotsFull = wornList.filter(id => id != null).length >= ACCESSORY_SLOT_MAX;
   wrap.innerHTML = pageItems.map(item => {
@@ -425,22 +460,23 @@ function renderAccessoryInventoryList(){
     const def = ACCESSORY_TYPES[type];
     if(!def) return '';
     const itemColor = weaponNameColor(type, item.level);
-    const isWorn = wornList.includes(item.id);
+    const isWorn = isWornAccessory(item);
+    const isNecklace = def.accessoryKind === 'necklace'; // 목걸이는 장신구1/2 슬롯 가득참과 무관(전용 슬롯, 착용 시 교체)
     const sellVal = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
     const reqOk = meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats());
-    const canWear = !isWorn && reqOk && !slotsFull;
+    const canWear = !isWorn && reqOk && (isNecklace || !slotsFull);
     const wearBtnHtml = isWorn
       ? `<button class="inv-btn equip active" data-action="unwear-accessory" data-id="${item.id}">착용 해제</button>`
-      : `<button class="inv-btn equip" data-action="wear-accessory" data-id="${item.id}" ${canWear ? '' : 'disabled'}>${slotsFull && reqOk ? '슬롯 가득참' : '착용'}</button>`;
+      : `<button class="inv-btn equip" data-action="wear-accessory" data-id="${item.id}" ${canWear ? '' : 'disabled'}>${!isNecklace && slotsFull && reqOk ? '슬롯 가득참' : '착용'}</button>`;
     const wearBtnFinal = (!isWorn && !reqOk)
       ? `<span class="equip-req-wrap">${wearBtnHtml}<span class="tooltip">착용 조건을 만족해야 장착할 수 있습니다.${weaponRequirementText(type) ? `<br>(${weaponRequirementText(type)})` : ''}</span></span>`
       : wearBtnHtml;
     // "강화 선택" — 무기/방어구 인벤토리 카드와 동일하게 equipItem()을 재사용해 대장간 화면(forgeTargetId)에 올림.
     const isForgeTarget = item.id === state.forgeTargetId;
-    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk) ? 'disabled' : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
+    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk || item.locked) ? 'disabled' : ''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
     return `
-      <div class="inv-card ${isWorn ? 'equipped' : ''}">
-        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}</div>
+      <div class="inv-card ${isWorn ? 'equipped' : ''} ${item.locked ? 'locked' : ''}" data-lock-src="accessory" data-lock-id="${item.id}">
+        <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}${invLockBadgeHtml(item.locked)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
             <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
@@ -451,7 +487,7 @@ function renderAccessoryInventoryList(){
         <div class="inv-actions">
           ${wearBtnFinal}
           ${forgeBtnHtml}
-          <button class="inv-btn sell" data-action="sell-accessory" data-id="${item.id}">판매 (${sellVal.toLocaleString()}G)</button>
+          <button class="inv-btn sell" data-action="sell-accessory" data-id="${item.id}" ${item.locked ? 'disabled' : ''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>판매 (${sellVal.toLocaleString()}G)</button>
         </div>
       </div>`;
   }).join('');
@@ -650,6 +686,10 @@ function renderCraftPopup(){
   el('craftPopupCost').textContent = '🪙 ' + (item.craftCost || 0).toLocaleString();
 
   el('craftPopupMakeBtn').disabled = !craftPopupCanCraft(craftPopup);
+  // 제작 결과물을 담을 인벤토리 슬롯이 없어 제작이 막힌 경우 그 이유를 카테고리별로 안내함
+  const blockedCategory = craftResultInventoryBlock(item);
+  const noteEl = el('craftPopupFullNote');
+  if(noteEl){ noteEl.textContent = blockedCategory ? inventoryFullMessage(blockedCategory) : ''; noteEl.style.display = blockedCategory ? 'block' : 'none'; }
 }
 
 // ---- 제작소: 제작 최종 확인 UI ----
@@ -783,13 +823,14 @@ function renderCraftMaterialQtyModal(){
 }
 
 function renderArtifactList(){
+  renderInvSortControl('artifact');
   el('artifactCount').textContent = state.equippedArtifacts.length + ' / ' + ARTIFACT_SLOT_MAX;
   const wrap = el('artifactList');
   if(state.artifacts.length === 0){
     wrap.innerHTML = `<div class="inv-empty">보유한 아티팩트가 없습니다.<br>던전에서 몬스터를 처치하거나 상점에서 구매해보세요.</div>`;
     return;
   }
-  wrap.innerHTML = state.artifacts.filter(id => ARTIFACTS[id]).map(id => {
+  wrap.innerHTML = invSortList('artifact', state.artifacts.filter(id => ARTIFACTS[id]), invSortInfoArtifact).map(id => {
     const a = ARTIFACTS[id];
     const nameColor = artifactNameColor(id);
     const equipped = isArtifactEquipped(id);
@@ -821,6 +862,7 @@ function renderArtifactList(){
 // 새 기타 아이템을 MISC_ITEMS에 등록하기만 하면 자동으로 여기 노출됨.
 // 이름에는 무기 툴팁과 동일한 레이아웃/서식의 전용 툴팁(hover)을 붙임.
 function renderMiscList(){
+  renderInvSortControl('misc');
   const wrap = el('miscList');
   const entries = Object.values(MISC_ITEMS)
     .filter(item => item.itemClass === 'misc')
@@ -830,7 +872,7 @@ function renderMiscList(){
     wrap.innerHTML = `<div class="inv-empty">보유한 기타 아이템이 없습니다.</div>`;
     return;
   }
-  wrap.innerHTML = entries.map(({ item, count }) => `
+  wrap.innerHTML = invSortList('misc', entries, e => invSortInfoMisc(e.item, 'misc')).map(({ item, count }) => `
     <div class="inv-card">
       <div class="inv-icon" style="border-color:${stoneNameColor(item.id)};">${itemIconHtml(item)}</div>
       <div class="inv-info">
@@ -846,6 +888,7 @@ function renderMiscList(){
 // 마석 탭: 아이템 분류가 'stone'인 아이템만 표시(기타 탭과 동일한 UI 구조).
 // 이름에는 등급 색상을 적용하고, 무기 툴팁과 동일한 레이아웃/서식의 전용 툴팁(hover)을 붙임.
 function renderStoneList(){
+  renderInvSortControl('stone');
   const wrap = el('stoneList');
   const entries = Object.values(MISC_ITEMS)
     .filter(item => item.itemClass === 'stone')
@@ -855,7 +898,7 @@ function renderStoneList(){
     wrap.innerHTML = `<div class="inv-empty">보유한 마석 아이템이 없습니다.</div>`;
     return;
   }
-  wrap.innerHTML = entries.map(({ item, count }) => `
+  wrap.innerHTML = invSortList('stone', entries, e => invSortInfoMisc(e.item, 'stone')).map(({ item, count }) => `
     <div class="inv-card">
       <div class="inv-icon" style="border-color: var(--forge-line);">${item.icon}</div>
       <div class="inv-info">
@@ -869,10 +912,12 @@ function renderStoneList(){
 }
 
 function renderConsumableList(){
+  renderInvSortControl('consumable');
   const wrap = el('consumableList');
-  const flasks = Object.values(CONSUMABLES)
+  // 플라스크/비급은 정렬 기준대로 정렬하고, 흔적(아래 traces)은 항상 그 뒤에 이어 표시됨(종류 정렬의 "플라스크 → 흔적" 순서와 같음).
+  const flasks = invSortList('consumable', Object.values(CONSUMABLES)
     .map(item => ({ item, count: (state.consumables && state.consumables[item.id]) || 0 }))
-    .filter(({ count }) => count > 0);
+    .filter(({ count }) => count > 0), e => invSortInfoConsumable(e.item));
 
   // 흔적(강화 파괴 보상) — CONSUMABLES처럼 정적 데이터표가 아니라 state.traceInventory에 개별 인스턴스로
   // 저장됨(같은 장비의 흔적이라도 서로 다른 id를 가진 별개 아이템). 아이콘은 복구 대상 장비의 실제 아이콘을
@@ -888,11 +933,11 @@ function renderConsumableList(){
     <div class="inv-card">
       <div class="inv-icon" style="border-color: var(--forge-line);">${itemIconHtml(item)}</div>
       <div class="inv-info">
-        <div class="inv-name">${item.name} ×${count}</div>
+        <div class="inv-name">${consumableNameHtml(item)} ×${count}</div>
         <div class="inv-sub">${item.desc}</div>
       </div>
       <div class="inv-actions">
-        <button class="inv-btn" data-action="use-flask" data-id="${item.id}">사용하기</button>
+        <button class="inv-btn" data-action="${isScrollItem(item) ? 'use-scroll' : 'use-flask'}" data-id="${item.id}">사용하기</button>
       </div>
     </div>`).join('');
 
@@ -1100,7 +1145,7 @@ function equippedItemForSlot(slotKey){
       tooltipHtml: buildWeaponTooltipHtml(type, level, undefined, equipped.currentDurability),
     };
   }
-  if(slotKey === 'helmet' || slotKey === 'armor'){
+  if(slotKey === 'helmet' || slotKey === 'armor' || slotKey === 'shoes'){
     const id = state.equippedArmor && state.equippedArmor[slotKey];
     if(!id) return null;
     const item = (state.armorInventory || []).find(i => i.id === id);
@@ -1127,9 +1172,11 @@ function equippedItemForSlot(slotKey){
       tooltipHtml: buildSubTooltipHtml(type, level, undefined, item.currentDurability),
     };
   }
-  if(slotKey === 'accessory1' || slotKey === 'accessory2'){
+  if(slotKey === 'accessory1' || slotKey === 'accessory2' || slotKey === 'necklace'){
     const slotIdx = slotKey === 'accessory1' ? 0 : 1;
-    const id = Array.isArray(state.equippedAccessories) ? state.equippedAccessories[slotIdx] : null;
+    const id = slotKey === 'necklace'
+      ? state.equippedNecklaceId
+      : (Array.isArray(state.equippedAccessories) ? state.equippedAccessories[slotIdx] : null);
     if(!id) return null;
     const item = (state.accessoryInventory || []).find(i => i.id === id);
     if(!item) return null;
@@ -1502,11 +1549,12 @@ function buildCharCombatStatsHtml(){
     <div class="char-stat-row big"><span>총 공격력</span>${charStatValueWithTip('atk', ctx, '총 공격력', `${totalAtk}`)}</div>
     <div class="char-stat-row big"><span>공격속도</span>${charStatValueWithTip('atkSpeed', ctx, '공격속도', `${totalSpeed.toFixed(2)}회/초`)}</div>
     <div class="char-stat-row big"><span>치명타 확률</span>${charStatValueWithTip('crit', ctx, '치명타 확률', `${totalCrit}%`)}</div>
+    <div class="char-stat-row big"><span>치명타 피해</span>${charStatValueWithTip('critDamage', ctx, '치명타 피해', `${critMultiplierFor(null) * 100}%`)}</div>
     <div class="char-stat-row big"><span>방어도 무시</span>${charStatValueWithTip('defenseIgnore', ctx, '방어도 무시', defenseIgnoreText)}</div>
     <div class="char-stat-divider"></div>
     <div class="char-stat-row big"><span>총 방어도</span>${charStatValueWithTip('defense', ctx, '총 방어도', `${totalDef}`)}</div>
-    <div class="char-stat-row big"><span>회피</span><span class="v" style="color:var(--forge-cream-dim);">준비 중</span></div>
-    <div class="char-stat-row big"><span>재생력</span><span class="v" style="color:var(--forge-cream-dim);">준비 중</span></div>
+    <div class="char-stat-row big"><span>회피</span>${charStatValueWithTip('evasion', ctx, '회피', `${effectivePlayerEvasion()}%`)}</div>
+    <div class="char-stat-row big"><span>재생력</span>${charStatValueWithTip('regen', ctx, '재생력', `${effectivePlayerRegen()}`)}</div>
   `;
 }
 // [세부 능력치] 2페이지 — 최대 체력/최대 마나/힘/민첩/지능의 "최종 스탯"만(모두 기존 계산 함수 그대로
@@ -1807,7 +1855,7 @@ function buildSkillIconBtnHtml(id){
   // 이미 습득된 스킬 아이콘을 눌렀을 때와 동일한 동작).
   const learned = isSkillDisplayedAsLearned(id);
   const grade = WEAPON_GRADES[s.grade];
-  const cantLearn = !learned && !canLearnSkill(id);
+  const cantLearn = !learned && !canLearnSkillOrChain(id); // 하위 체인까지 일괄 습득 가능하면 활성 표시
   // 요청 대응(버그 수정): 예전엔 여기서 실제 HTML `disabled` 속성을 썼는데, disabled 버튼은 그
   // 내부에서 발생하는 click 이벤트 자체를 브라우저가 아예 발생시키지 않아서(캡처/버블 단계 리스너에도
   // 전혀 도달하지 않음) 툴팁 안의 용어(.glossary-term)를 클릭해도 아무 반응이 없었음(습득 가능/이미
@@ -1883,6 +1931,19 @@ function buildDungeonDropIcons(d){
   // 3. 모험가의 유해 — 하드코딩 고정 안내(어떤 무기가 나올지는 표시하지 않음)
   icons.push({ icon: '💀', borderColor: 'var(--forge-green)',
     tooltip: `<span class="txt-relic">모험가의 유해</span><br>낮은 확률로 쓰러진 모험가의 장비를 획득합니다.` });
+
+  // 3-1. 비급 — 이 던전 몬스터 레벨 구간과 겹치는 비급이 있을 때만 표시(요구사항 14~16번), 모험가의 유해
+  // 바로 오른쪽 고정 위치. 새 비급이 추가되면 scrollsAvailableInDungeon이 자동으로 판정에 포함시킴.
+  const availableScrolls = scrollsAvailableInDungeon(d);
+  if(availableScrolls.length){
+    const nameLines = availableScrolls
+      .slice()
+      .sort((a, b) => scrollBaseLevel(a) - scrollBaseLevel(b))
+      .map(item => { const g = scrollGradeInfo(item); return `<span style="color:${g ? g.color : '#fff'};">${item.name}</span>`; })
+      .join('<br>');
+    icons.push({ iconHtml: itemIconHtml({ image: SCROLL_DEFAULT_IMAGE, icon: '📜' }), borderColor: WEAPON_GRADES.epic.color,
+      tooltip: `<div style="text-align:center;">몬스터 처치 시 획득 가능한 비급<br><br>${nameLines}</div>` });
+  }
 
   // 4. 장비 아이템 — 몬스터 드랍 테이블에 직접 등록된 장비(weaponId, 모험가의 유해와는 별개의 확정 드랍)가
   //    있다면 해당 장비 종류(무기/방어구/장신구)에 맞는 아이콘/툴팁 공식을 사용해 표시. weaponIconHtml·
@@ -2042,6 +2103,7 @@ function updateHuntTopUiToggle(){
     const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
     huntCardEl.style.display = (isMobile && hunt.topUiExpanded) ? 'none' : '';
   }
+  if(typeof alignHuntHeader === 'function') alignHuntHeader(); // 패널 열림/닫힘으로 huntCard 위치가 바뀌므로 상단 영역 정렬 갱신
 }
 function toggleHuntTopUi(){
   hunt.topUiExpanded = !hunt.topUiExpanded;
@@ -2375,11 +2437,25 @@ const KILL_REWARD_MESSAGE_RULES = [
     className: 'reward-artifact',
     text: '신비한 아티팩트를 획득했습니다!',
   },
+  {
+    // 비급 획득 문구(요구사항 12번) — 색상이 기존 CSS 클래스(초록/보라)와 다른 유니크 등급 색상이라
+    // className 대신 color 필드를 씀. 비급이 실제 지급되지 않았으면(scrollDrops 비어있음) 표시 안 함.
+    check: rewards => rewards.scrollDrops && Object.keys(rewards.scrollDrops).length > 0,
+    color: WEAPON_GRADES.unique.color,
+    text: '범상치 않은 비급서를 손에 넣었습니다!',
+  },
 ];
+// 보상창의 "인벤토리 가득참" 안내 — 카테고리별로 따로 표시함(예: "장비 인벤토리가 가득 찼습니다."). fullCategories는 이번
+// 보상에서 가득 차 지급하지 못한 드랍이 있던 카테고리({ stone: true } 등)이고, includeEquipState가 true이면 기존과 같이
+// 장비는 "지금 장비 인벤토리가 가득 찼는지" 상태 기준으로도 안내함(장비 안내 방식은 기존 그대로).
+function buildInventoryFullNotesHtml(fullCategories, includeEquipState){
+  const cats = Object.keys(INVENTORY_CATEGORIES).filter(c => (fullCategories && fullCategories[c]) || (c === 'equipment' && includeEquipState && anyEquipInventoryFull()));
+  return cats.map(c => `<div class="reward-note">${inventoryFullMessage(c)}</div>`).join('');
+}
 function buildKillRewardMessagesHtml(rewards){
   return KILL_REWARD_MESSAGE_RULES
     .filter(rule => rule.check(rewards))
-    .map(rule => `<div class="${rule.className}">${rule.text}</div>`)
+    .map(rule => rule.color ? `<div style="color:${rule.color}; font-weight:700;">${rule.text}</div>` : `<div class="${rule.className}">${rule.text}</div>`)
     .join('');
 }
 // ---- 던전 전투 종료 보상창 "획득 아이템" 아이콘 그리드 ----
@@ -2662,15 +2738,15 @@ function buildConsumableShopCardHtml(id){
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">${itemIconHtml(item)}</div>
           <span class="scroll-name-wrap">
-            <span class="scroll-name" style="color:var(--forge-cream);">${item.name}</span>
+            <span class="scroll-name" style="color:var(--forge-cream);">${consumableNameHtml(item)}</span>
             <span class="tooltip">${buildConsumableTooltipHtml(id)}</span>
           </span>
         </div>
         <span class="scroll-count">보유 ${owned}개</span>
       </div>
       <div class="scroll-body">
-        <button class="scroll-buy" data-action="buy-consumable" data-type="${id}" style="flex:1;" ${state.gold < item.buyPrice ? 'disabled' : ''}>구매 (${item.buyPrice} G)</button>
-        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice} G)</button>
+        ${item.buyPrice != null ? `<button class="scroll-buy" data-action="buy-consumable" data-type="${id}" style="flex:1;" ${(state.gold < item.buyPrice || !canAcquireInCategory('consumable', owned > 0)) ? 'disabled' : ''}>${!canAcquireInCategory('consumable', owned > 0) ? '소비 인벤토리 가득참' : `구매 (${item.buyPrice} G)`}</button>` : ''}
+        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice.toLocaleString()} G)</button>
       </div>
     </div>`;
 }
@@ -2678,8 +2754,9 @@ function buildConsumableShopCardHtml(id){
 function buildArtifactShopCardHtml(id){
   const a = ARTIFACTS[id];
   const owned = ownsArtifact(id);
-  const disabled = owned || state.gold < a.buyPrice;
-  const btnText = owned ? '보유 중' : `구매 (${a.buyPrice.toLocaleString()} G)`;
+  const slotFull = !owned && inventoryCategoryFull('artifact');
+  const disabled = owned || slotFull || state.gold < a.buyPrice;
+  const btnText = owned ? '보유 중' : (slotFull ? '아티팩트 인벤토리 가득참' : `구매 (${a.buyPrice.toLocaleString()} G)`);
   return `
     <div class="scroll-card artifact">
       <div class="scroll-head">

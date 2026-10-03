@@ -44,7 +44,8 @@ function requestSellQty(){
   }
   const total = (item.sellPrice || 0) * qty;
   el('buyQtyModal').style.display = 'none';
-  openSellConfirm(`${item.name} ${qty}개`, total, performSellQty, () => {
+  const sellLabel = (action === 'sell-consumable' && isScrollItem(item)) ? { html: `${consumableNameHtml(item)} ${qty}개` } : `${item.name} ${qty}개`;
+  openSellConfirm(sellLabel, total, performSellQty, () => {
     // 확인창 [취소] — 아이템/골드는 그대로, 판매 수량창으로 복귀(설정해둔 수량 유지)
     if(!buyQtyState) return;
     renderBuyQtyModal();
@@ -73,6 +74,7 @@ function startEnhance(){
   if(isEnhancing) return;
   const equipped = getEquipped();
   if(!equipped) return;
+  if(equipped.locked) return; // 잠긴 장비는 강화할 수 없음(인벤토리 잠금)
   const level = equipped.level;
   const type = equipped.type || 'longsword';
   if(level >= MAX_LEVEL) return;
@@ -198,6 +200,7 @@ function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem)
       const slotIdx = state.equippedAccessories.indexOf(itemId);
       if(slotIdx !== -1) state.equippedAccessories[slotIdx] = null;
     }
+    if(state.equippedNecklaceId === itemId) state.equippedNecklaceId = null;
   } else {
     const idx = state.inventory.findIndex(i => i.id === itemId);
     if(idx !== -1) state.inventory.splice(idx, 1);
@@ -211,14 +214,15 @@ function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem)
   const rewardKind = pickWeighted(odds);
 
   if(rewardKind === 'trace'){
-    state.traceInventory.push({ id: state.nextItemId++, forType: type });
+    // 소비 인벤토리가 가득 차 있으면 흔적을 받을 수 없음(파괴된 장비 자체는 이미 제거된 상태 — 기존 흐름 그대로)
+    if(!grantTraceItem(type)) return `${inventoryFullMessage('consumable')} '${displayName}의 흔적'을 획득하지 못했습니다.`;
     return `'${displayName}의 흔적'을 획득했습니다.`;
   }
   const isScrap = rewardKind === 'scrapmetal';
   const qty = tierQty(isScrap ? DESTROY_SCRAPMETAL_LEVEL_QTY : DESTROY_SHINYSTONE_LEVEL_QTY, w.levelReq || 1)
             + tierQty(isScrap ? DESTROY_SCRAPMETAL_ENHANCE_QTY : DESTROY_SHINYSTONE_ENHANCE_QTY, level);
   const rewardItem = MISC_ITEMS[isScrap ? 'rareScrapmetal' : 'epicShinystone'];
-  state[rewardItem.stateKey] = (state[rewardItem.stateKey] || 0) + qty;
+  if(!grantMiscStack(rewardItem, qty)) return `${inventoryFullMessage(miscItemCategory(rewardItem))} ${rewardItem.name} ${qty}개를 획득하지 못했습니다.`;
   return `${rewardItem.name} ${qty}개를 획득했습니다.`;
 }
 
@@ -226,7 +230,7 @@ function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem)
 function sellItem(id){
   if(isEnhancing) return;
   const item = state.inventory.find(i => i.id === id);
-  if(!item) return;
+  if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
   const type = item.type || 'longsword';
   const value = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
   const label = `${weaponName(type)}${levelSuffix(item.level)}`;
@@ -234,7 +238,7 @@ function sellItem(id){
 }
 function performSellItem(id){
   const idx = state.inventory.findIndex(i => i.id === id);
-  if(idx === -1) return;
+  if(idx === -1 || state.inventory[idx].locked) return;
   const item = state.inventory[idx];
   const type = item.type || 'longsword';
   const value = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
@@ -284,7 +288,7 @@ function recheckEquipRequirements(){
     }
   }
   if(state.equippedArmor){
-    ['helmet', 'armor'].forEach(kind => {
+    ['helmet', 'armor', 'shoes'].forEach(kind => {
       const id = state.equippedArmor[kind];
       if(id == null) return;
       const item = (state.armorInventory || []).find(i => i.id === id);
@@ -301,6 +305,10 @@ function recheckEquipRequirements(){
       return id;
     });
   }
+  if(state.equippedNecklaceId != null){
+    const item = (state.accessoryInventory || []).find(i => i.id === state.equippedNecklaceId);
+    if(item && !meetsWeaponEquipRequirements(item.type, state.playerLevel, stats)) state.equippedNecklaceId = null;
+  }
   if(state.equippedSubId != null){
     const item = (state.subInventory || []).find(i => i.id === state.equippedSubId);
     // 레벨 조건 재검사(방어구/장신구와 동일)에 더해, 이 시점에 양손 무기가 장착돼 있으면(이론상 불가능한
@@ -311,22 +319,19 @@ function recheckEquipRequirements(){
   }
   clampPlayerVitals();
 }
-// 강화 대상 선택. 무기를 선택하면 "착용 무기"(equippedId, 전투에 실제 사용)와 "대장간 표시 대상"
-// (forgeTargetId)을 함께 갱신함(기존 동작과 동일 — 무기는 강화 선택이 곧 착용). 방어구를 선택하면
-// forgeTargetId만 바뀌고 equippedId(착용 무기)는 그대로 유지됨 — 방어구는 별도의 "착용"(equipArmorPiece)
-// 상태가 실제 능력치를 결정하므로, 대장간에 올려놓는 것만으로 전투 중인 무기가 바뀌면 안 됨.
+// 강화 대상 선택(무기/방어구/장신구 공통) — "대장간 표시 대상"(forgeTargetId)만 바꿈. 착용 상태는 어떤 종류도
+// 건드리지 않음: 실제 착용은 별도의 착용 함수(무기 equipWeaponPiece, 방어구 equipArmorPiece, 장신구
+// equipAccessoryPiece)가 담당하고, 이 함수는 대장간에 올려놓는 일만 함(예전에는 무기만 강화 선택이 곧 착용이었으나
+// 이제 방어구/장신구와 같은 구조로 분리됨). 호출처: 구버전/신버전 인벤토리의 "강화 선택"(selectForgeTargetFromInventory),
+// 대장간의 "강화 장비 선택" 팝업(selectForgeTarget) — 모두 같은 forgeTargetId를 사용함.
 function equipItem(id){
   if(isEnhancing) return;
+  if(isEquipLockedById(id)) return; // 잠긴 장비는 강화 대상으로 선택할 수 없음(인벤토리 잠금)
   const weaponItem = state.inventory.find(i => i.id === id);
   if(weaponItem){
+    // 강화 선택은 착용이 아니므로 양손 무기/보조 아이템 상호 배타 조건은 적용하지 않음(착용 요구 조건만 방어구/장신구와 동일하게 확인).
     if(!meetsWeaponEquipRequirements(weaponItem.type, state.playerLevel, effectiveStats())) return;
-    // 양손 무기는 보조 아이템을 착용 중이면 장착할 수 없음(문서 3번 상호 배타 조건). 양손이 아닌
-    // 무기는 이 조건과 무관하게 항상 장착 가능. handType 기준 판정(요청사항 10번) — weaponKind가
-    // 'two_handed_sword'라는 특정 종류였던 과거 하드코딩을 제거해, 향후 양손 도끼/창 등도 동일하게 적용됨.
-    if(wpn(weaponItem.type).handType === 'two_hand' && !canEquipTwoHandedWeapon()) return;
-    state.equippedId = id;
     state.forgeTargetId = id;
-    recheckEquipRequirements(); // 무기 교체로 무기 고유 옵션의 스탯 보너스가 바뀌었을 수 있어 재검사
     showMsg('', '');
     render();
     saveState();
@@ -349,6 +354,38 @@ function equipItem(id){
     render();
     saveState();
   }
+}
+// ---- 무기 착용/착용 해제 (방어구/장신구의 equipArmorPiece/unequipArmorPiece와 같은 구조) ----
+// 실제 착용 무기(equippedId)만 바꾸고 강화 대상(forgeTargetId)은 건드리지 않음. 착용 조건(레벨/스탯)과 양손 무기 ↔
+// 보조 아이템 상호 배타 조건(문서 3번)은 기존 무기 착용 로직 그대로 유지함. 구버전/신버전 인벤토리가 모두 이 함수를 호출함.
+function equipWeaponPiece(id){
+  if(isEnhancing) return;
+  const weaponItem = state.inventory.find(i => i.id === id);
+  if(!weaponItem) return;
+  if(!meetsWeaponEquipRequirements(weaponItem.type, state.playerLevel, effectiveStats())) return;
+  // 양손 무기는 보조 아이템을 착용 중이면 장착할 수 없음(handType 기준 판정 — 향후 양손 도끼/창 등도 동일하게 적용됨).
+  if(wpn(weaponItem.type).handType === 'two_hand' && !canEquipTwoHandedWeapon()) return;
+  state.equippedId = id;
+  recheckEquipRequirements(); // 무기 교체로 무기 고유 옵션의 스탯 보너스가 바뀌었을 수 있어 재검사
+  showMsg('', '');
+  render();
+  saveState();
+}
+function unequipWeaponPiece(id){
+  if(isEnhancing) return;
+  if(state.equippedId !== id) return;
+  state.equippedId = null; // 무기를 착용하지 않은 상태는 기존에도 가능했음(판매/요구 조건 미달 해제 등)
+  recheckEquipRequirements(); // 무기 고유 옵션 스탯 보너스가 사라지므로 다른 장비 조건 재검사 + 체력/마나 한도 정리
+  showMsg('', '');
+  render();
+  saveState();
+}
+// 인벤토리(구버전/신버전 공통)의 "강화 선택" — 강화 대상을 지정(equipItem)한 뒤, 정상적으로 지정됐을 때만 기존 화면
+// 이동 함수(closeToForge → showView('forge'))로 대장간으로 이동함. 지정이 거부된 경우(강화 중, 착용 조건 미달 등)에는
+// 이동하지 않음. 대장간의 "강화 장비 선택"(selectForgeTarget)은 이 함수를 쓰지 않고 그대로 유지돼 같은 forgeTargetId를 사용함.
+function selectForgeTargetFromInventory(id){
+  equipItem(id);
+  if(state.forgeTargetId === id) closeToForge();
 }
 // 대장간 "강화 장비 선택" 팝업에서 아이템을 클릭했을 때 호출됨. 기존 equipItem(인벤토리의 "강화 선택"
 // 버튼과 동일 로직)을 그대로 재사용해서 강화 대상을 설정하고, 선택 즉시 팝업만 닫음 — 강화 공식/비용
@@ -399,7 +436,7 @@ function toggleFocus(){
 function buyArtifact(id, btn, silent){
   const a = ARTIFACTS[id];
   if(!a || a.buyPrice == null) return false;
-  if(ownsArtifact(id) || state.gold < a.buyPrice) return false;
+  if(ownsArtifact(id) || state.gold < a.buyPrice || inventoryCategoryFull('artifact')) return false; // 아티팩트 인벤토리 가득 참 포함
   state.gold -= a.buyPrice;
   state.artifacts.push(id);
   // 빈 장착 슬롯이 있을 때만 자동 장착(기존 장착 중인 아티팩트를 교체하지 않음).
@@ -490,14 +527,14 @@ function buyWeapon(typeId, btn, silent){
 function sellAccessoryItem(id){
   if(isEnhancing) return;
   const item = (state.accessoryInventory || []).find(i => i.id === id);
-  if(!item) return;
+  if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   const label = `${ACCESSORY_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellAccessoryItem(id));
 }
 function performSellAccessoryItem(id){
   const idx = (state.accessoryInventory || []).findIndex(i => i.id === id);
-  if(idx === -1) return;
+  if(idx === -1 || state.accessoryInventory[idx].locked) return;
   const item = state.accessoryInventory[idx];
   const def = ACCESSORY_TYPES[item.type];
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
@@ -509,6 +546,7 @@ function performSellAccessoryItem(id){
     const slotIdx = state.equippedAccessories.indexOf(id);
     if(slotIdx !== -1) state.equippedAccessories[slotIdx] = null;
   }
+  if(state.equippedNecklaceId === id) state.equippedNecklaceId = null; // 목걸이 전용 슬롯도 함께 정리
   if(state.forgeTargetId === id) state.forgeTargetId = null; // 대장간에 표시 중이었다면 함께 정리
   clampPlayerVitals();
   render(); saveState();
@@ -520,6 +558,15 @@ function equipAccessoryPiece(id){
   const item = (state.accessoryInventory || []).find(i => i.id === id);
   if(!item) return;
   if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
+  // 목걸이는 목걸이 전용 슬롯 1개에만 착용됨 — 반지/팔찌가 들어가는 장신구1·2 슬롯에는 절대 들어가지 않음.
+  // 이미 다른 목걸이를 착용 중이면 방어구처럼 새 목걸이로 교체됨.
+  if(ACCESSORY_TYPES[item.type] && ACCESSORY_TYPES[item.type].accessoryKind === 'necklace'){
+    if(state.equippedNecklaceId === id) return; // 이미 착용 중
+    state.equippedNecklaceId = id;
+    recheckEquipRequirements();
+    render(); saveState();
+    return;
+  }
   if(!Array.isArray(state.equippedAccessories)) state.equippedAccessories = [null, null];
   if(state.equippedAccessories.includes(id)) return; // 이미 착용 중
   const emptyIdx = state.equippedAccessories.indexOf(null);
@@ -529,6 +576,12 @@ function equipAccessoryPiece(id){
   render(); saveState();
 }
 function unequipAccessoryPiece(id){
+  if(state.equippedNecklaceId === id){
+    state.equippedNecklaceId = null;
+    recheckEquipRequirements();
+    render(); saveState();
+    return;
+  }
   if(!Array.isArray(state.equippedAccessories)) return;
   const idx = state.equippedAccessories.indexOf(id);
   if(idx === -1) return;
@@ -541,14 +594,14 @@ function unequipAccessoryPiece(id){
 function sellArmorItem(id){
   if(isEnhancing) return;
   const item = (state.armorInventory || []).find(i => i.id === id);
-  if(!item) return;
+  if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   const label = `${ARMOR_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellArmorItem(id));
 }
 function performSellArmorItem(id){
   const idx = (state.armorInventory || []).findIndex(i => i.id === id);
-  if(idx === -1) return;
+  if(idx === -1 || state.armorInventory[idx].locked) return;
   const item = state.armorInventory[idx];
   const def = ARMOR_TYPES[item.type];
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
@@ -572,7 +625,7 @@ function equipArmorPiece(id){
   const def = ARMOR_TYPES[item.type];
   if(!def) return;
   if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
-  if(!state.equippedArmor) state.equippedArmor = { helmet: null, armor: null };
+  if(!state.equippedArmor) state.equippedArmor = { helmet: null, armor: null, shoes: null };
   state.equippedArmor[def.armorKind] = id;
   recheckEquipRequirements();
   render(); saveState();
@@ -593,14 +646,14 @@ function unequipArmorPiece(id){
 function sellSubItem(id){
   if(isEnhancing) return;
   const item = (state.subInventory || []).find(i => i.id === id);
-  if(!item) return;
+  if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   const label = `${SUB_TYPES[item.type].name}${levelSuffix(item.level)}`;
   openSellConfirm(label, value, () => performSellSubItem(id));
 }
 function performSellSubItem(id){
   const idx = (state.subInventory || []).findIndex(i => i.id === id);
-  if(idx === -1) return;
+  if(idx === -1 || state.subInventory[idx].locked) return;
   const item = state.subInventory[idx];
   const def = SUB_TYPES[item.type];
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
@@ -637,8 +690,10 @@ function unequipSubPiece(id){
 // silent 파라미터는 buyWeapon과 동일한 역할(개수 지정 구매 팝업에서 반복 호출용).
 function buyFlask(id, btn, silent){
   const item = CONSUMABLES[id];
-  if(!item || state.gold < item.buyPrice) return false;
+  if(!item || item.buyPrice == null || state.gold < item.buyPrice) return false; // 구매 가격이 없는 아이템(비급)은 구매 불가
   if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
+  // 이미 보유 중인 종류면 기존 슬롯에 수량만 추가, 새 종류는 소비 인벤토리에 빈 슬롯이 있어야 구매 가능
+  if(!canAcquireInCategory('consumable', (state.consumables[id] || 0) > 0)) return false;
   state.gold -= item.buyPrice;
   state.consumables[id] = (state.consumables[id] || 0) + 1;
   if(!silent){
@@ -653,7 +708,7 @@ function sellAllFlask(id, btn){
   const count = state.consumables[id] || 0;
   if(count <= 0) return;
   const total = count * item.sellPrice;
-  const label = `${item.name} ${count}개`;
+  const label = isScrollItem(item) ? { html: `${consumableNameHtml(item)} ${count}개` } : `${item.name} ${count}개`;
   openSellConfirm(label, total, () => performSellAllFlask(id, btn));
 }
 function performSellAllFlask(id, btn){
@@ -930,7 +985,7 @@ let hpFlaskHeal = null; // { timerId, perTick, ticksLeft, isHp } 또는 null(진
 let mpFlaskHeal = null;
 function useFlask(id){
   const item = CONSUMABLES[id];
-  if(!item) return;
+  if(!item || !item.effect) return; // 회복 효과가 없는 소비 아이템(비급 등)은 플라스크 사용 경로로 처리하지 않음
   if(isFlaskOnCooldown(id)) return; // 쿨타임 중이면 수동/자동 사용 모두 무시
   // 전투 중 기절 상태면 회복(플라스크 사용)도 정지 — 마을/상점 등 전투 밖에서는 기절 상태가 아니므로 영향 없음
   if(currentView === 'hunt' && hunt.started && !hunt.paused && isStunned(hunt.player)) return;

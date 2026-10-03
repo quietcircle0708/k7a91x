@@ -16,19 +16,33 @@
     <div class="gold-badge"><span class="dot"></span><span id="goldText">0</span> G</div>
   </div>
   <div class="main-nav" id="mainNav">
-    <button class="nav-btn" id="openCharacterBtn"><svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="7.5" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg> 캐릭터</button>
-    <button class="nav-btn" id="openDungeonBtn">⚔️ 던전</button>
-    <button class="nav-btn" id="openCraftBtn">🛠️ 제작소</button>
-    <button class="nav-btn" id="openInventoryBtn"><svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14"><path d="M9.5 3h5l1.2 3.2H8.3L9.5 3z"/><path d="M6.2 8.4c0-1 .6-1.9 1.5-2.3l.6-.3h7.4l.6.3c.9.4 1.5 1.3 1.5 2.3 0 6.2-2.4 11.6-5.8 11.6s-5.8-5.4-5.8-11.6z"/></svg> 인벤토리</button>
-    <button class="nav-btn" id="openShopBtn">🛒 상점</button>
+    <button class="back-btn back-from-shop" id="backFromShopBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn back-from-inv" id="backFromInvBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn back-from-craft" id="backFromCraftBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn back-from-character" id="backFromCharacterBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn back-from-dlist" id="backFromDlistBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn" id="exitHuntBtn" style="display:none;">← 던전 나가기</button>
+    <button class="topmenu-btn" id="openPatchNoteBtn" title="공지사항"><img src="assets/ui/patchnote_icon.png" class="patchnote-icon-img" alt="공지사항" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'patchnote-icon-fallback',textContent:'📣'}))"></button>
+    <div class="menu-wrap" id="menuWrap">
+      <button class="topmenu-btn" id="menuToggleBtn" aria-expanded="false" aria-label="메뉴"><img src="assets/ui/icon_menu_button.png" class="topmenu-icon-img" alt="" draggable="false"><span class="topmenu-tip">메뉴</span></button>
+      <div class="menu-grid" id="menuGrid" style="display:none;">
+      <button class="menu-grid-item" id="openCharacterBtn"><img src="assets/ui/icon_menu_character.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">캐릭터</span></button>
+      <button class="menu-grid-item" id="openShopBtn"><img src="assets/ui/icon_menu_shop.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">상점</span></button>
+      <button class="menu-grid-item" id="openInventoryBtn"><img src="assets/ui/icon_menu_inventory.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">인벤토리</span></button>
+      <button class="menu-grid-item" id="openDungeonBtn"><img src="assets/ui/icon_menu_dungeon.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">던전</span></button>
+      <button class="menu-grid-item" id="openForgeMenuBtn"><img src="assets/ui/icon_menu_forge.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">대장간</span></button>
+      <button class="menu-grid-item" id="openCraftBtn"><img src="assets/ui/icon_menu_workshop.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">제작소</span></button>
+      <button class="menu-grid-item" id="openCollectionBtn"><img src="assets/ui/icon_menu_collection.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">도감</span></button>
+      <!-- 설정은 항상 마지막(CSS order:999) — 이후 메뉴가 추가돼도 맨 끝에 유지됨 -->
+      <button class="menu-grid-item menu-grid-item-last" id="openSettingsBtn"><img src="assets/ui/icon_menu_settings.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">설정</span></button>
+      </div>
+    </div>
   </div>
 
   <div id="forgeView">
     <div id="townToast" class="town-toast"></div>
     <div class="forge-card" id="forgeCard">
       <button class="stat-peek-btn blacksmith-peek-btn" id="openBlacksmithBtn" title="강화 장비 선택"><img src="assets/ui/blacksmith.png" class="blacksmith-icon-img" alt="대장간" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'blacksmith-icon-fallback',textContent:'🔨'}))"></button>
-      <button class="stat-peek-btn patchnote-peek-btn" id="openPatchNoteBtn" title="공지사항"><img src="assets/ui/patchnote_icon.png" class="patchnote-icon-img" alt="공지사항" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'patchnote-icon-fallback',textContent:'📣'}))"></button>
-      <button class="stat-peek-btn settings-peek-btn" id="openSettingsBtn" title="설정">⚙️</button>
       <div id="curseBadgeForge" class="curse-badge" style="display:none;">
         <span class="curse-badge-icon">💀</span>
         <span class="curse-badge-time" id="curseBadgeForgeTime">0:00</span>
@@ -127,7 +141,6 @@
   </div>
 
   <div id="shopView" style="display:none;">
-    <button class="back-btn back-from-shop">← 대장간으로 돌아가기</button>
     <div class="shop-card">
       <div class="shop-head-row">
         <div>
@@ -163,7 +176,6 @@
   </div>
 
   <div id="inventoryView" style="display:none;">
-    <button class="back-btn back-from-inv">← 대장간으로 돌아가기</button>
     <div class="inv-card-wrap">
       <div class="shop-title">인벤토리</div>
       <div class="inv-tabs" id="invTabs">
@@ -182,50 +194,76 @@
 
       <div class="inv-tab-panel" id="invTabWeapon">
         <div class="inv-count-row">
-          <div class="inv-count" id="invCount">0 / 50</div>
+          <div class="inv-count-left"><div class="inv-count" id="invCount">0 / 64</div><span class="inv-sort-wrap" data-sort-tab="weapon"></span></div>
           <div class="pager" id="invWeaponPager"></div>
         </div>
         <div id="inventoryList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabArmor" style="display:none;">
         <div class="inv-count-row">
-          <div class="inv-count" id="invCountArmor">0 / 50</div>
+          <div class="inv-count-left"><div class="inv-count" id="invCountArmor">0 / 64</div><span class="inv-sort-wrap" data-sort-tab="armor"></span></div>
           <div class="pager" id="invArmorPager"></div>
         </div>
         <div id="armorInventoryList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabSub" style="display:none;">
         <div class="inv-count-row">
-          <div class="inv-count" id="invCountSub">0 / 50</div>
+          <div class="inv-count-left"><div class="inv-count" id="invCountSub">0 / 64</div><span class="inv-sort-wrap" data-sort-tab="sub"></span></div>
           <div class="pager" id="invSubPager"></div>
         </div>
         <div id="subInventoryList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabAccessory" style="display:none;">
         <div class="inv-count-row">
-          <div class="inv-count" id="invCountAccessory">0 / 50</div>
+          <div class="inv-count-left"><div class="inv-count" id="invCountAccessory">0 / 64</div><span class="inv-sort-wrap" data-sort-tab="accessory"></span></div>
           <div class="pager" id="invAccessoryPager"></div>
         </div>
         <div id="accessoryInventoryList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabArtifact" style="display:none;">
-        <div class="inv-count" id="artifactCount">0 / 3</div>
+        <div class="inv-count-row inv-sort-row"><div class="inv-count-left"><div class="inv-count" id="artifactCount">0 / 3</div><span class="inv-sort-wrap" data-sort-tab="artifact"></span></div></div>
         <div id="artifactList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabConsumable" style="display:none;">
+        <div class="inv-count-row inv-sort-row"><div class="inv-count-left"><span class="inv-sort-wrap" data-sort-tab="consumable"></span></div></div>
         <div id="consumableList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabStone" style="display:none;">
+        <div class="inv-count-row inv-sort-row"><div class="inv-count-left"><span class="inv-sort-wrap" data-sort-tab="stone"></span></div></div>
         <div id="stoneList"></div>
       </div>
       <div class="inv-tab-panel" id="invTabMisc" style="display:none;">
+        <div class="inv-count-row inv-sort-row"><div class="inv-count-left"><span class="inv-sort-wrap" data-sort-tab="misc"></span></div></div>
         <div id="miscList"></div>
+      </div>
+    </div>
+
+    <!-- 신버전(박스) 인벤토리 — 설정의 인벤토리 UI가 '신버전(박스)'일 때만 표시됨(body.inventory-ui-box, CSS 참고).
+         구버전(세로) 인벤토리(.inv-card-wrap)는 그대로 두고 그 아래에 별도로 둠. 내용은 inventory_box.js가 채움. -->
+    <div class="inv-box-wrap" id="invBoxWrap">
+      <div class="shop-title">인벤토리</div>
+      <div class="inv-box-tabs" id="invBoxTabs"></div>
+      <div class="inv-box-panel">
+        <div class="inv-box-toolbar">
+          <div class="inv-box-tools">
+            <div class="inv-box-sort-area">
+              <span class="inv-sort-wrap" id="invBoxSortWrap"></span>
+              <label class="inv-box-check" id="invBoxWornFirstWrap" style="display:none;"><input type="checkbox" id="invBoxWornFirst"> 착용 장비 우선 정렬</label>
+            </div>
+            <span id="invBoxLockWrap"></span>
+          </div>
+          <div class="pager inv-box-pager" id="invBoxPager"></div>
+        </div>
+        <div class="inv-box-gridwrap"><div class="inv-box-grid" id="invBoxGrid"></div><div class="inv-box-compare" id="invBoxCompare" style="display:none;"></div></div>
+        <div class="inv-box-footer">
+          <div class="inv-box-slotcount" id="invBoxSlotCount"></div>
+          <div class="inv-box-gold" id="invBoxGold"></div>
+        </div>
       </div>
     </div>
   </div>
 
   <div id="craftView" style="display:none;">
-    <button class="back-btn back-from-craft">← 대장간으로 돌아가기</button>
     <div class="inv-card-wrap">
       <div class="shop-title">제작소</div>
       <div class="inv-tabs craft-tabs" id="craftTabs">
@@ -266,7 +304,6 @@
   </div>
 
   <div id="characterView" style="display:none;">
-    <button class="back-btn back-from-character">← 대장간으로 돌아가기</button>
     <div class="inv-card-wrap">
       <div class="shop-title">캐릭터</div>
       <div class="inv-tabs" id="charTabsRow"></div>
@@ -275,7 +312,6 @@
   </div>
 
   <div id="dungeonListView" style="display:none;">
-    <button class="back-btn back-from-dlist">← 대장간으로 돌아가기</button>
     <div class="shop-card">
       <div class="dungeon-title-row">
         <div class="shop-title">던전 입구</div>
@@ -290,8 +326,6 @@
   </div>
 
   <div id="huntView" style="display:none;">
-    <button class="back-btn" id="exitHuntBtn">← 던전 나가기</button>
-
     <!-- 던전 화면 좌우 패널 레이아웃(174 사용자 피드백 반영 — "던전 화면"은 huntCard 카드 전체를
          가리키며, 그 안의 요소를 확장/축소하는 구조가 아니라 huntCard는 완전히 그대로 두고 같은
          크기의 새 카드(huntTopSection)를 오른쪽에 별도로 추가하는 구조여야 함). 왼쪽 열은 지금은
@@ -481,9 +515,43 @@
         <span>사용 SP</span>
         <span id="skillLearnUseSp"></span>
       </div>
+      <div id="skillLearnBatchNote" style="display:none; text-align:center; font-size:12px; color:var(--forge-cream-dim); margin-top:2px;"></div>
       <div class="modal-actions">
         <button class="nav-btn" id="skillLearnCancelBtn">취소</button>
         <button class="btn btn-main" id="skillLearnConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 비급 사용 확인/결과 모달: 스킬 포인트 사용(skillLearnConfirmModal)·복구 결과(traceRestoreResultModal)의 구조/클래스를 그대로 재사용 -->
+  <div id="scrollUseModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="text-align:center;">
+      <div class="modal-title">비급 사용</div>
+      <div class="buy-qty-icon-row" style="margin-bottom:6px;">
+        <span class="artifact-icon-box buy-qty-icon-box weapon-name-wrap" id="scrollUseIconBox"></span>
+      </div>
+      <div id="scrollUseSkillName" style="text-align:center; margin-bottom:12px;"></div>
+      <div class="modal-body" id="scrollUseBody" style="text-align:center;"></div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="scrollUseCancelBtn">취소</button>
+        <span class="weapon-name-wrap" id="scrollUseConfirmWrap">
+          <button class="btn btn-main" id="scrollUseConfirmBtn" style="width:auto; padding:10px 18px;">사용</button>
+          <span class="tooltip" id="scrollUseConfirmTip" style="display:none;"></span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div id="scrollResultModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="text-align:center;">
+      <div class="modal-title">비급 사용 결과</div>
+      <div class="buy-qty-icon-row" style="margin-bottom:6px;">
+        <span class="artifact-icon-box buy-qty-icon-box weapon-name-wrap" id="scrollResultIconBox"></span>
+      </div>
+      <div id="scrollResultSkillName" style="text-align:center; margin-bottom:12px;"></div>
+      <div class="modal-body" id="scrollResultBody" style="text-align:center;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-main" id="scrollResultOkBtn" style="width:auto; padding:10px 24px;">확인</button>
       </div>
     </div>
   </div>
@@ -547,7 +615,7 @@
   <div id="traceSlotFullModal" class="modal-overlay" style="display:none;">
     <div class="modal-box">
       <div class="modal-title">알림</div>
-      <div class="modal-body">남은 인벤토리 슬롯을 확인해 주세요</div>
+      <div class="modal-body">장비 인벤토리가 가득 찼습니다.</div>
       <div class="modal-actions">
         <button class="btn btn-main" id="traceSlotFullOkBtn" style="width:auto; padding:10px 24px;">확인</button>
       </div>
@@ -642,6 +710,7 @@
       </div>
 
       <div class="craft-success-rate" id="craftPopupSuccessRate"></div>
+      <div class="reward-note" id="craftPopupFullNote" style="display:none; text-align:center;"></div>
 
       <div class="buy-qty-gold-row">
         <span>🪙 현재 보유 골드</span>
@@ -961,6 +1030,7 @@
 <script src="js/actions.js"></script>
 <script src="js/dungeon.js"></script>
 <script src="js/navigation.js"></script>
+<script src="js/inventory_box.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

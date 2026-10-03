@@ -74,8 +74,10 @@ function spawnMonsters(){
   // 이번 전투(그룹 전멸까지)에서 처치한 모든 몬스터의 보상을 합산해 담아둘 그릇
   hunt.pendingRewards = {
     gold: 0, expGained: 0, levelsGained: 0, newPlayerLevel: state.playerLevel,
-    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, flaskDrops: {}, artifactDrops: [], miscDrops: {}, killedMonsters: [],
+    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, flaskDrops: {}, artifactDrops: [], miscDrops: {}, scrollDrops: {}, killedMonsters: [],
+    fullCategories: {}, // 인벤토리 카테고리가 가득 차 지급하지 못한 드랍이 있었던 카테고리(보상창 안내용, 예: { stone: true })
   };
+  hunt.scrollGrantedThisBattle = false; // 비급은 한 전투(그룹 전멸까지)에서 최대 1회만 지급(요구사항 9번) — 새 전투가 시작될 때마다 초기화
 
   renderHunt();
   renderMonsterRow();
@@ -363,6 +365,14 @@ function monsterAttackTick(instanceId){
   if(isStunned(instance)) return; // 기절 중인 몬스터는 공격하지 못함
   ensurePlayerVitals();
   if(state.playerHp <= 0) return; // 이미 쓰러진 상태면 추가 피해 없음
+  // 회피 판정(요구사항 1·2·3·5번): 몬스터 기본 공격 1회당 최종 회피율로 딱 한 번만 판정. 성공하면 기존
+  // 피해 계산(레벨 차이 보정/방어도 적용 등)과 내구도 감소·중독 역격·화면 갱신·사망 판정을 전부 건너뛰고
+  // 회피 연출만 출력 — 기존 기본 공격 피해 처리 로직은 한 줄도 건드리지 않음. 몬스터 스킬 공격·상태 이상은
+  // 이 함수와 무관하므로(각자 별도 로직) 자동으로 회피 대상에서 제외됨.
+  if(rollEvasion(effectivePlayerEvasion())){
+    playerDodgeEffect();
+    return;
+  }
   const levelDiff = state.playerLevel - instance.level;
   let dmg = Math.max(1, Math.round((instance.atk || 0) * monsterDamageMultiplier(levelDiff)));
   // 착용 중인 방어구(투구+갑옷)의 방어도 합산치를 최종 피해 감소 공식에 적용(방어구 시스템 추가).
@@ -471,6 +481,56 @@ function stopAutoHealTicker(){
   if(autoHealCheckInterval){ clearInterval(autoHealCheckInterval); autoHealCheckInterval = null; }
 }
 
+// ---- 자연 회복(재생력) ----
+// 자동 플라스크 회복(위 startAutoHealTicker/checkAutoHeal)과는 완전히 별개의 시스템이자 타이머임 —
+// 마을에서도 동작해야 하므로(요구사항 2·4·6번) 전투 루프(startHuntLoop/stopHuntLoop)에 묶어서 시작·정지
+// 하지 않고, main.js 맨 아래의 다른 상시 타이머들처럼 게임이 로드될 때 딱 한 번만 등록해 계속 돈다. 그래서
+// 던전 재진입/화면 전환으로 인한 타이머 중복 생성 자체가 구조적으로 불가능함. 매 틱마다 hunt.paused만
+// 확인하는데, 마을 등 전투 밖에서는 hunt.paused가 항상 false이므로(showView) 정상 진행되고, 전투 일시정지
+// (보상/사망/스테이지 전환 팝업 등)에서만 진행이 멈춘다 — 남은 대기시간은 그대로 보존되었다가 정지가
+// 풀리면 이어서 진행됨(경과시간 누적 방식이라 실제 흐른 시간이 아니라 "진행이 허용된 시간"만 셈).
+const NATURAL_REGEN_TICK_MS = 1000;
+let hpRegenElapsedMs = 0;
+let mpRegenElapsedMs = 0;
+function naturalRegenTick(){
+  if(hunt.paused) return;
+  ensurePlayerVitals();
+  const maxHp = effectiveMaxHp(state.playerLevel);
+  const maxMp = effectiveMaxMp(state.playerLevel);
+  const regen = effectivePlayerRegen();
+  let changed = false;
+
+  if(state.playerHp >= maxHp){
+    hpRegenElapsedMs = 0; // 요구사항: 가득 찬 상태에서는 쿨타임을 불필요하게 진행하지 않음
+  } else {
+    hpRegenElapsedMs += NATURAL_REGEN_TICK_MS;
+    if(hpRegenElapsedMs >= HP_REGEN_INTERVAL_MS){
+      hpRegenElapsedMs = 0; // 발동 후 다음 주기를 처음부터 다시 시작
+      state.playerHp = Math.min(maxHp, state.playerHp + naturalHpRegenAmount(maxHp, regen));
+      changed = true;
+    }
+  }
+
+  if(state.playerMp >= maxMp){
+    mpRegenElapsedMs = 0;
+  } else {
+    mpRegenElapsedMs += NATURAL_REGEN_TICK_MS;
+    if(mpRegenElapsedMs >= MP_REGEN_INTERVAL_MS){
+      mpRegenElapsedMs = 0;
+      state.playerMp = Math.min(maxMp, state.playerMp + naturalMpRegenAmount(maxMp, regen));
+      changed = true;
+    }
+  }
+
+  if(changed){
+    // 기존 플라스크 지속 회복(applyFlaskHealTick)과 동일한 화면 갱신 방식을 그대로 재사용 — 던전 좌측
+    // 패널(renderHuntCharPanel)과 상단 등 다른 화면의 체력/마나 표시(refreshCharDisplays)를 모두 갱신.
+    renderHuntCharPanel();
+    refreshCharDisplays();
+    saveState();
+  }
+}
+
 // ---- 몬스터 개체 처치 ----
 // 개체 하나가 죽을 때마다: 1)전투 로직상 즉시 제거(타이머 정지, 배열/타겟에서 제외, 살아있으면 자동으로 다음 대상 지정)
 // 2)사망 애니메이션 재생 후 화면에서도 제거 3)이 개체의 보상을 즉시 지급하고 hunt.pendingRewards에 합산
@@ -508,7 +568,7 @@ function killMonsterInstance(instanceId){
   }, MONSTER_DEAD_ANIM_MS);
   hunt.deathAnimTimeouts.push(removalTimeout);
 
-  const result = resolveDrops(monsterDef, dungeon, level);
+  const result = resolveDrops(monsterDef, dungeon, level, { skipScroll: hunt.scrollGrantedThisBattle });
   // 이번 개체에서 실제로 지급이 확정된 아이템만 담아 연출에 넘김(연출은 이 목록을 "그리기"만 함 — 아래
   // 각 지급 블록에서 실제 지급이 확정된 시점에만 push되므로, 인벤토리가 가득 차 드랍이 무산된 경우 등은
   // 자동으로 연출 대상에서도 제외됨).
@@ -535,35 +595,49 @@ function killMonsterInstance(instanceId){
       } // 공용 장비 슬롯이 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨
     }
   }
+  // 마석/플라스크/아티팩트/기타/비급은 장비와 마찬가지로 "획득 시점에 해당 카테고리의 슬롯 용량"으로 지급 여부를 판단함
+  // (formulas.js의 grant*Stack/canGrantArtifact). 이미 보유 중인 종류에 수량만 추가하는 경우는 기존 슬롯을 그대로 쓰므로
+  // 가득 차 있어도 지급되고, 새 슬롯이 필요한데 가득 찬 카테고리의 드랍만 무산됨(다른 카테고리 드랍에는 영향 없음 —
+  // 무산된 드랍은 합산 목록/연출에도 반영하지 않고 fullCategories에 기록해 보상창에서 카테고리별로 안내함).
   if(result.stoneDrop){
     const item = MISC_ITEMS[result.stoneDrop.itemId];
-    state[item.stateKey] = (state[item.stateKey] || 0) + result.stoneDrop.qty;
-    hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] = (hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] || 0) + result.stoneDrop.qty;
-    dropVisualItems.push({ kind: 'item', itemId: result.stoneDrop.itemId });
+    if(grantMiscStack(item, result.stoneDrop.qty)){
+      hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] = (hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] || 0) + result.stoneDrop.qty;
+      dropVisualItems.push({ kind: 'item', itemId: result.stoneDrop.itemId });
+    } else hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true;
   }
   if(result.flaskDrop){
     // 플라스크는 마석(state[item.stateKey])과 달리 소비 아이템 전용 보유 수량 저장소(state.consumables)를
     // 사용함 — 상점 구매/사용(actions.js) 등 기존 플라스크 지급 로직과 완전히 동일한 방식으로 지급.
-    if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
-    state.consumables[result.flaskDrop.itemId] = (state.consumables[result.flaskDrop.itemId] || 0) + result.flaskDrop.qty;
-    hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] = (hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] || 0) + result.flaskDrop.qty;
-    dropVisualItems.push({ kind: 'consumable', itemId: result.flaskDrop.itemId });
+    if(grantConsumableStack(result.flaskDrop.itemId, result.flaskDrop.qty)){
+      hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] = (hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] || 0) + result.flaskDrop.qty;
+      dropVisualItems.push({ kind: 'consumable', itemId: result.flaskDrop.itemId });
+    } else hunt.pendingRewards.fullCategories.consumable = true;
   }
   if(result.artifactDropIds && result.artifactDropIds.length){
     for(const id of result.artifactDropIds){
-      grantArtifactSafe(id);
-      hunt.pendingRewards.artifactDrops.push(id);
-      dropVisualItems.push({ kind: 'artifact', id });
+      if(grantArtifactSafe(id)){
+        hunt.pendingRewards.artifactDrops.push(id);
+        dropVisualItems.push({ kind: 'artifact', id });
+      } else if(!ownsArtifact(id)) hunt.pendingRewards.fullCategories.artifact = true; // 보유 중이어서가 아니라 가득 차서 실패한 경우만 안내
     }
   }
   if(result.miscDrops && result.miscDrops.length){
     for(const drop of result.miscDrops){
       const item = MISC_ITEMS[drop.itemId];
-      state[item.stateKey] = (state[item.stateKey] || 0) + drop.qty;
+      if(!grantMiscStack(item, drop.qty)){ hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true; continue; }
       if(!hunt.pendingRewards.miscDrops[drop.itemId]) hunt.pendingRewards.miscDrops[drop.itemId] = { icon: drop.icon, name: drop.name, qty: 0 };
       hunt.pendingRewards.miscDrops[drop.itemId].qty += drop.qty;
       dropVisualItems.push({ kind: 'item', itemId: drop.itemId });
     }
+  }
+  if(result.scrollDrop){
+    // 플라스크와 동일하게 state.consumables 보유 수량 저장소를 그대로 사용(요구사항 1번 "실제 인벤토리 지급").
+    if(grantConsumableStack(result.scrollDrop.itemId, 1)){
+      hunt.pendingRewards.scrollDrops[result.scrollDrop.itemId] = (hunt.pendingRewards.scrollDrops[result.scrollDrop.itemId] || 0) + 1;
+      hunt.scrollGrantedThisBattle = true; // 이번 전투에서는 더 이상 비급을 지급하지 않음(요구사항 9번)
+      dropVisualItems.push({ kind: 'consumable', itemId: result.scrollDrop.itemId });
+    } else hunt.pendingRewards.fullCategories.consumable = true;
   }
   // 실제 지급이 전부 끝난 뒤, 그 결과를 그대로 보여주기만 하는 연출 호출(연출 성패는 위 지급 로직과 완전히 무관함).
   playMonsterDropEffect(instanceId, dropVisualItems);
@@ -619,9 +693,7 @@ function openKillResultModal(rewards){
   // 슬롯으로 변환만 함). 보상창을 새로 열 때마다 그리드는 항상 1페이지부터 시작.
   pageState.killRewardItems = 1;
   rewardsHtml += buildKillRewardItemSectionHtml(rewards);
-  if(anyEquipInventoryFull()){
-    rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;
-  }
+  rewardsHtml += buildInventoryFullNotesHtml(rewards.fullCategories, true);
   el('krRewards').innerHTML = rewardsHtml;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
   // 10스테이지 이하를 클리어한 경우에만 "탐험 계속"으로 다음 스테이지를 진행할 수 있음(11=숨겨진 장소는 별도 처리)
@@ -703,27 +775,35 @@ function grantTreasureRewards(){
   const minLevel = dungeonLevelRange(hunt.dungeon).min;
   const gold = rollTreasureGold(minLevel);
   state.gold += gold;
+  // 비급도 기존 골드/모험가의 유해/마석 구조를 그대로 재활용(요구사항 10번). 상자는 한 번 클릭으로
+  // 보상이 결정되는 1회성 구조라 별도의 "전투당 1회" 제한 없이 rollScrollDrop을 그대로 1회 호출.
+  const fullCategories = {}; // 가득 차 지급하지 못한 카테고리(결과창 안내용)
+  let scrollDrop = rollScrollDrop(minLevel);
+  if(scrollDrop && !grantConsumableStack(scrollDrop.itemId, 1)){
+    scrollDrop = null; // 소비 인벤토리가 가득 차 새 비급을 담을 수 없음(다른 카테고리 지급에는 영향 없음)
+    fullCategories.consumable = true;
+  }
 
   let weaponDrop = resolveWeaponRelicDrop(minLevel);
   if(weaponDrop && !grantRelicEquipDrop(weaponDrop)){
     weaponDrop = null; // 해당 장비 타입의 인벤토리가 가득 차 드랍 무산
   }
-  const stoneDrop = rollStoneDrop(minLevel, 'normal');
+  let stoneDrop = rollStoneDrop(minLevel, 'normal');
   if(stoneDrop){
     const item = MISC_ITEMS[stoneDrop.itemId];
-    state[item.stateKey] = (state[item.stateKey] || 0) + stoneDrop.qty;
+    if(!grantMiscStack(item, stoneDrop.qty)){ stoneDrop = null; fullCategories[miscItemCategory(item)] = true; }
   }
   // 숨겨진 장소 전용 기타 아이템 추첨 — 위 골드/모험가의 유해/마석과 완전히 독립적인 별도 판정
   // (rollTreasureMiscDrop 자체가 기존 전역 드랍 공식과 무관한 로직이라 서로 영향을 주지 않음).
-  const miscDrop = rollTreasureMiscDrop(minLevel);
+  let miscDrop = rollTreasureMiscDrop(minLevel);
   if(miscDrop){
     const item = MISC_ITEMS[miscDrop.itemId];
-    state[item.stateKey] = (state[item.stateKey] || 0) + miscDrop.qty;
+    if(!grantMiscStack(item, miscDrop.qty)){ miscDrop = null; fullCategories[miscItemCategory(item)] = true; }
   }
 
   render();
   saveState();
-  return { gold, weaponDrop, stoneDrop, miscDrop };
+  return { gold, weaponDrop, stoneDrop, miscDrop, scrollDrop, fullCategories };
 }
 function openTreasureResultModal(result){
   el('krIcon').textContent = '🎁';
@@ -750,14 +830,13 @@ function openTreasureResultModal(result){
     miscDrops: result.miscDrop
       ? { [result.miscDrop.itemId]: { icon: MISC_ITEMS[result.miscDrop.itemId].icon, name: MISC_ITEMS[result.miscDrop.itemId].name, qty: result.miscDrop.qty } }
       : {},
+    scrollDrops: result.scrollDrop ? { [result.scrollDrop.itemId]: 1 } : {},
   };
   pageState.killRewardItems = 1;
   rewardsHtml += buildKillRewardMessagesHtml(displayRewards);
   rewardsHtml += buildKillRewardItemSectionHtml(displayRewards);
 
-  if(anyEquipInventoryFull() && !result.weaponDrop){
-    rewardsHtml += `<div class="reward-note">장비 인벤토리가 가득 찼습니다.</div>`;
-  }
+  rewardsHtml += buildInventoryFullNotesHtml(result.fullCategories, !result.weaponDrop);
   el('krRewards').innerHTML = rewardsHtml;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
   el('krContinueBtn').style.display = 'none'; // 11스테이지 다음은 없으므로 "탐험 계속" 버튼은 숨김

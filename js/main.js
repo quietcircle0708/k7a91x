@@ -19,6 +19,117 @@ el('invEquipSubTabs').addEventListener('click', (e)=>{
   if(!btn) return;
   switchInvTab(btn.dataset.tab);
 });
+// ---- 인벤토리 정렬(구버전·신버전 공용) ----
+// 탭별 정렬 드롭다운(select.inv-sort-select[data-sort-tab])과 신버전 장비 탭의 "착용 장비 우선 정렬" 체크가 바뀌면 상태를 저장하고 다시 그림.
+// 정렬 상태는 탭별로 독립(state.invSort[탭 id])이고, 정렬을 바꾸면 그 탭만 1페이지로 돌아감.
+const INV_SORT_PAGE_KEY = { weapon: 'invWeapon', armor: 'invArmor', sub: 'invSub', accessory: 'invAccessory' };
+document.addEventListener('change', (e)=>{
+  const sel = e.target.closest ? e.target.closest('select.inv-sort-select') : null;
+  const isWornCb = e.target && e.target.id === 'invBoxWornFirst';
+  if(!sel && !isWornCb) return;
+  let tab;
+  if(sel){
+    tab = sel.dataset.sortTab;
+    invSortSet(tab, sel.value);
+  } else {
+    tab = 'equipment';
+    state.invSortWornFirst = e.target.checked;
+  }
+  if(INV_SORT_PAGE_KEY[tab]) pageState[INV_SORT_PAGE_KEY[tab]] = 1;
+  if(typeof invBoxUI !== 'undefined'){ invBoxUI.page[tab] = 1; invBoxClosePopup(); }
+  render();
+  saveState();
+});
+// ---- 인벤토리 아이템 잠금 모드(구버전·신버전 공용) ----
+// 잠금 상태/기능 제한 판정은 formulas.js(invLock*/isEquipLockedById)에 있고, 여기에는 "잠금 모드" 조작(버튼·클릭·커서)만 있음.
+// 잠금 모드(invLockMode)는 저장하지 않는 일시적 조작 모드: 잠금 버튼으로 켜고 끄며, 페이지/탭/장비 소분류를 옮겨도 유지되고,
+// 인벤토리 메뉴를 벗어나면 navigation.js showView가 invLockModeSet(false)로 끔(커서도 일반 커서로 복원).
+function invLockCursorEl(){
+  let c = document.getElementById('invLockCursor');
+  if(!c){
+    c = document.createElement('img');
+    c.id = 'invLockCursor'; c.className = 'inv-lock-cursor'; c.src = INV_LOCK_IMG; c.alt = ''; c.draggable = false;
+    document.body.appendChild(c);
+  }
+  return c;
+}
+// 마우스 커서를 쓸 수 있는 환경(데스크톱)인지 — 터치 기기에서는 커서 이미지를 쓰지 않고 잠금 버튼 활성 표시로만 모드를 나타냄.
+function invLockHasMouse(){
+  return typeof window.matchMedia === 'function' ? window.matchMedia('(hover: hover) and (pointer: fine)').matches : true;
+}
+function invLockModeSet(on){
+  invLockMode = !!on;
+  document.body.classList.toggle('inv-lock-mode', invLockMode); // CSS: 인벤토리 안에서 기본 커서 숨김, 잠긴 아이템 호버 시 해제 이미지 표시
+  if(!invLockMode){ const c = document.getElementById('invLockCursor'); if(c){ c.style.display = 'none'; invLockCursorSetImg(c, false); } }
+}
+// 잠금 모드 커서: 준비된 잠금 이미지(INV_LOCK_IMG)를 마우스 위치에 따라다니게 표시(CSS cursor: url()은 큰 PNG를 받지 않아 같은 파일을 그대로 씀).
+// 이미 잠긴 아이템(.locked) 영역 위에서는 커서 이미지 자체가 해제 이미지(INV_UNLOCK_IMG)로 바뀌고, 그 영역을 벗어나면 다시 잠금 이미지로 돌아옴.
+// (표시만 바뀜 — 실제 해제는 클릭했을 때만 이루어짐.)
+function invLockCursorSetImg(c, unlock){
+  const want = unlock ? INV_UNLOCK_IMG : INV_LOCK_IMG;
+  if(c.getAttribute('src') !== want) c.setAttribute('src', want);
+}
+document.addEventListener('mousemove', (e) => {
+  if(!invLockMode) return;
+  const c = invLockCursorEl();
+  if(!invLockHasMouse() || currentView !== 'inventory' || !e.target.closest || !e.target.closest('#inventoryView')){ c.style.display = 'none'; return; }
+  const host = e.target.closest('[data-lock-src]');
+  invLockCursorSetImg(c, !!(host && host.classList.contains('locked')));
+  c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; c.style.display = 'block';
+});
+document.addEventListener('mouseleave', () => { const c = document.getElementById('invLockCursor'); if(c) c.style.display = 'none'; });
+// ---- 아이템 비교 모드 커서(돋보기) ----
+// 잠금 모드 커서와 같은 방식: 준비된 PNG(INV_COMPARE_IMG)를 마우스를 따라다니게 표시하고 인벤토리 안에서는 기본 커서를 숨김(터치 환경에서는 쓰지 않음).
+// 비교 대상을 고르는 동안(비교 모드이고 비교 팝업이 닫혀 있을 때)만 켜지며, 팝업이 열려 있거나 모드가 끝나면 일반 커서로 복원됨.
+function invCompareCursorEl(){
+  let c = document.getElementById('invCompareCursor');
+  if(!c){
+    c = document.createElement('img');
+    c.id = 'invCompareCursor'; c.className = 'inv-compare-cursor'; c.src = INV_COMPARE_IMG; c.alt = ''; c.draggable = false;
+    document.body.appendChild(c);
+  }
+  return c;
+}
+function invCompareCursorSync(){
+  const active = typeof invCompare !== 'undefined' && invCompare.on && !invCompare.targetKey;
+  document.body.classList.toggle('inv-compare-mode', active);
+  if(!active){ const c = document.getElementById('invCompareCursor'); if(c) c.style.display = 'none'; }
+}
+document.addEventListener('mousemove', (e) => {
+  if(typeof invCompare === 'undefined' || !invCompare.on || invCompare.targetKey) return;
+  const c = invCompareCursorEl();
+  if(!invLockHasMouse() || currentView !== 'inventory' || !e.target.closest || !e.target.closest('#inventoryView')){ c.style.display = 'none'; return; }
+  c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; c.style.display = 'block';
+});
+document.addEventListener('mouseleave', () => { const c = document.getElementById('invCompareCursor'); if(c) c.style.display = 'none'; });
+// 캡처 단계에서 처리해 기존 클릭 동작(착용/강화 선택/판매/팝업 등)이 같은 클릭에 함께 실행되지 않게 함.
+document.addEventListener('click', (e) => {
+  if(!e.target.closest) return;
+  const toggleBtn = e.target.closest('[data-lock-toggle]');
+  if(toggleBtn){
+    if(toggleBtn.disabled) return;
+    e.stopPropagation(); e.preventDefault();
+    invLockModeSet(!invLockMode);
+    if(typeof invBoxClosePopup === 'function') invBoxClosePopup();
+    render();
+    return;
+  }
+  if(!invLockMode || currentView !== 'inventory') return;
+  const host = e.target.closest('[data-lock-src]');
+  if(!host) return; // 탭/페이지/정렬 등 아이템이 아닌 곳은 평소대로 동작
+  e.stopPropagation(); e.preventDefault();
+  if(invLockToggle(host.dataset.lockSrc, Number(host.dataset.lockId))){
+    if(typeof invBoxClosePopup === 'function') invBoxClosePopup();
+    // 클릭한 아이템 위에 커서가 그대로 있으므로(마우스를 움직이기 전에도) 바뀐 잠금 상태에 맞게 커서 이미지를 바로 갱신함:
+    // 방금 잠갔다면 해제 이미지, 방금 해제했다면 잠금 이미지.
+    const nowLocked = isInvItemLocked(host.dataset.lockSrc, Number(host.dataset.lockId));
+    const cur = document.getElementById('invLockCursor');
+    if(cur) invLockCursorSetImg(cur, nowLocked);
+    render();
+    saveState();
+  }
+}, true);
+
 // ---- 대장간 강화/수리 탭(내구도 시스템 15번 요구사항) ----
 el('forgeTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-tab]');
@@ -196,6 +307,18 @@ el('openInventoryBtn').addEventListener('click', openInventory);
 el('openDungeonBtn').addEventListener('click', openDungeonList);
 el('openCharacterBtn').addEventListener('click', openCharacterMenu);
 el('openCraftBtn').addEventListener('click', openCraft);
+// ---- 상단 메뉴 버튼 + 그리드: 표현 방식만 담당(각 항목은 위의 기존 열기 함수에 그대로 연결됨) ----
+el('openForgeMenuBtn').addEventListener('click', ()=>{ if(isEnhancing || currentView === 'forge') return; guardedNav('forge'); });
+// 도감: 이번 단계에서는 메뉴 항목만 있고 실제 기능은 없음(항목 클릭 시 그리드만 닫힘).
+function setMenuGridOpen(open){
+  el('menuGrid').style.display = open ? 'grid' : 'none';
+  el('menuToggleBtn').classList.toggle('open', open);
+  el('menuToggleBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+el('menuToggleBtn').addEventListener('click', ()=> setMenuGridOpen(el('menuGrid').style.display === 'none'));
+el('menuGrid').addEventListener('click', (e)=>{ if(e.target.closest('.menu-grid-item')) setMenuGridOpen(false); });
+document.addEventListener('click', (e)=>{ if(!e.target.closest('#menuWrap')) setMenuGridOpen(false); });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') setMenuGridOpen(false); });
 el('goInventoryBtn').addEventListener('click', openInventory);
 el('quickBuySwordBtn').addEventListener('click', (e)=> buyWeapon('longsword', e.currentTarget));
 el('resetLink').addEventListener('click', resetGame);
@@ -263,6 +386,23 @@ el('charTabsRow').addEventListener('click', (e)=>{
 // - 캐릭터 정보 탭: 소분류 전환([정보]/[착용 장비]/[세부 능력치]) + 스탯 배분 버튼 + 페이지 이동
 // - 스킬 탭: 하위 탭 전환 + 스킬 습득 + 스킬 퀵슬롯(배정/사용/제거) + 플라스크 퀵슬롯(기존 로직 그대로,
 //   skillTabFlaskRow가 quickSlotRow와 동일한 data-action 이름을 그대로 씀) + 퀵슬롯 초기화 + 페이지 이동
+const SKILL_ICON_DBLCLICK_DELAY_MS = 280;
+let pendingSkillIconClickTimer = null;
+function isMobileSkillPreset(){ return !!(state.settings && state.settings.screenPreset === 'mobile'); }
+// 데스크톱: 스킬 아이콘 우클릭 = 확인창 없이 즉시 부분 초기화(브라우저 기본 메뉴는 억제)
+function handleSkillIconContextMenu(e){
+  const btn = e.target.closest('button[data-learn-skill]');
+  if(!btn || isMobileSkillPreset()) return;
+  e.preventDefault();
+  partialResetSkill(btn.dataset.learnSkill);
+}
+// 모바일: 스킬 아이콘 더블클릭 = 확인창 없이 즉시 부분 초기화(대기 중이던 단일 탭 습득은 취소)
+function handleSkillIconDblClick(e){
+  const btn = e.target.closest('button[data-learn-skill]');
+  if(!btn || !isMobileSkillPreset()) return;
+  if(pendingSkillIconClickTimer){ clearTimeout(pendingSkillIconClickTimer); pendingSkillIconClickTimer = null; }
+  partialResetSkill(btn.dataset.learnSkill);
+}
 function handleCharPanelClick(e){
   // [캐릭터 정보] 탭 소분류([정보]/[착용 장비]/[세부 능력치]) 전환 — 캐릭터 메뉴/던전 우측 패널이 서로
   // 다른 data 속성을 쓰므로(switchCharInfoSubtab/switchHuntCharInfoSubtab) 각자 독립적으로 갱신됨.
@@ -278,7 +418,18 @@ function handleCharPanelClick(e){
   if(skillKindBtn){ switchSkillKind(skillKindBtn.dataset.skillKind); return; }
 
   const learnBtn = e.target.closest('button[data-learn-skill]');
-  if(learnBtn){ openSkillLearnConfirm(learnBtn.dataset.learnSkill); return; }
+  if(learnBtn){
+    const id = learnBtn.dataset.learnSkill;
+    if(isMobileSkillPreset()){
+      // 모바일: 더블클릭 부분 초기화와 충돌하지 않도록 단일 탭 습득을 잠깐 지연시키고, 그 사이 더블클릭이
+      // 감지되면(handleSkillIconDblClick) 예약을 취소함. 데스크톱은 기존과 동일하게 즉시 처리.
+      if(pendingSkillIconClickTimer) clearTimeout(pendingSkillIconClickTimer);
+      pendingSkillIconClickTimer = setTimeout(() => { pendingSkillIconClickTimer = null; openSkillLearnConfirm(id); }, SKILL_ICON_DBLCLICK_DELAY_MS);
+    } else {
+      openSkillLearnConfirm(id);
+    }
+    return;
+  }
 
   const skillUseBtn = e.target.closest('button[data-action="use-skill"]');
   const skillAssignBtn = e.target.closest('button[data-action="assign-skill"]');
@@ -318,6 +469,10 @@ function handleCharPanelClick(e){
 }
 el('charTabPanels').addEventListener('click', handleCharPanelClick);
 el('huntCharTabPanels').addEventListener('click', handleCharPanelClick);
+el('charTabPanels').addEventListener('contextmenu', handleSkillIconContextMenu);
+el('huntCharTabPanels').addEventListener('contextmenu', handleSkillIconContextMenu);
+el('charTabPanels').addEventListener('dblclick', handleSkillIconDblClick);
+el('huntCharTabPanels').addEventListener('dblclick', handleSkillIconDblClick);
 el('huntCharTabsRow').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-hunt-char-tab]');
   if(!btn) return;
@@ -342,6 +497,9 @@ el('skillLearnConfirmBtn').addEventListener('click', confirmSkillLearn);
 el('traceRestoreCancelBtn').addEventListener('click', closeTraceRestoreConfirm);
 el('traceRestoreConfirmBtn').addEventListener('click', confirmTraceRestore);
 el('traceRestoreResultOkBtn').addEventListener('click', closeTraceRestoreResult);
+el('scrollUseCancelBtn').addEventListener('click', closeScrollUseModal);
+el('scrollUseConfirmBtn').addEventListener('click', confirmScrollUse);
+el('scrollResultOkBtn').addEventListener('click', closeScrollResultModal);
 el('traceSlotFullOkBtn').addEventListener('click', closeTraceSlotFullModal);
 el('skillResetCancelBtn').addEventListener('click', cancelSkillReset);
 el('skillResetConfirmBtn').addEventListener('click', confirmSkillReset);
@@ -403,7 +561,10 @@ el('inventoryList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;
   const id = Number(btn.dataset.id);
-  if(btn.dataset.action === 'equip') equipItem(id);
+  if(!btn || btn.disabled) return;
+  if(btn.dataset.action === 'wear-weapon') equipWeaponPiece(id);
+  else if(btn.dataset.action === 'unwear-weapon') unequipWeaponPiece(id);
+  else if(btn.dataset.action === 'equip') selectForgeTargetFromInventory(id); // 강화 선택 → 강화 대상 지정 후 대장간으로 이동
   else if(btn.dataset.action === 'sell') sellItem(id);
 });
 el('armorInventoryList').addEventListener('click', (e)=>{
@@ -412,7 +573,7 @@ el('armorInventoryList').addEventListener('click', (e)=>{
   const id = Number(btn.dataset.id);
   if(btn.dataset.action === 'wear-armor') equipArmorPiece(id);
   else if(btn.dataset.action === 'unwear-armor') unequipArmorPiece(id);
-  else if(btn.dataset.action === 'equip') equipItem(id); // 강화 선택(대장간 화면에 표시) — 무기 인벤토리와 동일한 함수 재사용
+  else if(btn.dataset.action === 'equip') selectForgeTargetFromInventory(id); // 강화 선택 → 강화 대상 지정 후 대장간으로 이동
   else if(btn.dataset.action === 'sell-armor') sellArmorItem(id);
 });
 el('accessoryInventoryList').addEventListener('click', (e)=>{
@@ -421,7 +582,7 @@ el('accessoryInventoryList').addEventListener('click', (e)=>{
   const id = Number(btn.dataset.id);
   if(btn.dataset.action === 'wear-accessory') equipAccessoryPiece(id);
   else if(btn.dataset.action === 'unwear-accessory') unequipAccessoryPiece(id);
-  else if(btn.dataset.action === 'equip') equipItem(id);
+  else if(btn.dataset.action === 'equip') selectForgeTargetFromInventory(id); // 강화 선택 → 강화 대상 지정 후 대장간으로 이동
   else if(btn.dataset.action === 'sell-accessory') sellAccessoryItem(id);
 });
 el('subInventoryList').addEventListener('click', (e)=>{
@@ -444,6 +605,7 @@ el('consumableList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;
   if(btn.dataset.action === 'use-flask') useFlask(btn.dataset.id);
+  else if(btn.dataset.action === 'use-scroll') openScrollUseModal(btn.dataset.id);
   else if(btn.dataset.action === 'use-trace') useTraceItem(Number(btn.dataset.id));
 });
 el('quickSlotRow').addEventListener('click', (e)=>{
@@ -517,6 +679,9 @@ setInterval(updateSkillQuickSlotCooldowns, 100);
 // 던전 전투화면 버프 지속시간 UI(요구사항) 실시간 갱신 — renderHuntBuffUi 내부에서 el('huntBuffUi')가
 // 없으면(던전 화면이 아닐 때) 조용히 무시하므로 위 두 타이머와 동일하게 항상 켜둬도 무방함.
 setInterval(renderHuntBuffUi, 100);
+// 자연 회복(재생력) — 마을/던전 어디서나 항상 진행되어야 하므로(dungeon.js naturalRegenTick 주석 참고)
+// 전투 루프 시작/종료에 묶지 않고 위 타이머들과 동일하게 게임이 켜져 있는 동안 딱 한 번만 등록함.
+setInterval(naturalRegenTick, NATURAL_REGEN_TICK_MS);
 
 // ---- 툴팁 위치 자동 보정 ----
 // 모든 툴팁(class="tooltip")은 CSS(:hover)만으로 위치가 고정되어 있어서, 화면 위/아래/좌우 경계에
@@ -701,11 +866,14 @@ if(typeof ResizeObserver !== 'undefined'){
       const rect = huntCardEl.getBoundingClientRect();
       if(rect.width > 0) wrapEl.style.setProperty('--hunt-card-width', rect.width + 'px');
       if(rect.height > 0) wrapEl.style.setProperty('--hunt-card-height', rect.height + 'px');
+      if(typeof alignHuntHeader === 'function') alignHuntHeader();
     };
     new ResizeObserver(syncHuntCardSize).observe(huntCardEl);
     syncHuntCardSize(); // 초기 1회 즉시 반영(옵저버 콜백은 다음 프레임부터 발동하므로)
   }
 }
+
+window.addEventListener('resize', ()=>{ if(typeof alignHuntHeader === 'function') alignHuntHeader(); });
 
 loadState();
 initPatchNoteSystem();

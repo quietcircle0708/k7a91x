@@ -14,6 +14,22 @@
     --forge-blue: #4fa3d1;
     --forge-purple: #a066d6;
   }
+  /* ---- 공용 스크롤바 스타일(게임 전체): 어두운 트랙 + 중간 톤 thumb, 가는 폭, 호버 시 살짝 밝게. 아이템 비교 팝업에서 쓰던 스타일을 그대로 공용화함.
+     색/폭은 아래 변수만 바꾸면 전체에 반영됨. 스크롤 동작 자체는 건드리지 않고 모양만 통일. ---- */
+  :root{
+    --scroll-width: 6px;
+    --scroll-track: #241d10;
+    --scroll-thumb: #5a4a2c;
+    --scroll-thumb-hover: #75613a;
+  }
+  ::-webkit-scrollbar{ width: var(--scroll-width); height: var(--scroll-width); } /* 세로 폭/가로 높이 */
+  ::-webkit-scrollbar-track{ background: var(--scroll-track); border-radius:3px; }
+  ::-webkit-scrollbar-thumb{ background: var(--scroll-thumb); border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover{ background: var(--scroll-thumb-hover); }
+  ::-webkit-scrollbar-corner{ background: var(--scroll-track); } /* 가로·세로 스크롤바가 만나는 모서리 */
+  @supports not selector(::-webkit-scrollbar){ /* Firefox 등: 표준 속성(호버 효과는 지원되지 않음) */
+    *{ scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
+  }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
     background: radial-gradient(ellipse at 50% -10%, #2a1f16 0%, var(--forge-black) 55%);
@@ -30,8 +46,8 @@
   .brand{ font-family:'Cinzel', 'Noto Serif KR', serif; font-weight:900; font-size:19px; letter-spacing:1.5px; }
   .brand span{ color: var(--forge-ember); }
   .topbar-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  /* 메인 메뉴(캐릭터/던전/인벤토리/상점) — 항상 좌측 정렬로 고정, 가로 배치는 기존 topbar-right와 동일 */
-  .main-nav{ display:flex; justify-content:flex-start; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  /* 상단 메뉴 영역 — [공지사항][메뉴 버튼] 오른쪽 정렬, 메뉴 버튼을 누르면 아래로 그리드가 펼쳐짐(아래 .menu-grid) */
+  .main-nav{ display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:18px; position:relative; z-index:20; }
   .gold-badge{
     display:flex; align-items:center; gap:6px;
     background: var(--forge-panel); border:1px solid var(--forge-line);
@@ -801,6 +817,8 @@
   /* 치명타 피해: 표시 위치·이동 방식은 일반 피해(.float → dmg-float)와 동일하게 두고, 색상(기존 치명타
      표시 규칙)만 유지한 채 텍스트 크기만 일반 피해(17px)보다 1pt 크게(18px) 설정함. */
   .dmg-popup.crit{ font-size:18px; color:#ff4d4d; text-shadow:0 0 8px #ff4d4d99, 0 0 4px rgba(0,0,0,.7); }
+  /* 회피 문구 — 피해 숫자와 구분되는 색상만 다르게(밝은 하늘색), 위치·크기·이동 방식은 일반 피해와 동일. */
+  .dmg-popup.dodge{ color:#7fe0ff; text-shadow:0 0 8px #7fe0ff99, 0 0 4px rgba(0,0,0,.7); }
 
   /* 몬스터 처치 시 드랍 아이템 연출 — 실제 아이템 객체가 아닌 순수 이미지 애니메이션.
      monster-slot이 아니라 monsterRow에 절대좌표(px)로 직접 붙기 때문에(effects.js 참고, 사망 애니메이션
@@ -1064,9 +1082,7 @@
   .blacksmith-icon-fallback{ font-size:16px; line-height:1; }
   .blacksmith-icon-img{ width:20px; height:20px; object-fit:contain; }
 
-  /* 공지사항(패치노트) 버튼: 설정 버튼(settings-peek-btn) 바로 위, 왼쪽 상단에 같은 크기로 배치.
-     설정 버튼은 이 버튼이 들어갈 자리만큼 아래로(top:60px) 내림 — 대장간/캐릭터정보 버튼 쌍과 동일한 배치 방식. */
-  .patchnote-peek-btn{ top:16px; left:16px; right:auto; font-size:16px; }
+  /* 공지사항(패치노트) 버튼 — 상단 메뉴 영역(메뉴 버튼 왼쪽)으로 이동(.topmenu-btn 스타일 사용). */
   .patchnote-icon-fallback{ font-size:16px; line-height:1; }
   .patchnote-icon-img{ width:20px; height:20px; object-fit:contain; }
 
@@ -1254,7 +1270,6 @@
   #spawnToast.show{ opacity:1; transform:translate(-50%,0); }
 
   /* ---- 설정 화면 ---- */
-  .settings-peek-btn{ top:60px; left:16px; right:auto; font-size:16px; }
   .settings-modal{ max-width:380px; text-align:left; }
 
   /* ---- 공지사항(패치노트) 모달 ---- */
@@ -1441,3 +1456,190 @@
      화면은 이 선택자 범위 밖이라 전혀 영향받지 않고, 여기서도 자바스크립트는 손대지 않고 CSS
      우선순위만으로 이 화면에서만 배경을 투명하게 되돌림 — PNG의 원래 투명 영역이 그대로 투명하게 보임. */
   .drop-item-visual-inner .icon-grade-bg{ background: transparent; }
+
+  /* ============================================================
+     신버전(박스) 인벤토리 — 설정의 인벤토리 UI가 '신버전(박스)'일 때만 보임(body.inventory-ui-box, navigation.js
+     applyScreenPreset가 붙임). 구버전(세로) 인벤토리는 CSS/DOM을 그대로 두고 신버전일 때만 숨김.
+     아이콘 크기(.inv-icon-img 30px)/슬롯 크기(.inv-icon 42px)는 기존 인벤토리 값을 그대로 씀 — 8×8 배치에서 맞지
+     않는 부분은 화면 확인 후 이후 단계에서 조정. 이 블록 아래 규칙은 전부 .inv-box-* 로 스코프됨.
+     ============================================================ */
+  #invBoxWrap{
+    display:none;
+    background: linear-gradient(180deg, var(--forge-panel) 0%, var(--forge-panel-2) 100%);
+    border:1px solid var(--forge-line); border-radius:18px; padding:22px 20px;
+  }
+  body.inventory-ui-box #inventoryView .inv-card-wrap{ display:none; }
+  body.inventory-ui-box #inventoryView #invBoxWrap{ display:block; }
+
+  /* 탭 + 아이템 영역을 하나의 상자처럼: 선택된 탭이 패널 윗선을 덮어 패널과 이어져 보임 */
+  .inv-box-tabs{ display:flex; gap:4px; margin-top:10px; align-items:flex-end; position:relative; z-index:1; }
+  .inv-box-tab{
+    flex:1; background: var(--forge-panel-2); border:1px solid var(--forge-line); border-bottom:none;
+    color: var(--forge-cream-dim); border-radius:8px 8px 0 0; padding:8px 2px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .inv-box-tab:hover{ color: var(--forge-cream); }
+  .inv-box-tab.active{
+    background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold);
+    padding-bottom:11px; margin-bottom:-1px; position:relative; z-index:2;
+  }
+  .inv-box-panel{
+    background:#2c2415; border:1px solid var(--forge-gold); border-radius:0 0 12px 12px; padding:10px 12px 12px;
+    position:relative;
+  }
+  .inv-box-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding-bottom:8px; }
+  .inv-box-tools{ display:flex; gap:6px; }
+  .inv-box-btn{
+    background:#2a231f; border:1px solid var(--forge-line); color: var(--forge-cream); border-radius:6px;
+    padding:4px 12px; font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  .inv-box-btn:hover{ border-color: var(--forge-gold); color: var(--forge-gold); }
+  .inv-box-btn.active{ border-color: var(--forge-gold); color: var(--forge-gold); }
+  /* ---- 신버전 인벤토리 아이템 비교 ---- */
+  .inv-box-gridwrap{ position:relative; }
+  .inv-box-slot.compare-disabled{ opacity:.3; pointer-events:none; } /* 비교할 수 없는 장비(다른 대분류/비장비 탭)는 흐리게, 클릭 불가 */
+  .inv-box-slot.compare-base{ box-shadow:0 0 0 2px var(--forge-gold); } /* 비교 기준 장비 강조 */
+  .inv-compare-cursor{ position:fixed; left:0; top:0; width:28px; height:28px; transform:translate(-30%, -30%); pointer-events:none; z-index:100000; display:none; -webkit-user-drag:none; user-select:none; }
+  @media (hover:hover) and (pointer:fine){
+    body.inv-compare-mode #inventoryView, body.inv-compare-mode #inventoryView *{ cursor:none !important; }
+  }
+  .inv-box-compare{
+    position:absolute; left:0; top:0; right:0; bottom:0; z-index:20; flex-direction:column;
+    background:#2c2415; border:1px solid var(--forge-line); border-radius:8px; padding:6px 8px; box-sizing:border-box; font-size:11.5px;
+  }
+  .cmp-head{ display:grid; grid-template-columns:64px 1fr 1fr; gap:6px; align-items:center; padding-bottom:6px; border-bottom:1px solid var(--forge-line);
+    position:sticky; top:0; z-index:2; margin-top:-4px; padding-top:4px; background:#2c2415; } /* 스크롤 영역 안에서 맨 위에 고정(.cmp-body 위쪽 여백 4px 상쇄) */
+  .cmp-head-side{ display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; }
+  /* 비교 팝업 아이콘: 인벤토리 슬롯과 같은 정사각형(최대 42px)으로, 각 열의 가운데에 배치 — 일반 슬롯의 width:100%를 이기려고 선택자를 한 단계 높임 */
+  .inv-box-compare .cmp-slot{ width:min(42px, 100%); height:auto; flex:none; aspect-ratio:1 / 1; margin:0 auto; }
+  .cmp-head-side{ position:relative; }
+  .cmp-change{ position:absolute; left:calc(50% + 28px); top:50%; transform:translateY(-50%); padding:2px 8px; font-size:11px; } /* 아이콘은 가운데 유지, [변경]은 B 아이콘 오른쪽 */
+  .cmp-body{ flex:1; overflow-y:auto; padding:4px 0; }
+  /* 비교 팝업의 스크롤바는 위쪽의 공용 스크롤바 스타일을 그대로 사용함 */
+  .cmp-row{ display:grid; grid-template-columns:64px 1fr 1fr; gap:6px; padding:3px 0; border-bottom:1px dashed rgba(255,255,255,.06); line-height:1.4; }
+  .cmp-label{ color: var(--forge-cream-dim); }
+  .cmp-val{ text-align:center; color: var(--forge-gold); word-break:keep-all; overflow-wrap:anywhere; min-width:0; }
+  .cmp-delta{ font-weight:700; white-space:nowrap; }
+  .cmp-delta.good{ color:#6fd16f; } /* 능력치 관점에서 더 좋아짐(초록) */
+  .cmp-delta.bad{ color:#ff6b6b; }  /* 능력치 관점에서 더 나빠짐(빨강) */
+  .cmp-sellval{ color: var(--forge-gold); }
+  .cmp-sellval.reduced{ color:#ff6b6b; }
+  .cmp-foot{ display:flex; justify-content:center; padding-top:6px; border-top:1px solid var(--forge-line); }
+  .inv-box-btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .inv-box-btn:disabled:hover{ border-color: var(--forge-line); color: var(--forge-cream); }
+  /* ---- 인벤토리 아이템 잠금 ---- */
+  .inv-icon{ position:relative; } /* 잠금 아이콘 오버레이 기준 */
+  .inv-lock-wrap{ display:inline-block; }
+  .inv-lock-wrap .tooltip{ width:auto; white-space:nowrap; left:0; transform:none; }
+  body.mobile-preset .inv-lock-wrap .tooltip{ display:none !important; } /* 안내 문구는 데스크톱 화면 프리셋에서만 */
+  /* 잠금 아이콘: 아이콘 왼쪽 상단의 작은 최상단 오버레이 — 기존 아이템 아이콘/테두리/등급 색/강화 이펙트는 그대로 두고 위에 얹음 */
+  .inv-lock-badge, .inv-unlock-badge{
+    position:absolute; left:1px; top:1px; width:16px; height:16px; z-index:6; pointer-events:none;
+    filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); -webkit-user-drag:none; user-select:none;
+  }
+  .inv-unlock-badge{ display:none; }
+  /* 잠금 모드에서 잠긴 아이템에 마우스를 올리면 잠금 아이콘 대신 해제 이미지(실제 해제는 클릭 시) — 마우스 오버가 있는 환경에서만 */
+  @media (hover:hover){
+    body.inv-lock-mode .inv-box-slot.locked:hover .inv-lock-badge,
+    body.inv-lock-mode .inv-card.locked:hover .inv-lock-badge{ display:none; }
+    body.inv-lock-mode .inv-box-slot.locked:hover .inv-unlock-badge,
+    body.inv-lock-mode .inv-card.locked:hover .inv-unlock-badge{ display:block; }
+  }
+  /* 잠금 모드 커서(데스크톱): 인벤토리 안에서는 기본 커서를 숨기고 잠금 이미지를 따라다니게 함. 모드가 꺼지면 이 클래스가 사라져 일반 커서로 복원됨 */
+  .inv-lock-cursor{ position:fixed; left:0; top:0; width:26px; height:26px; transform:translate(-50%, -50%); pointer-events:none; z-index:100000; display:none; -webkit-user-drag:none; user-select:none; }
+  @media (hover:hover) and (pointer:fine){
+    body.inv-lock-mode #inventoryView, body.inv-lock-mode #inventoryView *{ cursor:none !important; }
+  }
+  /* 잠금 모드에서는 카드 안의 버튼(비활성 버튼 포함)이 클릭을 가로채지 않고 카드 클릭으로 처리되게 함 */
+  body.inv-lock-mode #inventoryView .inv-card .inv-actions{ pointer-events:none; }
+  /* 인벤토리 정렬 드롭다운(구버전·신버전 공용). 구버전은 "보유 개수 / 최대" 오른쪽에 여백을 두고 배치, 신버전은 툴바 왼쪽에 정렬 드롭다운 + 장비 탭 착용 우선 체크 */
+  .inv-count-left{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .inv-sort-row{ margin-bottom:10px; }
+  .inv-sort-select{
+    background:#2a231f; border:1px solid var(--forge-line); color: var(--forge-cream); border-radius:6px;
+    padding:3px 8px; font-size:12px; cursor:pointer; font-family:inherit; max-width:130px;
+  }
+  .inv-sort-select:hover, .inv-sort-select.active{ border-color: var(--forge-gold); color: var(--forge-gold); }
+  .inv-sort-select option{ background:#2a231f; color: var(--forge-cream); }
+  .inv-box-tools{ align-items:flex-start; }
+  .inv-box-sort-area{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+  .inv-box-sort-area .inv-sort-select{ padding:4px 12px; }
+  .inv-box-check{ display:flex; align-items:center; gap:5px; font-size:12px; color: var(--forge-cream-dim); cursor:pointer; user-select:none; }
+  .inv-box-check input{ margin:0; cursor:pointer; accent-color: var(--forge-gold); }
+  .inv-box-pager .pager-btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .inv-box-pager .pager-btn:disabled:hover{ border-color: var(--forge-line); color: var(--forge-cream); }
+
+  .inv-box-grid{
+    display:grid; grid-template-columns: repeat(8, minmax(0, 42px)); gap:4px; justify-content:center; padding:4px 0 2px;
+  }
+  .inv-box-slot{
+    position:relative; width:100%; aspect-ratio:1 / 1; box-sizing:border-box; border-radius:9px;
+    border:1px solid var(--forge-line); background: var(--forge-panel-2);
+    display:flex; align-items:center; justify-content:center; font-size:19px;
+  }
+  .inv-box-slot.empty{ opacity:.5; }
+  .inv-box-slot.filled{ cursor:pointer; user-select:none; -webkit-user-select:none; }
+  .inv-box-slot.filled:hover{ background:#352b1d; }
+  .inv-box-slot .tooltip{ width:210px; left:50%; transform:translateX(-50%); bottom:120%; line-height:1.6; }
+  .inv-box-slot:hover .tooltip{ visibility:visible; opacity:1; }
+  /* 장착 중 표시 — 아이콘 우측 상단 */
+  .inv-box-equip-mark{
+    position:absolute; top:1px; right:1px; z-index:2; pointer-events:none;
+    font-size:9px; font-weight:900; line-height:12px; padding:0 3px; border-radius:3px;
+    color:#1a140c; background: var(--forge-gold);
+  }
+  .inv-box-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
+  .inv-box-slotcount{ font-size:13px; color: var(--forge-cream-dim); }
+  .inv-box-slotcount b{ color: var(--forge-cream); font-weight:700; }
+  .inv-box-gold{
+    display:flex; justify-content:flex-end; align-items:center; gap:6px;
+    font-size:13px; color: var(--forge-cream-dim);
+  }
+  .inv-box-gold b{ color: var(--forge-gold); font-weight:700; }
+  .inv-box-gold .dot{ width:8px; height:8px; border-radius:50%; background: var(--forge-gold); box-shadow:0 0 8px var(--forge-gold); }
+
+  /* 아이템 클릭 팝업(선택한 슬롯 우측, inventory_box.js가 위치 보정). 모달(z-index 50)보다 아래에 둠 */
+  .inv-box-popup{
+    position:fixed; z-index:45; min-width:150px; max-width:240px;
+    background: var(--forge-panel); border:1px solid var(--forge-gold); border-radius:10px;
+    padding:10px 12px; box-shadow:0 6px 20px rgba(0,0,0,.5);
+  }
+  .inv-box-popup-name{ font-size:13px; font-weight:700; margin-bottom:8px; word-break:keep-all; }
+  .inv-box-popup-qty{ color: var(--forge-cream-dim); font-weight:400; }
+  .inv-box-popup-actions{ display:flex; flex-direction:column; gap:6px; }
+  .inv-box-popup-actions .inv-btn{ width:100%; }
+  .inv-box-popup-empty{ font-size:11.5px; color: var(--forge-cream-dim); }
+
+  /* ---- 상단 메뉴 버튼 + 메뉴 그리드 ---- */
+  .topmenu-btn{
+    position:relative; width:34px; height:34px; border-radius:9px; cursor:pointer; padding:0;
+    background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream);
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+  }
+  .topmenu-btn:hover, .topmenu-btn.open{ border-color: var(--forge-gold); }
+  .topmenu-icon-img{ width:22px; height:22px; object-fit:contain; pointer-events:none; }
+  .topmenu-tip{
+    position:absolute; top:calc(100% + 6px); right:0; z-index:5; white-space:nowrap; pointer-events:none;
+    background:#000; color:#fff; font-size:11px; padding:3px 8px; border-radius:6px; border:1px solid var(--forge-line);
+    opacity:0; transition:opacity .12s;
+  }
+  .topmenu-btn:hover .topmenu-tip{ opacity:1; }
+  .topmenu-btn.open .topmenu-tip{ opacity:0; }
+  .menu-wrap{ position:relative; }
+  .menu-grid{
+    position:absolute; top:calc(100% + 8px); right:0; z-index:60;
+    display:grid; grid-template-columns:repeat(3, 84px); gap:4px; padding:12px;
+    background:#000; border:1px solid var(--forge-line); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.6);
+  }
+  .menu-grid-item{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    padding:6px 4px; background:transparent; border:1px solid transparent; border-radius:10px;
+    color:#fff; cursor:pointer; font-family:inherit;
+  }
+  .menu-grid-item:hover:not(:disabled){ border-color: var(--forge-gold); background:rgba(255,255,255,.06); }
+  .menu-grid-item:disabled{ opacity:.4; cursor:not-allowed; }
+  .menu-grid-icon{ width:32px; height:32px; display:block; pointer-events:none; }
+  .menu-grid-label{ font-size:12px; line-height:1; color:#fff; white-space:nowrap; }
+  .menu-grid-item-last{ order:999; }
+
+  /* 상단 메뉴 영역 안의 나가기 버튼(전투 화면 전용): 왼쪽 끝, 아래 여백 없음 */
+  .main-nav .back-btn{ margin:0 auto 0 0; }

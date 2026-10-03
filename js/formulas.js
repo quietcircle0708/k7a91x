@@ -403,9 +403,12 @@ function meetsWeaponEquipRequirements(type, playerLevel, playerStats){
 function signedStatText(n){
   return (typeof n === 'number' && n > 0) ? '+' + n : String(n);
 }
-function wtipRow(label, value){
-  return `<div>${label ? `<span style="color:var(--forge-cream-dim);">${label}</span> ` : ''}<span style="color:var(--forge-gold);">${value}</span></div>`;
+function wtipRow(label, value, tipKey){ // tipKey(선택): 항목 식별용 data-tip 속성(표시 변화 없음 — 인벤토리 아이템 비교가 툴팁 항목을 읽을 때 사용)
+  return `<div${tipKey ? ` data-tip="${tipKey}"` : ''}>${label ? `<span style="color:var(--forge-cream-dim);">${label}</span> ` : ''}<span style="color:var(--forge-gold);">${value}</span></div>`;
 }
+
+// 고유 옵션 줄(들)을 data-tip="unique" 묶음으로 감쌈 — display:contents라 레이아웃/표시는 그대로이고, 아이템 비교가 고유 옵션 항목을 찾는 용도.
+function tipUniqueWrap(html){ return html ? `<div data-tip="unique" style="display:contents;">${html}</div>` : ''; }
 
 // ---- 툴팁 최하단 "현재 판매 가격" 공통 블록(장비 5종 중 아티팩트 제외 + 소비 아이템 공용) ----
 // 새로운 판매 가격 공식을 만들지 않고 기존 sellValueFor(강화 단계별 판매가) → durabilityAdjustedSellValue
@@ -444,13 +447,13 @@ function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   // 1. 이름 (+강화단계, +0이면 숨김) — 무기 이름 색상 효과 적용. 손상된 아이템은 이름 바로 뒤,
   // 강화단계 앞에 "(손상)"을 붙임(요청사항 11번 — 띄어쓰기 없이, 강화단계 표기보다 앞).
   const nameLine = w.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
-  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+  html += `<div data-tip="name" style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
 
   // 1-2. 등급 — 이름과 별도 줄, 등급 색상 효과 적용
-  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  if(grade) html += `<div data-tip="grade" style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
 
   // 2. 장비 설명
-  if(w.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${w.desc}</div>`;
+  if(w.desc) html += `<div data-tip="desc" style="color:var(--forge-cream-dim); margin-bottom:2px;">${w.desc}</div>`;
 
   // 3. 무기 종류
   const kindLabel = weaponKindLabel(type);
@@ -473,7 +476,7 @@ function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   if(crit) html += wtipRow('치명타 확률', crit + '%');
 
   // 6-2. 고유 옵션 (에픽/유니크 전용, 활성화 단계 미만이면 회색 텍스트 + 활성화 조건 안내)
-  html += weaponUniqueOptionTooltipHtml(type, lvl);
+  html += tipUniqueWrap(weaponUniqueOptionTooltipHtml(type, lvl));
 
   // 7. 착용 제한 (필요한 조건이 있을 때만)
   const reqText = weaponRequirementText(type);
@@ -489,6 +492,8 @@ function armorKindLabel(type){ return ARMOR_KINDS[wpn(type).armorKind] || ''; }
 function defenseFor(type, level){ const w = wpn(type); return w.defArr ? w.defArr[level] : null; }
 function armorHpFor(type, level){ const w = wpn(type); return w.hpArr ? w.hpArr[level] : null; }
 function armorManaFor(type, level){ const w = wpn(type); return w.manaArr ? w.manaArr[level] : null; }
+// 방어구/장신구의 회피(%) — 강화 단계별 배열(evasionArr)에서 조회. 데이터 값이 공란이면 null(옵션 없음).
+function evasionFor(type, level){ const w = wpn(type); return w.evasionArr ? w.evasionArr[level] : null; }
 // 방어구 툴팁: 무기 툴팁(buildWeaponTooltipHtml)과 동일한 레이아웃/서식(이름·등급 색상 효과, wtipRow
 // 구조)을 그대로 재사용하되("장비 전역 설정" — 등급 색상/이름 색상/중앙 정렬 서식 공용), 표시 항목만
 // 방어구 데이터 스키마에 맞게 구성함: 이름/등급/장비 설명/방어구 종류/방어도/체력/마나/(고유 옵션)/레벨 제한.
@@ -499,12 +504,12 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
   let html = `<div style="text-align:center;">`;
 
   const nameLine = a.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
-  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
-  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
-  if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
+  html += `<div data-tip="name" style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+  if(grade) html += `<div data-tip="grade" style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  if(a.desc) html += `<div data-tip="desc" style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
 
   const kindLabel = armorKindLabel(type);
-  if(kindLabel) html += wtipRow('', kindLabel);
+  if(kindLabel) html += wtipRow('', kindLabel, 'kind');
 
   html += durabilityTooltipLine(type, currentDurability, damaged);
 
@@ -514,10 +519,12 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
   if(hp != null) html += wtipRow('체력', hp);
   const mana = armorManaFor(type, lvl);
   if(mana != null) html += wtipRow('마나', mana);
+  const eva = evasionFor(type, lvl);
+  if(eva != null) html += wtipRow('회피', eva + '%'); // 방어구 출력 순서: ... 마나 → 회피 → (고유 옵션)
 
   // 고유 옵션(있으면) — weaponUniqueOptionTooltipHtml은 wpn(type).uniqueOption만 참조하는 범용 함수라
   // 방어구에도 그대로 재사용 가능함(무기 전용 필드 미참조).
-  html += weaponUniqueOptionTooltipHtml(type, lvl);
+  html += tipUniqueWrap(weaponUniqueOptionTooltipHtml(type, lvl));
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('레벨 제한 :', `레벨 ${a.levelReq} 이상`);
 
@@ -529,9 +536,47 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
 // 소비 아이템(플라스크 등) 툴팁: 무기/방어구 툴팁과 동일한 레이아웃/서식(중앙 정렬, wtipRow 구조)을 그대로
 // 재사용하되, 표시 항목은 이름/종류(class)/효과(effectText)/구매 가격 4가지로 단순화함(등급·레벨 제한 등
 // 장비 전용 필드는 소비 아이템에 없으므로 표시하지 않음).
+// ---- 비급(소비 아이템 종류) 표시 헬퍼 ----
+function isScrollItem(item){ return !!item && item.class === SCROLL_CLASS; }
+function scrollSkill(item){ return isScrollItem(item) ? (SKILLS[item.skillId] || null) : null; }
+function scrollGradeInfo(item){ return WEAPON_GRADES[item.grade] || null; } // 비급 등급 = 할당 스킬 등급(getter)
+// 존재하는 모든 비급 아이템(CONSUMABLES 중 class==='비급'). 새 비급을 CONSUMABLES에 추가하기만 하면
+// 드랍/던전 판정에 자동으로 포함됨(하드코딩 없음).
+function allScrollItems(){ return Object.values(CONSUMABLES).filter(isScrollItem); }
+// 비급의 "기준 레벨" = 할당 스킬의 요구 레벨(levelReq). 할당 스킬이 없으면(정상 데이터에서는 발생하지 않음) null.
+function scrollBaseLevel(item){ const sk = scrollSkill(item); return sk ? sk.levelReq : null; }
+
+// 소비 아이템 이름 표시(HTML). 비급이면 이름 왼쪽에 공백 없이 굵은 에픽 보라색 "[비급]"을 붙이고 이름은 비급 등급
+// 색상으로 표시함 — 다른 소비 아이템은 기존과 동일하게 이름 텍스트 그대로 반환(표시 변화 없음).
+function consumableNameHtml(item){
+  if(!isScrollItem(item)) return item ? item.name : '';
+  const g = scrollGradeInfo(item);
+  return `<span style="color:${WEAPON_GRADES.epic.color}; font-weight:700;">[비급]</span><span style="color:${g ? g.color : 'inherit'};">${item.name}</span>`;
+}
+// 비급 효과 문구(할당 스킬 이름을 데이터에서 읽어 출력, 스킬 이름은 굵게 + 스킬 등급 색상). sep은 두 문장 사이 구분자.
+function scrollEffectHtml(item, sep){
+  const sk = scrollSkill(item);
+  if(!sk) return '';
+  const g = WEAPON_GRADES[sk.grade];
+  const nm = `<b style="color:${g ? g.color : 'inherit'};">${sk.name}</b>`;
+  return `${nm}의 묘리가 적혀있는 비급서${sep}사용 시, ${nm} 습득 해금`;
+}
 function buildConsumableTooltipHtml(id){
   const item = CONSUMABLES[id];
   if(!item) return '';
+  if(isScrollItem(item)){
+    // 비급 툴팁: 기존 소비 아이템 툴팁 레이아웃 그대로, 이름/등급/종류/효과/판매 가격을 항목명 없이 값만 출력함
+    // (할당 스킬은 별도 항목 없이 효과 문구에 포함, 구매 불가라 구매 가격 없음).
+    const g = scrollGradeInfo(item);
+    let h = `<div style="text-align:center;">`;
+    h += `<div style="font-weight:700; margin-bottom:2px;">${consumableNameHtml(item)}</div>`;
+    if(g) h += `<div style="color:${g.color}; font-weight:700; margin-bottom:4px;">${g.label}</div>`;
+    h += wtipRow('', item.class);
+    h += wtipRow('', item.effectText);
+    h += consumableTooltipSellPriceHtml(id);
+    h += `</div>`;
+    return h;
+  }
   let html = `<div style="text-align:center;">`;
   html += `<div style="color:var(--forge-cream); font-weight:700; margin-bottom:4px;">${item.name}</div>`;
   if(item.class) html += wtipRow('', item.class);
@@ -582,11 +627,11 @@ function statusDefenseBonusFor(target){
   });
   return bonus;
 }
-// 현재 착용 중인 방어구(투구/갑옷) 아이템 목록을 반환.
+// 현재 착용 중인 방어구(투구/갑옷/신발) 아이템 목록을 반환.
 function wornArmorItems(){
   const list = [];
   if(!state.equippedArmor) return list;
-  ['helmet', 'armor'].forEach(kind => {
+  ['helmet', 'armor', 'shoes'].forEach(kind => {
     const id = state.equippedArmor[kind];
     if(!id) return;
     const item = (state.armorInventory || []).find(i => i.id === id);
@@ -594,13 +639,21 @@ function wornArmorItems(){
   });
   return list;
 }
-// 현재 착용 중인 장신구(반지 등, 최대 2개) 아이템 목록을 반환.
+// 현재 착용 중인 장신구 아이템 목록을 반환 — 장신구1/장신구2 슬롯의 반지(팔찌)들(최대 2개) + 목걸이 전용 슬롯의
+// 목걸이(최대 1개). 능력치/내구도/고유 옵션 등 모든 장비 합산 함수가 이 함수를 그대로 쓰므로, 목걸이도 여기 포함되는
+// 것만으로 반지와 동일하게 자동 반영됨(개별 합산 코드 없음).
 function wornAccessoryItems(){
-  if(!Array.isArray(state.equippedAccessories)) return [];
-  return state.equippedAccessories
-    .filter(id => id != null)
-    .map(id => (state.accessoryInventory || []).find(i => i.id === id))
-    .filter(Boolean);
+  const list = Array.isArray(state.equippedAccessories)
+    ? state.equippedAccessories
+        .filter(id => id != null)
+        .map(id => (state.accessoryInventory || []).find(i => i.id === id))
+        .filter(Boolean)
+    : [];
+  if(state.equippedNecklaceId != null){
+    const necklace = (state.accessoryInventory || []).find(i => i.id === state.equippedNecklaceId);
+    if(necklace) list.push(necklace);
+  }
+  return list;
 }
 // 현재 착용 중인 보조 아이템(방패/보조 무기, 최대 1개) — 있으면 배열에 담아 반환(없으면 빈 배열).
 // 방어구/장신구와 동일한 "배열로 통일해서 반환" 규칙을 따름(wornEquipmentItems에서 그대로 합쳐 쓰기 위함).
@@ -641,6 +694,7 @@ function armorStatBonus(key){
     if(key === 'hp') val = armorHpFor(item.type, item.level);
     else if(key === 'mana') val = armorManaFor(item.type, item.level);
     else if(key === 'crit') val = wpn(item.type).crit ? critChanceFor(item.type, item.level) : null;
+    else if(key === 'evasion') val = evasionFor(item.type, item.level); // 방어구/장신구 기본 회피 옵션(고유 옵션의 evasion과 별개)
     return sum + (val || 0);
   }, 0);
 }
@@ -657,12 +711,12 @@ function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
   let html = `<div style="text-align:center;">`;
 
   const nameLine = a.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
-  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
-  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
-  if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
+  html += `<div data-tip="name" style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+  if(grade) html += `<div data-tip="grade" style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  if(a.desc) html += `<div data-tip="desc" style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
 
   const kindLabel = accessoryKindLabel(type);
-  if(kindLabel) html += wtipRow('', kindLabel);
+  if(kindLabel) html += wtipRow('', kindLabel, 'kind');
 
   html += durabilityTooltipLine(type, currentDurability, damaged);
 
@@ -672,10 +726,12 @@ function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
   if(hp != null) html += wtipRow('체력', hp);
   const mana = armorManaFor(type, lvl);
   if(mana != null) html += wtipRow('마나', mana);
+  const eva = evasionFor(type, lvl);
+  if(eva != null) html += wtipRow('회피', eva + '%'); // 장신구 출력 순서: ... 마나 → 회피 → 치명타 확률 (재생력은 고유 옵션 줄로만 표시)
   const crit = wpn(type).crit ? critChanceFor(type, lvl) : null; // crit 배열이 없는 장신구(예: 무색 반지)는 건너뜀
   if(crit != null) html += wtipRow('치명타 확률', crit + '%');
 
-  html += weaponUniqueOptionTooltipHtml(type, lvl); // wpn(type).uniqueOption만 참조하는 범용 함수라 그대로 재사용
+  html += tipUniqueWrap(weaponUniqueOptionTooltipHtml(type, lvl)); // wpn(type).uniqueOption만 참조하는 범용 함수라 그대로 재사용
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
 
@@ -696,12 +752,12 @@ function buildSubTooltipHtml(type, level, damaged, currentDurability){
   let html = `<div style="text-align:center;">`;
 
   const nameLine = a.name + (damaged ? '(손상)' : '') + levelSuffix(lvl);
-  html += `<div style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
-  if(grade) html += `<div style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
-  if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
+  html += `<div data-tip="name" style="color:${weaponNameColor(type, lvl)}; font-weight:700; margin-bottom:2px;">${nameLine}</div>`;
+  if(grade) html += `<div data-tip="grade" style="color:${weaponGradeColor(type)}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  if(a.desc) html += `<div data-tip="desc" style="color:var(--forge-cream-dim); margin-bottom:2px;">${a.desc}</div>`;
 
   const kindLabel = subKindLabel(type);
-  if(kindLabel) html += wtipRow('', kindLabel);
+  if(kindLabel) html += wtipRow('', kindLabel, 'kind');
 
   html += durabilityTooltipLine(type, currentDurability, damaged);
 
@@ -712,7 +768,7 @@ function buildSubTooltipHtml(type, level, damaged, currentDurability){
   const mana = armorManaFor(type, lvl);
   if(mana != null) html += wtipRow('마나', mana);
 
-  html += subUniqueOptionTooltipHtml(type, lvl); // 보조 아이템 전용: 고정 옵션 여러 개는 쉼표 기준 한 줄씩 출력(요청사항)
+  html += tipUniqueWrap(subUniqueOptionTooltipHtml(type, lvl)); // 보조 아이템 전용: 고정 옵션 여러 개는 쉼표 기준 한 줄씩 출력(요청사항)
 
   if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
 
@@ -729,8 +785,7 @@ function artifactGradeColor(id){ const a = ARTIFACTS[id]; const g = a && WEAPON_
 function artifactNameColor(id){ return artifactGradeColor(id); }
 // 아티팩트 툴팁: 레이아웃/줄바꿈/서식(라벨-값 구성 등)은 buildWeaponTooltipHtml과 동일하게 유지하고,
 // 표시 항목은 이름 / 장비 설명 / 장비 타입(값만, 라벨 없음) / 효과 설명(값만, 라벨 없음) / 상점 구매 가격으로 구성함.
-// 등급 행은 아티팩트 툴팁에서만 표시하지 않음(이름 색상에 이미 등급이 반영되어 있음). 이 규칙은 이 함수(아티팩트)에만
-// 적용되며, 무기/마석/기타 아이템 툴팁(buildWeaponTooltipHtml 등)에는 영향을 주지 않음. 새로 추가되는 아티팩트도
+// 등급 행은 이름 바로 아래 줄에 표시함(장비 툴팁과 같은 위치·서식). 새로 추가되는 아티팩트도
 // ARTIFACTS 데이터만 등록하면 이 함수를 그대로 거치므로 동일한 규칙이 자동 적용됨.
 function buildArtifactTooltipHtml(id){
   const a = ARTIFACTS[id];
@@ -739,6 +794,10 @@ function buildArtifactTooltipHtml(id){
 
   // 1. 이름 — 아티팩트 등급 색상 효과 적용
   html += `<div style="color:${artifactNameColor(id)}; font-weight:700; margin-bottom:2px;">${a.name}</div>`;
+
+  // 1-2. 등급 — 이름과 별도 줄, 등급 색상 효과 적용(장비 툴팁의 등급 줄과 같은 위치·서식)
+  const artGrade = WEAPON_GRADES[a.grade];
+  if(artGrade) html += `<div style="color:${artifactGradeColor(id)}; font-weight:700; margin-bottom:4px;">${artGrade.label}</div>`;
 
   // 2. 장비 설명
   if(a.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:4px;">${a.desc}</div>`;
@@ -779,8 +838,8 @@ function buildStoneTooltipHtml(id){
   // 4. 아이템 분류
   html += wtipRow('아이템 분류', ITEM_CLASS_LABELS[item.itemClass] || '');
 
-  // 5. 판매 가격 — 기존 아이템과 동일한 형식(G 단위, 천단위 구분)
-  html += wtipRow('판매 가격', item.sellPrice.toLocaleString() + 'G');
+  // 5. 판매 가격 — 장비 툴팁과 같은 최하단 판매 가격 블록(항목명 없이 금액+🪙, 점선 구분)
+  html += tooltipSellPriceHtml(item.sellPrice, false);
 
   html += `</div>`;
   return html;
@@ -788,9 +847,7 @@ function buildStoneTooltipHtml(id){
 // 기타(misc) 아이템 이름 색상: 마석과 동일하게 무기 등급 색상 공식(WEAPON_GRADES)을 그대로 재사용함.
 function miscGradeInfo(id){ return WEAPON_GRADES[MISC_ITEMS[id].grade]; }
 function miscNameColor(id){ const g = miscGradeInfo(id); return g ? g.color : '#ffffff'; }
-// 기타(misc) 아이템 툴팁: 이름 텍스트 색상에만 등급 공식(miscNameColor)을 적용하고, 나머지 표시 항목
-// (설명/아이템 분류/판매 가격)과 레이아웃/서식은 등급 추가 이전과 동일하게 유지함 — 마석 툴팁과 달리
-// 등급을 별도 줄로 표시하지 않음.
+// 기타(misc) 아이템 툴팁: 이름 / 등급(이름 아래 줄, 등급 색상) / 설명 / 아이템 분류 / 최하단 판매 가격(장비와 같은 방식).
 function buildMiscTooltipHtml(id){
   const item = MISC_ITEMS[id];
   let html = `<div style="text-align:center;">`;
@@ -798,14 +855,18 @@ function buildMiscTooltipHtml(id){
   // 1. 이름 — 등급 색상 효과 적용
   html += `<div style="color:${miscNameColor(id)}; font-weight:700; margin-bottom:2px;">${item.name}</div>`;
 
-  // 2. 설명
+  // 2. 등급 — 이름과 별도 줄, 등급 색상 효과 적용(장비·마석 툴팁과 같은 위치·서식)
+  const miscGrade = miscGradeInfo(id);
+  if(miscGrade) html += `<div style="color:${miscGrade.color}; font-weight:700; margin-bottom:4px;">${miscGrade.label}</div>`;
+
+  // 3. 설명
   if(item.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${item.desc}</div>`;
 
-  // 3. 아이템 분류
+  // 4. 아이템 분류
   html += wtipRow('아이템 분류', ITEM_CLASS_LABELS[item.itemClass] || '');
 
-  // 4. 판매 가격 — 기존 아이템과 동일한 형식(G 단위, 천단위 구분)
-  html += wtipRow('판매 가격', item.sellPrice.toLocaleString() + 'G');
+  // 5. 판매 가격 — 장비 툴팁과 같은 최하단 판매 가격 블록(항목명 없이 금액+🪙, 점선 구분)
+  html += tooltipSellPriceHtml(item.sellPrice, false);
 
   html += `</div>`;
   return html;
@@ -842,6 +903,16 @@ function simplifyUniqueOptionTooltipText(text){
 function weaponUniqueOptionTooltipHtml(type, level){
   const opt = wpn(type).uniqueOption;
   if(!opt) return '';
+  // 여러 스탯이 동시에 강화 단계별로 성장하는 신규 스키마(opt.growthStats, 진호박의 결정/조화의 목걸이) —
+  // 스탯마다 한 줄씩(라벨 +수치) 표시하고, 활성화 여부(activateLevel)/회색 서식은 기존 옵션과 동일하게 재사용함.
+  if(Array.isArray(opt.growthStats)){
+    const gsActive = weaponUniqueOptionActive(type, level);
+    const gsLines = uniqueOptionGrowthEntries(opt, level).map(g => `${g.label} +${g.value}`);
+    if(opt.text != null) gsLines.push(opt.text);
+    const gsText = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(gsLines.join('<br>')));
+    if(gsActive) return wtipRow('', gsText);
+    return `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${gsText}<br>(+${opt.activateLevel} 활성화)</div>`;
+  }
   const active = weaponUniqueOptionActive(type, level);
   const rawText = opt.text != null ? opt.text : (() => {
     const chance = weaponUniqueOptionChance(type, level);
@@ -916,13 +987,16 @@ function targetStatusDamageMultiplier(target){
   const percent = weaponUniqueOptionChance(equipped.type, equipped.level) || 0;
   return 1 + percent / 100;
 }
-// 치명타 피해 배율(기존 로직의 1.5배 고정값을 그대로 가져와 하나로 통합) — 화상처럼 데이터에
-// critDamageBonusPercent가 설정된 dot 상태 이상이 대상에게 걸려있으면 해당 값을 합연산(%p)으로
-// 가산함(요구사항 4번: 150%+20%p=170%, 곱연산 아님). 화상이 없는 대상은 기존과 완전히 동일하게 150%.
+// 치명타 피해 배율(기존 로직의 1.5배 고정값을 그대로 가져와 하나로 통합) — 힘 1당 +0.05%(스탯 효과
+// 개편으로 신규 추가, 대상과 무관하게 항상 합산)와, 화상처럼 데이터에 critDamageBonusPercent가 설정된
+// dot 상태 이상이 대상에게 걸려있으면 해당 값을 합연산(%p)으로 가산함(요구사항 4번: 150%+20%p=170%,
+// 곱연산 아님). 힘 0·화상 없는 대상은 기존과 완전히 동일하게 150%.
 // 다른 상태 이상(중독/기절/둔화)은 이 필드가 없으므로 치명타 배율에 전혀 영향을 주지 않음.
 const BASE_CRIT_MULTIPLIER = 1.5;
 function critMultiplierFor(target){
   let bonusPercent = 0;
+  const str = ((state.stats && state.stats.str) || 0) + artifactStatBonus('str');
+  bonusPercent += str * 0.05; // 힘 1당 치명타 피해량 +0.05%(합연산, 스탯 효과 개편으로 신규 추가)
   if(target && target.statusEffects){
     target.statusEffects.forEach(s => {
       const def = STATUS_EFFECTS[s.key];
@@ -948,6 +1022,24 @@ function weaponUniqueOptionForgeHtml(type, level){
   const activeNow = weaponUniqueOptionActive(type, level);
   const hasNext = level < MAX_LEVEL;
   const activeNext = hasNext ? weaponUniqueOptionActive(type, level+1) : activeNow;
+
+  // 여러 스탯이 동시에 성장하는 옵션(opt.growthStats): 스탯마다 한 줄씩, 다음 단계에서 수치가 오르는 줄만
+  // 화살표+증가량으로 표시(성장형 옵션의 기존 표시 규칙과 동일). 활성화 전 서식/안내 문구도 동일하게 재사용.
+  if(Array.isArray(opt.growthStats)){
+    const nowEntries = uniqueOptionGrowthEntries(opt, level);
+    const nextEntries = hasNext ? uniqueOptionGrowthEntries(opt, level+1) : null;
+    const gsLines = nowEntries.map((g, i) => {
+      const nextVal = nextEntries ? nextEntries[i].value : null;
+      const valueHtml = (activeNow && nextVal != null && nextVal !== g.value)
+        ? formatStatDelta(g.value, nextVal, 0, '') : String(g.value);
+      return `${g.label} +${valueHtml}`;
+    });
+    if(opt.text != null) gsLines.push(opt.text);
+    const gsText = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(gsLines.join('<br>')));
+    if(activeNow) return `<div style="color:var(--forge-cream);">${gsText}</div>`;
+    const gsNote = activeNext ? '고유 옵션 활성화' : `+${opt.activateLevel} 달성 시 활성화`;
+    return `<div style="color:var(--forge-cream-dim);">${gsText}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${gsNote}</div>`;
+  }
 
   if(opt.text != null){
     const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(opt.text));
@@ -1031,7 +1123,9 @@ function shopEquipmentEntries(typesTable){
 }
 // 소비 아이템: 상점 구매가(buyPrice) 기준. 착용 레벨 제한 개념이 없으므로 levelReq는 null.
 function shopConsumableEntries(){
-  return Object.values(CONSUMABLES).map(c => ({ id: c.id, price: c.buyPrice, levelReq: null }));
+  return Object.values(CONSUMABLES)
+    .filter(c => c.buyPrice != null || ((state.consumables && state.consumables[c.id]) || 0) > 0) // 구매 불가(비급)는 보유 중일 때만 판매용으로 노출
+    .map(c => ({ id: c.id, price: c.buyPrice != null ? c.buyPrice : (c.sellPrice || 0), levelReq: null }));
 }
 // 아티팩트: 상점 구매 가격(buyPrice)이 있는 항목만 상점에 노출. 공란(null)이면 상점 목록에서 제외됨.
 function shopArtifactEntries(){
@@ -1164,16 +1258,13 @@ function skillPointsGrantedAtLevel(lv){
 function awakeningPointsGrantedAtLevel(lv){
   return totalAwakeningPointsForLevel(lv) - totalAwakeningPointsForLevel(lv - 1);
 }
-// 분류(공용/특화/기연)별 스킬 포인트 마일스톤 레벨 목록. 공용/특화는 위 공식과 동일하게 LV1,5,10,...,95,99
-// 이고, 기연은 LV10,20,...,90,99. 캐릭터 메뉴 스킬 탭의 "레벨별 스킬 목록" 행이 이 레벨들을 그대로 사용함.
+// 스킬 탭의 레벨 라벨 목록(LV1, 5, 10, ..., 95, 99). 기연도 공용/특화와 동일한 라벨을 쓰도록 분류와 무관하게
+// 같은 목록을 반환함(categoryId는 기존 호출부 호환을 위해 남겨둔 인자). 이 목록은 스킬 트리 UI의 가로축 라벨
+// 전용이며, 실제 포인트 지급 레벨(총 스킬 포인트/깨달음 포인트 공식 — 기연은 LV10,20,...,90,99)과는 별개라
+// 지급 로직에는 영향이 없음. 캐릭터 메뉴 스킬 탭의 "레벨별 스킬 목록" 행이 이 레벨들을 그대로 사용함.
 function skillMilestoneLevels(categoryId){
-  const levels = [];
-  if(categoryId === 'awakening'){
-    for(let lv = 10; lv <= 90; lv += 10) levels.push(lv);
-  } else {
-    levels.push(1);
-    for(let lv = 5; lv <= 95; lv += 5) levels.push(lv);
-  }
+  const levels = [1];
+  for(let lv = 5; lv <= 95; lv += 5) levels.push(lv);
   levels.push(PLAYER_MAX_LEVEL); // 99는 항상 예외적으로 마지막에 단독 포함
   return levels;
 }
@@ -1403,13 +1494,22 @@ function buildSkillTooltipHtml(id){
     const resourceLabel = s.resourceType === 'hp' ? '체력' : '마나';
     html += wtipRow('', `${resourceLabel} ${s.resourceAmount}`);
   }
-  if(s.levelReq != null) html += wtipRow('', 'LV' + s.levelReq);
+  // 요구조건 행은 "지금 이 조건을 만족하는지"에 따라 초록(만족)/빨강(미충족)으로 매번 새로 계산해 표시함
+  // (저장하지 않으므로 한 번 만족했다고 영구 초록이 되지 않음). 이름/설명 등 다른 줄 색상은 건드리지 않음.
+  // 이미 습득했거나 상위 스킬로 교체돼 습득 표시 중인 스킬은 조건을 모두 충족한 상태로 보고 전부 초록.
+  const reqDone = isSkillDisplayedAsLearned(id);
+  const reqRow = (text, ok) => `<div style="color:${(reqDone || ok) ? 'var(--forge-green)' : 'var(--forge-blood)'};">${text}</div>`;
+  if(s.levelReq != null) html += reqRow('LV' + s.levelReq, (state.playerLevel || 1) >= s.levelReq);
   // 스킬 업그레이드 요구사항 5-1번: upgradeFrom이 지정된 스킬만 레벨 제한 행 아래에 선행 스킬 습득 조건을
-  // 한 줄 더 표시(레이아웃/서식은 위 행들과 동일한 wtipRow 재사용). upgradeFrom이 없는 스킬은 이 행이
-  // 아예 없으므로 기존 스킬들의 툴팁 출력은 그대로 유지됨(요구사항 6번).
+  // 한 줄 더 표시. upgradeFrom이 없는 스킬은 이 행이 아예 없으므로 기존 스킬들의 툴팁 출력은 그대로 유지됨.
   if(s.upgradeFrom){
     const prereq = SKILLS[s.upgradeFrom];
-    if(prereq) html += wtipRow('', `${prereq.name} 습득 상태`);
+    if(prereq) html += reqRow(`${prereq.name} 습득 상태`, isSkillLearned(s.upgradeFrom));
+  }
+  // 기연 스킬 습득 조건(기본 규칙): 비급으로 해금 + 레벨 + 하위 스킬(위 두 행) + 깨달음 포인트.
+  if(skillRequiresUnlock(s)){
+    html += reqRow('비급을 통해 해금 필요', isAwakeningSkillUnlocked(id));
+    html += reqRow(`깨달음 포인트 ${s.cost || 1} 필요`, (state.awakeningPoints || 0) >= (s.cost || 1));
   }
   html += `</div>`;
   return html;
@@ -1473,16 +1573,78 @@ function activeBuffListForUi(){
 // 스킬을 실제로 보유(isSkillLearned) 중이어야만 습득 가능. upgradeFrom이 없는 스킬은 기존 방식 그대로
 // 동작(요구사항 7번, 조건 추가 없음). isSkillSupersededByUpgrade 체크는 이미 상위 스킬로 교체되어 화면에만
 // "습득됨"으로 표시되는 하위 스킬을 다시 클릭해 재습득하는 것을 막음(교체된 하위 스킬 재습득 방지).
+// ---- 기연 스킬 해금(비급) ----
+// 기연(awakening) 분류 스킬은 비급 사용으로 "해금"돼야 습득 대상이 됨. 해금 여부는 습득 여부와 별개로
+// state.unlockedAwakeningSkills(스킬 id 배열)에 저장되며, 스킬을 초기화해도 해금 상태는 유지됨.
+function skillRequiresUnlock(s){ return !!s && s.category === 'awakening'; }
+function isAwakeningSkillUnlocked(id){
+  return Array.isArray(state.unlockedAwakeningSkills) && state.unlockedAwakeningSkills.includes(id);
+}
+// 습득 가능 여부 판정의 등급/해금 단계 — 기연은 해금 여부만 보고(에픽 등급이어도 해금되면 통과), 공용/특화의
+// 에픽·유니크는 기존과 동일하게 해금 방식이 없어 항상 불가로 유지함.
+function skillGradeAllowsLearning(s, id){
+  if(skillRequiresUnlock(s)) return isAwakeningSkillUnlocked(id);
+  return !(s.grade === 'epic' || s.grade === 'unique');
+}
 function canLearnSkill(id){
   const s = SKILLS[id];
   if(!s || isSkillLearned(id)) return false;
-  if(s.grade === 'epic' || s.grade === 'unique') return false;
+  if(!skillGradeAllowsLearning(s, id)) return false;
   if(s.levelReq && (state.playerLevel || 1) < s.levelReq) return false;
   if(hasConflictingLearnedSkill(id)) return false;
   if(s.upgradeFrom && !isSkillLearned(s.upgradeFrom)) return false;
   if(isSkillSupersededByUpgrade(id)) return false;
   const pool = s.category === 'awakening' ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
   return pool >= (s.cost || 1);
+}
+// ---- 스킬 체인 일괄 습득(검증 전용, state를 전혀 바꾸지 않음) ----
+// id를 시작으로 upgradeFrom을 거슬러 올라가며 "아직 실제로 보유하지 않은" 스킬들을 하위→상위 순서로 모음.
+// 실제 보유 스킬(isSkillLearned)을 만나거나 체인 끝(upgradeFrom 없음)에 도달하면 멈춤 — 이미 보유 중인
+// 스킬은 다시 습득/비용 계산에 포함되지 않음. id 자신이 이미 보유 중이면 빈 배열.
+function collectUnlearnedSkillChain(id){
+  const chain = [];
+  const visited = new Set();
+  let curId = id;
+  while(curId && SKILLS[curId] && !visited.has(curId) && !isSkillLearned(curId)){
+    visited.add(curId);
+    chain.unshift(curId);
+    curId = SKILLS[curId].upgradeFrom;
+  }
+  return chain;
+}
+// 체인의 한 단계가 습득 가능한지 — canLearnSkill과 동일한 개별 조건(등급/레벨/습득 제한/교체된 하위 스킬
+// 재습득 금지)을 그대로 사용하되, "upgradeFrom 보유" 조건만 체인의 바로 이전 단계가 습득될 것으로
+// 가정해서 확인함(포인트는 전체 합계를 skillChainLearnPlan에서 따로 확인).
+function canLearnSkillChainStep(id, prevIdInChain){
+  const s = SKILLS[id];
+  if(!s || isSkillLearned(id)) return false;
+  if(!skillGradeAllowsLearning(s, id)) return false;
+  if(s.levelReq && (state.playerLevel || 1) < s.levelReq) return false;
+  if(hasConflictingLearnedSkill(id)) return false;
+  if(s.upgradeFrom && !(isSkillLearned(s.upgradeFrom) || s.upgradeFrom === prevIdInChain)) return false;
+  if(isSkillSupersededByUpgrade(id)) return false;
+  return true;
+}
+// 일괄 습득 계획: 체인 전체가 습득 가능 + 필요한 전체 SP를 보유했을 때만 { chain, cost }, 아니면 null.
+// (분류별로 포인트 풀이 다르므로 풀마다 필요 합계를 따로 확인함)
+function skillChainLearnPlan(id){
+  const chain = collectUnlearnedSkillChain(id);
+  if(!chain.length) return null;
+  let prev = null;
+  const need = { awakening: 0, normal: 0 };
+  for(const stepId of chain){
+    if(!canLearnSkillChainStep(stepId, prev)) return null;
+    const s = SKILLS[stepId];
+    need[s.category === 'awakening' ? 'awakening' : 'normal'] += (s.cost || 1);
+    prev = stepId;
+  }
+  if((state.skillPoints || 0) < need.normal) return null;
+  if((state.awakeningPoints || 0) < need.awakening) return null;
+  return { chain, cost: need.normal + need.awakening };
+}
+// 아이콘 활성 표시/클릭 처리용 — 바로 습득 가능하거나, 하위 체인까지 일괄 습득 가능하면 true.
+function canLearnSkillOrChain(id){
+  return canLearnSkill(id) || !!skillChainLearnPlan(id);
 }
 // 착용 중인 무기의 고유 옵션이 "고정 스탯 보너스"(statBonus)를 갖고 있으면 해당 스탯의 보너스 값을
 // 반환. activateLevel 조건을 만족할 때만 적용됨(현재 강화 단계 기준, 무기 자체 판정 그대로 재사용).
@@ -1534,15 +1696,34 @@ function weaponUniqueOptionGrowthStat(stat){
   if(!equipped) return 0;
   if(isEquipDurabilityZero(equipped)) return 0;
   const opt = wpn(equipped.type).uniqueOption;
-  if(!opt || opt.growthStat !== stat) return 0;
+  if(!opt) return 0;
   if(!weaponUniqueOptionActive(equipped.type, equipped.level)) return 0;
-  return weaponUniqueOptionChance(equipped.type, equipped.level) || 0;
+  return uniqueOptionGrowthStatValue(opt, equipped.type, equipped.level, stat);
+}
+// 고유 옵션 하나가 특정 스탯에 기여하는 "현재 강화 단계의 성장 수치"(활성화 여부는 호출부에서 이미 확인). 기존 단일
+// 성장 스탯(opt.growthStat + chanceByLevel)과 신규 다중 성장 스탯(opt.growthStats[].byLevel)을 모두 합산함 —
+// 기존 옵션은 growthStats가 없어 결과가 완전히 동일하고, 한 옵션이 두 경로를 함께 써도(이론상) 정상 합산됨.
+function uniqueOptionGrowthStatValue(opt, type, level, stat){
+  let v = 0;
+  if(opt.growthStat === stat) v += weaponUniqueOptionChance(type, level) || 0;
+  if(Array.isArray(opt.growthStats)){
+    opt.growthStats.forEach(g => { if(g.stat === stat) v += (g.byLevel && g.byLevel[level]) || 0; });
+  }
+  return v;
+}
+// opt.growthStats(여러 스탯 동시 성장 스키마)의 각 항목에 대해 표시용 {stat, label, value}를 만듦. 아직
+// 활성화 전(level < activateLevel)이면 툴팁 미리보기용으로 활성화 시점(activateLevel)의 수치를 사용함
+// (weaponUniqueOptionChance와 동일한 규칙).
+function uniqueOptionGrowthEntries(opt, level){
+  if(!opt || !Array.isArray(opt.growthStats)) return [];
+  const lookup = level >= opt.activateLevel ? level : opt.activateLevel;
+  return opt.growthStats.map(g => ({ stat: g.stat, label: g.label, value: (g.byLevel && g.byLevel[lookup] != null) ? g.byLevel[lookup] : 0 }));
 }
 function armorUniqueOptionGrowthStat(stat){
   return wornArmorItems().concat(wornSubItems()).concat(wornAccessoryItems()).reduce((sum, item) => {
     const opt = wpn(item.type).uniqueOption;
-    if(opt && opt.growthStat === stat && weaponUniqueOptionActive(item.type, item.level) && !isEquipDurabilityZero(item)){
-      return sum + (weaponUniqueOptionChance(item.type, item.level) || 0);
+    if(opt && weaponUniqueOptionActive(item.type, item.level) && !isEquipDurabilityZero(item)){
+      return sum + uniqueOptionGrowthStatValue(opt, item.type, item.level, stat);
     }
     return sum;
   }, 0);
@@ -1559,6 +1740,76 @@ function armorUniqueOptionGrowthStat(stat){
 function playerDefenseIgnore(){
   return weaponUniqueOptionStatBonus('defenseIgnore') + armorUniqueOptionStatBonus('defenseIgnore')
     + weaponUniqueOptionGrowthStat('defenseIgnore') + armorUniqueOptionGrowthStat('defenseIgnore');
+}
+// ---- 회피율 ----
+// 플레이어의 최종 회피율(치명타 확률/방어도 무시와 완전히 동일한 "여러 출처를 그대로 합산하는 %스탯"
+// 패턴). 특정 아이템/스킬을 하드코딩하지 않고, 이미 있는 범용 함수(무기/방어구/보조/장신구 고유 옵션의
+// 고정형·성장형 statBonus, 패시브 스킬, 버프 스킬)를 'evasion'이라는 키로 그대로 재호출만 함 — 그래서
+// 앞으로 어떤 장비/아티팩트/패시브/버프든 자신의 데이터에 evasion 값을 등록하기만 하면 이 함수 수정 없이
+// 자동으로 합산됨(요구사항 8번). 지금은 실제로 evasion 값을 등록한 데이터가 하나도 없어 항상 0%.
+function effectivePlayerEvasion(){
+  const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
+  const total = agi * 0.04 // 민첩 1당 회피 +0.04%(합연산, 스탯 효과 개편으로 신규 추가)
+    + weaponUniqueOptionStatBonus('evasion') + weaponUniqueOptionGrowthStat('evasion')
+    + armorUniqueOptionStatBonus('evasion') + armorUniqueOptionGrowthStat('evasion')
+    + armorStatBonus('evasion') // 착용 중인 방어구/장신구의 기본 회피 옵션(강화 단계 반영, 내구도 0이면 제외)
+    + learnedPassiveSkillBonus('evasion') + activeBuffBonus('evasion');
+  return Math.min(100, Math.max(0, total)); // 요구사항 4번: 0~100% 범위로 고정
+}
+// 회피 판정 자체(주사위 굴림)는 "누구의 회피율인지"와 완전히 분리해둠 — 지금은 monsterAttackTick에서
+// effectivePlayerEvasion()의 결과만 넘겨 쓰지만, 나중에 몬스터도 회피를 갖게 되면 몬스터 쪽 최종 회피율
+// 계산 함수만 새로 만들어서 이 함수를 그대로 재사용하면 됨(요구사항 10번, 이번 단계에서 몬스터 회피 자체는
+// 구현하지 않음).
+function rollEvasion(evasionPercent){
+  return Math.random() * 100 < evasionPercent;
+}
+// ---- 재생력 ----
+// 회피와 완전히 동일한 패턴 — 이미 있는 범용 함수들을 'regen' 키로 그대로 재호출해 합산만 함(요구사항 10번:
+// 특정 아이템/스킬 하드코딩 금지). 지금은 실제 regen 값을 등록한 데이터가 하나도 없어 항상 0 — 다음 작업에서
+// 장비/아티팩트/패시브/버프 데이터에 evasion 값을 등록했던 것과 같은 방식으로 'regen' 값만 채우면 자동 반영됨.
+function effectivePlayerRegen(){
+  const total = weaponUniqueOptionStatBonus('regen') + weaponUniqueOptionGrowthStat('regen')
+    + armorUniqueOptionStatBonus('regen') + armorUniqueOptionGrowthStat('regen')
+    + learnedPassiveSkillBonus('regen') + activeBuffBonus('regen');
+  return Math.max(0, total); // 요구사항 1번: 0 미만 불가(상한은 문서에 없어 별도로 두지 않음)
+}
+// 체력/마나 자연 회복 주기(ms) — 캐릭터 정보창 재생력 툴팁(combatStatTooltipHtml)과 실제 회복 타이머
+// (dungeon.js naturalRegenTick)가 이 두 상수를 그대로 같이 참조하므로 항상 서로 일치함.
+const HP_REGEN_INTERVAL_MS = 15000;
+const MP_REGEN_INTERVAL_MS = 20000;
+// 주기별 "기본 자연 회복 비율"(체력 3%/마나 5%) — 재생력 0일 때뿐 아니라 재생력>0 공식 안에도 그대로
+// 곱해져 들어가는 값이라, 숫자를 공식 안에 바로 적지 않고 이 함수 하나로 뽑아둠. 지금은 실제로 이 비율을
+// 바꾸는 시스템이 없어 항상 기본값 그대로지만, 나중에 "회복 효율 증폭" 같은 버프/패시브가 생기면
+// naturalRegenRateBonus의 활용처(activeBuffBonus/learnedPassiveSkillBonus)에 'hpRegenRatePercent' /
+// 'mpRegenRatePercent' 키 값만 채우면 이 함수와 아래 두 회복량 함수는 전혀 수정할 필요 없이 자동으로
+// 반영됨(요청: 3%/5%가 추후 일시적으로 증폭될 수 있는 구조로).
+const NATURAL_REGEN_BASE_RATE = { hp: 0.03, mp: 0.05 };
+function naturalRegenRateBonus(kind){
+  const key = kind + 'RegenRatePercent';
+  return activeBuffBonus(key) + learnedPassiveSkillBonus(key);
+}
+function naturalRegenBaseRate(kind){
+  const base = NATURAL_REGEN_BASE_RATE[kind] || 0;
+  const bonusPct = naturalRegenRateBonus(kind);
+  return bonusPct ? base * (1 + bonusPct / 100) : base;
+}
+// 체력 자연 회복량(반올림까지 끝낸 정수) — 재생력이 0이든 아니든 항상 같은 공식:
+// 최대체력 × 0.005 × (100 + 재생력) × 기본 회복 비율(위 naturalRegenBaseRate, 현재 3%). 재생력 0이면 최대체력 ×
+// 0.5 × 3% = 1.5%이고, 재생력이 100이면 3%가 됨(재생력이 오를수록 회복량이 항상 증가). 기본 회복 비율(3%)은
+// NATURAL_REGEN_BASE_RATE.hp 한 곳에서만 정의되므로 나중에 이 숫자만 바꾸면 툴팁/실제 회복 틱 모두 자동 반영됨.
+// 툴팁과 실제 회복 틱이 이 함수를 그대로 같이 호출함.
+function naturalHpRegenAmount(maxHp, regen){
+  const rate = naturalRegenBaseRate('hp');
+  const raw = maxHp * 0.005 * (100 + Math.max(0, regen || 0)) * rate;
+  return Math.round(raw);
+}
+// 마나 자연 회복량 — 기존 공식(최대 마나×기본 회복 비율 + 재생력>0이면 재생력 수치×기본 회복 비율 가산)은
+// 그대로 유지하고, 하드코딩돼 있던 0.05 리터럴만 위와 동일한 naturalRegenBaseRate('mp')로 교체함(현재는
+// 기본값이 그대로 0.05라 계산 결과는 전혀 바뀌지 않음 — 나중에 비율이 증폭될 때 여기도 같이 반영되도록).
+function naturalMpRegenAmount(maxMp, regen){
+  const rate = naturalRegenBaseRate('mp');
+  const raw = maxMp * rate + (regen > 0 ? regen * rate : 0);
+  return Math.round(raw);
 }
 // 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
 // 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
@@ -1683,7 +1934,7 @@ function effectiveAtkSpeed(type, level, durabilityZero){
   let s = atkSpeedFor(type, level);
   if(isArtifactEquipped('batwing')) s *= 1.05;
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
-  s *= 1 + agi * 0.0015; // 민첩 1당 공격속도 +0.15%
+  s *= 1 + agi * 0.001; // 민첩 1당 공격속도 +0.1%(배수, 스탯 효과 개편으로 0.15%→0.1%)
   s *= 1 + activeBuffBonus('atkSpeedPercent') / 100; // 활성화된 버프 스킬(예: 선공)의 공격속도% 보너스
   s *= 1 + weaponUniqueOptionStatBonus('atkSpeedPercent') / 100; // 착용 무기의 고유 옵션 중 공격속도% 보너스(예: 척호검) 합산
   return s;
@@ -1780,9 +2031,9 @@ function combatStatBreakdown(key, ctx){
     push('장비', '무기 기본 공격속도', null, `${atkSpeedFor(type, level).toFixed(2)}회/초`);
     if(isArtifactEquipped('batwing')) push('장비', '박쥐 날개(아티팩트)', null, '+5%');
     const agi = (state.stats && state.stats.agi) || 0;
-    if(agi) push('스탯', '민첩', null, `+${(agi * 0.15).toFixed(2)}%`);
+    if(agi) push('스탯', '민첩', null, `+${(agi * 0.1).toFixed(2)}%`);
     const agiBonus = artifactStatBonus('agi');
-    if(agiBonus) push('장비', '장비 스탯 보너스(민첩)', null, `+${(agiBonus * 0.15).toFixed(2)}%`);
+    if(agiBonus) push('장비', '장비 스탯 보너스(민첩)', null, `+${(agiBonus * 0.1).toFixed(2)}%`);
     const buffPct = activeBuffBonus('atkSpeedPercent');
     if(buffPct) push('스킬/패시브', '전투 버프', null, `+${buffPct}%`);
     const optPct = weaponUniqueOptionStatBonus('atkSpeedPercent');
@@ -1846,15 +2097,55 @@ function combatStatBreakdown(key, ctx){
     if(isArtifactEquipped('foxorb')) push('장비', `${ARTIFACTS.foxorb.name}(아티팩트)`, 500);
     push('장비', '방어구/보조/장신구 마나 보너스', armorStatBonus('mana'));
     push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('maxMana'));
+  } else if(key === 'critDamage'){
+    // 치명타 피해 배율(critMultiplierFor)과 완전히 동일한 항목 구성 — 대상(target)이 없는 캐릭터 정보창
+    // 기준이라 대상측 상태이상(화상 등) 보너스는 애초에 대상이 없어 critMultiplierFor(null)에서도 항상
+    // 0이므로 여기 breakdown에도 포함하지 않음(전투 중 적용치는 대상에 따라 달라질 수 있음을 별도 안내).
+    const str = (state.stats && state.stats.str) || 0;
+    push('기타', '기본 치명타 피해량', BASE_CRIT_MULTIPLIER * 100);
+    push('스탯', '힘', str * 0.05);
+    push('장비', '장비 스탯 보너스(힘)', artifactStatBonus('str') * 0.05);
+  } else if(key === 'evasion'){
+    const agi = (state.stats && state.stats.agi) || 0;
+    push('스탯', '민첩', agi * 0.04);
+    push('장비', '장비 스탯 보너스(민첩)', artifactStatBonus('agi') * 0.04);
+    push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('evasion'));
+    push('장비', '무기 고유 옵션(성장형)', weaponUniqueOptionGrowthStat('evasion'));
+    push('장비', '방어구/장신구 회피 옵션', armorStatBonus('evasion'));
+    push('장비', '방어구/보조/장신구 고유 옵션', armorUniqueOptionStatBonus('evasion'));
+    push('장비', '방어구/보조/장신구 고유 옵션(성장형)', armorUniqueOptionGrowthStat('evasion'));
+    push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus('evasion'));
+    push('스킬/패시브', '전투 버프', activeBuffBonus('evasion'));
+  } else if(key === 'regen'){
+    push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('regen'));
+    push('장비', '무기 고유 옵션(성장형)', weaponUniqueOptionGrowthStat('regen'));
+    push('장비', '방어구/보조/장신구 고유 옵션', armorUniqueOptionStatBonus('regen'));
+    push('장비', '방어구/보조/장신구 고유 옵션(성장형)', armorUniqueOptionGrowthStat('regen'));
+    push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus('regen'));
+    push('스킬/패시브', '전투 버프', activeBuffBonus('regen'));
   }
   // 플랫 항목을 전부 나열한 뒤, 이 능력치에 실제로 % 보정이 붙어있으면(현재는 패시브 스킬만 실제 데이터가
   // 있음) 그 출처를 그대로 한 줄씩 더 보여줌 — applyPercentBonus가 실제로 곱하는 것과 동일한 값이라
   // "위 항목 합계 → 최종 수치"가 실제 계산과 정확히 일치한다(사용자 확인 요청 사항).
   if(PERCENT_EFFECT_KEY_BY_STAT[key]){
+    // % 항목도 "현재 이 %가 실제로 더해주는 수치가 얼마인지"를 앞에, 그 뒤에 괄호로 원래 %값을 보여줌
+    // (사용자 요청) — flatTotal(위에서 나열한 모든 플랫 항목의 합)에 각 % 소스의 비율만큼을 곱한 값이며,
+    // applyPercentBonus가 여러 %를 먼저 합연산한 뒤 flatTotal에 한 번만 곱하는 것과 수학적으로 동일하다
+    // (flatTotal*(1+(a+b)/100) = flatTotal + flatTotal*a/100 + flatTotal*b/100이므로, 항목별 기여분을
+    // 이렇게 나눠 표시해도 합계가 최종 적용값과 정확히 일치함).
+    const flatTotal = parts.reduce((sum, p) => sum + (p.text === undefined ? p.value : 0), 0);
     const pctPassive = learnedPassiveSkillPercentBonus(key);
-    if(pctPassive) push('스킬/패시브', '패시브 스킬(%)', null, `${pctPassive > 0 ? '+' : ''}${pctPassive}%`, true);
+    if(pctPassive){
+      const amount = flatTotal * pctPassive / 100;
+      const pctText = `${pctPassive > 0 ? '+' : ''}${pctPassive}%`;
+      push('스킬/패시브', '패시브 스킬(%)', null, `${formatSignedBreakdownValue(amount)}(${pctText})`, true);
+    }
     const pctEquip = equipmentPercentBonus(key);
-    if(pctEquip) push('장비', '장비 옵션(%)', null, `${pctEquip > 0 ? '+' : ''}${pctEquip}%`, true);
+    if(pctEquip){
+      const amount = flatTotal * pctEquip / 100;
+      const pctText = `${pctEquip > 0 ? '+' : ''}${pctEquip}%`;
+      push('장비', '장비 옵션(%)', null, `${formatSignedBreakdownValue(amount)}(${pctText})`, true);
+    }
   }
   return parts;
 }
@@ -1872,15 +2163,20 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
   let html = `<div style="text-align:center; color:var(--forge-gold); font-weight:700; margin-bottom:6px;">${titleLabel} ${totalText}</div>`;
   if(grouped.length === 0){
     html += `<div style="text-align:center; color:var(--forge-cream-dim);">기여 항목 없음</div>`;
-    return html;
-  }
-  grouped.forEach(g => {
-    html += `<div style="color:var(--forge-cream-dim); font-size:10.5px; letter-spacing:1px; margin-top:6px;">${g.cat}</div>`;
-    g.items.forEach(p => {
-      const valueText = p.text !== undefined ? p.text : formatSignedBreakdownValue(p.value);
-      html += `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${p.label}</span><span style="color:var(--forge-cream);">${valueText}</span></div>`;
+  } else {
+    grouped.forEach(g => {
+      html += `<div style="color:var(--forge-cream-dim); font-size:10.5px; letter-spacing:1px; margin-top:6px;">${g.cat}</div>`;
+      // 치명타 확률/치명타 피해/회피는 항목 하나하나가 전부 "%로 합연산"되는 수치라서(사용자 요청) 각
+      // 줄 끝에 %를 붙여줌 — text가 이미 지정된 항목(예: 위 %패시브 줄의 "300(+5%)")은 자체적으로 단위가
+      // 붙어있으므로 건드리지 않음.
+      const PERCENT_SUFFIX_KEYS = ['crit', 'critDamage', 'evasion'];
+      const suffix = PERCENT_SUFFIX_KEYS.includes(key) ? '%' : '';
+      g.items.forEach(p => {
+        const valueText = p.text !== undefined ? p.text : formatSignedBreakdownValue(p.value) + suffix;
+        html += `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${p.label}</span><span style="color:var(--forge-cream);">${valueText}</span></div>`;
+      });
     });
-  });
+  }
   if(key === 'atkSpeed'){
     html += `<div style="margin-top:6px; font-size:10.5px; color:var(--forge-cream-dim);">각 항목이 순서대로 곱해져 계산됩니다.</div>`;
   } else if(parts.some(p => p.isPercent)){
@@ -1888,6 +2184,29 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
     // 수치가 나온다는 것을 안내(applyPercentBonus와 완전히 동일한 순서 — 요구사항: % 적용이 정확히
     // 이루어지는지 확인 가능하도록).
     html += `<div style="margin-top:6px; font-size:10.5px; color:var(--forge-cream-dim);">위 플랫 항목의 합계에 %가 적용된 값이 최종 수치입니다.</div>`;
+  } else if(key === 'regen'){
+    // 재생력 전용 추가 정보(요구사항 9번) — 위 기여 항목과 별개로, 실제 자연 회복 시스템이 지금 이 순간
+    // 적용할 회복량을 그대로 계산해서 보여줌. naturalHpRegenAmount/naturalMpRegenAmount는 실제 회복
+    // 틱(dungeon.js naturalRegenTick)이 호출하는 함수와 완전히 동일한 함수라, 여기 표시되는 수치와 실제
+    // 적용되는 회복량이 어긋날 수 없음.
+    const maxHp = effectiveMaxHp(state.playerLevel);
+    const maxMp = effectiveMaxMp(state.playerLevel);
+    const regenVal = effectivePlayerRegen();
+    const baseHp = naturalHpRegenAmount(maxHp, 0);
+    const baseMp = naturalMpRegenAmount(maxMp, 0);
+    const finalHp = naturalHpRegenAmount(maxHp, regenVal);
+    const finalMp = naturalMpRegenAmount(maxMp, regenVal);
+    const deltaHp = finalHp - baseHp;
+    const deltaMp = finalMp - baseMp;
+    const row = (label, value) => `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${label}</span><span style="color:var(--forge-cream);">${value}</span></div>`;
+    html += `<div style="margin-top:8px; padding-top:6px; border-top:1px solid var(--forge-line);">`;
+    html += row('체력 회복 주기', `${HP_REGEN_INTERVAL_MS / 1000}초`);
+    html += row('마력 회복 주기', `${MP_REGEN_INTERVAL_MS / 1000}초`);
+    html += row('자연 회복량(기본)', `체력 ${baseHp} / 마력 ${baseMp}`);
+    html += row('재생력 회복량(기본 대비)', `체력 ${deltaHp >= 0 ? '+' : ''}${deltaHp} / 마력 ${deltaMp >= 0 ? '+' : ''}${deltaMp}`);
+    html += row('체력 회복량', `${finalHp}`);
+    html += row('마력 회복량', `${finalMp}`);
+    html += `</div>`;
   }
   return html;
 }
@@ -1937,9 +2256,13 @@ function shopBuyMaxQty(action, typeId){
     cap = INV_MAX - totalEquipInventoryCount();
   } else if(action === 'buy-artifact'){
     // 아티팩트는 종류당 1개만 보유 가능 — 이미 보유 중이면 애초에 구매 버튼이 비활성화되어 팝업까지
-    // 오지 않지만, 방어적으로 한 번 더 확인함.
-    if(ownsArtifact(typeId)) return 0;
+    // 오지 않지만, 방어적으로 한 번 더 확인함. 아티팩트 인벤토리가 가득 차 있어도 구매 불가.
+    if(ownsArtifact(typeId) || inventoryCategoryFull('artifact')) return 0;
     cap = 1;
+  } else if(action === 'buy-consumable'){
+    // 이미 보유 중인 종류는 기존 슬롯에 수량만 늘어나 가득 차 있어도 구매 가능, 새 종류는 빈 슬롯이 있어야 함.
+    const owned = (state.consumables && state.consumables[typeId]) || 0;
+    if(!canAcquireInCategory('consumable', owned > 0)) return 0;
   }
   return Math.max(0, Math.min(hardMax, goldMax, cap));
 }
@@ -1991,6 +2314,57 @@ function equipInventoryFull(){
   return totalEquipInventoryCount() >= INV_MAX;
 }
 
+// ---- 인벤토리 카테고리별 슬롯 용량(장비/아티팩트/소비/마석/기타 각각 INV_MAX슬롯, 서로 독립) ----
+// 구버전/신버전 인벤토리 UI와 모든 아이템 획득 경로(던전 보상/드랍/상자/강화 파괴 보상/상점 구매/제작)가 이 함수들로
+// 용량을 판단함 — UI마다 별도 용량을 두지 않음. 슬롯 사용량은 기존 보유 데이터에서 그대로 계산하며(새 저장 구조 없음),
+// 수량을 가지는 아이템(소비/마석/기타)은 기존 스택 방식대로 종류당 1슬롯이고 이미 보유 중인 종류에 수량을 더하는 것은
+// 새 슬롯이 필요 없음. 아이템 이름을 하드코딩하지 않고 데이터(CONSUMABLES/MISC_ITEMS의 itemClass 등)로만 판단함.
+function inventorySlotsUsed(category){
+  if(category === 'equipment') return totalEquipInventoryCount(); // 무기/방어구/보조/장신구 공용
+  if(category === 'artifact') return (state.artifacts || []).length;
+  if(category === 'consumable'){
+    // 소비: 보유 수량이 있는 소비 아이템 종류(플라스크/비급 등) 수 + 흔적(개별 인스턴스라 1개당 1슬롯)
+    const stacks = Object.values(CONSUMABLES).filter(item => ((state.consumables && state.consumables[item.id]) || 0) > 0).length;
+    return stacks + (state.traceInventory || []).length;
+  }
+  if(category === 'stone' || category === 'misc'){
+    return Object.values(MISC_ITEMS).filter(item => item.itemClass === category && (state[item.stateKey] || 0) > 0).length;
+  }
+  return 0;
+}
+function inventorySlotMax(category){ return INV_MAX; }
+function inventoryCategoryFull(category){ return inventorySlotsUsed(category) >= inventorySlotMax(category); }
+// 해당 카테고리에 "새로 들어오는" 아이템을 받을 수 있는지. alreadyOwned가 true면(이미 보유 중인 종류에 수량만 추가)
+// 기존 슬롯을 계속 쓰므로 가득 차 있어도 받을 수 있고, false면 빈 슬롯이 있어야 함.
+function canAcquireInCategory(category, alreadyOwned){
+  return !!alreadyOwned || !inventoryCategoryFull(category);
+}
+function inventoryCategoryLabel(category){ return (INVENTORY_CATEGORIES[category] || {}).label || category; }
+function inventoryFullMessage(category){ return `${inventoryCategoryLabel(category)} 인벤토리가 가득 찼습니다.`; }
+function miscItemCategory(item){ return item.itemClass === 'stone' ? 'stone' : 'misc'; }
+
+// 소비 아이템(플라스크/비급 등)을 보유 수량에 추가. 새 슬롯이 필요한데 가득 차 있으면 지급하지 않고 false 반환.
+function grantConsumableStack(id, qty){
+  if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
+  const owned = state.consumables[id] || 0;
+  if(!canAcquireInCategory('consumable', owned > 0)) return false;
+  state.consumables[id] = owned + qty;
+  return true;
+}
+// 마석/기타 아이템(MISC_ITEMS)을 보유 수량에 추가. 새 슬롯이 필요한데 가득 차 있으면 지급하지 않고 false 반환.
+function grantMiscStack(item, qty){
+  const owned = state[item.stateKey] || 0;
+  if(!canAcquireInCategory(miscItemCategory(item), owned > 0)) return false;
+  state[item.stateKey] = owned + qty;
+  return true;
+}
+// 흔적(개별 인스턴스, 소비 인벤토리 1슬롯)을 추가. 소비 인벤토리가 가득 차 있으면 지급하지 않고 false 반환.
+function grantTraceItem(type){
+  if(inventoryCategoryFull('consumable')) return false;
+  state.traceInventory.push({ id: state.nextItemId++, forType: type });
+  return true;
+}
+
 // ---- 대장간 "강화 장비 선택" 팝업: 후보 목록 조회 ----
 // EQUIP_INVENTORY_POOLS(data.js)를 순회하며 "소유 + 착용 가능 + 강화 가능" 세 조건을 모두 만족하는
 // 장비만 모아 하나의 배열로 반환. 장비 종류(무기/방어구/장신구)를 구분하지 않고 섞어서 반환하며,
@@ -2010,6 +2384,7 @@ function forgeSelectableItems(){
       if(item.id !== state.forgeTargetId && !pool.meetsReq(type)) return; // 착용 가능 조건
       if(!typeDef.cost || typeDef.cost.length === 0) return; // 강화 가능 조건(강화단계 비용 데이터가 있어야 함) — 무기/방어구 공용
       if(item.damaged) return; // 손상된 아이템은 강화 대상으로 선택할 수 없음(요청사항 13번)
+      if(item.locked) return;  // 잠긴 장비는 강화 대상으로 선택할 수 없음(인벤토리 잠금)
       list.push({ kind: pool.kind, id: item.id, type, level: item.level, item });
     });
   });
@@ -2159,6 +2534,17 @@ function dungeonLevelRange(d){
   });
   return { min: Math.min(...levels), max: Math.max(...levels) };
 }
+// 이 던전에서 실제로 획득 가능한 비급 목록(요구사항 15번). 비급의 획득 가능 몬스터 레벨 범위
+// [기준레벨-10, 기준레벨]와 던전의 몬스터 레벨 범위(dungeonLevelRange)가 1레벨이라도 겹치면 후보.
+// 새 비급이 추가되면 allScrollItems()를 통해 자동으로 판정에 포함됨.
+function scrollsAvailableInDungeon(d){
+  const range = dungeonLevelRange(d);
+  return allScrollItems().filter(item => {
+    const lv = scrollBaseLevel(item);
+    if(lv == null) return false;
+    return lv >= range.min && (lv - 10) <= range.max;
+  });
+}
 // 던전 아이콘: 비어있으면 등장 몬스터 중 첫 번째의 아이콘을 그대로 사용(그 몬스터에 PNG가 등록돼있으면
 // monsterIconHtml을 통해 PNG로, 없으면 기존처럼 이모지로 출력됨). 던전 자체에 지정된 커스텀 아이콘(d.icon)은
 // 몬스터 데이터가 아니므로 PNG 대상이 아니라 기존처럼 문자열 그대로 사용함.
@@ -2199,13 +2585,232 @@ function sortEquippedFirst(items, isEquippedFn){
   items.forEach(item => { (isEquippedFn(item) ? equipped : rest).push(item); });
   return equipped.concat(rest);
 }
+// ---- 인벤토리 아이템 잠금(구버전·신버전 공용) ----
+// 잠금 상태 = 장비 인스턴스의 locked 필드(data.js의 INV_LOCKABLE_SRCS 주석 참고). 잠금은 '실수로 소모하는 기능'(강화 선택/강화/판매/제작 재료)만
+// 막고, 착용/착용 해제/수리/손상 복구는 제한하지 않음 — 그래서 아래 isEquipLockedById/isInvItemLocked는 강화 선택·강화·판매·제작 재료
+// 판정에서만 호출됨. 잠금 모드(invLockMode)는 저장하지 않는 일시적 조작 모드로, 인벤토리 메뉴를 벗어나면 꺼짐(navigation.js showView).
+let invLockMode = false;
+function isInvLockable(src){ return INV_LOCKABLE_SRCS.includes(src); }
+function invLockFind(src, id){
+  const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === src); // 장비 4종(확장 시 이 함수에서 src별 조회를 추가)
+  return pool ? (pool.items() || []).find(it => it.id === id) || null : null;
+}
+function isInvItemLocked(src, id){ const it = invLockFind(src, id); return !!(it && it.locked); }
+// 장비 id만 아는 곳(판매/강화 선택/강화)용 — 아이템 id는 장비 인벤토리 전체에서 유일하므로 모든 풀을 훑어 찾음.
+function isEquipLockedById(id){
+  return EQUIP_INVENTORY_POOLS.some(p => (p.items() || []).some(it => it.id === id && it.locked));
+}
+// 잠금/해제 토글. 강화 중에는 강화 대상이 바뀌면 안 되므로 거부함. 현재 강화 대상(forgeTargetId)을 잠그면 대장간 선택을 해제함
+// (판매로 아이템이 사라질 때 forgeTargetId를 정리하는 것과 같은 처리 — 잠긴 장비가 강화 화면에 남아 있지 않게 함).
+function invLockToggle(src, id){
+  if(isEnhancing || !isInvLockable(src)) return false;
+  const it = invLockFind(src, id);
+  if(!it) return false;
+  if(it.locked) delete it.locked;
+  else { it.locked = true; if(state.forgeTargetId === id) state.forgeTargetId = null; }
+  return true;
+}
+const INV_LOCKED_REASON = '잠긴 장비는 사용할 수 없습니다. 잠금을 해제해주세요.';
+// 잠금 버튼 HTML(구버전 페이저/신버전 툴바 공용). 데스크톱 화면 프리셋에서만 마우스를 올리면 안내가 표시됨(CSS가 모바일 프리셋에서 숨김).
+function invLockButtonHtml(){
+  return `<span class="equip-req-wrap inv-lock-wrap"><button class="inv-box-btn inv-lock-btn ${invLockMode ? 'active' : ''}" data-lock-toggle="1">잠금</button>`
+    + `<span class="tooltip">해당 아이템의 일부 기능을 제한합니다.</span></span>`;
+}
+// 잠금 아이콘 오버레이(아이콘 왼쪽 상단 최상단 레이어) — 잠긴 아이템에만. 해제 이미지는 잠금 모드 + 마우스 오버(CSS)에서만 보임.
+function invLockBadgeHtml(locked){
+  return locked ? `<img class="inv-lock-badge" src="${INV_LOCK_IMG}" alt="" draggable="false"><img class="inv-unlock-badge" src="${INV_UNLOCK_IMG}" alt="" draggable="false">` : '';
+}
+
+// ---- 신버전 인벤토리 아이템 비교(장비 전용) ----
+// 비교 표는 기존 장비 툴팁 HTML(buildWeapon/Armor/Accessory/SubTooltipHtml)에서 항목을 읽어 만듦 — 항목을 따로 복제하지 않으므로 툴팁에 새 항목/옵션이
+// 추가되면 비교에도 자동 반영됨(툴팁이 실제 강화 단계·손상·내구도를 이미 반영). 항목의 순서는 툴팁 순서를 따르고, 한쪽에만 있는 항목도 표시함.
+// 같은 장비 대분류(슬롯) 판정(data.js의 INV_COMPARABLE_SRCS/INV_COMPARE_GROUP_OVERRIDES): 비교 불가면 null.
+function invCompareGroup(entry){
+  if(!entry || !INV_COMPARABLE_SRCS.includes(entry.src)) return null;
+  if(INV_COMPARE_GROUP_OVERRIDES[entry.kindKey]) return INV_COMPARE_GROUP_OVERRIDES[entry.kindKey];
+  return (entry.src === 'armor' || entry.src === 'accessory') ? entry.kindKey : entry.src;
+}
+function invCompareNumber(text){
+  const m = /^([+-]?)(\d+(?:\.\d+)?)(%?)$/.exec((text || '').trim());
+  return m ? { value: Number(m[1] + m[2]), decimals: (m[2].split('.')[1] || '').length, unit: m[3] } : null;
+}
+// 툴팁 HTML → [{ key, label, valueHtml, sell?, reduced? }] (툴팁 순서 그대로)
+function invCompareParseTooltip(html){
+  const root = document.createElement('div');
+  root.innerHTML = html;
+  const box = root.firstElementChild || root;
+  const rows = [], byKey = {};
+  const add = (key, label, valueHtml, extra) => {
+    if(byKey[key]){ byKey[key].valueHtml += '<br>' + valueHtml; return; } // 같은 항목이 여러 줄(고유 옵션 등)이면 줄바꿈으로 이어붙임
+    const r = Object.assign({ key, label, valueHtml }, extra || {});
+    byKey[key] = r; rows.push(r);
+  };
+  const styled = ch => `<span style="${(ch.getAttribute('style') || '').replace(/margin-bottom:[^;]*;?/g, '')}">${ch.innerHTML}</span>`;
+  Array.from(box.children).forEach((ch, idx) => {
+    const tip = ch.getAttribute('data-tip');
+    if(ch.classList.contains('tooltip-sell-price')){
+      add('sell', INV_COMPARE_TIP_LABELS.sell, ch.textContent.trim(), { sell: true, reduced: ch.classList.contains('reduced') });
+    } else if(tip === 'unique'){
+      Array.from(ch.children).forEach(line => add('unique', INV_COMPARE_TIP_LABELS.unique, line.innerHTML));
+    } else if(tip === 'name' || tip === 'grade' || tip === 'desc'){
+      add(tip, INV_COMPARE_TIP_LABELS[tip], styled(ch));
+    } else if(ch.children.length >= 1 && ch.children[0].tagName === 'SPAN'){ // wtipRow: [항목명 span] [값 span] 또는 값 span 하나
+      const sp = ch.children, hasLabel = sp.length >= 2;
+      const label = hasLabel ? sp[0].textContent.replace(/[\s:]+$/, '') : '';
+      const key = tip || label || ('row' + idx);
+      add(key, label || INV_COMPARE_TIP_LABELS[tip] || '', (hasLabel ? sp[1] : sp[0]).innerHTML);
+    } else {
+      add(tip || ('row' + idx), INV_COMPARE_TIP_LABELS[tip] || '', ch.innerHTML);
+    }
+  });
+  return rows;
+}
+// 두 장비(엔트리)의 비교 행 목록: [{ label, aHtml, bHtml, deltaA, delta(=B), sell?, aReduced?, bReduced? }] — delta = { dir:'up'|'down'(좋아짐=up/나빠짐=down), good:boolean, text }
+// A = 비교 기준(왼쪽), B = 비교 대상(오른쪽). delta는 "A 대비 B"의 증감(오른쪽 값 옆), deltaA는 "B 대비 A"의 증감(왼쪽 값 옆) —
+// 같은 ▲▼ 형식이고 방향만 서로 반대라서, 어느 쪽 값을 봐도 차이를 바로 알 수 있음.
+function invCompareBuildRows(a, b){
+  const ra = invCompareParseTooltip(a.tooltipHtml), rb = invCompareParseTooltip(b.tooltipHtml);
+  const keys = ra.map(r => r.key);
+  let last = -1;
+  rb.forEach(r => { // B에만 있는 항목은 B에서 바로 앞에 있던 공통 항목 뒤에 끼워 넣어 툴팁 순서를 유지함
+    const i = keys.indexOf(r.key);
+    if(i >= 0) last = i; else { keys.splice(last + 1, 0, r.key); last++; }
+  });
+  const ma = Object.fromEntries(ra.map(r => [r.key, r])), mb = Object.fromEntries(rb.map(r => [r.key, r]));
+  return keys.map(k => {
+    const x = ma[k], y = mb[k];
+    const missing = k === 'unique' ? '없음' : '-';
+    const row = { label: (x || y).label, aHtml: x ? x.valueHtml : missing, bHtml: y ? y.valueHtml : missing, delta: null, deltaA: null };
+    if(x && x.sell) row.aReduced = x.reduced;
+    if(y && y.sell) row.bReduced = y.reduced;
+    if((x && x.sell) || (y && y.sell)) row.sell = true;
+    if((x || y) && !INV_COMPARE_NO_DELTA_KEYS.includes(k)){
+      let na = x ? invCompareNumber(x.valueHtml.replace(/<[^>]*>/g, '')) : null, nb = y ? invCompareNumber(y.valueHtml.replace(/<[^>]*>/g, '')) : null;
+      // 한쪽에만 있는 수치 항목은 없는 쪽을 0으로 보고 증감을 계산함(표시는 그대로 '-'). 단위(%)는 있는 쪽을 따름.
+      if(x && !y && na) nb = { value: 0, decimals: 0, unit: na.unit };
+      if(y && !x && nb) na = { value: 0, decimals: 0, unit: nb.unit };
+      if(na && nb && na.unit === nb.unit){
+        const diff = nb.value - na.value;
+        if(Math.abs(diff) > 1e-9){
+          const dec = Math.max(na.decimals, nb.decimals);
+          const txt = Math.abs(diff).toFixed(dec).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '') + na.unit; // 부동소수 오차 정리(0.95-1.2 등)
+          // 화살표/부호는 "좋아졌는지"로 정함(INV_COMPARE_STAT_BETTER): 높을수록 좋음은 증가=▲/감소=▼, 낮을수록 좋음(방어도 등)은 증가=▼/감소=▲.
+          // 숫자 크기(txt)는 실제 차이 그대로이고, 좋아짐은 ▲ + 초록 / 나빠짐은 ▼ - 빨강으로 표시됨.
+          const lowBetter = INV_COMPARE_STAT_BETTER[k] === 'low';
+          const mk = (d) => { const good = lowBetter ? d < 0 : d > 0; return { dir: good ? 'up' : 'down', good, text: (good ? '▲ +' : '▼ -') + txt }; };
+          row.delta = mk(diff);   // 오른쪽(B): A 대비
+          row.deltaA = mk(-diff); // 왼쪽(A): B 대비(방향 반대)
+        }
+      }
+    }
+    return row;
+  });
+}
+
+// ---- 인벤토리 정렬(구버전·신버전 공용) ----
+// 정렬 기준 표(탭별 제공 기준·종류 순서·착용 슬롯 순서)는 data.js의 INV_SORT_*에 있고, 여기에는 실제 비교/상태 처리만 있음.
+// 아이템 이름은 쓰지 않고 정렬용 정보 { kindKey, gradeRank, price, level }만 비교함 — 이 정보는 아래 invSortInfo*가 기존 아이템 데이터/
+// 판매 가격 계산(sellValueFor 등)에서 만들어 주며, 구버전 목록과 신버전 엔트리가 같은 함수를 씀.
+// 정렬 상태는 탭별로 state.invSort[탭 id] = 기준 id에 저장됨(없으면 기본 정렬). 보유 데이터 배열 자체는 바꾸지 않고 표시 순서만 바꿈.
+const INV_SORT_CRITERIA = {
+  kind:    { label: '아이템 종류', compare: (a, b) => invSortKindRank(a.kindKey) - invSortKindRank(b.kindKey) },
+  value:   { label: '아이템 가치', compare: (a, b) => (b.price || 0) - (a.price || 0) },          // 현재 판매 가격이 높은 순
+  grade:   { label: '등급',        compare: (a, b) => b.gradeRank - a.gradeRank },                // 유니크 → 에픽 → 레어 → 일반
+  enhance: { label: '높은 강화 순', compare: (a, b) => (b.level || 0) - (a.level || 0) },        // +9 → … → +0(강화 단계가 없는 아이템은 0)
+};
+// 종류 키 → 비교용 숫자(대분류 순서 × 1000 + 세부 종류 순서). 목록에 없는 값은 위 data.js 주석의 규칙대로 뒤로 감.
+function invSortKindRank(kindKey){
+  const key = kindKey || '';
+  const group = key.split(':')[0];
+  const gi = INV_SORT_KIND_ORDER.findIndex(g => g.group === group);
+  if(gi === -1) return INV_SORT_KIND_ORDER.length * 1000;
+  const ki = INV_SORT_KIND_ORDER[gi].kinds.indexOf(key);
+  return gi * 1000 + (ki === -1 ? INV_SORT_KIND_ORDER[gi].kinds.length : ki);
+}
+// 정렬용 정보 만들기 — 장비(src: weapon/armor/sub/accessory), 아티팩트, 소비(비급 포함), 흔적, 마석/기타.
+function invSortInfoEquip(src, item){
+  const type = item.type || 'longsword';
+  const def = wpn(type);
+  const kindKey = src === 'weapon' ? 'weapon:' + def.weaponKind + ':' + def.handType
+    : src === 'armor' ? 'armor:' + def.armorKind
+    : src === 'sub' ? 'sub:' + def.subKind
+    : 'accessory:' + def.accessoryKind;
+  return {
+    kindKey, gradeRank: WEAPON_GRADE_RANK[def.grade] ?? -1,
+    price: durabilityAdjustedSellValue(sellValueFor(type, item.level), item), level: item.level || 0,
+  };
+}
+function invSortInfoArtifact(id){
+  const a = ARTIFACTS[id];
+  return { kindKey: 'artifact', gradeRank: WEAPON_GRADE_RANK[a.grade] ?? -1, price: a.sellPrice || 0, level: 0 };
+}
+function invSortInfoConsumable(item){
+  return {
+    kindKey: 'consumable:' + (item.class || ''), gradeRank: isScrollItem(item) ? (WEAPON_GRADE_RANK[item.grade] ?? -1) : -1,
+    price: item.sellPrice || 0, level: 0,
+  };
+}
+function invSortInfoTrace(){
+  return { kindKey: 'consumable:trace', gradeRank: -1, price: 0, level: 0 };
+}
+function invSortInfoMisc(item, itemClass){
+  return { kindKey: itemClass, gradeRank: WEAPON_GRADE_RANK[item.grade] ?? -1, price: item.sellPrice || 0, level: 0 };
+}
+// 탭별 정렬 상태 — state에 저장되어 화면을 나갔다 와도, 새로고침/불러오기 후에도 유지됨(saveState가 state 전체를 저장).
+// 저장된 값이 그 탭의 제공 기준에 없으면(기준 목록이 바뀐 경우 등) 기본 정렬로 취급함.
+function invSortGet(tab){
+  const id = state.invSort && state.invSort[tab];
+  return id && (INV_SORT_TAB_CRITERIA[tab] || []).includes(id) ? id : '';
+}
+function invSortSet(tab, id){
+  if(!state.invSort || typeof state.invSort !== 'object') state.invSort = {};
+  if(id && (INV_SORT_TAB_CRITERIA[tab] || []).includes(id)) state.invSort[tab] = id;
+  else delete state.invSort[tab];
+}
+// 신버전 장비 탭 전용 "착용 장비 우선 정렬" 체크 상태(저장됨).
+function invSortWornFirstOn(){ return !!state.invSortWornFirst; }
+// list를 해당 탭의 정렬 상태대로 정렬한 새 배열을 반환. infoOf(항목) → { kindKey, gradeRank, price, level }.
+// 선택된 기준이 1순위, 동점은 기본 정렬(높은 등급 먼저), 그래도 같으면 원래 보유 순서 유지. 선택된 기준이 없으면 기본 정렬만 적용됨.
+function invSortList(tab, list, infoOf){
+  const crit = invSortGet(tab);
+  const cmp = crit ? INV_SORT_CRITERIA[crit].compare : null;
+  return list.map((x, i) => ({ x, i, info: infoOf(x) })).sort((a, b) => {
+    if(cmp){ const d = cmp(a.info, b.info); if(d) return d; }
+    const g = b.info.gradeRank - a.info.gradeRank;
+    return g || a.i - b.i;
+  }).map(o => o.x);
+}
+// 착용 장비 우선 정렬용: 착용 중인 장비가 어느 슬롯인지에 따른 순서(INV_SORT_WORN_SLOT_ORDER). 착용 중이 아니면 -1.
+function invWornSlotRank(src, id){
+  let slot = null;
+  if(src === 'weapon'){ if(state.equippedId === id) slot = 'weapon'; }
+  else if(src === 'armor'){ const eq = state.equippedArmor || {}; slot = ['helmet', 'armor', 'shoes'].find(k => eq[k] === id) || null; }
+  else if(src === 'sub'){ if(state.equippedSubId === id) slot = 'sub'; }
+  else if(src === 'accessory'){
+    const rings = state.equippedAccessories || [];
+    if(state.equippedNecklaceId === id) slot = 'necklace';
+    else if(rings[0] === id) slot = 'accessory1';
+    else if(rings[1] === id) slot = 'accessory2';
+  }
+  return slot ? INV_SORT_WORN_SLOT_ORDER.indexOf(slot) : -1;
+}
+// 정렬 드롭다운 HTML(탭에 제공 기준이 없으면 빈 문자열). 맨 위에 \'기본 값\'(기본 상태 정렬로 되돌리기)이 있고, 그 아래에 그 탭의 기준만 나열됨.
+function invSortSelectHtml(tab){
+  const ids = INV_SORT_TAB_CRITERIA[tab] || [];
+  if(ids.length === 0) return '';
+  const cur = invSortGet(tab);
+  return `<select class="inv-sort-select ${cur ? 'active' : ''}" data-sort-tab="${tab}" aria-label="정렬 기준">`
+    + `<option value="" ${cur ? '' : 'selected'}>기본 값</option>` // 맨 위 '기본 값' = 기준을 고르지 않은 기본 상태 정렬(높은 등급 먼저)
+    + ids.map(id => `<option value="${id}" ${id === cur ? 'selected' : ''}>${INV_SORT_CRITERIA[id].label}</option>`).join('')
+    + `</select>`;
+}
 // 페이지 이동 UI 공통 HTML: "현재 페이지 / 전체 페이지 [이전] [다음]". 첫 페이지는 [이전] 생략,
 // 마지막 페이지는 [다음] 생략. target은 어떤 화면의 페이지인지 구분하는 키(pageState의 키와 동일) —
 // 클릭 시 data-page-target으로 actions.js가 pageState의 어느 값을 바꿀지 알 수 있음.
-function pagerHtml(target, page, totalPageCount){
+function pagerHtml(target, page, totalPageCount, leadHtml){ // leadHtml: 페이지 라벨 앞에 붙는 추가 HTML(구버전 장비 탭의 잠금 버튼)
   const prevBtn = page > 1 ? `<button class="pager-btn" data-action="page-prev" data-page-target="${target}">이전</button>` : '';
   const nextBtn = page < totalPageCount ? `<button class="pager-btn" data-action="page-next" data-page-target="${target}">다음</button>` : '';
-  return `<div class="pager"><span class="pager-label">${page} / ${totalPageCount}</span>${prevBtn}${nextBtn}</div>`;
+  return `<div class="pager">${leadHtml || ''}<span class="pager-label">${page} / ${totalPageCount}</span>${prevBtn}${nextBtn}</div>`;
 }
 function pickWeighted(pairs){
   const total = pairs.reduce((s, [, w]) => s + w, 0);
@@ -2300,6 +2905,24 @@ function resolveWeaponRelicDrop(monsterLevel){
     : 0;
   return { type: chosenType.id, level: enhanceLevel, equipType };
 }
+// 비급 전역 드랍 판정(요구사항 2·5·6번). 1) SCROLL_DROP_CHANCE로 드랍 여부 판정(다른 드랍표와 완전히
+// 독립) → 2) 몬스터 레벨 M 기준 [M-10, M] 범위에 요구 레벨(scrollBaseLevel)이 들어오는 비급만 후보로
+// 필터(몬스터보다 요구 레벨이 높은 비급은 후보에서 절대 제외) → 3) 후보가 없으면 드랍 취소(null) →
+// 4) 후보가 1개면 그대로 지급 → 5) 여러 개면 몬스터 레벨과 가까울수록(레벨 차이가 작을수록)
+// SCROLL_LEVEL_WEIGHT_DECAY 기반 가중치를 적용해 pickWeighted로 하나만 추첨.
+// 새 비급이 CONSUMABLES에 추가되면 allScrollItems()가 자동으로 후보에 포함시킴.
+function rollScrollDrop(monsterLevel){
+  if(Math.random() * 100 >= SCROLL_DROP_CHANCE) return null;
+  const candidates = allScrollItems().filter(item => {
+    const lv = scrollBaseLevel(item);
+    return lv != null && lv <= monsterLevel && lv >= monsterLevel - 10;
+  });
+  if(candidates.length === 0) return null;
+  if(candidates.length === 1) return { itemId: candidates[0].id };
+  const pairs = candidates.map(item => [item.id, Math.pow(SCROLL_LEVEL_WEIGHT_DECAY, monsterLevel - scrollBaseLevel(item))]);
+  return { itemId: pickWeighted(pairs) };
+}
+
 // 몬스터 데이터의 drops 항목(name) 중 재료성 아이템(MISC_ITEMS)에 등록된 이름과 일치하는 것을 찾음.
 // 이름 기반으로 매칭하므로, MISC_ITEMS에 새 재료 아이템을 추가하고 몬스터의 drops에 같은 이름만
 // 등록하면 별도 코드 수정 없이 자동으로 연결됨.
@@ -2334,7 +2957,8 @@ function pickPriorityEquipDrop(candidates){
 }
 
 // 몬스터 처치 시 모든 드랍(골드/모험가의 유해/마석/몬스터 고유 드랍/재료 아이템)을 판정
-function resolveDrops(monsterDef, dungeon, level){
+function resolveDrops(monsterDef, dungeon, level, options){
+  options = options || {};
   const grade = monsterDef.grade;
   const gradeInfo = MONSTER_GRADES[grade];
 
@@ -2408,7 +3032,11 @@ function resolveDrops(monsterDef, dungeon, level){
     }
   }
 
-  return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, artifactDropIds, miscDrops };
+  // 비급은 한 전투(그룹 전멸까지)에서 최대 1회만 지급되어야 하므로(요구사항 9번), 이미 지급된 전투라면
+  // options.skipScroll로 판정 자체를 건너뜀(호출부인 killMonsterInstance가 hunt.scrollGrantedThisBattle로 전달).
+  const scrollDrop = options.skipScroll ? null : rollScrollDrop(level);
+
+  return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, artifactDropIds, miscDrops, scrollDrop };
 }
 
 // ---- 던전 전투 종료 보상창의 "획득 아이템" 아이콘 그리드 표시용 데이터 ----
@@ -2460,6 +3088,21 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: buildConsumableTooltipHtml(itemId),
       borderColor: 'var(--forge-line)',
       qty: rewards.flaskDrops[itemId],
+    });
+  });
+  // 비급(요구사항 13번) — 플라스크와 같은 소비 아이템 카테고리지만, 비급은 할당 스킬의 등급을 가지므로
+  // 등급 순위/등급 색상 테두리를 적용함(플라스크는 등급이 없어 -1/고정 회색을 그대로 씀).
+  Object.keys(rewards.scrollDrops || {}).forEach(itemId => {
+    const item = CONSUMABLES[itemId];
+    if(!item) return;
+    const g = scrollGradeInfo(item);
+    slots.push({
+      category: 'consumable',
+      gradeRank: WEAPON_GRADE_RANK[item.grade] ?? -1,
+      iconHtml: itemIconHtml(item, 'reward-icon-img'),
+      tooltipHtml: buildConsumableTooltipHtml(itemId),
+      borderColor: g ? g.color : 'var(--forge-line)',
+      qty: rewards.scrollDrops[itemId],
     });
   });
   Object.keys(rewards.miscDrops).forEach(itemId => {
@@ -2721,7 +3364,7 @@ function weightedOutcome(odds){
 // ---- 제작소: 제작 아이템/재료 공용 헬퍼 ----
 // iconType/iconRef로 등록된 기존 아이템 아이콘을 그대로 재사용해서 렌더링함(신규 제작 전용 이미지 없음).
 function craftItemIconHtml(item, className){
-  if(item.iconType === 'weapon') return weaponIconHtml(item.iconRef, className);
+  if(item.iconType === 'weapon' || item.iconType === 'accessory') return weaponIconHtml(item.iconRef, className); // weaponIconHtml은 무기/방어구/장신구 공용
   return ''; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
 }
 // 제작 아이템 이름/아이콘 테두리 색상 — 기존 무기 등급 색상 공식(WEAPON_GRADES)을 그대로 재사용.
@@ -2733,6 +3376,7 @@ function craftItemNameColor(item){
 // iconType이 'weapon'이면 강화 단계 0으로 간주해 무기 툴팁을 그대로 출력함(기존 아이템 표시 규칙 재사용).
 function craftItemTooltipHtml(item){
   if(item.iconType === 'weapon') return buildWeaponTooltipHtml(item.iconRef, 0);
+  if(item.iconType === 'accessory') return buildAccessoryTooltipHtml(item.iconRef, 0); // 장신구 툴팁 그대로 재사용(+0, 내구도 최대)
   return ''; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
 }
 function findCraftItem(category, id){
@@ -2743,7 +3387,7 @@ function findCraftItem(category, id){
 // 실제 장비 데이터의 levelReq를 그대로 조회 — craftItemIconHtml/craftItemTooltipHtml과 동일한 분기
 // 구조라 iconType이 늘어나면 여기에도 같은 방식으로 분기만 추가하면 됨.
 function craftItemLevelReq(item){
-  if(item.iconType === 'weapon') return wpn(item.iconRef).levelReq || 0;
+  if(item.iconType === 'weapon' || item.iconType === 'accessory') return wpn(item.iconRef).levelReq || 0;
   return 0; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
 }
 
@@ -2791,7 +3435,7 @@ function isEquipInstanceWorn(equipType, id){
   if(equipType === 'weapon') return state.equippedId === id;
   if(equipType === 'armor') return Object.values(state.equippedArmor || {}).includes(id);
   if(equipType === 'sub') return state.equippedSubId === id;
-  if(equipType === 'accessory') return (state.equippedAccessories || []).includes(id);
+  if(equipType === 'accessory') return (state.equippedAccessories || []).includes(id) || state.equippedNecklaceId === id;
   return false;
 }
 // 재료로 쓸 수 있는 장비 인벤토리 항목만(착용 중 제외·손상된 아이템 제외·내구도 완전 온전한 것만 —
@@ -2801,7 +3445,7 @@ function craftEligibleEquipInstances(resource){
   const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
   if(!pool) return [];
   const items = (typeof pool.items === 'function' ? pool.items() : pool.items) || [];
-  return items.filter(it => it.type === resource.typeId && !it.damaged && !isEquipInstanceWorn(resource.equipType, it.id) && isEquipDurabilityFull(it));
+  return items.filter(it => it.type === resource.typeId && !it.damaged && !it.locked && !isEquipInstanceWorn(resource.equipType, it.id) && isEquipDurabilityFull(it)); // 잠긴 장비는 제작 재료에서 제외
 }
 // 내구도가 "완전히 온전한(현재 내구도 === 최대 내구도)" 상태인지 — 내구도 시스템이 없는 종류는 항상
 // true(제한 없음).
@@ -2931,9 +3575,9 @@ function craftAnimResultIconsHtml(item, success, resultReturn){
 function craftGrantResultItems(item){
   if(!craftAnim) return;
   if(craftAnim.resultSuccess){
-    if(item.iconType === 'weapon'){
+    if(item.iconType === 'weapon' || item.iconType === 'accessory'){
       const wdef = wpn(item.iconRef);
-      grantRelicEquipDrop({ type: item.iconRef, level: 0, equipType: wdef.equipType });
+      grantRelicEquipDrop({ type: item.iconRef, level: 0, equipType: wdef.equipType }); // equipType 'weapon'/'accessory'에 맞는 인벤토리로 지급
     }
     craftAnim.heldEquip = [];
     return;
@@ -2943,7 +3587,7 @@ function craftGrantResultItems(item){
   const resource = findCraftResource(picked.name);
   if(!resource){ craftAnim.heldEquip = []; return; }
   if(resource.kind === 'misc'){
-    state[resource.def.stateKey] = (state[resource.def.stateKey] || 0) + (picked.need || 1); // 반환 개수(need 생략 시 1개)
+    grantMiscStack(resource.def, picked.need || 1); // 반환 개수(need 생략 시 1개) — 카테고리별 슬롯 용량 규칙 적용(재료로 소모돼 슬롯이 비었으므로 보통 다시 들어감)
     craftAnim.heldEquip = [];
     return;
   }
@@ -2987,5 +3631,16 @@ function craftPopupCanCraft(popup){
     return slot && slot.qty === m.need;
   });
   const goldOk = state.gold >= (item.craftCost || 0);
-  return materialsOk && goldOk;
+  return materialsOk && goldOk && !craftResultInventoryBlock(item);
+}
+// 제작 성공 시 지급될 제작 아이템을 담을 인벤토리 슬롯이 부족하면 해당 카테고리를 반환(막지 않으면 제작 재료/골드만 소모되고
+// 결과물이 지급되지 못함). 제작 시작 때 소모되는 장비 재료는 인벤토리에서 빠지므로 그만큼의 슬롯은 비는 것으로 계산함.
+// 제작 아이템은 모두 장비(무기/방어구/보조/장신구)라 장비 카테고리로 판단함(iconType이 늘어나면 여기에 분기 추가).
+function craftResultInventoryBlock(item){
+  if(item.iconType !== 'weapon' && item.iconType !== 'accessory') return null;
+  const freed = item.materials.reduce((sum, m) => {
+    const resource = findCraftResource(m.name);
+    return sum + (resource && resource.kind === 'equip' ? m.need : 0);
+  }, 0);
+  return (inventorySlotsUsed('equipment') - freed >= inventorySlotMax('equipment')) ? 'equipment' : null;
 }

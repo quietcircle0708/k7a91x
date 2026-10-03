@@ -5,6 +5,8 @@
 // ============================================================
 
 function showView(name){
+  if(currentView === 'inventory' && name !== 'inventory' && typeof invCompareReset === 'function') invCompareReset(); // 비교 모드도 인벤토리 메뉴 안에서만 유지됨(나가면 모드·기준·팝업·돋보기 커서 초기화)
+  if(currentView === 'inventory' && name !== 'inventory') invLockModeSet(false); // 잠금 모드는 인벤토리 메뉴 안에서만 유지됨(나가면 해제 + 일반 커서 복원)
   if(currentView === 'hunt' && name !== 'hunt'){
     stopHuntLoop();
     closeKillResultModal();
@@ -70,9 +72,15 @@ function showView(name){
   el('dungeonListView').style.display = name === 'dungeonlist' ? 'block' : 'none';
   el('characterView').style.display = name === 'character' ? 'block' : 'none';
   el('huntView').style.display = name === 'hunt' ? 'block' : 'none';
+  el('exitHuntBtn').style.display = name === 'hunt' ? '' : 'none'; // 전투 화면의 나가기 버튼은 상단 메뉴 영역(메뉴 버튼과 같은 줄, 왼쪽)에 있음
+  el('backFromDlistBtn').style.display = name === 'dungeonlist' ? '' : 'none'; // 던전 입구의 대장간 돌아가기 버튼도 상단 메뉴 영역에 있음
+  // 상점/인벤토리/제작소/캐릭터 화면의 [대장간으로 돌아가기] 버튼도 상단 메뉴 영역에 있고, 해당 화면에서만 표시함
+  [['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character']]
+    .forEach(([id, view]) => { el(id).style.display = name === view ? '' : 'none'; });
   currentView = name;
   if(name === 'dungeonlist') renderDungeonList();
   if(name === 'hunt') renderHunt();
+  alignHuntHeader();
   if(name === 'craft'){ renderCraftTabs(); renderCraftList(craftUI.tab); }
   if(name === 'character'){
     // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
@@ -91,6 +99,26 @@ function showView(name){
     renderCharacterMenu();
   }
   render();
+}
+
+
+// 전투 화면에서는 상단 영역(로고·소유 골드 / 공지사항·메뉴 버튼·나가기 버튼)을 실제 전투 화면 프레임(#huntCard)의
+// 가로 범위(왼쪽 끝~오른쪽 끝)에 맞춰 배치함. 던전 화면은 3열 그리드(좌 여백 / huntCard / 우 패널)라 huntCard의
+// 시작 위치·폭이 .wrap과 다를 수 있어(패널 닫힘: 열 간격만큼, 패널 열림: 왼쪽 여백 칸만큼 오른쪽) 실측값으로
+// margin-left와 width를 계산함. 모바일에서 패널이 huntCard를 대체하는 동안에는 huntCard가 숨겨지므로 보이는
+// 패널 기준으로 맞춤. 전투 화면이 아니면 항상 원래 상태로 되돌림.
+function alignHuntHeader(){
+  const nav = el('mainNav');
+  const top = document.querySelector('.topbar');
+  const rows = [top, nav].filter(Boolean);
+  const reset = () => rows.forEach(e => { e.style.marginLeft = ''; e.style.width = ''; });
+  if(currentView !== 'hunt'){ reset(); return; }
+  let rect = el('huntCard').getBoundingClientRect();
+  if(!(rect.width > 0) && el('huntTopSection')) rect = el('huntTopSection').getBoundingClientRect();
+  if(!(rect.width > 0)){ reset(); return; }
+  const wrapEl = document.querySelector('.wrap');
+  const offset = Math.max(0, Math.round((rect.left - wrapEl.getBoundingClientRect().left) * 10) / 10);
+  rows.forEach(e => { e.style.marginLeft = offset + 'px'; e.style.width = rect.width + 'px'; });
 }
 
 let pendingNavTarget = null;
@@ -484,7 +512,7 @@ function openCraftAnim(){
       const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
       const arr = pool.items();
       for(let i = 0; i < m.need; i++){
-        const idx = arr.findIndex(it => it.type === resource.typeId && !it.damaged && !isEquipInstanceWorn(resource.equipType, it.id));
+        const idx = arr.findIndex(it => it.type === resource.typeId && !it.damaged && !it.locked && !isEquipInstanceWorn(resource.equipType, it.id)); // 잠긴 장비는 재료로 소모하지 않음
         if(idx === -1) break; // craftPopupCanCraft가 이미 보유량을 검증했으므로 이론상 발생하지 않음
         const [inst] = arr.splice(idx, 1); // 홀딩: 인벤토리에서 제거
         heldEquip.push({ equipType: resource.equipType, typeId: inst.type, level: inst.level });
@@ -679,7 +707,7 @@ function openQuickSlotPicker(idx){
   const list = el('quickSlotPickerList');
   // 보유 수량이 1개 이상인 플라스크만 후보로 나열함(0개 보유 종류는 제외) — 실제 보유 수량(state.consumables)과
   // 실시간으로 연동되므로, 이 팝업을 다시 열 때마다 그 시점의 최신 보유 현황이 그대로 반영됨.
-  const ownedItems = Object.values(CONSUMABLES).filter(item => ((state.consumables && state.consumables[item.id]) || 0) > 0);
+  const ownedItems = Object.values(CONSUMABLES).filter(item => item.effect && ((state.consumables && state.consumables[item.id]) || 0) > 0); // 퀵슬롯은 회복 플라스크 전용(비급 제외)
   if(ownedItems.length === 0){
     list.innerHTML = `<div class="inv-empty">등록 가능한 플라스크가 없습니다.</div>`;
   } else {
@@ -869,25 +897,24 @@ function switchSkillKind(kindId){
 // 호출됨(확인을 누르기 전까지는 데이터가 바뀌지 않아야 하므로).
 // 스킬 업그레이드 요구사항 3·4번: upgradeFrom이 지정된 스킬을 습득하면 그 하위 스킬을 목록에서 제거하고
 // 새 스킬로 교체. 하위 스킬이 등록돼 있던 퀵슬롯이 있으면 그 위치(인덱스)를 그대로 유지한 채 스킬 id만
-// 교체하고, 등록돼 있지 않았다면 새로 등록하지 않음(요구사항 4번 "중요한 규칙" 그대로). 기연(awakening)은
-// 이 요구사항 대상이 아니므로(업그레이드 체인은 현재 공용/특화 스킬에만 적용) 건드리지 않음 — upgradeFrom을
-// 쓰는 기연 스킬이 생기면 이 분기도 필요해질 수 있으나 지금은 범위 밖.
+// 교체하고, 등록돼 있지 않았다면 새로 등록하지 않음(요구사항 4번 "중요한 규칙" 그대로). 기연(awakening)
+// 스킬도 같은 체인 규칙을 따르며(깨달음 포인트·기연 습득 목록만 다름) 아래에서 함께 처리함.
 function learnSkill(id){
   if(!canLearnSkill(id)) return;
   const s = SKILLS[id];
   const cost = s.cost || 1;
-  if(s.category === 'awakening'){
-    state.awakeningPoints -= cost;
-    state.learnedAwakeningSkills.push(id);
-  } else {
-    state.skillPoints -= cost;
-    if(s.upgradeFrom){
-      const oldId = s.upgradeFrom;
-      state.learnedSkills = state.learnedSkills.filter(existingId => existingId !== oldId);
-      state.skillQuickSlots = state.skillQuickSlots.map(slotId => slotId === oldId ? id : slotId);
-    }
-    state.learnedSkills.push(id);
+  const isAwakening = s.category === 'awakening';
+  if(isAwakening) state.awakeningPoints -= cost;
+  else state.skillPoints -= cost;
+  // 기연도 공용/특화와 동일한 업그레이드 체인 규칙(하위 스킬 제거+교체, 퀵슬롯 위치 유지)을 적용함 —
+  // 목록과 포인트 풀만 분류에 따라 다르고 나머지 동작은 완전히 같음.
+  if(s.upgradeFrom){
+    const oldId = s.upgradeFrom;
+    if(isAwakening) state.learnedAwakeningSkills = state.learnedAwakeningSkills.filter(existingId => existingId !== oldId);
+    else state.learnedSkills = state.learnedSkills.filter(existingId => existingId !== oldId);
+    state.skillQuickSlots = state.skillQuickSlots.map(slotId => slotId === oldId ? id : slotId);
   }
+  (isAwakening ? state.learnedAwakeningSkills : state.learnedSkills).push(id);
   renderCharacterMenu();
   renderHuntSidePanel(); // 던전 우측 카드 스킬 탭도 습득 가능 여부 등 최신 상태로 갱신
   renderSkillQuickSlots(); // 퀵슬롯이 교체됐을 수 있으므로 명시적으로 다시 갱신(다른 퀵슬롯 변경 함수들과 동일한 패턴)
@@ -900,29 +927,78 @@ function resetSkillQuickSlots(){
   saveState();
 }
 
+// ---- 스킬 부분 초기화 ----
+// 대상은 "실제 보유(isSkillLearned)" 스킬뿐 — 상위 스킬로 교체되어 화면에만 습득 표시된 하위 스킬이나
+// 미습득 스킬은 아무 일도 일어나지 않음. 선택한 스킬의 cost만 환급하고, 바로 아래 하위 스킬(upgradeFrom)을
+// 실제 보유 상태로 복구함(복구 비용 없음, 하위 스킬 비용은 환급 안 함). 퀵슬롯에 등록돼 있었다면 하위
+// 스킬로 교체(learnSkill의 교체 방향과 정확히 반대), 하위 스킬이 없으면(체인 최하위) 슬롯을 비움.
+function partialResetSkill(id){
+  if(!isSkillLearned(id)) return;
+  const s = SKILLS[id];
+  const isAwakening = s.category === 'awakening';
+  const list = isAwakening ? state.learnedAwakeningSkills : state.learnedSkills;
+  const idx = list.indexOf(id);
+  if(idx === -1) return;
+  const cost = s.cost || 1;
+  list.splice(idx, 1);
+  if(isAwakening) state.awakeningPoints = (state.awakeningPoints || 0) + cost;
+  else state.skillPoints = (state.skillPoints || 0) + cost;
+  if(s.upgradeFrom && SKILLS[s.upgradeFrom] && !list.includes(s.upgradeFrom)) list.push(s.upgradeFrom);
+  const fallback = s.upgradeFrom || null; // 기연도 동일하게 퀵슬롯을 하위 스킬로 교체(없으면 비움)
+  state.skillQuickSlots = state.skillQuickSlots.map(slotId => slotId === id ? fallback : slotId);
+  renderCharacterMenu();
+  renderHuntSidePanel();
+  renderSkillQuickSlots();
+  saveState();
+}
+
 // ---- 스킬 습득 확인 모달 ----
 // 상점의 "개수 지정 구매" 팝업(buyQtyModal)과 동일한 레이아웃(아이콘 박스 + 수치 두 줄 + 구분선 +
 // 취소/확인 버튼)을 그대로 재사용함. 실제 습득(포인트 차감)은 확인 버튼을 눌러야만 기존 learnSkill이
 // 실행되며, 취소하거나 모달을 그냥 닫으면 데이터는 전혀 바뀌지 않음.
 let pendingLearnSkillId = null;
+let pendingLearnSkillChain = null; // 이번 확인에서 실제로 순서대로 습득할 스킬 id 배열(단일 습득이면 [id])
 function openSkillLearnConfirm(id){
-  if(!canLearnSkill(id)) return; // 습득 불가 상태(포인트 부족 등)에서는 버튼 자체가 비활성화되어 있어 방어적 처리
   const s = SKILLS[id];
+  if(!s) return;
+  // 바로 습득 가능하면 기존 그대로 단일 습득, 아니면 하위 체인 일괄 습득 계획을 확인(둘 다 불가면 무시)
+  let chain, cost;
+  if(canLearnSkill(id)){
+    chain = [id];
+    cost = s.cost || 1;
+  } else {
+    const plan = skillChainLearnPlan(id);
+    if(!plan) return;
+    chain = plan.chain;
+    cost = plan.cost;
+  }
   pendingLearnSkillId = id;
+  pendingLearnSkillChain = chain;
   el('skillLearnIconBox').innerHTML = skillIconHtml(s) + `<span class="tooltip" id="skillLearnTooltip">${buildSkillTooltipHtml(id)}</span>`;
   const pool = s.category === 'awakening' ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
   el('skillLearnCurrentSp').textContent = pool;
-  el('skillLearnUseSp').textContent = s.cost || 1;
+  el('skillLearnUseSp').textContent = cost;
+  const noteEl = el('skillLearnBatchNote');
+  if(chain.length > 1){
+    noteEl.textContent = `${s.name} 외 ${chain.length - 1}개의 스킬을 습득합니다.`;
+    noteEl.style.display = '';
+  } else {
+    noteEl.textContent = '';
+    noteEl.style.display = 'none';
+  }
   el('skillLearnConfirmModal').style.display = 'flex';
 }
 function closeSkillLearnConfirm(){
   el('skillLearnConfirmModal').style.display = 'none';
   pendingLearnSkillId = null;
+  pendingLearnSkillChain = null;
 }
+// 확인 시 하위→상위 순서로 기존 learnSkill을 그대로 반복 호출 — 각 단계는 직전 단계가 방금 실제로 습득된
+// 상태에서 실행되므로 learnSkill 내부의 canLearnSkill 검증·upgradeFrom 교체·퀵슬롯 교체가 그대로 동작함.
 function confirmSkillLearn(){
-  const id = pendingLearnSkillId;
+  const chain = pendingLearnSkillChain;
   closeSkillLearnConfirm();
-  if(id) learnSkill(id);
+  if(chain && chain.length) chain.forEach(stepId => learnSkill(stepId));
 }
 function cancelSkillLearn(){
   closeSkillLearnConfirm();
@@ -995,6 +1071,70 @@ function openTraceRestoreResult(type, itemName){
 }
 function closeTraceRestoreResult(){
   el('traceRestoreResultModal').style.display = 'none';
+}
+
+// ---- 비급 사용 ----
+// 순서: 사용 버튼 → 확인창(이 시점엔 아이템 소모 없음) → [사용] 확정 시에만 해금 + 비급 1개 소멸 → 결과창.
+// 비급은 할당 스킬의 "해금 상태"(state.unlockedAwakeningSkills)만 바꾸며, 레벨·하위 스킬·깨달음 포인트 등
+// 실제 습득 조건은 전혀 건드리지 않음(습득은 기존 스킬 습득 시스템 그대로).
+let pendingScrollItemId = null;
+// 주격 조사: 마지막 글자에 받침이 있으면 '이', 없으면 '가'(비연검·비류검·비월검·비천검은 모두 '이'로 문구 그대로)
+function josaI(word){
+  const code = (word || '').charCodeAt((word || '').length - 1);
+  if(code >= 0xAC00 && code <= 0xD7A3) return ((code - 0xAC00) % 28) !== 0 ? '이' : '가';
+  return '이';
+}
+function scrollSkillNameHtml(sk){
+  const g = WEAPON_GRADES[sk.grade];
+  return `<span style="color:${g ? g.color : 'inherit'}; font-weight:700;">${sk.name}</span>`;
+}
+function openScrollUseModal(itemId){
+  const item = CONSUMABLES[itemId];
+  const sk = scrollSkill(item);
+  if(!item || !sk) return;
+  if(((state.consumables && state.consumables[itemId]) || 0) <= 0) return;
+  pendingScrollItemId = itemId;
+  el('scrollUseIconBox').innerHTML = skillIconHtml(sk) + `<span class="tooltip">${buildSkillTooltipHtml(item.skillId)}</span>`;
+  el('scrollUseSkillName').innerHTML = scrollSkillNameHtml(sk);
+  el('scrollUseBody').innerHTML = `사용 시, 비급 아이템은 <b style="color:var(--forge-blood);">소멸</b>하며,<br>${scrollSkillNameHtml(sk)}${josaI(sk.name)} 해금 됩니다.<br>해금된 스킬의 요구조건을 모두 만족한 상태에서,<br>깨달음 포인트를 사용하여 최종 스킬 습득이 가능합니다.`;
+  const already = isAwakeningSkillUnlocked(item.skillId);
+  el('scrollUseConfirmBtn').disabled = already;
+  const tip = el('scrollUseConfirmTip');
+  tip.textContent = already ? '이미 해금한 스킬 입니다.' : '';
+  tip.style.display = already ? '' : 'none';
+  el('scrollUseModal').style.display = 'flex';
+}
+function closeScrollUseModal(){
+  el('scrollUseModal').style.display = 'none';
+  pendingScrollItemId = null;
+}
+function confirmScrollUse(){
+  const itemId = pendingScrollItemId;
+  const item = CONSUMABLES[itemId];
+  const sk = scrollSkill(item);
+  if(!item || !sk){ closeScrollUseModal(); return; }
+  if(isAwakeningSkillUnlocked(item.skillId)) return; // 이미 해금 — 확인창에서 버튼이 막혀 있지만 방어적으로 한 번 더 확인
+  if(((state.consumables && state.consumables[itemId]) || 0) <= 0){ closeScrollUseModal(); render(); return; }
+  if(!Array.isArray(state.unlockedAwakeningSkills)) state.unlockedAwakeningSkills = [];
+  state.unlockedAwakeningSkills.push(item.skillId); // 해금이 정상 처리된 뒤에만 비급 1개를 소모함
+  state.consumables[itemId] -= 1;
+  closeScrollUseModal();
+  openScrollResultModal(item.skillId);
+  render();
+  renderCharacterMenu(); // 기연 탭 스킬 아이콘/툴팁에 해금 상태 즉시 반영
+  renderHuntSidePanel();
+  saveState();
+}
+function openScrollResultModal(skillId){
+  const sk = SKILLS[skillId];
+  if(!sk) return;
+  el('scrollResultIconBox').innerHTML = skillIconHtml(sk) + `<span class="tooltip">${buildSkillTooltipHtml(skillId)}</span>`;
+  el('scrollResultSkillName').innerHTML = scrollSkillNameHtml(sk);
+  el('scrollResultBody').innerHTML = `${scrollSkillNameHtml(sk)}${josaI(sk.name)} 해금 되었습니다.<br>스킬 탭에서 확인해주세요.`;
+  el('scrollResultModal').style.display = 'flex';
+}
+function closeScrollResultModal(){
+  el('scrollResultModal').style.display = 'none';
 }
 
 // ---- 스킬 초기화 확인 모달 ----
@@ -1154,6 +1294,17 @@ function selectSettingRadio(id, value){
   // 화면 프리셋 자체를 바꾸거나(전역 body 클래스 갱신) 모바일 우측 패널 형식을 바꿀 때(둘 다 body
   // 클래스로 반영되므로) 즉시 화면에 반영되도록 함.
   if(id === 'screenPreset' || id === 'mobileHuntPanelStyle') applyScreenPreset();
+  // 인벤토리 UI 형식을 바꾸면 body 클래스를 갱신하고 인벤토리를 다시 그려 해당 형식의 렌더러로 분기함.
+  if(id === 'inventoryUi'){
+    applyScreenPreset();
+    render();
+  }
+}
+// 현재 선택된 인벤토리 UI 형식('legacy'|'box')을 반환 — 데스크톱/모바일 구분 없이 하나의 공통 설정값
+// (state.settings.inventoryUi)을 사용함.
+function currentInventoryUiVariant(){
+  const v = state.settings ? state.settings.inventoryUi : undefined;
+  return v === 'legacy' ? 'legacy' : 'box'; // 없는 값/알 수 없는 값은 기본값(신버전)으로 처리 — 명시적으로 저장된 'legacy'만 구버전
 }
 // 현재 선택된 화면 프리셋(state.settings.screenPreset)과, 모바일에서 던전 화면의 우측 패널을 여는
 // 버튼 형식(state.settings.mobileHuntPanelStyle — '가로바' 또는 '정사각형 버튼')을 문서 최상위(body)에
@@ -1166,6 +1317,10 @@ function applyScreenPreset(){
   const panelStyle = (state.settings && state.settings.mobileHuntPanelStyle) || 'bar';
   document.body.classList.toggle('mobile-panel-style-bar', panelStyle === 'bar');
   document.body.classList.toggle('mobile-panel-style-corner', panelStyle === 'corner');
+  // 인벤토리 UI 형식도 body 클래스로 반영 — 이후 단계에서 신버전(박스)용 CSS가 이 클래스로 스코프됨.
+  const invUi = currentInventoryUiVariant();
+  document.body.classList.toggle('inventory-ui-legacy', invUi === 'legacy');
+  document.body.classList.toggle('inventory-ui-box', invUi === 'box');
   relocateHuntTopToggleBtn(preset);
 }
 // 모바일 UI 개편 3단계: #huntTopToggleBtn은 원래 #combatArena 안에 깊이 중첩돼 있어서, 모바일에서
@@ -1217,7 +1372,12 @@ let pendingSellCancel = null; // 선택 인자 — 상점 판매 수량창처럼
 function openSellConfirm(itemLabel, price, onConfirm, onCancel){
   pendingSellAction = onConfirm;
   pendingSellCancel = onCancel || null;
-  el('sellConfirmBody').textContent = `정말 ${itemLabel}을(를) ${price.toLocaleString()}G에 판매하시겠습니까? 판매 후 재구매 불가능합니다!`;
+  // itemLabel이 { html }이면(비급처럼 이름에 색상/굵기 표시가 필요한 아이템) HTML로, 문자열이면 기존처럼 텍스트로 표시
+  if(itemLabel && typeof itemLabel === 'object' && itemLabel.html != null){
+    el('sellConfirmBody').innerHTML = `정말 ${itemLabel.html}을(를) ${price.toLocaleString()}G에 판매하시겠습니까? 판매 후 재구매 불가능합니다!`;
+  } else {
+    el('sellConfirmBody').textContent = `정말 ${itemLabel}을(를) ${price.toLocaleString()}G에 판매하시겠습니까? 판매 후 재구매 불가능합니다!`;
+  }
   el('sellConfirmModal').style.display = 'flex';
 }
 function closeSellConfirm(){

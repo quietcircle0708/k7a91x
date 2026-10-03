@@ -13,16 +13,17 @@ let state = {
   inventory: [],
   equippedId: null,   // 실제 전투에 사용되는 착용 무기(대장간 화면과 무관하게 항상 무기만 가리킴)
   // 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기든 방어구든 상관없이 여기에 지정된 아이템이
-  // 표시됨. 무기를 강화 선택하면 equipItem()이 이 값과 equippedId를 함께 갱신(=강화 선택이 곧 착용)하지만,
-  // 방어구를 강화 선택할 때는 equippedId(착용 무기)는 건드리지 않고 이 값만 바뀜 — 방어구의 실제 능력치
-  // 적용은 이 값과 무관하게 별도의 equippedArmor(착용) 상태를 따름.
+  // 표시됨. 무기든 방어구든 장신구든 강화 선택(equipItem)은 이 값만 바꾸고 착용 상태는 건드리지 않음 — 실제 능력치
+  // 적용은 이 값과 무관하게 별도의 착용 상태(무기 equippedId, 방어구 equippedArmor 등)를 따르며, 착용은 별도의
+  // 착용 함수(equipWeaponPiece/equipArmorPiece 등)가 담당함(강화 선택과 착용은 서로 독립).
   forgeTargetId: null,
   nextItemId: 1,
   armorInventory: [],                          // 보유 방어구 목록({id,type,level}, 무기 인벤토리와 동일한 형태)
-  equippedArmor: { helmet: null, armor: null }, // 착용 중인 방어구(종류당 1개) — 강화 대상(forgeTargetId)과는 별개 개념
+  equippedArmor: { helmet: null, armor: null, shoes: null }, // 착용 중인 방어구(종류당 1개 — 투구/갑옷/신발) — 강화 대상(forgeTargetId)과는 별개 개념
   subInventory: [],                             // 보유 보조(방패/보조 무기) 목록({id,type,level} — level은 강화가 없어 항상 0)
   equippedSubId: null,                          // 착용 중인 보조 아이템 id(동시에 1개만, 양손 무기 장착 중이면 착용 불가)
   accessoryInventory: [],                       // 보유 장신구 목록({id,type,level})
+  equippedNecklaceId: null,                     // 착용 중인 목걸이 id(목걸이 전용 슬롯 1개 — 장신구1/2 슬롯과 별개, 목걸이는 여기에만 착용)
   equippedAccessories: [null, null],            // 착용 중인 장신구(장신구1/장신구2 슬롯, 최대 ACCESSORY_SLOT_MAX개) — 같은 아이템 2개 착용 가능
   traceInventory: [],                           // 보유 흔적 목록({id,forType} — forType은 복구할 장비의 WEAPON_TYPES/
                                                   // ARMOR_TYPES/ACCESSORY_TYPES 키. 강화 파괴 시 processDestroyReward가
@@ -50,6 +51,7 @@ let state = {
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
   skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
   learnedSkills: [], learnedAwakeningSkills: [], // 습득한 스킬 id 목록(공용·특화 공용 / 기연 별도)
+  unlockedAwakeningSkills: [], // 비급으로 해금된 기연 스킬 id 목록(습득 여부와 별개, 스킬 초기화해도 유지)
   skillQuickSlots: [null, null, null, null, null, null, null, null, null, null], // 스킬 퀵슬롯(2줄×5칸)에 등록된 스킬 id
   consumables: { hpFlask6: 0, mpFlask6: 0 }, // 보유 플라스크 개수
   quickSlots: [null, null], // 사냥 화면 퀵슬롯에 등록된 소비 아이템 id
@@ -66,7 +68,7 @@ let currentView = 'forge';
 // 예외를 던지고, 그 여파로 전투 타이머 자체가 생성되지 않아 공격이 전혀 진행되지 않는" 버그가 발생했음
 // (원인 파악·수정: 2026-09-11). 이제 필드를 추가할 땐 이 함수 한 곳만 고치면 두 경로 모두 자동 반영됨.
 function defaultHuntState(){
-  return { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle' };
+  return { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle', scrollGrantedThisBattle: false };
 }
 let hunt = defaultHuntState();
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
@@ -174,7 +176,7 @@ function equippedInstanceForSlot(slotKey){
     const item = getEquippedWeapon();
     return item ? { item, type: item.type || 'longsword' } : null;
   }
-  if(slotKey === 'helmet' || slotKey === 'armor'){
+  if(slotKey === 'helmet' || slotKey === 'armor' || slotKey === 'shoes'){
     const id = state.equippedArmor && state.equippedArmor[slotKey];
     if(id == null) return null;
     const item = (state.armorInventory || []).find(i => i.id === id);
@@ -188,6 +190,12 @@ function equippedInstanceForSlot(slotKey){
   if(slotKey === 'accessory1' || slotKey === 'accessory2'){
     const slotIdx = slotKey === 'accessory1' ? 0 : 1;
     const id = Array.isArray(state.equippedAccessories) ? state.equippedAccessories[slotIdx] : null;
+    if(id == null) return null;
+    const item = (state.accessoryInventory || []).find(i => i.id === id);
+    return item ? { item, type: item.type } : null;
+  }
+  if(slotKey === 'necklace'){
+    const id = state.equippedNecklaceId;
     if(id == null) return null;
     const item = (state.accessoryInventory || []).find(i => i.id === id);
     return item ? { item, type: item.type } : null;
@@ -220,6 +228,15 @@ function resolveRepairTarget(target){
 // 새 설정 메뉴가 추가돼도 기존 저장 데이터를 불러올 때 자동으로 기본값이 채워짐.
 function ensureSettingsDefaults(){
   if(!state.settings) state.settings = {};
+  // 인벤토리 UI 설정이 데스크톱/모바일 별도 값(desktopInventoryUi/mobileInventoryUi)이던 직전 버전의 저장 데이터 정리:
+  // 공통 설정(inventoryUi)이 아직 없으면 그 저장 당시 실제로 적용 중이던 값(현재 화면 프리셋 쪽)을 이어받고,
+  // 더 이상 쓰지 않는 두 키는 삭제함(별도 값을 남겨두지 않음).
+  if(state.settings.inventoryUi === undefined){
+    const old = state.settings.screenPreset === 'mobile' ? state.settings.mobileInventoryUi : state.settings.desktopInventoryUi;
+    if(old === 'legacy' || old === 'box') state.settings.inventoryUi = old;
+  }
+  delete state.settings.desktopInventoryUi;
+  delete state.settings.mobileInventoryUi;
   SETTINGS_SCHEMA.forEach(cat => {
     cat.items.forEach(item => {
       if(item.type === 'stepper-row'){
@@ -319,7 +336,7 @@ function gainExp(amount){
 // 보유 아티팩트 수는 제한이 없고(인벤토리에 계속 쌓임), 동시에 장착 가능한 개수만 ARTIFACT_SLOT_MAX로 제한됨.
 function ownsArtifact(id){ return state.artifacts.includes(id); }
 function isArtifactEquipped(id){ return state.equippedArtifacts.includes(id); }
-function canGrantArtifact(id){ return !ownsArtifact(id); }
+function canGrantArtifact(id){ return !ownsArtifact(id) && !inventoryCategoryFull('artifact'); } // 이미 보유 중이거나 아티팩트 인벤토리(64슬롯)가 가득 차면 지급 불가
 function grantArtifactSafe(id){
   if(!canGrantArtifact(id)) return false;
   state.artifacts.push(id);
@@ -472,13 +489,16 @@ function applyLoadedRaw(raw){
   }
   // 방어구 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
   if(!Array.isArray(state.armorInventory)) state.armorInventory = [];
-  if(!state.equippedArmor || typeof state.equippedArmor !== 'object') state.equippedArmor = { helmet: null, armor: null };
+  if(!state.equippedArmor || typeof state.equippedArmor !== 'object') state.equippedArmor = { helmet: null, armor: null, shoes: null };
   if(state.equippedArmor.helmet === undefined) state.equippedArmor.helmet = null;
   if(state.equippedArmor.armor === undefined) state.equippedArmor.armor = null;
+  if(state.equippedArmor.shoes === undefined) state.equippedArmor.shoes = null; // 신발 슬롯 추가 이전 세이브 마이그레이션
   // 장신구 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
   if(!Array.isArray(state.accessoryInventory)) state.accessoryInventory = [];
   if(!Array.isArray(state.equippedAccessories)) state.equippedAccessories = [null, null];
   while(state.equippedAccessories.length < ACCESSORY_SLOT_MAX) state.equippedAccessories.push(null);
+  // 목걸이 전용 슬롯 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값(착용 없음)으로 채움
+  if(state.equippedNecklaceId === undefined) state.equippedNecklaceId = null;
   // 보조(방패/보조 무기) 시스템 추가 이전 세이브 마이그레이션: 필드 자체가 없었으므로 빈 값으로 채움
   if(!Array.isArray(state.subInventory)) state.subInventory = [];
   if(state.equippedSubId === undefined) state.equippedSubId = null;
@@ -504,6 +524,9 @@ function applyLoadedRaw(raw){
   if(loaded.awakeningPoints === undefined) state.awakeningPoints = totalAwakeningPointsForLevel(state.playerLevel);
   if(!Array.isArray(state.learnedSkills)) state.learnedSkills = [];
   if(!Array.isArray(state.learnedAwakeningSkills)) state.learnedAwakeningSkills = [];
+  if(!Array.isArray(state.unlockedAwakeningSkills)) state.unlockedAwakeningSkills = [];
+  // 해금 없이 이미 습득된 기연 스킬이 세이브에 있다면(구버전 데이터) 해금된 것으로 취급해 습득 상태와 어긋나지 않게 함
+  state.learnedAwakeningSkills.forEach(id => { if(!state.unlockedAwakeningSkills.includes(id)) state.unlockedAwakeningSkills.push(id); });
   if(!Array.isArray(state.skillQuickSlots) || state.skillQuickSlots.length !== SKILL_QUICK_SLOT_COUNT){
     const prevSkillSlots = Array.isArray(state.skillQuickSlots) ? state.skillQuickSlots : [];
     state.skillQuickSlots = Array.from({ length: SKILL_QUICK_SLOT_COUNT }, (_, i) => prevSkillSlots[i] || null);
@@ -608,9 +631,9 @@ function resetGame(){
 
   state = {
     gold: 1000, inventory: [], equippedId: null, forgeTargetId: null, nextItemId: 1,
-    armorInventory: [], equippedArmor: { helmet: null, armor: null },
+    armorInventory: [], equippedArmor: { helmet: null, armor: null, shoes: null },
     subInventory: [], equippedSubId: null,
-    accessoryInventory: [], equippedAccessories: [null, null],
+    accessoryInventory: [], equippedAccessories: [null, null], equippedNecklaceId: null,
     traceInventory: [],
     charmActive:false, blessingActive:false, focusActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
@@ -618,7 +641,7 @@ function resetGame(){
     skipEffects:false, autoRebuy:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
-    skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [],
+    skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [], unlockedAwakeningSkills: [],
     skillQuickSlots: [null, null, null, null, null, null, null, null, null, null],
     consumables: { hpFlask6: 0, mpFlask6: 0 },
     quickSlots: [null, null],

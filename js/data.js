@@ -5,7 +5,18 @@
 // ============================================================
 
 const MAX_LEVEL = 9;
-const INV_MAX = 50; // 장비(무기/방어구/장신구) 공용 인벤토리 최대 슬롯 — 세 종류가 하나의 총량을 공유함(totalEquipInventoryCount 참고)
+// 인벤토리 카테고리별 최대 슬롯(슬롯 = 아이템 "개수"가 아니라 아이템 종류/인스턴스가 차지하는 칸 수). 모든 카테고리가
+// 같은 64슬롯이며, 구버전/신버전 인벤토리 UI 모두 이 값과 formulas.js의 용량 함수(inventorySlotsUsed 등)를 그대로 씀.
+// 장비 카테고리는 무기/방어구/보조/장신구가 하나의 용량을 공유하고(totalEquipInventoryCount 참고), 아티팩트/소비/마석/기타는
+// 각각 독립된 용량임. 카테고리 id는 신버전 인벤토리 탭 id와 같음.
+const INV_MAX = 64; // 카테고리별 최대 슬롯(기존 이름 유지 — 장비 공용 인벤토리 최대 슬롯 계산 등 기존 코드가 그대로 참조함)
+const INVENTORY_CATEGORIES = {
+  equipment:  { label: '장비' },
+  artifact:   { label: '아티팩트' },
+  consumable: { label: '소비' },
+  stone:      { label: '마석' },
+  misc:       { label: '기타' },
+};
 
 // 장비 타입. 무기 / 방어구 / 보조 / 장신구 / 아티팩트가 있음.
 const EQUIPMENT_TYPES = { weapon: '무기', armor: '방어구', sub: '보조', accessory: '장신구', artifact: '아티팩트' };
@@ -1052,13 +1063,13 @@ const WEAPON_TYPES = {
 };
 
 
-// ---- 방어구 종류(투구/갑옷) ----
-const ARMOR_KINDS = { helmet: '투구', armor: '갑옷' };
+// ---- 방어구 종류(투구/갑옷/신발) ----
+const ARMOR_KINDS = { helmet: '투구', armor: '갑옷', shoes: '신발' };
 // 방어구 이미지 파일 경로 규칙(무기와 동일한 onerror 방식). image 필드가 비어 있으면 방어구 종류별
-// 기본 이미지(투구→helmetbase, 갑옷→armorbase)를 자동 적용함(방어구 아이템 데이터 스키마 규칙).
+// 기본 이미지(투구→helmetbase, 갑옷→armorbase, 신발→bootbase)를 자동 적용함(방어구 아이템 데이터 스키마 규칙).
 const ARMOR_IMAGE_DIR = 'assets/armor/';
 const ARMOR_IMAGE_EXT = '.png';
-const ARMOR_DEFAULT_IMAGE = { helmet: 'helmetbase', armor: 'armorbase' };
+const ARMOR_DEFAULT_IMAGE = { helmet: 'helmetbase', armor: 'armorbase', shoes: 'bootbase' };
 
 // 방어구 종류 도감. 무기 데이터 스키마와 동일한 구조를 기본으로 사용함(이름/장비 설명/아이템 등급/
 // 고유 옵션/상점 구매 여부/판매 가격/이미지는 무기와 동일한 규칙). 레벨 제한은 레벨만 검사하고(힘/민첩 등
@@ -1348,6 +1359,129 @@ const ARMOR_TYPES = {
       textTemplate: '힘 +5<br>방어도 무시 +{chance}',
     },
   },
+
+  // ---- 신발 7종(방어구 종류 shoes) ----
+  // 상점 판매용 기본 신발 — 회피 옵션은 없음(회피를 기본으로 가진 신발은 이후 추가 예정). 방어도는 신발 규칙에 따라
+  // 강화되지 않고, 고유 옵션은 강화 단계별로 자라는 민첩(성장형, growthStat:'agi'). 철/강철/은 장화는 같은 이미지를 공유함.
+  clothboots: {
+    id: 'clothboots', name: '천 장화', desc: '질긴 천으로 만든 가벼운 장화',
+    equipType: 'armor',
+    durability: 1500,
+    armorKind: 'shoes', // 신발
+    grade: 'normal', // 일반
+    defense: -1, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: true, levelReq: 1,
+    image: 'common_cloth_boots',
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
+  leatherboots: {
+    id: 'leatherboots', name: '가죽 장화', desc: '튼튼한 가죽으로 만든 장화',
+    equipType: 'armor',
+    durability: 2500,
+    armorKind: 'shoes', // 신발
+    grade: 'normal', // 일반
+    defense: -1, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: true, levelReq: 10,
+    image: '',  // 공란 → 신발 기본 이미지(bootbase) 자동 적용
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 2, 1: 2, 2: 2, 3: 2, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 5 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
+  linenboots: {
+    id: 'linenboots', name: '리넨 장화', desc: '가볍고 통기성이 좋은 장화',
+    equipType: 'armor',
+    durability: 1800,
+    armorKind: 'shoes', // 신발
+    grade: 'rare', // 레어
+    defense: -2, hp: 50, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: true, levelReq: 8,
+    image: 'rare_linen_boots',
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
+  ironboots: {
+    id: 'ironboots', name: '철 장화', desc: '철판으로 덧댄 견고한 장화',
+    equipType: 'armor',
+    durability: 3000,
+    armorKind: 'shoes', // 신발
+    grade: 'normal', // 일반
+    defense: -2, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: true, levelReq: 20,
+    image: 'common_iron_boots',
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 3, 1: 3, 2: 3, 3: 3, 4: 3, 5: 4, 6: 4, 7: 5, 8: 5, 9: 6 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
+  steelboots: {
+    id: 'steelboots', name: '강철 장화', desc: '단단한 강철로 만든 중갑 장화',
+    equipType: 'armor',
+    durability: 5000,
+    armorKind: 'shoes', // 신발
+    grade: 'normal', // 일반
+    defense: -2, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: true, levelReq: 30,
+    image: 'common_iron_boots',
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 5, 6: 5, 7: 6, 8: 6, 9: 7 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
+  silverboots: {
+    id: 'silverboots', name: '은 장화', desc: '은으로 장식한 장화',
+    equipType: 'armor',
+    durability: 7000,
+    armorKind: 'shoes', // 신발
+    grade: 'normal', // 일반
+    defense: -3, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: true, levelReq: 40,
+    image: 'common_iron_boots',
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 5, 4: 5, 5: 6, 6: 6, 7: 7, 8: 7, 9: 8 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
+  goldboots: {
+    id: 'goldboots', name: '금 장식 장화', desc: '금장 장식이 돋보이는 고급 장화',
+    equipType: 'armor',
+    durability: 10000,
+    armorKind: 'shoes', // 신발
+    grade: 'normal', // 일반
+    defense: -4, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: true, levelReq: 50,
+    image: 'common_gold_boots',
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 6, 1: 6, 2: 6, 3: 6, 4: 6, 5: 7, 6: 7, 7: 8, 8: 8, 9: 10 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
 };
 
 // ---- 방어구 강화 단계별 체력/마나 증가 공식 ----
@@ -1376,23 +1510,46 @@ function computeArmorDefenseArray(baseDefense){
   return arr;
 }
 
+// ---- 방어구 강화 단계별 회피 증가 공식 ----
+// 합연산(재귀) 방식: +N 회피(%) = +(N-1) 회피 + 해당 강화 단계 증가치. +0 = 데이터 값, 등급 무관.
+// index = 강화 단계(1~9). 데이터 값이 공란(null/undefined)이면 강화 계산 자체를 건너뜀(옵션 없음).
+const ARMOR_EVASION_STEP_DELTA = [null, 0, 0, 0, 0, 0.5, 0.5, 0.5, 1.5, 2];
+// 회피 강화 배열 계산(방어구/장신구 공용 — 증가치 표만 다르게 넘김). 0.5% 단위 소수 값이 그대로 유지되며,
+// 부동소수 오차만 소수 둘째 자리 반올림으로 정리함(정수로 반올림하지 않음).
+function computeEvasionArray(baseEvasion, stepDelta){
+  if(baseEvasion == null) return null;
+  const arr = [baseEvasion];
+  for(let lv = 1; lv <= 9; lv++){
+    arr.push(Math.round((arr[lv - 1] + (stepDelta[lv] || 0)) * 100) / 100);
+  }
+  return arr;
+}
+
 // 방어도/체력/마나 강화 배열은 여기서 바로 채움(다른 데이터 테이블에 의존하지 않는 자체 계산).
 // 강화 비용/확률/판매가("장비 전역 설정")는 computeGradeCost 등 관련 함수/상수가 이 파일 아래쪽에
 // 정의되므로, 그 정의 이후(무기 판매가 공식 연결부 바로 다음)에서 이어서 연결함 — 3단계 참고.
 Object.values(ARMOR_TYPES).forEach(a => {
-  if(a.defense != null) a.defArr = computeArmorDefenseArray(a.defense);
+  // 신발(armorKind:'shoes')은 방어도가 강화 대상에서 제외됨 — 모든 강화 단계에서 데이터 값 그대로(10칸 flat).
+  // 다른 방어구는 기존 재귀 공식. (현재 신발 종류/아이템은 미등록 — 신발 추가 시 이 규칙이 자동 적용됨)
+  if(a.defense != null) a.defArr = (a.armorKind === 'shoes') ? new Array(10).fill(a.defense) : computeArmorDefenseArray(a.defense);
   if(a.hp != null) a.hpArr = computeArmorVitalArray(a.hp);
   if(a.mana != null) a.manaArr = computeArmorVitalArray(a.mana);
+  if(a.evasion != null) a.evasionArr = computeEvasionArray(a.evasion, ARMOR_EVASION_STEP_DELTA);
 });
 
 // ---- 장신구 종류(현재는 반지만 사용) ----
-const ACCESSORY_KINDS = { ring: '반지' };
+// 목걸이(necklace)는 반지/팔찌가 들어가는 장신구1·2 슬롯이 아니라 전용 목걸이 슬롯(state.equippedNecklaceId)에만 착용됨.
+const ACCESSORY_KINDS = { ring: '반지', necklace: '목걸이' };
 // 장신구 이미지 경로 규칙(무기/방어구와 동일한 onerror 방식). image 필드가 비어 있으면 장신구 종류별
 // 기본 이미지(반지→ringbase)를 자동 적용함(장신구 데이터 스키마 규칙). 종류가 늘어나도(목걸이 등)
 // 이 표에 항목만 추가하면 자동 적용됨.
 const ACCESSORY_IMAGE_DIR = 'assets/accessory/';
 const ACCESSORY_IMAGE_EXT = '.png';
-const ACCESSORY_DEFAULT_IMAGE = { ring: 'ringbase' };
+const ACCESSORY_DEFAULT_IMAGE = { ring: 'ringbase', necklace: 'pendantbase' }; // 목걸이는 이미지 공란이면 pendantbase 자동 할당
+
+// 목걸이 고유 옵션 공용 표 — 힘/민첩/지능이 같은 강화 단계별 수치로 함께 성장하는 목걸이(자금연주금패/조화의
+// 목걸이)가 공유함. 툴팁에는 스탯마다 한 줄씩 따로 표시됨(opt.growthStats 참고, formulas.js).
+const PENDANT_TRIPLE_STAT_BY_LEVEL = { 0: 5, 1: 5, 2: 6, 3: 7, 4: 8, 5: 9, 6: 10, 7: 11, 8: 12, 9: 15 };
 
 // 장신구 도감. 무기/방어구와 동일한 데이터 구조를 그대로 사용함. 레벨 제한은 레벨만 검사(힘/민첩 등
 // 추가 조건 없음). 반지는 같은 아이템이라도 2개까지 동시 착용 가능(장신구1/장신구2 슬롯) — 방어구처럼
@@ -1552,6 +1709,192 @@ const ACCESSORY_TYPES = {
     purchasable: false, levelReq: 50,
     image: 'epic_morion_ring',
   },
+
+  // ---- 목걸이 9종(장신구 종류 necklace) ----
+  // 아이템 데이터만 등록(실제 획득처는 이후 작업에서 결정 — 상점 구매 불가, 드랍 테이블에도 아직 미연결).
+  // 목걸이는 목걸이 전용 슬롯에만 착용됨(반지와 달리 1개만). 판매 가격/강화 확률·비용은 반지와 동일하게
+  // 등급·레벨 제한 기준으로 자동 계산됨(별도 sell/odds/cost 필드 없음). 재생력(regen)은 고유 옵션으로만 부여됨.
+  // 성장형 재생력은 growthStat:'regen' + chanceByLevel(각 단계의 절대 수치, 인형술사의 옷과 동일 방식)로 등록하고,
+  // 고정 스탯(지능+4/힘+3)은 statBonus에 등록하며 textTemplate에 고정 문구로 함께 적음(흑령투구와 동일 방식).
+  // 자금연주금패(구 진호박의 결정)/조화의 목걸이처럼 여러 스탯이 동시에 성장하는 옵션은 opt.growthStats 배열로 등록함(신규 스키마).
+  silvernecklace: {
+    id: 'silvernecklace', name: '은색 목걸이', desc: '은색 반지로 장식한 목걸이',
+    equipType: 'accessory',
+    durability: 2000,
+    accessoryKind: 'necklace',
+    grade: 'normal', // 일반
+    defense: -1, mana: 50,
+    purchasable: false, levelReq: 21,
+    image: '', // 공란 → 목걸이 기본 이미지(pendantbase) 자동 적용
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      statBonus: { int: 4 },
+      chanceByLevel: { 0: 15, 1: 20, 2: 23, 3: 26, 4: 30, 5: 33, 6: 36, 7: 40, 8: 45, 9: 60 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}<br>지능 +4',
+    },
+  },
+  vitalitynecklace: {
+    id: 'vitalitynecklace', name: '활력의 목걸이', desc: '생명의 기운을 머금은 목걸이',
+    equipType: 'accessory',
+    durability: 4000,
+    accessoryKind: 'necklace',
+    grade: 'epic', // 에픽
+    defense: -2, hp: 400,
+    purchasable: false, levelReq: 46,
+    image: 'epic_heart_pendant',
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      statBonus: { str: 3 },
+      chanceByLevel: { 0: 40, 1: 40, 2: 45, 3: 50, 4: 55, 5: 60, 6: 65, 7: 70, 8: 75, 9: 100 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}<br>힘 +3',
+    },
+  },
+  silvercrossnecklace: {
+    id: 'silvercrossnecklace', name: '은색 십자 목걸이', desc: '성스러운 힘이 깃든 목걸이',
+    equipType: 'accessory',
+    durability: 10000,
+    accessoryKind: 'necklace',
+    grade: 'rare', // 레어
+    defense: -4, hp: 100, mana: 30, evasion: 1,
+    purchasable: false, levelReq: 38,
+    image: 'rare_silvercross_pendant',
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      chanceByLevel: { 0: 15, 1: 15, 2: 18, 3: 21, 4: 24, 5: 27, 6: 30, 7: 35, 8: 44, 9: 60 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}',
+    },
+  },
+  bonenecklace: {
+    id: 'bonenecklace', name: '뼈 목걸이', desc: '낡은 뼈를 엮어 만든 목걸이',
+    equipType: 'accessory',
+    durability: 5000,
+    accessoryKind: 'necklace',
+    grade: 'normal', // 일반
+    defense: -3, hp: 50, mana: 50,
+    purchasable: false, levelReq: 15,
+    image: 'common_bone_pendant',
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      chanceByLevel: { 0: 18, 1: 18, 2: 20, 3: 22, 4: 24, 5: 26, 6: 28, 7: 30, 8: 32, 9: 34 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}',
+    },
+  },
+  goldnecklace: {
+    id: 'goldnecklace', name: '금 장식 목걸이', desc: '금 장식으로 꾸민 목걸이',
+    equipType: 'accessory',
+    durability: 10000,
+    accessoryKind: 'necklace',
+    grade: 'normal', // 일반
+    defense: -6, // 방어도가 높은(수치가 큰 음수) 대신 옵션이 단출한 컨셉 아이템(요청사항)
+    purchasable: false, levelReq: 50,
+    image: 'common_gold_pendant',
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      chanceByLevel: { 0: 10, 1: 10, 2: 14, 3: 18, 4: 22, 5: 26, 6: 30, 7: 34, 8: 38, 9: 50 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}',
+    },
+  },
+  scorpionshard: {
+    id: 'scorpionshard', name: '전갈의 편린', desc: '전갈의 몸에서 떨어져 나온 단단한 껍질 조각',
+    equipType: 'accessory',
+    durability: 20000,
+    accessoryKind: 'necklace',
+    grade: 'epic', // 에픽
+    defense: -2, crit: 1, evasion: 1,
+    purchasable: false, levelReq: 56,
+    image: 'epic_scorpion_pendant',
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      chanceByLevel: { 0: 30, 1: 30, 2: 34, 3: 38, 4: 42, 5: 46, 6: 50, 7: 54, 8: 65, 9: 88 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}',
+    },
+  },
+  purpleamberpendant: {
+    id: 'purpleamberpendant', name: '자금연주금패', desc: '희귀한 보석을 희생시켜 탄생한 목걸이',
+    equipType: 'accessory',
+    durability: 50000,
+    accessoryKind: 'necklace',
+    grade: 'unique', // 유니크
+    defense: -3, hp: 500, mana: 300, crit: 2,
+    purchasable: false, levelReq: 70,
+    image: 'unique_purpleamber_pendant', // 등급이 유니크라 파일명 접두어도 unique_(요청사항)
+    // 재생력/힘/민첩/지능이 각각 강화 단계별로 성장 — 툴팁에는 한 줄에 하나씩 표시됨.
+    uniqueOption: {
+      activateLevel: 0,
+      growthStats: [
+        { stat: 'regen', label: '재생력', byLevel: { 0: 60, 1: 60, 2: 70, 3: 80, 4: 90, 5: 100, 6: 110, 7: 120, 8: 130, 9: 160 } },
+        { stat: 'str', label: '힘', byLevel: PENDANT_TRIPLE_STAT_BY_LEVEL },
+        { stat: 'agi', label: '민첩', byLevel: PENDANT_TRIPLE_STAT_BY_LEVEL },
+        { stat: 'int', label: '지능', byLevel: PENDANT_TRIPLE_STAT_BY_LEVEL },
+      ],
+    },
+  },
+  brassnecklace: {
+    id: 'brassnecklace', name: '황동 목걸이', desc: '황동으로 만들어진 묵직한 목걸이',
+    equipType: 'accessory',
+    durability: 5000,
+    accessoryKind: 'necklace',
+    grade: 'normal', // 일반
+    defense: -3, hp: 30,
+    purchasable: false, levelReq: 31,
+    image: 'common_brass_pendant',
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      chanceByLevel: { 0: 25, 1: 25, 2: 27, 3: 29, 4: 31, 5: 33, 6: 35, 7: 37, 8: 39, 9: 45 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}',
+    },
+  },
+  harmonynecklace: {
+    id: 'harmonynecklace', name: '조화의 목걸이', desc: '서로 다른 힘이 조화를 이루는 신비로운 목걸이',
+    equipType: 'accessory',
+    durability: 30000,
+    accessoryKind: 'necklace',
+    grade: 'epic', // 에픽
+    defense: -1,
+    purchasable: false, levelReq: 52,
+    image: 'epic_harmony_pendant',
+    uniqueOption: {
+      activateLevel: 0,
+      growthStats: [
+        { stat: 'str', label: '힘', byLevel: PENDANT_TRIPLE_STAT_BY_LEVEL },
+        { stat: 'agi', label: '민첩', byLevel: PENDANT_TRIPLE_STAT_BY_LEVEL },
+        { stat: 'int', label: '지능', byLevel: PENDANT_TRIPLE_STAT_BY_LEVEL },
+      ],
+    },
+  },
+  // 무색 목걸이: 무색 반지의 목걸이 버전(레벨 5 입문용, 상점 구매 가능). 이미지가 공란이라 목걸이 기본 이미지
+  // (pendantbase)가 자동 적용됨. 재생력은 다른 목걸이와 동일하게 고유 옵션(성장형)으로만 부여됨.
+  colorlessnecklace: {
+    id: 'colorlessnecklace', name: '무색 목걸이', desc: '희미한 마나가 서려있는 목걸이',
+    equipType: 'accessory',
+    durability: 1000,
+    accessoryKind: 'necklace',
+    grade: 'normal', // 일반
+    defense: -1, mana: 50,
+    purchasable: true, levelReq: 5,
+    image: '', // 공란 → 목걸이 기본 이미지(pendantbase) 자동 적용
+    uniqueOption: {
+      growthStat: 'regen',
+      activateLevel: 0,
+      chanceByLevel: { 0: 2, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 12 },
+      chanceSuffix: '',
+      textTemplate: '재생력 +{chance}',
+    },
+  },
 };
 
 // ---- 장신구 강화 단계별 치명타 확률 증가 공식 ----
@@ -1567,6 +1910,11 @@ function computeAccessoryCritArray(baseCrit){
   return arr;
 }
 
+// ---- 장신구 강화 단계별 회피 증가 공식 ----
+// 방어구와 동일한 합연산(재귀) 방식이지만 증가치 표는 장신구 전용(computeEvasionArray 공용 함수 재사용).
+// 장신구 종류(반지/목걸이/팔찌) 무관하게 모든 장신구 공유. index = 강화 단계(1~9)
+const ACCESSORY_EVASION_STEP_DELTA = [null, 0, 0, 0, 0, 0.5, 0, 0.5, 0, 2];
+
 // 방어도/체력/마나/치명타 강화 배열 계산. 방어도는 "강화 대상에서 제외"되므로 배열 전체를 기본값으로
 // 채워(defenseFor(type, level)이 어떤 강화 단계를 물어봐도 항상 기본값을 반환하게) 강화되지 않게 함 —
 // defenseFor 등 기존 접근자 함수(formulas.js)를 그대로 재사용하기 위한 방식(별도 함수를 만들지 않음).
@@ -1575,6 +1923,7 @@ Object.values(ACCESSORY_TYPES).forEach(a => {
   if(a.defense != null) a.defArr = new Array(10).fill(a.defense);
   if(a.hp != null) a.hpArr = computeArmorVitalArray(a.hp);
   if(a.mana != null) a.manaArr = computeArmorVitalArray(a.mana);
+  if(a.evasion != null) a.evasionArr = computeEvasionArray(a.evasion, ACCESSORY_EVASION_STEP_DELTA);
   if(a.crit != null) a.crit = computeAccessoryCritArray(a.crit); // crit 필드를 배열로 덮어씀(critChanceFor가 wpn(type).crit[level]로 읽음)
 });
 
@@ -2228,7 +2577,43 @@ const CONSUMABLES = {
     buyPrice: 900, sellPrice: 450,
     effect: { type: 'healMpInstant', amount: 1200 },
   },
+  // ---- 비급(class: '비급') — 기연 스킬 해금용 소비 아이템 ----
+  // 데이터에는 이름/종류/아이콘(선택)/해금 스킬(skillId)만 적음. 등급·효과 문구·판매 가격은 아래
+  // initConsumableClassRules가 종류(class)와 할당 스킬 데이터(SKILLS[skillId])를 기준으로 자동 결정함 —
+  // 그래서 스킬 등급이 바뀌어도 비급 데이터는 수정할 필요 없고, 새 비급은 이 형식의 항목만 추가하면 됨.
+  // 구매 가격(buyPrice)이 없으므로 상점 구매 불가(판매만 가능). 실제 획득처는 아직 없음(테스트용 보유만 가능).
+  scroll_swallow_sword: { id: 'scroll_swallow_sword', name: '비천사검 - 비연검', class: '비급', icon: '📜', skillId: 'swallow_sword' },
+  scroll_flowing_sword: { id: 'scroll_flowing_sword', name: '비천사검 - 비류검', class: '비급', icon: '📜', skillId: 'flowing_sword' },
+  scroll_cascade_sword: { id: 'scroll_cascade_sword', name: '비천사검 - 비월검', class: '비급', icon: '📜', skillId: 'cascade_sword' },
+  scroll_soaring_sword: { id: 'scroll_soaring_sword', name: '비천사검 - 비천검', class: '비급', icon: '📜', skillId: 'soaring_sword' },
 };
+
+// ---- 소비 아이템 "종류(class)" 기준 자동 규칙 ----
+const SCROLL_CLASS = '비급';
+// 전역 드랍 설정값(요구사항 2·6번 — 추후 쉽게 조정할 수 있도록 이 두 상수만 바꾸면 됨. 특정 몬스터/던전별
+// 개별 확률은 두지 않음).
+const SCROLL_DROP_CHANCE = 0.3; // 몬스터 처치 시 비급 드랍 여부 판정 확률(%), 다른 드랍표와 완전히 독립적으로 판정
+const SCROLL_LEVEL_WEIGHT_DECAY = 0.85; // 후보 비급의 요구 레벨이 몬스터 레벨보다 1씩 낮아질 때마다 가중치 ×이 값(요구사항 6번 "가까울수록 높은 가중치")
+// 비급에 image를 지정하지 않았을 때 쓰는 기본 아이콘(assets/MiscItems/item_secret_manual.png)
+const SCROLL_DEFAULT_IMAGE = 'item_secret_manual';
+// 이 함수는 SKILLS를 "접근 시점(getter)"에 참조하므로 SKILLS가 아래에서 정의돼도 문제없음.
+// grade/effectText/desc/sellPrice를 getter로 두는 이유: 할당 스킬의 등급·요구 레벨·이름이 바뀌면 비급의
+// 표시/가격도 자동으로 따라가게 하기 위함(요구사항 3·4번 — 비급 데이터에 값을 중복 저장하지 않음).
+(function initConsumableClassRules(){
+  Object.values(CONSUMABLES).forEach(item => {
+    if(item.class === SCROLL_CLASS){
+      const ownImage = item.image; // 개별 지정 이미지가 있으면 우선
+      Object.defineProperties(item, {
+        grade:      { get(){ const sk = SKILLS[this.skillId]; return sk ? sk.grade : undefined; }, enumerable: true, configurable: true },
+        image:      { get(){ return ownImage || SCROLL_DEFAULT_IMAGE; }, enumerable: true, configurable: true },
+        effectText: { get(){ return scrollEffectHtml(this, '<br><br>'); }, enumerable: true, configurable: true },
+        desc:       { get(){ return scrollEffectHtml(this, '<br>'); }, enumerable: true, configurable: true },
+        // 판매 가격 = 기존 장비 기본 판매가 공식(equipBaseSellPrice) 그대로 재사용, 레벨/등급은 할당 스킬 기준(요구사항 4번).
+        sellPrice:  { get(){ const sk = SKILLS[this.skillId]; return sk ? equipBaseSellPrice(sk.levelReq, sk.grade) : 0; }, enumerable: true, configurable: true },
+      });
+    }
+  });
+})();
 
 // 재료성 아이템 도감(기타/마석 등 인벤토리·상점 하단 탭에 노출되는 아이템)
 // stateKey: 보유 개수가 저장되는 state의 필드 이름. 상점/판매 로직이 이 값만 보고 동작하므로
@@ -2675,6 +3060,25 @@ CRAFTABLE_ITEMS.weapon.push(
   },
 );
 
+// 장신구 제작 아이템 — 장신구 소분류 탭의 첫 제작 아이템. iconType이 'accessory'면 iconRef는 ACCESSORY_TYPES 키를
+// 그대로 넣으며, 아이콘/등급/툴팁/착용 제한 레벨이 실제 장신구 데이터와 완전히 동일하게 연동됨(formulas.js).
+// 자금연주금패는 제작으로만 획득 가능(드랍 테이블/상점 미연결). 성공 확률 100%라 실패 반환(failReturns)은 없음 —
+// 데이터에 failReturns를 등록하지 않으면 제작 실패 영역 자체가 화면에서 숨겨짐.
+CRAFTABLE_ITEMS.accessory.push(
+  {
+    id: 'craft_purpleamberpendant', name: '자금연주금패', grade: 'unique',
+    iconType: 'accessory', iconRef: 'purpleamberpendant',
+    successChance: 100, craftCost: 1000000,
+    materials: [
+      { name: '조화의 목걸이', need: 1 },
+      { name: '진호박', need: 300 },
+      { name: '현철', need: 20 },
+      { name: '흑철', need: 15 },
+      { name: '쇠조각', need: 30 },
+    ],
+  },
+);
+
 
 // 제작소 탭 id → PAGE_SIZE/페이지 상태 키 매핑(SHOP_PAGE_KEY와 동일한 역할).
 // 제작 연출 UI(요청사항 4번) 진행률 구간별 안내 문구. 진행률(%) 오름차순으로 max값만 넣어두면
@@ -2731,6 +3135,66 @@ const INVENTORY_TABS = [
   { id: 'stone', label: '마석' },
   { id: 'misc', label: '기타' },
 ];
+
+// ---- 신버전 인벤토리 아이템 비교(장비 전용) ----
+// 비교 가능 여부는 아이템 이름이 아니라 "장비 대분류(슬롯)"로 판정함: 무기는 weapon, 보조는 sub, 방어구/장신구는 세부 종류(kindKey — 투구/갑옷/신발,
+// 목걸이/반지)별로 따로 묶임. 새 장비 종류가 생겨 다른 종류와 같은 슬롯을 써야 하면(예: 팔찌는 반지와 같은 슬롯) 아래 오버라이드 표에
+// `kindKey: 묶을 그룹 id`만 추가하면 됨(예: 'accessory:bracelet': 'accessory:ring'). 비교는 INV_COMPARABLE_SRCS의 장비 종류에서만 가능.
+const INV_COMPARABLE_SRCS = ['weapon', 'armor', 'sub', 'accessory'];
+const INV_COMPARE_GROUP_OVERRIDES = {};
+const INV_COMPARE_IMG = 'assets/ui/icon_item_comparison.png'; // 비교 모드 커서(돋보기)
+// 비교 표의 항목명 — 툴팁의 data-tip 키(name/grade/desc/kind/unique)에 대응. 그 외 항목은 툴팁 줄의 항목명을 그대로 씀.
+const INV_COMPARE_TIP_LABELS = { name: '이름', grade: '등급', desc: '설명', kind: '종류', unique: '고유 옵션', sell: '판매 가격' };
+// 수치 항목의 "좋은 방향" — 'high'(높을수록 좋음) / 'low'(낮을수록 좋음). 키는 툴팁 항목명(= 비교 표의 항목명)이고, 여기에 없으면 'high'로 취급함.
+// ▲▼ 화살표/부호/색은 "좋아졌는지/나빠졌는지"를 나타냄: 좋아지면 ▲ +(초록), 나빠지면 ▼ -(빨강). 숫자 크기(차이값)는 실제 차이 그대로이고,
+// 'high'는 값이 오르면 좋아짐, 'low'(방어도 등)는 값이 내리면 좋아짐(예: 방어도 -30 → -20은 ▼ -10 빨강, -30 → -40은 ▲ +10 초록).
+// 지금 비교 표에 실제로 나오는 수치 항목만 등록함(공격력/공격 속도/치명타 확률/방어도/체력/마나/회피). 방어도는 값이 낮을수록 받는 피해가 줄어드는
+// 시스템이라 'low'(양수면 피해 증가). 새 수치 항목이 비교에 추가되면 여기에 `항목명: 'high'|'low'`만 적어주면 됨.
+const INV_COMPARE_STAT_BETTER = {
+  '공격력': 'high', '공격 속도': 'high', '치명타 확률': 'high',
+  '방어도': 'low',
+  '체력': 'high', '마나': 'high', '회피': 'high',
+};
+// ▲▼ 증감 비교를 하지 않는 항목(텍스트/단순 정보). 이 외에 값이 숫자(+부호/소수/% 허용)인 항목만 증감을 비교함.
+const INV_COMPARE_NO_DELTA_KEYS = ['name', 'grade', 'desc', 'kind', 'unique', 'sell'];
+
+// ---- 인벤토리 아이템 잠금(구버전·신버전 인벤토리 공용) ----
+// 잠금 상태는 장비 인스턴스(EQUIP_INVENTORY_POOLS의 보유 아이템 객체) 자체의 locked 필드(true)로 저장됨 — 새 저장 구조 없음,
+// 기존 저장 데이터에는 이 필드가 없어 전부 '잠금 아님'. 잠금 가능한 탭(아이템 종류)은 아래 INV_LOCKABLE_SRCS에 등록된 src뿐이며,
+// 현재는 장비 4종(src = EQUIP_INVENTORY_POOLS의 kind). 아티팩트/소비/마석/기타로 확장할 때는 이 목록에 src를 추가하고
+// formulas.js의 invLockFind(src, id)가 그 src의 아이템 객체를 찾도록 하면 되며, UI는 슬롯/카드에 data-lock-src/data-lock-id만 붙이면 동작함.
+const INV_LOCKABLE_SRCS = ['weapon', 'armor', 'sub', 'accessory'];
+const INV_LOCK_IMG = 'assets/ui/icon_item_locked.png';     // 잠금 아이콘(아이콘 왼쪽 상단 오버레이) + 잠금 모드 커서
+const INV_UNLOCK_IMG = 'assets/ui/icon_item_unlocked.png'; // 잠금 모드에서 잠긴 아이템에 마우스를 올렸을 때(해제 가능 표시)
+
+// ---- 인벤토리 정렬 기준(구버전·신버전 인벤토리 공용) ----
+// 정렬 로직(formulas.js의 invSortList 등)은 아이템 이름이 아니라 아래 표와 아이템 데이터(종류/등급/판매 가격/강화 단계)만 봄.
+// 새 정렬 기준: INV_SORT_CRITERIA(formulas.js)에 { label, compare } 항목을 추가하고, 그 기준을 제공할 탭의 INV_SORT_TAB_CRITERIA에 id를 넣으면 됨.
+// 탭별로 의미 있는 기준만 드롭다운에 표시됨(탭 id는 신버전: equipment/artifact/consumable/stone/misc, 구버전: weapon/armor/sub/accessory/artifact/consumable/stone/misc).
+const INV_SORT_TAB_CRITERIA = {
+  equipment: ['kind', 'value', 'grade', 'enhance'], // 신버전 장비 탭
+  weapon: ['kind', 'value', 'grade', 'enhance'],    // 구버전 장비 하위탭 4개
+  armor: ['kind', 'value', 'grade', 'enhance'],
+  sub: ['kind', 'value', 'grade', 'enhance'],
+  accessory: ['kind', 'value', 'grade', 'enhance'],
+  artifact: ['grade'],
+  consumable: ['kind', 'value'],
+  stone: ['grade', 'value'],
+  misc: ['grade', 'value'],
+};
+// 아이템 종류 정렬 순서. 종류 키는 `대분류:세부종류` 형태(무기는 `weapon:무기종류:손수`)이며 데이터의 weaponKind/handType/armorKind/
+// accessoryKind/subKind 값을 그대로 씀. 대분류(group) 순서 → 대분류 안의 세부 종류(kinds) 순서로 비교하고,
+// 목록에 없는 새 세부 종류는 그 대분류의 맨 뒤, 목록에 없는 새 대분류는 전체의 맨 뒤로 감(새 종류가 추가돼도 정렬이 깨지지 않음).
+// 새 무기 종류/장신구 종류(예: 지팡이, 팔찌)는 해당 kinds 배열의 원하는 위치에 키를 끼워 넣으면 됨.
+const INV_SORT_KIND_ORDER = [
+  { group: 'weapon', kinds: ['weapon:sword:two_hand', 'weapon:sword:one_hand', 'weapon:dagger:one_hand'] }, // 양손/검 → 한손/검 → 한손/단검
+  { group: 'armor', kinds: ['armor:helmet', 'armor:armor', 'armor:shoes'] },                                // 투구 → 갑옷 → 신발
+  { group: 'accessory', kinds: ['accessory:necklace', 'accessory:ring', 'accessory:bracelet'] },            // 목걸이 → 반지 → (팔찌 예정)
+  { group: 'sub', kinds: ['sub:shield', 'sub:sub_weapon'] },                                                // 방패 → 보조 무기
+  { group: 'consumable', kinds: ['consumable:플라스크', 'consumable:' + SCROLL_CLASS, 'consumable:trace'] }, // 플라스크 → 비급 → 흔적
+];
+// 신버전 \"착용 장비 우선 정렬\" 시 착용 장비끼리의 순서(착용 슬롯 키 — EQUIPMENT_SLOTS의 key와 같은 값).
+const INV_SORT_WORN_SLOT_ORDER = ['weapon', 'helmet', 'armor', 'sub', 'necklace', 'accessory1', 'accessory2', 'shoes'];
 
 // 상점 정렬 기준 목록 (필터 드롭다운에 그대로 표시됨)
 const SHOP_SORT_FIELDS = [
@@ -2863,7 +3327,7 @@ const SKILLS = {
     grade: 'normal', category: 'common', target: 'single', levelReq: 10,
     cooldown: 5.5, resourceType: 'mp', resourceAmount: 50, castTime: 0,
     damagePercent: 90, hits: 2, icon: 'lv10atk',
-    hitDelayMs: 0.1, // 1타는 즉시, 2타는 이 시간(초) 뒤에 순차 적용(resolveSkillEffect의 hitDelayMs 분기 참고)
+    hitDelayMs: 0.25, // 1타는 즉시, 2타는 이 시간(초) 뒤에 순차 적용(resolveSkillEffect의 hitDelayMs 분기 참고)
   },
   preemptive_strike: {
     name: '선공', desc: '{duration}초 동안 공격 속도 {atkSpeed}% 증가.',
@@ -2966,6 +3430,41 @@ const SKILLS = {
     grade: 'normal', category: 'common', target: 'passive', levelReq: 97,
     passiveEffect: { intFlat: 35 }, icon: 'lv7_int_passive', upgradeFrom: 'great_awakening',
   },
+  lightness_technique: {
+    name: '경신술', desc: '[패시브] 회피 +{evasion}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 27,
+    passiveEffect: { evasion: 1 }, icon: 'lv27_dodge_passive',
+  },
+  lightness_mastery: {
+    name: '경신공', desc: '[패시브] 회피 +{evasion}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 38,
+    passiveEffect: { evasion: 2 }, icon: 'lv27_dodge_passive', upgradeFrom: 'lightness_technique',
+  },
+  swift_body_mastery: {
+    name: '쾌신공', desc: '[패시브] 회피 +{evasion}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 49,
+    passiveEffect: { evasion: 3 }, icon: 'lv27_dodge_passive', upgradeFrom: 'lightness_mastery',
+  },
+  gale_step: {
+    name: '질풍', desc: '[패시브] 회피 +{evasion}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 60,
+    passiveEffect: { evasion: 4 }, icon: 'lv27_dodge_passive', upgradeFrom: 'swift_body_mastery',
+  },
+  earth_shadow_step: {
+    name: '지영보', desc: '[패시브] 회피 +{evasion}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 71,
+    passiveEffect: { evasion: 5 }, icon: 'lv27_dodge_passive', upgradeFrom: 'gale_step',
+  },
+  meteor_step: {
+    name: '유성보', desc: '[패시브] 회피 +{evasion}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 82,
+    passiveEffect: { evasion: 6 }, icon: 'lv27_dodge_passive', upgradeFrom: 'earth_shadow_step',
+  },
+  shadowless_step: {
+    name: '무영보', desc: '[패시브] 회피 +{evasion}%',
+    grade: 'normal', category: 'common', target: 'passive', levelReq: 93,
+    passiveEffect: { evasion: 8 }, icon: 'lv27_dodge_passive', upgradeFrom: 'meteor_step',
+  },
   cleave: {
     name: '참격 1성', desc: '{dp}%의 데미지로 모든 적을 공격.',
     grade: 'rare', category: 'common', target: 'aoe', levelReq: 15,
@@ -2999,10 +3498,10 @@ const SKILLS = {
     cooldown: 5.4, resourceType: 'mp', resourceAmount: 125, castTime: 0,
     damagePercent: 100, hits: 3, icon: 'lv30atk',
     upgradeFrom: 'double_strike', // 스킬 업그레이드: 이연격 보유해야 습득 가능, 습득시 이연격→삼연격으로 교체
-    // 이연격(double_strike)과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용.
+    // 이연격(double_strike)과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.25초)마다 순차 적용.
     // applyDelayedSkillHits(actions.js)가 hits 값에 따라 자동으로 반복하므로 3타도 별도 처리 없이
     // 1타(즉시)→2타(0.1초 뒤)→3타(0.2초 뒤) 순으로 그대로 동작함.
-    hitDelayMs: 0.1,
+    hitDelayMs: 0.25,
   },
   ankle_slash: {
     name: '발목 가르기', desc: '{dp}% 데미지로 공격한 후<br>피해 입은 적을 {duration}초 동안 {term:slow}둔화{/term}.',
@@ -3038,9 +3537,9 @@ const SKILLS = {
     grade: 'rare', category: 'common', target: 'single', levelReq: 40,
     cooldown: 5.1, resourceType: 'mp', resourceAmount: 200, castTime: 0,
     damagePercent: 100, hits: 4, icon: 'lv50atk',
-    // 이연격/삼연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
+    // 이연격/삼연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(사연격 0.15초)마다 순차 적용(applyDelayedSkillHits가
     // hits 값에 따라 자동 반복하므로 4타도 별도 처리 없이 1타(즉시)→2타(0.1초)→3타(0.2초)→4타(0.3초) 순으로 동작).
-    hitDelayMs: 0.1,
+    hitDelayMs: 0.15,
     upgradeFrom: 'triple_strike', // 스킬 업그레이드: 삼연격 보유해야 습득 가능, 습득시 삼연격→사연격으로 교체
   },
   cleave4: {
@@ -3069,9 +3568,9 @@ const SKILLS = {
     grade: 'rare', category: 'common', target: 'single', levelReq: 50,
     cooldown: 5, resourceType: 'mp', resourceAmount: 250, castTime: 0,
     damagePercent: 100, hits: 5, icon: 'lv50atk', // 요청대로 사연격과 동일한 lv50atk 아이콘 재사용
-    // 이연격/삼연격/사연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
+    // 이연격/삼연격/사연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(오연격 0.12초)마다 순차 적용(applyDelayedSkillHits가
     // hits 값에 따라 자동 반복하므로 5타도 별도 처리 없이 1타(즉시)→2타(0.1초)→3타(0.2초)→4타(0.3초)→5타(0.4초) 순으로 동작).
-    hitDelayMs: 0.1,
+    hitDelayMs: 0.12,
     upgradeFrom: 'quad_strike', // 스킬 업그레이드: 사연격 보유해야 습득 가능, 습득시 사연격→오연격으로 교체
   },
   seven_strike: {
@@ -3079,7 +3578,7 @@ const SKILLS = {
     grade: 'rare', category: 'common', target: 'single', levelReq: 60,
     cooldown: 5, resourceType: 'mp', resourceAmount: 300, castTime: 0,
     damagePercent: 100, hits: 7, icon: 'lv60atk',
-    // 이연격~오연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(0.1초)마다 순차 적용(applyDelayedSkillHits가
+    // 이연격~오연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(칠연격 0.1초)마다 순차 적용(applyDelayedSkillHits가
     // hits 값에 따라 자동 반복하므로 7타도 별도 처리 없이 순차 적용됨).
     hitDelayMs: 0.1,
     upgradeFrom: 'five_strike', // 스킬 업그레이드: 오연격 보유해야 습득 가능, 습득시 오연격→칠연격으로 교체
@@ -3153,6 +3652,42 @@ const SKILLS = {
     // 전달됐던 것을 사용자가 정정 — 원래 의도한 체인은 내려베기→중압검→압쇄검→파쇄격 단일 직선 체인),
     // 습득시 압쇄검→파쇄격으로 교체
   },
+  // ---- 기연(awakening) 스킬: 비연검 → 비류검 → 비월검 → 비천검 (upgradeFrom 단일 직선 체인) ----
+  // 기연 스킬은 깨달음 포인트(awakeningPoints)를 쓰며 cost 생략 시 1(기본 규칙). 에픽 등급은 canLearnSkill이
+  // 해금 방식(비급) 구현 전까지 항상 습득 불가로 처리하므로, 이번 단계에서는 스킬 UI에 표시만 되고 습득은 안 됨.
+  swallow_sword: {
+    name: '비연검', desc: '제비처럼 날렵하게 움직이며,<br>적의 빈틈을 꿰뚫는다.<br><br>{dp}%의 데미지로 {hits}번 공격',
+    grade: 'epic', category: 'awakening', target: 'single', levelReq: 27,
+    cooldown: 12, resourceType: 'mp', resourceAmount: 125, castTime: 0,
+    damagePercent: 120, hits: 3, icon: 'lv27_bc4s_atk',
+    hitDelayMs: 0.15,
+  },
+  flowing_sword: {
+    name: '비류검', desc: '흐르는 구름처럼 자유롭게<br>검로를 바꾸며 적을 벤다<br><br>{dp}%의 데미지로 {hits}번 공격',
+    grade: 'epic', category: 'awakening', target: 'single', levelReq: 47,
+    cooldown: 11, resourceType: 'mp', resourceAmount: 200, castTime: 0,
+    damagePercent: 220, hits: 3, icon: 'lv47_bc4s_atk',
+    hitDelayMs: 0.15,
+    upgradeFrom: 'swallow_sword',
+  },
+  cascade_sword: {
+    name: '비월검', desc: '폭포처럼 끊임없이 몰아치며<br>상대를 압도한다.<br><br>{dp}%의 데미지로 {hits}번 공격',
+    grade: 'epic', category: 'awakening', target: 'single', levelReq: 67,
+    cooldown: 10, resourceType: 'mp', resourceAmount: 300, castTime: 0,
+    damagePercent: 250, hits: 3, icon: 'lv67_bc4s_atk',
+    hitDelayMs: 0.15,
+    upgradeFrom: 'flowing_sword',
+  },
+  soaring_sword: {
+    name: '비천검', desc: '하늘을 가르듯 거침없이 솟구쳐<br>단숨에 적을 제압한다.<br><br>{dp}%의 데미지로 {hits}번 공격<br>적중한 적은 {duration}초 동안 {term:stun}기절{/term}',
+    grade: 'epic', category: 'awakening', target: 'single', levelReq: 87,
+    cooldown: 9, resourceType: 'mp', resourceAmount: 400, castTime: 0,
+    damagePercent: 350, hits: 3, icon: 'lv87_bc4s_atk',
+    hitDelayMs: 0.15,
+    onHitStatus: { key: 'stun', durationMs: 4000 }, // 파쇄격과 동일: 다중 타수 중 적중(=생존)한 "최초의" 타격에만 1회 부여
+    onceOnHitStatus: true,
+    upgradeFrom: 'cascade_sword',
+  },
 };
 // 스킬 등급 색상은 별도로 정의하지 않고 무기 등급 색상 시스템(WEAPON_GRADES)을 그대로 재사용함
 // (일반/레어/에픽/유니크 라벨·색상이 이미 동일하므로 SKILLS[id].grade를 WEAPON_GRADES에 그대로 대입해 조회).
@@ -3217,10 +3752,12 @@ const SKILL_QUICK_SLOT_COUNT = 10; // 2줄 × 5칸(요구사항: 기존 1줄 5�
 // buildEquipPanelHtml(render.js)가 이 목록을 그대로 순회해 슬롯을 그림. 새 장비 타입(방어구 등)이 실제로
 // 추가되면 이 배열에 항목만 추가하고 equippedItemForSlot(render.js)에 조회 로직 한 줄만 이어주면 되며,
 // 나머지 렌더링 코드는 수정할 필요가 없음. cellClass는 장비창 그리드에서 이 슬롯이 위치할 CSS 그리드 영역.
-// necklace(목걸이)/shoes(신발)는 장비창에 자리만 먼저 마련한 신규 슬롯임 — 아직 이 슬롯에 착용되는 아이템 데이터/
-// 착용 로직이 없으므로 equippedItemForSlot(render.js)/equippedInstanceForSlot(state.js)이 항상 null을 반환해
-// 빈 슬롯(라벨만)으로 표시되고, 장착 아이템 정보·수리 대상 목록에서도 자동으로 제외됨. 나중에 아이템이 생기면 두 함수에
-// 이 key의 조회 로직만 이어주면 됨(레이아웃 수정 불필요). 배열 순서는 "모두 수리" 대상 순서와 같으므로 뒤에 추가함.
+// necklace(목걸이)는 목걸이 아이템(장신구 종류 necklace)이 추가되면서 실제 착용 로직이 연결됨(state.equippedNecklaceId,
+// equippedItemForSlot(render.js)/equippedInstanceForSlot(state.js)에 조회 로직 있음). shoes(신발)는 아직 자리만
+// 마련된 신규 슬롯이라 두 함수가 항상 null을 반환해 빈 슬롯(라벨만)으로 표시되고, 장착 아이템 정보·수리 대상
+// 목록에서도 자동으로 제외됨. 신발 아이템이 생기면 두 함수에 이 key의 조회 로직만 이어주면 됨(레이아웃 수정 불필요).
+// → 신발 아이템(방어구 종류 shoes) 추가와 함께 조회 로직이 연결됨(state.equippedArmor.shoes).
+// 배열 순서는 "모두 수리" 대상 순서와 같으므로 뒤에 추가함.
 const EQUIPMENT_SLOTS = [
   { key: 'weapon', label: '무기', cellClass: 'area-weapon' },
   { key: 'helmet', label: '투구', cellClass: 'area-helmet' },
@@ -3532,6 +4069,7 @@ const MONSTERS = {
       { name: '사슴고기', chance: 50 },
       { name: '녹용', chance: 20 },
       { name: '사슴 뿔 깃발', chance: 10, artifactId: 'antlerflag' },
+      { name: '뼈 목걸이', chance: 3, weaponId: 'bonenecklace' },
     ],
   },
   red_bear: {
@@ -3581,6 +4119,7 @@ const MONSTERS = {
       { name: '숲돼지고기', chance: 25 },
       { name: '반월대도', chance: 5, weaponId: 'moongreatsword' },
       { name: '흑철', chance: 7 },
+      { name: '은색 목걸이', chance: 3, weaponId: 'silvernecklace' },
     ],
   },
   fox: {
@@ -3602,6 +4141,7 @@ const MONSTERS = {
       { name: '제령도', chance: 2, weaponId: 'ninetaildagger' },
       { name: '흑철', chance: 7 },
       { name: '풀잎반지', chance: 4, weaponId: 'grassring' },
+      { name: '은색 십자 목걸이', chance: 2, weaponId: 'silvercrossnecklace' },
     ],
   },
   // 이미지 파일명 참고: 기획서상 image 필드는 'ninetailfox'였으나 실제 업로드된 파일명은
@@ -3617,6 +4157,7 @@ const MONSTERS = {
       { name: '사각방패', chance: 10, weaponId: 'squareshield' },
       { name: '흑철', chance: 10 },
       { name: '풀잎반지', chance: 8, weaponId: 'grassring' },
+      { name: '은색 십자 목걸이', chance: 5, weaponId: 'silvercrossnecklace' },
     ],
   },
   tiger1: {
@@ -3642,6 +4183,8 @@ const MONSTERS = {
       { name: '척호검', chance: 5, weaponId: 'tigersword' },
       { name: '자호의 송곳니', chance: 7 },
       { name: '방어의 반지', chance: 3, weaponId: 'defensering' },
+      { name: '황동 목걸이', chance: 3, weaponId: 'brassnecklace' },
+      { name: '활력의 목걸이', chance: 1, weaponId: 'vitalitynecklace' },
     ],
   },
   tiger4: {
@@ -3658,6 +4201,8 @@ const MONSTERS = {
       { name: '혈호대검', chance: 5, weaponId: 'bloodtigerlongsword' },
       { name: '자호의 송곳니', chance: 10 },
       { name: '방어의 반지', chance: 7, weaponId: 'defensering' },
+      { name: '황동 목걸이', chance: 5, weaponId: 'brassnecklace' },
+      { name: '활력의 목걸이', chance: 4, weaponId: 'vitalitynecklace' },
     ],
   },
   mantis: {
@@ -3715,6 +4260,7 @@ const MONSTERS = {
       { name: '진호박', chance: 20 },
       { name: '팔각비도', chance: 5, weaponId: 'eight_knife' },
       { name: '거미의 송곳니', chance: 7 },
+      { name: '금 장식 목걸이', chance: 2, weaponId: 'goldnecklace' },
     ],
   },
   epicspider2: {
@@ -3726,6 +4272,7 @@ const MONSTERS = {
       { name: '백현갑', chance: 2, weaponId: 'spiderarmor' },
       { name: '보라방패', chance: 5, weaponId: 'purpleshield' },
       { name: '거미의 송곳니', chance: 10 },
+      { name: '금 장식 목걸이', chance: 5, weaponId: 'goldnecklace' },
     ],
   },
   // 전갈굴 신규 몬스터 4종. 현랑전갈/현랑장은 자호굴·사마귀굴·거미굴과 동일한 방식으로 pickEpicMonsterId가
@@ -3750,6 +4297,7 @@ const MONSTERS = {
       { name: '은반지', chance: 3, weaponId: 'silverring' },
       { name: '청사연투구', chance: 2.5, weaponId: 'bluehelmet56' },
       { name: '세컨드 어템프트', chance: 3, weaponId: 'secondattempt' },
+      { name: '전갈의 편린', chance: 0.5, weaponId: 'scorpionshard' },
     ],
   },
   epicscorpion2: {
@@ -3762,6 +4310,7 @@ const MONSTERS = {
       { name: '현랑반지', chance: 2.5, weaponId: 'wolfmoonring' },
       { name: '은반지', chance: 4, weaponId: 'silverring' },
       { name: '청사연투구', chance: 3.8, weaponId: 'bluehelmet56' },
+      { name: '전갈의 편린', chance: 1, weaponId: 'scorpionshard' },
     ],
   },
   woodpuppet: {
@@ -3782,6 +4331,7 @@ const MONSTERS = {
       { name: '진호박', chance: 20 },
       { name: '쇠조각', chance: 10 },
       { name: '인형술사의 옷', chance: 3, weaponId: 'puppeteercloth' },
+      { name: '조화의 목걸이', chance: 2, weaponId: 'harmonynecklace' },
     ],
   },
   puppeteer: {
@@ -3793,6 +4343,7 @@ const MONSTERS = {
       { name: '쇠조각', chance: 20 },
       { name: '백화검', chance: 5, weaponId: 'firesword' },
       { name: '인형술사의 옷', chance: 5.5, weaponId: 'puppeteercloth' },
+      { name: '조화의 목걸이', chance: 4, weaponId: 'harmonynecklace' },
     ],
   },
   // 유령굴 신규 몬스터 4종. 고급유령/불연은 자호굴·사마귀굴·거미굴·전갈굴·인형굴과 동일한 방식으로
@@ -4315,6 +4866,13 @@ const PATCHNOTE_IMAGE_DIR = 'assets/ui/patchnote/';
 const PATCHNOTE_MAX_PAGES = 20; // 존재하지 않는 번호를 무한히 요청하지 않기 위한 상한(연속 파일이 끊기면 그 전에 멈춤)
 const PATCHNOTE_HIDE_DATE_KEY = 'forge-patchnote-hide-date-v1';
 
+// 인벤토리 UI 형식 선택지(설정 항목 inventoryUi가 사용). value는 INVENTORY_UI_RENDERERS(render.js)의
+// 키와 일치해야 하며, 신버전(box) 인벤토리가 구현되면 그 키에 렌더러만 등록하면 됨(이 목록은 수정 불필요).
+const INVENTORY_UI_OPTIONS = [
+  { value: 'legacy', label: '구버전(세로)' },
+  { value: 'box', label: '신버전(박스)' },
+];
+
 // ---- 설정 시스템 ----
 // 카테고리(예: 전투) 안에 메뉴(예: 회복 설정)들이 들어가는 구조.
 // 새 카테고리/메뉴를 추가할 때는 이 배열에 항목만 추가하면 됨 — 모달 UI, 저장 로직은 자동으로 반영됨.
@@ -4351,6 +4909,18 @@ const SETTINGS_SCHEMA = [
           { value: 'bar', label: '가로바' },
           { value: 'corner', label: '정사각형 버튼 (우상단)' },
         ],
+      },
+      // 인벤토리 UI 형식 — 데스크톱/모바일을 구분하지 않는 하나의 공통 설정값(state.settings.inventoryUi). 선택한
+      // 형식이 두 환경 모두에 동일하게 적용됨(PC/모바일에 맞는 슬롯 크기·배치 차이는 이후 신버전 UI를 구현할 때
+      // 반응형 레이아웃으로 처리). 기본값은 box(신버전)이며, 이미 선택해서 저장한 값(legacy/box)은 그대로 유지됨. 신버전(box)은 1단계에서는 선택값/분기 기반만 있고 실제 UI는 아직 없어 선택해도 구버전
+      // 인벤토리가 그대로 표시됨(INVENTORY_UI_RENDERERS, render.js 참고).
+      {
+        id: 'inventoryUi',
+        label: '인벤토리 UI',
+        desc: '신버전(박스)은 준비 중이며, 선택해도 현재는 구버전과 동일하게 표시됩니다.',
+        type: 'radio',
+        default: 'box', // 저장된 선택값이 없을 때(새 게임/설정값이 없는 저장 데이터)의 기본값 = 신버전(박스). 이미 저장된 선택은 ensureSettingsDefaults가 덮어쓰지 않음
+        options: INVENTORY_UI_OPTIONS,
       },
     ],
   },
