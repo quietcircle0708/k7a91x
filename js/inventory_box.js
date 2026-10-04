@@ -422,6 +422,15 @@ function renderInventoryBox(){
   invCompareRenderPanel();
 }
 
+// 비교 행 목록(invCompareBuildRows 결과) → 행 HTML. 인벤토리 비교 팝업과 도감 아이템 상세 정보(codex.js)가 같은 출력 방식을 쓰도록 공용으로 분리함.
+function invCompareRowsHtml(rows){
+  return rows.map(r => {
+    const cls = r.sell ? 'cmp-sell' : '';
+    const val = (html, reduced) => r.sell ? `<span class="cmp-sellval ${reduced ? 'reduced' : ''}">${html}</span>` : html;
+    const dl = d => d ? ` <span class="cmp-delta ${d.good ? 'good' : 'bad'}">${d.text}</span>` : ''; // 색은 좋아짐/나빠짐 기준
+    return `<div class="cmp-row ${cls}"><div class="cmp-label">${r.label}</div><div class="cmp-val">${val(r.aHtml, r.aReduced)}${dl(r.deltaA)}</div><div class="cmp-val">${val(r.bHtml, r.bReduced)}${dl(r.delta)}</div></div>`;
+  }).join('');
+}
 // ---- 비교 팝업(아이템 그리드 영역 위에 표시) ----
 // 항목은 툴팁에서 읽은 invCompareBuildRows(formulas.js)를 그대로 그림 — 항목명 열 하나에 기준 장비(왼쪽)/비교 대상(오른쪽) 값을 대응시키고,
 // 수치 항목만 오른쪽 값 뒤에 A 대비 ▲(초록)/▼(빨강)를 붙임. 상단에 양쪽 장비 아이콘(B 옆 [변경]), 하단에 [닫기]만 있음.
@@ -434,12 +443,7 @@ function invCompareRenderPanel(){
   const a = all[invCompare.baseKey], b = all[invCompare.targetKey];
   if(!a || !b || invCompareGroup(b) !== invCompare.group){ invCompareReset(); return; } // 대상 아이템이 사라진 경우 안전하게 종료
   const icon = e => `<div class="inv-box-slot filled cmp-slot" style="border-color:${e.borderColor};">${e.iconHtml}</div>`;
-  const rows = invCompareBuildRows(a, b).map(r => {
-    const cls = r.sell ? 'cmp-sell' : '';
-    const val = (html, reduced) => r.sell ? `<span class="cmp-sellval ${reduced ? 'reduced' : ''}">${html}</span>` : html;
-    const dl = d => d ? ` <span class="cmp-delta ${d.good ? 'good' : 'bad'}">${d.text}</span>` : ''; // 색은 좋아짐/나빠짐 기준
-    return `<div class="cmp-row ${cls}"><div class="cmp-label">${r.label}</div><div class="cmp-val">${val(r.aHtml, r.aReduced)}${dl(r.deltaA)}</div><div class="cmp-val">${val(r.bHtml, r.bReduced)}${dl(r.delta)}</div></div>`;
-  }).join('');
+  const rows = invCompareRowsHtml(invCompareBuildRows(a, b));
   // 아이콘 머리글은 스크롤 영역(.cmp-body) 안에 두고 CSS sticky로 맨 위에 고정함 — 항목 행과 같은 폭을 쓰기 때문에, 스크롤바가 생겨
   // 행의 열 폭이 줄어들어도 아이콘이 이름/값 열의 가운데에 계속 맞음(머리글이 스크롤 영역 밖이면 오른쪽 열이 스크롤바 폭만큼 어긋남).
   panel.innerHTML = `<div class="cmp-body"><div class="cmp-head"><div class="cmp-head-label"></div><div class="cmp-head-side">${icon(a)}</div>`

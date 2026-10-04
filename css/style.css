@@ -1643,3 +1643,107 @@
 
   /* 상단 메뉴 영역 안의 나가기 버튼(전투 화면 전용): 왼쪽 끝, 아래 여백 없음 */
   .main-nav .back-btn{ margin:0 auto 0 0; }
+
+  /* ============================================================
+     도감(기본 목록 UI) — 탭/슬롯/툴팁/패널은 신버전 인벤토리(.inv-box-*)를 재사용하고, 여기서는 도감 전용 부분만 정의
+     ============================================================ */
+  #codexWrap{
+    background: linear-gradient(180deg, var(--forge-panel) 0%, var(--forge-panel-2) 100%);
+    border:1px solid var(--forge-line); border-radius:18px; padding:22px 20px;
+  }
+  /* 가로 탭: 탭 영역 전체를 채우지 않고 왼쪽부터 필요한 만큼만 */
+  .codex-tabs .inv-box-tab{ flex:0 0 auto; min-width:76px; padding:8px 14px; }
+  .codex-tabs .inv-box-tab.active{ padding-bottom:11px; }
+  /* 패널 왼쪽 안쪽 여백 없음 — 세로 탭이 목록 영역 맨 왼쪽에 붙음(필터 줄은 자체 여백) */
+  .codex-panel{ padding:10px 12px 12px 0; }
+  .codex-placeholder{ padding:40px 12px; text-align:center; font-size:12px; color: var(--forge-cream-dim); }
+
+  /* 등급 필터(체크박스) + 검색 */
+  .codex-filter{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:0 0 10px 12px; }
+  .codex-checks{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .codex-check{ display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; -webkit-user-select:none; font-size:12px; }
+  .codex-check input{ position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
+  .codex-checkbox{
+    position:relative; width:14px; height:14px; box-sizing:border-box; flex:none; border-radius:4px;
+    background:#1a1510; border:1px solid var(--forge-line); transition: border-color .12s, background .12s;
+  }
+  .codex-check:hover .codex-checkbox{ border-color: var(--codex-grade-color, var(--forge-gold)); }
+  .codex-check input:checked + .codex-checkbox{ background:#2c2415; border-color: var(--codex-grade-color, var(--forge-gold)); }
+  .codex-check input:checked + .codex-checkbox::after{
+    content:''; position:absolute; left:3.5px; top:0.5px; width:3px; height:7px;
+    border:solid var(--codex-grade-color, var(--forge-gold)); border-width:0 2px 2px 0; transform:rotate(45deg);
+  }
+  .codex-check input:focus-visible + .codex-checkbox{ outline:1px solid var(--forge-gold); outline-offset:1px; }
+  .codex-check-label{ color: var(--codex-grade-color, var(--forge-cream)); opacity:.6; font-weight:700; }
+  .codex-check input:checked ~ .codex-check-label{ opacity:1; }
+
+  .codex-search{ position:relative; margin-left:auto; flex:0 1 170px; min-width:130px; }
+  .codex-search input{
+    width:100%; box-sizing:border-box; background:#1a1510; border:1px solid var(--forge-line); border-radius:6px;
+    padding:5px 28px 5px 8px; font-size:12px; font-family:inherit; color: var(--forge-cream); outline:none;
+    user-select:text; -webkit-user-select:text;
+  }
+  .codex-search input:focus{ border-color: var(--forge-gold); }
+  .codex-search input::placeholder{ font-style:italic; color: var(--forge-cream-dim); opacity:.5; }
+  .codex-search-icon{ position:absolute; right:7px; top:50%; transform:translateY(-50%); width:16px; height:16px; opacity:.5; pointer-events:none; }
+  .codex-results{
+    position:absolute; top:calc(100% + 4px); right:0; z-index:30; width:max(100%, 230px); max-height:240px; overflow-y:auto;
+    box-sizing:border-box; background:#0e0b09; border:1px solid var(--forge-line); border-radius:8px; padding:4px;
+    box-shadow:0 8px 20px rgba(0,0,0,.55);
+  }
+  .codex-result{
+    display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; padding:5px 8px;
+    background:transparent; border:none; border-radius:6px; cursor:pointer; text-align:left; font-size:12px; font-family:inherit;
+  }
+  .codex-result:hover{ background:#352b1d; }
+  .codex-result-cat{ flex:none; font-size:11px; color: var(--forge-cream-dim); }
+  .codex-result-empty{ padding:8px; font-size:12px; color: var(--forge-cream-dim); text-align:center; }
+  .codex-hl{ color:#ffe14d; font-weight:700; }
+
+  /* 세로 탭(96×32, 간격 없음, 위에서부터) + 아이템 그리드 */
+  .codex-body{ display:flex; align-items:flex-start; }
+  .codex-vtabs{ display:flex; flex-direction:column; flex:none; width:96px; overflow-y:auto; }
+  .codex-vtab{
+    width:96px; height:32px; flex:none; box-sizing:border-box; margin:0; padding:0;
+    background: var(--forge-panel-2); border:1px solid var(--forge-line); border-left:none; border-top-width:0;
+    color: var(--forge-cream-dim); font-size:12px; font-weight:700; font-family:inherit; cursor:pointer;
+  }
+  .codex-vtab:first-child{ border-top-width:1px; }
+  .codex-vtab:hover{ color: var(--forge-cream); }
+  .codex-vtab.active{ background:#352b1d; color: var(--forge-gold); box-shadow: inset 3px 0 0 var(--forge-gold); }
+  /* 그리드 영역: 높이는 JS(codexSyncGridHeight)가 8줄 높이로 고정 — 40개를 넘으면 이 안에서 스크롤 */
+  .codex-gridscroll{ position:relative; flex:1; min-width:0; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; padding-left:10px; box-sizing:border-box; }
+  .codex-grid{ display:grid; grid-template-columns: repeat(5, minmax(0, 42px)); gap:4px; justify-content:center; padding:4px 0 2px; }
+  .codex-slot.flash{ box-shadow:0 0 0 2px var(--forge-gold); }
+  /* 툴팁: 스크롤 영역에서 잘리지 않도록 화면 기준 고정 위치(JS가 left/top 지정). 내용 스타일은 기존 .tooltip 그대로 */
+  .tooltip.codex-tip{ position:fixed; width:210px; bottom:auto; transform:none; line-height:1.6; z-index:200; }
+  .tooltip.codex-tip.show{ visibility:visible; opacity:1; }
+
+  /* ---- 도감: 즐겨찾기 / 아이템 세부 정보 ---- */
+  .codex-body{ position:relative; }
+  .codex-vtab-fav{ margin-bottom:8px; }                 /* 즐겨찾기 탭과 장비 종류 탭 사이의 시각적 간격(세로 탭 영역 안에서만 쓰이므로 전체 높이는 변하지 않음) */
+  .codex-vtab-after-fav{ border-top-width:1px; }         /* 간격 때문에 떨어진 첫 장비 탭에도 위쪽 테두리 */
+  /* 즐겨찾기 표시: 아이콘 우측 상단(장착 표시 E와 같은 자리, 잠금 배지와 같은 16px) */
+  .codex-fav-mark{
+    position:absolute; top:1px; right:1px; width:16px; height:16px; z-index:6; pointer-events:none;
+    filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); -webkit-user-drag:none; user-select:none;
+  }
+  /* 세부 정보/선택 화면: 인벤토리 비교 화면과 같은 폭(패널 좌우 12px 여백)·그리드 영역 높이 */
+  #codexInfo, #codexPicker{ left:12px; right:0; top:0; bottom:auto; height: var(--codex-grid-h, 364px); }
+  .codex-pick-msg{ padding:4px 2px 6px; font-size:11.5px; color: var(--forge-cream-dim); text-align:center; }
+  /* 강화 단계 선택(◀ [ +0 ] ▶) */
+  .cdx-enh{ display:inline-flex; align-items:center; justify-content:center; gap:4px; }
+  .cdx-enh-btn{
+    width:20px; height:18px; padding:0; line-height:1; font-size:10px; font-family:inherit; cursor:pointer;
+    background:#2a231f; border:1px solid var(--forge-line); color: var(--forge-cream); border-radius:4px;
+  }
+  .cdx-enh-btn:hover:not(:disabled){ border-color: var(--forge-gold); color: var(--forge-gold); }
+  .cdx-enh-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .cdx-enh-val{
+    min-width:34px; box-sizing:border-box; text-align:center; padding:0 4px; border-radius:4px;
+    background:#1a1510; border:1px solid var(--forge-line); color: var(--forge-gold); font-weight:700;
+  }
+  /* 비교 대상 선택 중 돋보기 커서(마우스 환경): 인벤토리 비교 모드와 동일하게 기본 커서를 숨김 */
+  @media (hover:hover) and (pointer:fine){
+    body.codex-picking #codexPicker, body.codex-picking #codexPicker *{ cursor:none !important; }
+  }

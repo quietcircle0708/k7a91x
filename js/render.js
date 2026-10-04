@@ -180,12 +180,14 @@ function render(){
     el('openDungeonBtn').disabled = true;
     el('openCharacterBtn').disabled = true;
     el('openCraftBtn').disabled = true;
+    el('openCollectionBtn').disabled = true;
   } else {
     el('openShopBtn').disabled = false;
     el('openInventoryBtn').disabled = false;
     el('openDungeonBtn').disabled = false;
     el('openCharacterBtn').disabled = false;
     el('openCraftBtn').disabled = false;
+    el('openCollectionBtn').disabled = false;
   }
 }
 
@@ -1549,7 +1551,7 @@ function buildCharCombatStatsHtml(){
     <div class="char-stat-row big"><span>총 공격력</span>${charStatValueWithTip('atk', ctx, '총 공격력', `${totalAtk}`)}</div>
     <div class="char-stat-row big"><span>공격속도</span>${charStatValueWithTip('atkSpeed', ctx, '공격속도', `${totalSpeed.toFixed(2)}회/초`)}</div>
     <div class="char-stat-row big"><span>치명타 확률</span>${charStatValueWithTip('crit', ctx, '치명타 확률', `${totalCrit}%`)}</div>
-    <div class="char-stat-row big"><span>치명타 피해</span>${charStatValueWithTip('critDamage', ctx, '치명타 피해', `${critMultiplierFor(null) * 100}%`)}</div>
+    <div class="char-stat-row big"><span>치명타 피해</span>${charStatValueWithTip('critDamage', ctx, '치명타 피해', `${Math.round(critMultiplierFor(null) * 10000) / 100}%`)}</div>
     <div class="char-stat-row big"><span>방어도 무시</span>${charStatValueWithTip('defenseIgnore', ctx, '방어도 무시', defenseIgnoreText)}</div>
     <div class="char-stat-divider"></div>
     <div class="char-stat-row big"><span>총 방어도</span>${charStatValueWithTip('defense', ctx, '총 방어도', `${totalDef}`)}</div>

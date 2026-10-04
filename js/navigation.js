@@ -5,6 +5,7 @@
 // ============================================================
 
 function showView(name){
+  if(currentView === 'collection' && name !== 'collection' && typeof codexOnLeave === 'function') codexOnLeave(); // 도감 툴팁/검색 결과창은 도감 화면 안에서만 유지됨
   if(currentView === 'inventory' && name !== 'inventory' && typeof invCompareReset === 'function') invCompareReset(); // 비교 모드도 인벤토리 메뉴 안에서만 유지됨(나가면 모드·기준·팝업·돋보기 커서 초기화)
   if(currentView === 'inventory' && name !== 'inventory') invLockModeSet(false); // 잠금 모드는 인벤토리 메뉴 안에서만 유지됨(나가면 해제 + 일반 커서 복원)
   if(currentView === 'hunt' && name !== 'hunt'){
@@ -69,16 +70,18 @@ function showView(name){
   el('shopView').style.display = name === 'shop' ? 'block' : 'none';
   el('inventoryView').style.display = name === 'inventory' ? 'block' : 'none';
   el('craftView').style.display = name === 'craft' ? 'block' : 'none';
+  el('collectionView').style.display = name === 'collection' ? 'block' : 'none';
   el('dungeonListView').style.display = name === 'dungeonlist' ? 'block' : 'none';
   el('characterView').style.display = name === 'character' ? 'block' : 'none';
   el('huntView').style.display = name === 'hunt' ? 'block' : 'none';
   el('exitHuntBtn').style.display = name === 'hunt' ? '' : 'none'; // 전투 화면의 나가기 버튼은 상단 메뉴 영역(메뉴 버튼과 같은 줄, 왼쪽)에 있음
   el('backFromDlistBtn').style.display = name === 'dungeonlist' ? '' : 'none'; // 던전 입구의 대장간 돌아가기 버튼도 상단 메뉴 영역에 있음
   // 상점/인벤토리/제작소/캐릭터 화면의 [대장간으로 돌아가기] 버튼도 상단 메뉴 영역에 있고, 해당 화면에서만 표시함
-  [['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character']]
+  [['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character'],['backFromCollectionBtn','collection']]
     .forEach(([id, view]) => { el(id).style.display = name === view ? '' : 'none'; });
   currentView = name;
   if(name === 'dungeonlist') renderDungeonList();
+  if(name === 'collection') codexOpen(); // 도감: 진입할 때마다 현재 장비 데이터로 목록을 새로 구성
   if(name === 'hunt') renderHunt();
   alignHuntHeader();
   if(name === 'craft'){ renderCraftTabs(); renderCraftList(craftUI.tab); }
@@ -151,6 +154,7 @@ function openInventory(){ if(isEnhancing) return; guardedNav('inventory'); }
 function openDungeonList(){ if(isEnhancing) return; guardedNav('dungeonlist'); }
 function openCharacterMenu(){ if(isEnhancing) return; guardedNav('character'); }
 function openCraft(){ if(isEnhancing) return; guardedNav('craft'); }
+function openCollection(){ if(isEnhancing) return; guardedNav('collection'); }
 function closeToForge(){ showView('forge'); }
 
 // ---- 인벤토리 탭 ----

@@ -20,6 +20,7 @@
     <button class="back-btn back-from-inv" id="backFromInvBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn back-from-craft" id="backFromCraftBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn back-from-character" id="backFromCharacterBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn back-from-collection" id="backFromCollectionBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn back-from-dlist" id="backFromDlistBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn" id="exitHuntBtn" style="display:none;">← 던전 나가기</button>
     <button class="topmenu-btn" id="openPatchNoteBtn" title="공지사항"><img src="assets/ui/patchnote_icon.png" class="patchnote-icon-img" alt="공지사항" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'patchnote-icon-fallback',textContent:'📣'}))"></button>
@@ -258,6 +259,36 @@
         <div class="inv-box-footer">
           <div class="inv-box-slotcount" id="invBoxSlotCount"></div>
           <div class="inv-box-gold" id="invBoxGold"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 도감(기본 목록 UI) — 내용은 codex.js가 채움. 탭/슬롯/툴팁 스타일은 신버전 인벤토리(.inv-box-*)를 재사용 -->
+  <div id="collectionView" style="display:none;">
+    <div class="codex-wrap" id="codexWrap">
+      <div class="shop-title">도감</div>
+      <div class="inv-box-tabs codex-tabs" id="codexTabs"></div>
+      <div class="inv-box-panel codex-panel">
+        <div id="codexPanelEquipment">
+          <div class="codex-filter">
+            <div class="codex-checks" id="codexChecks"></div>
+            <div class="codex-search" id="codexSearch">
+              <input type="text" id="codexSearchInput" placeholder="클릭하여 검색..." autocomplete="off" autocapitalize="off" spellcheck="false">
+              <img src="assets/ui/icon_item_comparison.png" class="codex-search-icon" alt="" draggable="false">
+              <div class="codex-results" id="codexResults" style="display:none;"></div>
+            </div>
+          </div>
+          <div class="codex-body">
+            <div class="codex-vtabs" id="codexVTabs"></div>
+            <div class="codex-gridscroll" id="codexGridScroll"><div class="codex-grid" id="codexGrid"></div></div>
+            <!-- 아이템 세부 정보 / 비교 대상 선택: 인벤토리 비교 화면(.inv-box-compare)과 같은 모양, 그리드 영역 위에 덮어서 표시(codex.js) -->
+            <div class="inv-box-compare codex-overlay" id="codexInfo" style="display:none;"></div>
+            <div class="inv-box-compare codex-overlay" id="codexPicker" style="display:none;"></div>
+          </div>
+        </div>
+        <div id="codexPanelMonster" style="display:none;">
+          <div class="codex-placeholder">몬스터 도감은 준비 중입니다.</div>
         </div>
       </div>
     </div>
@@ -1022,6 +1053,9 @@
 
 
 <!-- 스크립트 로드 순서 중요: 아래 순서를 바꾸면 안 됨 (뒤 파일이 앞 파일의 함수/데이터를 참조함) -->
+<!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
+     위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
+<div class="tooltip codex-tip" id="codexTip"></div>
 <script src="js/data.js"></script>
 <script src="js/formulas.js"></script>
 <script src="js/state.js"></script>
@@ -1031,6 +1065,7 @@
 <script src="js/dungeon.js"></script>
 <script src="js/navigation.js"></script>
 <script src="js/inventory_box.js"></script>
+<script src="js/codex.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

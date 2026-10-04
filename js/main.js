@@ -309,7 +309,7 @@ el('openCharacterBtn').addEventListener('click', openCharacterMenu);
 el('openCraftBtn').addEventListener('click', openCraft);
 // ---- 상단 메뉴 버튼 + 그리드: 표현 방식만 담당(각 항목은 위의 기존 열기 함수에 그대로 연결됨) ----
 el('openForgeMenuBtn').addEventListener('click', ()=>{ if(isEnhancing || currentView === 'forge') return; guardedNav('forge'); });
-// 도감: 이번 단계에서는 메뉴 항목만 있고 실제 기능은 없음(항목 클릭 시 그리드만 닫힘).
+el('openCollectionBtn').addEventListener('click', openCollection); // 도감: 기본 목록 UI(codex.js)
 function setMenuGridOpen(open){
   el('menuGrid').style.display = open ? 'grid' : 'none';
   el('menuToggleBtn').classList.toggle('open', open);
@@ -327,6 +327,7 @@ document.querySelector('.back-from-inv').addEventListener('click', closeToForge)
 document.querySelector('.back-from-craft').addEventListener('click', closeToForge);
 document.querySelector('.back-from-character').addEventListener('click', closeToForge);
 document.querySelector('.back-from-dlist').addEventListener('click', closeToForge);
+document.querySelector('.back-from-collection').addEventListener('click', closeToForge);
 el('exitHuntBtn').addEventListener('click', ()=> guardedNav('dungeonlist'));
 el('huntTopToggleBtn').addEventListener('click', toggleHuntTopUi);
 el('treasureChest').addEventListener('click', clickTreasureChest);
