@@ -2545,6 +2545,11 @@ function scrollsAvailableInDungeon(d){
     return lv >= range.min && (lv - 10) <= range.max;
   });
 }
+// 던전이 속한 지역 이름(던전 데이터의 region, 비어 있으면 DEFAULT_DUNGEON_REGION). 몬스터 도감이 지역별 몬스터 목록을
+// 만들 때 사용함 — 몬스터 자체에는 지역 데이터가 없고 항상 던전을 거쳐서 판단함.
+function dungeonRegionOf(d){
+  return (d && d.region) ? d.region : DEFAULT_DUNGEON_REGION;
+}
 // 던전 아이콘: 비어있으면 등장 몬스터 중 첫 번째의 아이콘을 그대로 사용(그 몬스터에 PNG가 등록돼있으면
 // monsterIconHtml을 통해 PNG로, 없으면 기존처럼 이모지로 출력됨). 던전 자체에 지정된 커스텀 아이콘(d.icon)은
 // 몬스터 데이터가 아니므로 PNG 대상이 아니라 기존처럼 문자열 그대로 사용함.

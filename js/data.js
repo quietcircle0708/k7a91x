@@ -2407,10 +2407,13 @@ const ENABLE_MAX_LEVEL_EXP_SYSTEM = false;
 const STAT_POINTS_PER_LEVEL = 4;
 
 // 몬스터 등급
+// 표시 순서 = 등급 순서(도감 정렬이 이 키 순서를 그대로 사용). 기존 '네임드'는 '유니크'로 이름/키만 바뀌었고
+// 골드 보너스 등 동작은 그대로 이어받음(체력/공격력은 에픽만 등급 공식이 있고 유니크는 별도 공식 없음 — 기존과 동일).
+// 유니크 색상은 장비 등급 색상(WEAPON_GRADES.unique)을 그대로 참조해 항상 같은 색을 씀.
 const MONSTER_GRADES = {
   normal: { label: '일반', color: '#ffffff', goldBonus: 0 },
   epic:   { label: '에픽', color: '#a066d6', goldBonus: 0.20 },
-  named:  { label: '네임드', color: '#ff8fc7', goldBonus: 0.35 },
+  unique: { label: '유니크', color: WEAPON_GRADES.unique.color, goldBonus: 0.35 },
 };
 
 // 획득 가능한 아티팩트(장비) 도감
@@ -4550,6 +4553,11 @@ const MONSTERS = {
 //   고정 레벨(level)로만 등장함.
 // dropTable(마석 파편 드랍 규칙)은 더 이상 던전별로 관리하지 않고, 아래 전역 설정(STONE_* / STONE_GRADE_RULES)으로 통일됨.
 // 모험가의 유해(무기) 드랍도 마찬가지로 던전별 설정을 쓰지 않고 위의 RELIC_* 전역 설정값으로 통일됨.
+// region: 던전이 속한 지역 이름(예: '일반', 추후 '일본' 등). 몬스터 데이터에는 지역을 두지 않고, 던전의 region +
+//   그 던전의 monsters 목록으로 "이 몬스터가 어느 지역에 나오는지"를 판단함(몬스터 도감의 세로 탭이 이 값으로 자동 생성됨).
+//   같은 몬스터가 여러 던전에 등록되면 여러 지역에 포함될 수 있음. 등급(일반/에픽 등)과는 무관한 지역 이름이며,
+//   지금은 던전 메뉴/카드에 표시하지 않음. 새 지역은 던전에 region 값만 넣으면 됨.
+const DEFAULT_DUNGEON_REGION = '일반'; // region이 비어 있는 던전에 쓰는 기본 지역(dungeonRegionOf, formulas.js)
 const DUNGEONS = [
   {
     id: 'squirrel_hole',
@@ -4558,6 +4566,7 @@ const DUNGEONS = [
     desc: '숲에서 으스나무의 알 수 없는 힘에 빨려들어온 다람쥐들이 사는 굴입니다. 이들은 이성이 없고 침입자를 무차별적으로 공격합니다.',
     monsters: ['squirrel'],
     levelRange: 2,
+    region: '일반',
   },
   {
     id: 'rat_den',
@@ -4566,6 +4575,7 @@ const DUNGEONS = [
     desc: '하수도 깊은 곳에 자리 잡은 쥐떼의 소굴입니다. 가끔 흡혈 박쥐가 함께 서식하기도 합니다.',
     monsters: ['rat', 'bat'],
     levelRange: 2,
+    region: '일반',
   },
   {
     id: 'snake_den',
@@ -4574,6 +4584,7 @@ const DUNGEONS = [
     desc: '습하고 어두운 동굴 깊은 곳에 뱀들이 똬리를 튼 소굴입니다. 방울뱀의 독은 매우 위험합니다.',
     monsters: ['blue_snake', 'tailless_snake', 'rattlesnake'],
     levelRange: 2,
+    region: '일반',
   },
   {
     id: 'deer_den',
@@ -4582,6 +4593,7 @@ const DUNGEONS = [
     desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다.',
     monsters: ['blue_deer', 'red_deer', 'bluehorn_deer'],
     levelRange: 4,
+    region: '일반',
   },
   {
     id: 'bear_den',
@@ -4590,6 +4602,7 @@ const DUNGEONS = [
     desc: '곰들의 울음소리가 끊이지 않는 어두운 굴. 용기 있는 자만이 발을 들일 수 있다.',
     monsters: ['red_bear', 'fierce_bear', 'black_bear'],
     levelRange: 4,
+    region: '일반',
   },
   {
     id: 'boar_den',
@@ -4598,6 +4611,7 @@ const DUNGEONS = [
     desc: '거친 숨소리와 발굽 소리가 울려 퍼지는 맷돼지들의 소굴',
     monsters: ['mountain_boar', 'forest_boar', 'red_boar'],
     levelRange: 4,
+    region: '일반',
   },
   {
     id: 'fox_den',
@@ -4606,6 +4620,7 @@ const DUNGEONS = [
     desc: '붉은 노을이 지는 언덕 아래, 영악한 여우들이 무리 지어 사는 굴',
     monsters: ['fox', 'greenfox', 'blackfox', 'ninetailfox'],
     levelRange: 4,
+    region: '일반',
   },
   {
     id: 'tiger_den',
@@ -4614,6 +4629,7 @@ const DUNGEONS = [
     desc: '호랑이들이 서식하는 깊고 험난한 동굴',
     monsters: ['tiger1', 'tiger2', 'tiger3', 'tiger4'],
     levelRange: 6,
+    region: '일반',
   },
   {
     id: 'mantis_den',
@@ -4622,6 +4638,7 @@ const DUNGEONS = [
     desc: '어둠 속에서 낫을 휘두르는 사마귀들의 소굴',
     monsters: ['mantis', 'mantis2', 'epicmantis1', 'epicmantis2'],
     levelRange: 6,
+    region: '일반',
   },
   {
     id: 'spider_den',
@@ -4630,6 +4647,7 @@ const DUNGEONS = [
     desc: '어둠 속에 끝없이 이어진 거미들의 소굴',
     monsters: ['spider', 'spider2', 'epicspider1', 'epicspider2'],
     levelRange: 6,
+    region: '일반',
   },
   {
     id: 'scorpion_den',
@@ -4638,6 +4656,7 @@ const DUNGEONS = [
     desc: '전갈들이 지배하는 거대한 지하 동굴',
     monsters: ['scorpion', 'scorpion2', 'epicscorpion', 'epicscorpion2'],
     levelRange: 7,
+    region: '일반',
   },
   {
     id: 'puppet_den',
@@ -4646,6 +4665,7 @@ const DUNGEONS = [
     desc: '버려진 인형들이 저주받은 채 살아 움직이는 동굴',
     monsters: ['woodpuppet', 'ironpuppet', 'emeraldpuppet', 'puppeteer'],
     levelRange: 7,
+    region: '일반',
   },
   {
     id: 'ghost_den',
@@ -4654,6 +4674,7 @@ const DUNGEONS = [
     desc: '산 자의 발걸음을 기다리는 원혼들의 지하묘지',
     monsters: ['ghost', 'ghost2', 'epicghost', 'epicghost2'],
     levelRange: 5,
+    region: '일반',
   },
   {
     id: 'black_ghost_den',
@@ -4662,6 +4683,7 @@ const DUNGEONS = [
     desc: '깊숙한 곳에 자리잡은 원혼들의 지하묘지',
     monsters: ['blackghost', 'blackghost2', 'epicblackghost', 'epicblackghost2'],
     levelRange: 5,
+    region: '일반',
   },
   {
     id: 'skeleton_den',
@@ -4670,6 +4692,7 @@ const DUNGEONS = [
     desc: '해골이 잠든 저주받은 지하 동굴',
     monsters: ['skeleton', 'skeleton2', 'epicskeleton', 'epicskeleton2'],
     levelRange: 5,
+    region: '일반',
   },
   {
     id: 'black_skeleton_den',
@@ -4678,6 +4701,7 @@ const DUNGEONS = [
     desc: '해골이 잠든 저주받은 지하 동굴의 깊은 곳',
     monsters: ['blackskeleton', 'blackskeleton2', 'epicblackskeleton', 'epicblackskeleton2'],
     levelRange: 5,
+    region: '일반',
   },
 ];
 

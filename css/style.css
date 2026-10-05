@@ -1747,3 +1747,41 @@
   @media (hover:hover) and (pointer:fine){
     body.codex-picking #codexPicker, body.codex-picking #codexPicker *{ cursor:none !important; }
   }
+
+  /* ---- 도감: 몬스터 ----
+     아이콘 크기는 여기 변수 두 개로만 정함(JS에 크기를 쓰지 않음). 나중에 크기를 바꾸려면 이 값만 수정하면 됨.
+     --codex-monster-icon-size: 몬스터 도감 목록/정보 화면의 몬스터 아이콘, --codex-mdrop-icon-size: 정보 화면의 드랍 아이콘. */
+  #codexWrap{ --codex-monster-icon-size:32px; --codex-mdrop-icon-size:32px; }
+  /* 몬스터 슬롯: 이미지(1em)와 이모지 모두 슬롯의 font-size를 따라가므로 font-size로 크기를 지정 */
+  .codex-mslot{ font-size: var(--codex-monster-icon-size); line-height:1; }
+  .codex-mslot .codex-monster-icon{ max-width:100%; max-height:100%; }
+  /* 몬스터 정보 화면: 장비 비교 UI(.inv-box-compare/.cmp-*)와 스타일을 공유하지 않는 독립 패널(모양만 비슷하게 맞춤) */
+  .codex-minfo{
+    position:absolute; left:12px; right:0; top:0; height: var(--codex-grid-h, 364px); z-index:20; flex-direction:column;
+    background:#2c2415; border:1px solid var(--forge-line); border-radius:8px; padding:6px 8px; box-sizing:border-box; font-size:11.5px;
+  }
+  /* 정보를 열면 목록 영역 대신 정보 패널이 그 자리에 놓임: 최소 높이는 그리드 영역과 같고(데스크톱 크기 동일), 내용이 더 길면(좁은 모바일 폭) 패널이 늘어나 스크롤 없이 전부 보임 */
+  .codex-body.cmi-open > .codex-vtabs, .codex-body.cmi-open > .codex-gridscroll{ display:none; }
+  .codex-body.cmi-open > .codex-minfo{ position:relative; left:auto; right:auto; top:auto; flex:1; min-width:0; height:auto; min-height: var(--codex-grid-h, 364px); margin-left:12px; }
+  .cmi-body{ flex:1; min-height:0; overflow-y:auto; padding:2px 0 4px; }
+  .cmi-section{ margin:6px 0 3px; padding-bottom:2px; border-bottom:1px solid var(--forge-line); font-weight:700; color: var(--forge-gold); }
+  .cmi-section:first-child{ margin-top:0; }
+  /* 기본 정보: 아이콘은 왼쪽, 이름/레벨/등급/방어도 줄은 오른쪽(세로 공간 절약 — 드랍 아이템까지 한 화면에 들어오도록) */
+  .cmi-basic{ display:flex; align-items:center; gap:8px; }
+  .cmi-basic-rows{ flex:1; min-width:0; }
+  .cmi-slot{ width:42px; flex:none; }
+  .cmi-row{ display:grid; grid-template-columns:64px 1fr; gap:6px; padding:2px 0; border-bottom:1px dashed rgba(255,255,255,.06); line-height:1.4; }
+  .cmi-label{ color: var(--forge-cream-dim); }
+  .cmi-val{ text-align:center; color: var(--forge-gold); word-break:keep-all; overflow-wrap:anywhere; min-width:0; }
+  .cmi-dungeons{ text-align:center; color: var(--forge-cream); line-height:1.6; }
+  /* 드랍 아이콘 줄: 한 줄, 칸이 적으면 가운데 정렬 / 넘치면 가로 스크롤(margin:auto는 넘칠 때 0이 되어 왼쪽부터 스크롤됨) */
+  .cmi-drops{ overflow-x:auto; overflow-y:hidden; padding:3px 0 4px; }
+  .cmi-drops-inner{ display:flex; gap:6px; width:max-content; margin:0 auto; }
+  .codex-mdrop{
+    flex:none; box-sizing:border-box; width:calc(var(--codex-mdrop-icon-size) + 8px); height:calc(var(--codex-mdrop-icon-size) + 8px);
+    display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid var(--forge-line);
+    background: var(--forge-panel-2); font-size: var(--codex-mdrop-icon-size); line-height:1; cursor:help; user-select:none; -webkit-user-select:none;
+  }
+  .codex-mdrop:hover{ background:#352b1d; }
+  .codex-drop-img{ width: var(--codex-mdrop-icon-size); height: var(--codex-mdrop-icon-size); }
+  .cmi-foot{ display:flex; justify-content:center; padding-top:6px; border-top:1px solid var(--forge-line); }

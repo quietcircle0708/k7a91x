@@ -164,8 +164,8 @@ function codexSearchResults(){
 }
 
 // 검색어와 일치하는 부분을 노란색으로 강조한 이름 HTML.
-function codexHighlightHtml(name){
-  const q = codexUI.query.trim();
+function codexHighlightHtml(name, query){ // query를 생략하면 장비 도감 검색어(몬스터 도감은 자기 검색어를 넘김)
+  const q = (query != null ? query : codexUI.query).trim();
   if(!q) return codexEsc(name);
   const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
   return name.split(re).map((part, i) => i % 2 === 1 ? `<span class="codex-hl">${codexEsc(part)}</span>` : codexEsc(part)).join('');
@@ -252,6 +252,8 @@ function codexRender(scrollToKey, keepScroll){
     codexRenderVTabs();
     codexRenderGrid(scrollToKey, keepScroll);
     codexRenderResults();
+  } else if(codexUI.tab === 'monster' && typeof codexMonsterRender === 'function'){
+    codexMonsterRender(scrollToKey, keepScroll); // 몬스터 도감(codex_monster.js)
   }
 }
 
@@ -260,6 +262,7 @@ function codexOpen(){
   codexEntries = codexBuildEntries();
   codexEntryByKey = {};
   codexEntries.forEach(e => { codexEntryByKey[e.key] = e; });
+  if(typeof codexMonsterOpen === 'function') codexMonsterOpen(); // 몬스터 도감 엔트리 구성(툴팁/팝업 조회용으로 codexEntryByKey에도 등록됨, 장비 목록과는 별도 배열)
   const cats = codexCategories();
   if(!cats.some(c => c.id === codexUI.cat)){ // 기본 선택은 즐겨찾기가 아니라 첫 번째 장비 분류
     const firstEquip = cats.find(c => c.id !== CODEX_FAVORITES_ID);
@@ -282,6 +285,7 @@ function codexOnLeave(){
   codexCloseOverlays();
   codexUI.resultsOpen = false;
   el('codexResults').style.display = 'none';
+  if(typeof codexMonsterOnLeave === 'function') codexMonsterOnLeave();
 }
 
 // ---- 검색 결과 선택 → 해당 아이템이 속한 가로/세로 탭으로 이동 ----
@@ -300,11 +304,17 @@ function codexGoToEntry(key){
 // ---- 툴팁(스크롤 영역 안에서 잘리지 않도록 화면 기준 고정 위치로 표시) ----
 function codexShowTip(slotEl){
   const e = codexEntryByKey[slotEl.dataset.key];
+  if(!e) return;
+  codexShowTipHtml(slotEl, e.tooltipHtml, e.key);
+}
+// 임의의 HTML을 anchorEl 위(공간이 없으면 아래)에 고정 위치 툴팁으로 표시(몬스터 도감의 드랍 아이콘 툴팁도 사용).
+function codexShowTipHtml(anchorEl, html, tipKey){
   const tip = el('codexTip');
-  if(!e || !tip) return;
-  tip.innerHTML = e.tooltipHtml;
+  if(!anchorEl || !tip) return;
+  tip.innerHTML = html;
   tip.classList.add('show');
-  codexUI.tipKey = e.key;
+  codexUI.tipKey = tipKey;
+  const slotEl = anchorEl;
   const r = slotEl.getBoundingClientRect();
   const tw = tip.offsetWidth, th = tip.offsetHeight;
   const vw = document.documentElement.clientWidth;
@@ -490,6 +500,7 @@ function codexCursorSync(){
     codexHideTip();
     codexClosePopup();
     codexCloseInfo();
+    if(typeof codexMonsterCloseInfo === 'function') codexMonsterCloseInfo();
     codexRender();
   });
   el('codexVTabs').addEventListener('click', (ev) => {
@@ -583,7 +594,7 @@ function codexCursorSync(){
   });
 
   document.addEventListener('click', (ev) => {
-    if(!ev.target.closest('.codex-slot') && !ev.target.closest('#codexPopup')){
+    if(!ev.target.closest('.codex-slot') && !ev.target.closest('#codexPopup') && !ev.target.closest('.codex-mdrop')){
       codexHideTip();
       codexClosePopup(); // 메뉴 바깥 영역을 누르면 닫힘(신버전 인벤토리와 동일)
     }
@@ -594,6 +605,7 @@ function codexCursorSync(){
   });
   document.addEventListener('keydown', (ev) => {
     if(ev.key !== 'Escape' || currentView !== 'collection') return;
+    if(codexUI.tab === 'monster'){ if(typeof codexMonsterOnEscape === 'function') codexMonsterOnEscape(); return; }
     if(codexUI.popupKey){ codexClosePopup(); return; }
     if(codexInfo.picking){ codexInfo.picking = false; codexRenderOverlays(); return; } // 비교 대상 선택 취소 → 세부 정보로
     if(codexInfoIsOpen()) codexCloseInfo();
@@ -602,6 +614,9 @@ function codexCursorSync(){
   window.addEventListener('resize', () => {
     codexHideTip();
     codexClosePopup();
-    if(currentView === 'collection') codexSyncGridHeight();
+    if(currentView === 'collection'){
+      if(codexUI.tab === 'monster' && typeof codexMonsterSyncGridHeight === 'function') codexMonsterSyncGridHeight();
+      else codexSyncGridHeight();
+    }
   });
 })();

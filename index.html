@@ -287,8 +287,22 @@
             <div class="inv-box-compare codex-overlay" id="codexPicker" style="display:none;"></div>
           </div>
         </div>
+        <!-- 몬스터 도감 — 장비 도감과 같은 모양(.codex-*)을 쓰되 DOM id/로직은 완전히 분리(codex_monster.js) -->
         <div id="codexPanelMonster" style="display:none;">
-          <div class="codex-placeholder">몬스터 도감은 준비 중입니다.</div>
+          <div class="codex-filter">
+            <div class="codex-checks" id="codexMChecks"></div>
+            <div class="codex-search" id="codexMSearch">
+              <input type="text" id="codexMSearchInput" placeholder="클릭하여 검색..." autocomplete="off" autocapitalize="off" spellcheck="false">
+              <img src="assets/ui/icon_item_comparison.png" class="codex-search-icon" alt="" draggable="false">
+              <div class="codex-results" id="codexMResults" style="display:none;"></div>
+            </div>
+          </div>
+          <div class="codex-body">
+            <div class="codex-vtabs" id="codexMVTabs"></div>
+            <div class="codex-gridscroll" id="codexMGridScroll"><div class="codex-grid" id="codexMGrid"></div></div>
+            <!-- 몬스터 정보(단일 패널): 장비 비교 UI와 코드/스타일을 공유하지 않는 별도 구조 -->
+            <div class="codex-minfo" id="codexMInfo" style="display:none;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1066,6 +1080,7 @@
 <script src="js/navigation.js"></script>
 <script src="js/inventory_box.js"></script>
 <script src="js/codex.js"></script>
+<script src="js/codex_monster.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
