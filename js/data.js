@@ -126,6 +126,15 @@ const WEAPON_IMAGE_FALLBACK = 'common_shortsword';
 // 실패하는 경우엔 폴백 PNG가 아니라 이모지(icon)로 대체됨(monsterIconHtml/monsterImgError, formulas.js).
 const MONSTER_IMAGE_DIR = 'assets/monster/';
 const MONSTER_IMAGE_EXT = '.png';
+// UI 공통 아이콘(골드/경험치/모험가의 유해) — assets/ui/<image>.png. PNG 로드에 실패하면 icon(이모지)으로 자동 대체됨.
+// 표시는 formulas.js의 uiIconHtml/goldHtml을 거치므로, 아이콘을 바꾸려면 여기 image 파일명만 바꾸면 모든 화면에 반영됨.
+const UI_ICON_DIR = 'assets/ui/';
+const UI_ICON_EXT = '.png';
+const UI_ICONS = {
+  gold:  { image: 'ui_gold_icon',  icon: '🪙' },
+  exp:   { image: 'ui_xp_icon',    icon: '✨' },
+  relic: { image: 'ui_relic_icon', icon: '💀' },
+};
 
 // 기타/아티팩트/소비 아이템 이미지 파일 경로 규칙(무기·몬스터와 동일한 방식). ARTIFACTS/CONSUMABLES/
 // MISC_ITEMS 항목에 선택 필드 image(파일명만, 확장자/경로 제외)를 등록하면 이모지(icon) 대신 PNG가
@@ -2632,72 +2641,72 @@ const ITEM_CLASS_LABELS = { stone: '마석', misc: '기타' };
 // 곧 마석 종류 자체를 나타내므로 이 필드의 의미가 다름(둘 다 itemClass로 이미 명확히 구분되어 섞이지 않음).
 const MISC_ITEMS = {
   manaFragment: {
-    id: 'manaFragment', name: '마석 파편', icon: '💠', itemClass: 'stone', grade: 'normal',
+    id: 'manaFragment', name: '마석 파편', icon: '', image: 'stone_common', itemClass: 'stone', grade: 'normal',
     desc: '마물의 부서진 심장 파편',
     sellPrice: 50, stateKey: 'manaFragments',
   },
   manaShard: {
-    id: 'manaShard', name: '마석 조각', icon: '💠', itemClass: 'stone', grade: 'rare',
+    id: 'manaShard', name: '마석 조각', icon: '', image: 'stone_rare', itemClass: 'stone', grade: 'rare',
     desc: '마물의 부서진 심장 조각',
-    sellPrice: 100, stateKey: 'manaShards',
+    sellPrice: 200, stateKey: 'manaShards',
   },
   manaCrystal: {
-    id: 'manaCrystal', name: '마석 결정', icon: '💠', itemClass: 'stone', grade: 'epic',
+    id: 'manaCrystal', name: '마석 결정', icon: '', image: 'stone_epic', itemClass: 'stone', grade: 'epic',
     desc: '마물의 심장 결정',
-    sellPrice: 200, stateKey: 'manaCrystals',
+    sellPrice: 500, stateKey: 'manaCrystals',
   },
   manaStone: {
-    id: 'manaStone', name: '마석', icon: '💠', itemClass: 'stone', grade: 'unique',
+    id: 'manaStone', name: '마석 정수', icon: '', image: 'stone_unique', itemClass: 'stone', grade: 'unique',
     desc: '온전한 마물의 심장',
-    sellPrice: 1000, stateKey: 'manaStones',
+    sellPrice: 2500, stateKey: 'manaStones',
   },
   acorn: {
-    id: 'acorn', name: '도토리', icon: '🌰', itemClass: 'misc', grade: 'normal',
+    id: 'acorn', name: '도토리', icon: '🌰', image: 'acorn', itemClass: 'misc', grade: 'normal',
     desc: '다람쥐의 먹이',
     sellPrice: 5, stateKey: 'acorns',
   },
   ratMeat: {
-    id: 'ratMeat', name: '쥐고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
+    id: 'ratMeat', name: '쥐고기', icon: '🍖', image: 'ratmeat', itemClass: 'misc', grade: 'normal',
     desc: '쥐의 고기',
     sellPrice: 10, stateKey: 'ratMeats',
   },
   batMeat: {
-    id: 'batMeat', name: '박쥐고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
+    id: 'batMeat', name: '박쥐고기', icon: '🍖', image: 'boarmeat', itemClass: 'misc', grade: 'normal',
     desc: '박쥐의 고기',
     sellPrice: 100, stateKey: 'batMeats',
   },
   snakeMeat: {
-    id: 'snakeMeat', name: '뱀고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
+    id: 'snakeMeat', name: '뱀고기', icon: '🍖', image: 'snakemeat', itemClass: 'misc', grade: 'normal',
     desc: '뱀의 고기',
     sellPrice: 15, stateKey: 'snakeMeats',
   },
   deerMeat: {
-    id: 'deerMeat', name: '사슴고기', icon: '🍖', itemClass: 'misc', grade: 'normal',
+    id: 'deerMeat', name: '사슴고기', icon: '🍖', image: 'deermeat', itemClass: 'misc', grade: 'normal',
     desc: '사슴의 고기',
     sellPrice: 20, stateKey: 'deerMeats',
   },
   deerAntler: {
-    id: 'deerAntler', name: '녹용', icon: '🦴', itemClass: 'misc', grade: 'rare',
+    id: 'deerAntler', name: '녹용', icon: '🦴', image: 'dearhorn', itemClass: 'misc', grade: 'rare',
     desc: '약재로 사용되는 귀한 재료',
     sellPrice: 200, stateKey: 'deerAntlers',
   },
   bearHide: {
-    id: 'bearHide', name: '곰 가죽', icon: '🍖', itemClass: 'misc', grade: 'normal',
+    id: 'bearHide', name: '곰 가죽', icon: '🍖', image: 'bearskin', itemClass: 'misc', grade: 'normal',
     desc: '곰의 가죽',
     sellPrice: 50, stateKey: 'bearHides',
   },
   bearBile: {
-    id: 'bearBile', name: '웅담', icon: '🍖', itemClass: 'misc', grade: 'rare',
+    id: 'bearBile', name: '웅담', icon: '🍖', image: 'beargall', itemClass: 'misc', grade: 'rare',
     desc: '곰의 강인한 생명력이 깃든 귀한 약재',
     sellPrice: 400, stateKey: 'bearBiles',
   },
   mountainBoarMeat: {
-    id: 'mountainBoarMeat', name: '산돼지고기', icon: '🍖', itemClass: 'misc', grade: 'rare',
+    id: 'mountainBoarMeat', name: '산돼지고기', icon: '🍖', image: 'boarmeat', itemClass: 'misc', grade: 'rare',
     desc: '비싼 값에 팔리는 산돼지의 고기',
     sellPrice: 200, stateKey: 'mountainBoarMeats',
   },
   forestBoarMeat: {
-    id: 'forestBoarMeat', name: '숲돼지고기', icon: '🍖', itemClass: 'misc', grade: 'rare',
+    id: 'forestBoarMeat', name: '숲돼지고기', icon: '🍖', image: 'boarmeat', itemClass: 'misc', grade: 'rare',
     desc: '구하기 어려운 숲돼지의 고기',
     sellPrice: 250, stateKey: 'forestBoarMeats',
   },
@@ -2712,12 +2721,12 @@ const MISC_ITEMS = {
     sellPrice: 1000, stateKey: 'epicShinystones',
   },
   foxFur: {
-    id: 'foxFur', name: '여우 모피', icon: '🍖', itemClass: 'misc', grade: 'normal', // 요청 표에 등급 미기재 → 등급 미표기 기존 아이템 규칙(전부 '일반')과 동일하게 적용
+    id: 'foxFur', name: '여우 모피', icon: '🍖', image: 'foxskin', itemClass: 'misc', grade: 'normal', // 요청 표에 등급 미기재 → 등급 미표기 기존 아이템 규칙(전부 '일반')과 동일하게 적용
     desc: '여우의 가죽, 귀중한 재료로 쓰인다',
     sellPrice: 200, stateKey: 'foxFurs',
   },
   tigerHide: {
-    id: 'tigerHide', name: '자호의 가죽', icon: '🍖', itemClass: 'misc', grade: 'normal', // 요청 표에 등급 미기재 → 등급 미표기 기존 아이템 규칙(전부 '일반')과 동일하게 적용
+    id: 'tigerHide', name: '자호의 가죽', icon: '🍖', image: 'tigerskin', itemClass: 'misc', grade: 'normal', // 요청 표에 등급 미기재 → 등급 미표기 기존 아이템 규칙(전부 '일반')과 동일하게 적용
     desc: '보랏빛을 띈 줄무늬 가죽',
     sellPrice: 250, stateKey: 'tigerHides',
   },
@@ -3224,6 +3233,27 @@ const RESTORE_MATERIALS_BY_GRADE = {
 // 나중에 탭별로 다른 값을 쓰고 싶으면 이 숫자만 바꾸면 됨(다른 코드 수정 불필요).
 // 상점은 무기/방어구/소비/아티팩트 4개 탭에만 적용하고, 마석·기타 탭은 페이지네이션을 적용하지 않음
 // (그 두 탭은 이 객체에 키 자체가 없음 → renderShopTab에서 자동으로 페이지 UI 없이 전체 출력됨).
+// ---- 던전 카드 「획득 가능 아이템」 정렬 설정(render.js buildDungeonDropIcons → formulas.js sortDungeonDropIcons가 사용) ----
+// 분류 순서와 분류별 정렬 기준을 이 두 표에서만 정함. 아이템 이름을 하나씩 지정하지 않고 아이템 데이터(등급/착용 제한 레벨/판매가/이름)만 읽음.
+// DUNGEON_DROP_KINDS: 위에서부터 표시되는 분류 순서. 각 분류의 sort는 정렬 기준 이름의 우선순위 목록(아래 기준 표 참고).
+//   목록에 없는 새 분류(kind)의 아이콘은 모든 분류 뒤에 붙고 DUNGEON_DROP_DEFAULT_SORT를 씀. 새 분류에 전용 규칙이 필요하면 여기에 항목만 추가.
+// 정렬 기준 이름: grade(등급 높은 순, 등급 없음=일반) / levelReq(착용 제한 레벨) / price(판매가 높은 순) / name(가나다 순).
+// levelReq의 방향은 DUNGEON_DROP_LEVEL_REQ_DESC로 바꿀 수 있음(true=높은 레벨 먼저, false=낮은 레벨 먼저).
+// 이 정렬은 던전 카드 전용이며 도감/인벤토리/상점 등 다른 화면의 정렬과 무관함.
+const DUNGEON_DROP_KINDS = [
+  { id: 'gold' },                                                // 골드
+  { id: 'exp' },                                                 // 경험치
+  { id: 'relic' },                                               // 모험가의 유해
+  { id: 'scroll' },                                              // 비급
+  { id: 'artifact', sort: ['grade', 'name'] },                   // 아티팩트(등급 높은 순 → 이름 가나다순)
+  { id: 'equipment', sort: ['grade', 'levelReq', 'name'] },      // 장비(무기/방어구/보조/장신구를 구분하지 않음)
+  { id: 'misc',      sort: ['grade', 'price', 'name'] },         // 기타
+  { id: 'stone',     sort: ['grade', 'price', 'name'] },         // 마석
+  { id: 'consumable', sort: ['grade', 'price', 'name'] },        // 소비(플라스크 — 비급은 별도 분류라 제외)
+];
+const DUNGEON_DROP_DEFAULT_SORT = ['grade', 'price', 'name'];
+const DUNGEON_DROP_LEVEL_REQ_DESC = true;
+
 const PAGE_SIZE = {
   invWeapon: 6,        // 인벤토리 무기 탭
   invArmor: 6,          // 인벤토리 방어구 탭
@@ -3937,14 +3967,19 @@ const RELIC_ENHANCE_LEVEL_CHANCE = {
 
 // 마석 드랍 — 전역 설정값. 던전/몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함.
 // (예전의 던전별 드랍 확률·에픽 몬스터 확정 드랍 규칙은 삭제되고 이 전역 설정으로 대체됨)
-const STONE_DROP_CHANCE = 20;   // 몬스터 처치 시 마석 드랍 판정 확률(%)
-const STONE_DROP_BASE_QTY = 1;  // 기본 드랍 수량(에픽 등급 몬스터는 formulas.js에서 이 값의 2배를 지급)
-// 마석 등급 선택 공식(몬스터 레벨 기준). 위에서부터 순서대로 검사해 조건에 맞는 첫 구간의 등급을 사용함.
-// maxLevel이 null이면 그 구간은 상한이 없는 것으로 처리됨.
-// 지금은 테스트용 공식이며, 레벨 구간이나 등급을 바꾸고 싶으면 이 배열만 수정하면 됨(다른 코드 수정 불필요).
-const STONE_GRADE_RULES = [
-  { minLevel: 1, maxLevel: 9, grade: 'normal' },
-  { minLevel: 10, maxLevel: null, grade: 'rare' },
+const STONE_DROP_CHANCE = 10;   // 몬스터 처치 시 마석 드랍 판정 확률(%)
+// 마석 등급·수량 결정표(실제 처치 몬스터의 최종 레벨 기준, 몬스터 등급은 사용하지 않음 — 모든 몬스터 공통).
+// 몬스터 레벨이 속하는 첫 구간(minLevel~maxLevel, maxLevel이 null이면 상한 없음)을 골라, 그 구간 grades 안에서
+// chance(%, 구간 합계 100)로 등급을 추첨하고, 당첨된 등급의 min~max 사이 정수를 균등 확률로 뽑아 지급 수량으로 씀(min=max면 고정).
+// grades에 없는 등급(=0%)은 그 구간에서 드랍되지 않음. 구간·확률·수량을 바꾸고 싶으면 이 표만 수정하면 됨(다른 코드 수정 불필요).
+const STONE_DROP_TABLE = [
+  { minLevel: 1,  maxLevel: 19,   grades: { normal: { chance: 90, min: 1, max: 1 }, rare: { chance: 10, min: 1, max: 1 } } },
+  { minLevel: 20, maxLevel: 39,   grades: { normal: { chance: 50, min: 1, max: 2 }, rare: { chance: 50, min: 1, max: 1 } } },
+  { minLevel: 40, maxLevel: 59,   grades: { normal: { chance: 20, min: 2, max: 4 }, rare: { chance: 79, min: 1, max: 2 }, epic: { chance: 1, min: 1, max: 1 } } },
+  { minLevel: 60, maxLevel: 79,   grades: { normal: { chance: 10, min: 3, max: 6 }, rare: { chance: 80, min: 1, max: 2 }, epic: { chance: 10, min: 1, max: 1 } } },
+  { minLevel: 80, maxLevel: 89,   grades: { rare: { chance: 70, min: 2, max: 3 }, epic: { chance: 29, min: 1, max: 1 }, unique: { chance: 1, min: 1, max: 1 } } },
+  { minLevel: 90, maxLevel: 94,   grades: { rare: { chance: 50, min: 2, max: 4 }, epic: { chance: 47, min: 1, max: 1 }, unique: { chance: 3, min: 1, max: 1 } } },
+  { minLevel: 95, maxLevel: null, grades: { rare: { chance: 20, min: 2, max: 4 }, epic: { chance: 75, min: 2, max: 2 }, unique: { chance: 5, min: 1, max: 1 } } },
 ];
 
 // 플라스크 드랍 — 전역 설정값. 마석 전역 드랍(STONE_*)과 완전히 동일한 구조를 그대로 재사용해 던전/
@@ -3954,7 +3989,7 @@ const FLASK_DROP_CHANCE = 15;   // 몬스터 처치 시 플라스크 드랍 판�
 const FLASK_DROP_BASE_QTY = 1;  // 기본 드랍 수량(등급 무관 전부 동일)
 // 플라스크 종류 선택 확률(%, 합계 100) — 드랍이 확정된 뒤 체력 회복/마나 회복 중 하나를 고름. 레벨과 무관.
 const FLASK_TYPE_CHANCE = { hp: 60, mp: 40 };
-// 플라스크 단계(포션 등급) 선택 공식(몬스터 레벨 기준). STONE_GRADE_RULES와 동일한 구간 조회 패턴 —
+// 플라스크 단계(포션 등급) 선택 공식(몬스터 레벨 기준). 마석 드랍표(STONE_DROP_TABLE)와 동일한 구간 조회 패턴 —
 // 위에서부터 순서대로 검사해 조건에 맞는 첫 구간의 tier를 사용함. maxLevel이 null이면 상한 없음.
 // tier 값은 CONSUMABLES의 hpFlask{tier}/mpFlask{tier} id와 그대로 연결됨(예: tier 2 → hpFlask2/mpFlask2).
 const FLASK_TIER_RULES = [
@@ -4017,17 +4052,17 @@ const TREASURE_MISC_DROP_TABLE = [
 // 대신 PNG가 출력됨(monsterIconHtml, formulas.js). 등록하지 않으면 기존처럼 icon이 그대로 출력됨.
 const MONSTERS = {
   squirrel: {
-    id: 'squirrel', name: '다람쥐', icon: '🐿️', grade: 'normal', level: 1,
+    id: 'squirrel', name: '다람쥐', icon: '🐿️', image: 'monster_squirrel', grade: 'normal', level: 1,
     defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '도토리', chance: 50 } ],
   },
   rat: {
-    id: 'rat', name: '쥐', icon: '🐀', grade: 'normal', level: 3,
+    id: 'rat', name: '쥐', icon: '🐀', image: 'monster_rat', grade: 'normal', level: 3,
     defense: 0, hpMult: 1.0, atkMult: 0.6, speedMult: 1.5,
     drops: [ { name: '쥐고기', chance: 50 } ],
   },
   bat: {
-    id: 'bat', name: '박쥐', icon: '🦇', grade: 'epic', level: 6,
+    id: 'bat', name: '박쥐', icon: '🦇', image: 'epic_monster_bat', grade: 'epic', level: 6,
     defense: 0, extraGoldBonus: 0.10, // 등급 보너스 위에 추가로 붙는 골드 보너스(기존 그대로 유지)
     hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
     drops: [
@@ -4036,17 +4071,17 @@ const MONSTERS = {
     ],
   },
   blue_snake: {
-    id: 'blue_snake', name: '청사', icon: '🐍', grade: 'normal', level: 6,
+    id: 'blue_snake', name: '청사', icon: '🐍', image: 'monster_snake', grade: 'normal', level: 6,
     defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '뱀고기', chance: 50 } ],
   },
   tailless_snake: {
-    id: 'tailless_snake', name: '꼬리잘린 뱀', icon: '🐍', grade: 'normal', level: 6,
+    id: 'tailless_snake', name: '꼬리잘린 뱀', icon: '🐍', image: 'monster_snake', grade: 'normal', level: 6,
     defense: 0, hpMult: 0.9, atkMult: 1.0, speedMult: 1.1,
     drops: [ { name: '뱀고기', chance: 50 } ],
   },
   rattlesnake: {
-    id: 'rattlesnake', name: '방울뱀', icon: '🐍', grade: 'epic', level: 9,
+    id: 'rattlesnake', name: '방울뱀', icon: '🐍', image: 'monster_snake', grade: 'epic', level: 9,
     defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '뱀고기', chance: 50 },
@@ -4056,17 +4091,17 @@ const MONSTERS = {
     ],
   },
   blue_deer: {
-    id: 'blue_deer', name: '청록수', icon: '🦌', grade: 'normal', level: 10,
+    id: 'blue_deer', name: '청록수', icon: '🦌', image: 'monster_bluedeer', grade: 'normal', level: 10,
     defense: 0, hpMult: 1.0, atkMult: 2.0, speedMult: 0.5,
     drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
   red_deer: {
-    id: 'red_deer', name: '적록수', icon: '🦌', grade: 'normal', level: 10,
+    id: 'red_deer', name: '적록수', icon: '🦌', image: 'monster_reddeer', grade: 'normal', level: 10,
     defense: 0, hpMult: 1.0, atkMult: 0.5, speedMult: 2.0,
     drops: [ { name: '사슴고기', chance: 50 }, { name: '녹용', chance: 20 } ],
   },
   bluehorn_deer: {
-    id: 'bluehorn_deer', name: '청각수', icon: '🦌', grade: 'epic', level: 15,
+    id: 'bluehorn_deer', name: '광록지수', icon: '🦌', image: 'epic_monster_deer', grade: 'epic', level: 15,
     defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '사슴고기', chance: 50 },
@@ -4076,7 +4111,7 @@ const MONSTERS = {
     ],
   },
   red_bear: {
-    id: 'red_bear', name: '적웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
+    id: 'red_bear', name: '평웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
     defense: 0, hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '곰 가죽', chance: 25 },
@@ -4085,7 +4120,7 @@ const MONSTERS = {
     ],
   },
   fierce_bear: {
-    id: 'fierce_bear', name: '사웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
+    id: 'fierce_bear', name: '사웅', icon: '🐻', grade: 'normal', level: 15, image: 'purplebear',
     defense: 0, hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [
       { name: '곰 가죽', chance: 30 },
@@ -4094,7 +4129,7 @@ const MONSTERS = {
     ],
   },
   black_bear: {
-    id: 'black_bear', name: '흑웅', icon: '🐻', grade: 'epic', level: 20, image: 'bear',
+    id: 'black_bear', name: '흑웅', icon: '🐻', grade: 'epic', level: 20, image: 'blackbear',
     defense: 0, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
     drops: [
       { name: '곰 가죽', chance: 50 },
@@ -4106,7 +4141,7 @@ const MONSTERS = {
     ],
   },
   forest_boar: {
-    id: 'forest_boar', name: '숲돼지', icon: '🐗', grade: 'normal', level: 20, image: 'boar',
+    id: 'forest_boar', name: '숲돼지', icon: '🐗', grade: 'normal', level: 20, image: 'monter_forest_boar',
     defense: 0, hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '숲돼지고기', chance: 15 } ],
   },
@@ -4131,7 +4166,7 @@ const MONSTERS = {
     drops: [ { name: '여우 모피', chance: 20 } ],
   },
   greenfox: {
-    id: 'greenfox', name: '사여우', icon: '🦊', grade: 'normal', level: 25, image: 'greenfox',
+    id: 'greenfox', name: '서여우', icon: '🦊', grade: 'normal', level: 25, image: 'greenfox',
     defense: 0, hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [ { name: '여우 모피', chance: 25 } ],
   },
@@ -4246,7 +4281,7 @@ const MONSTERS = {
   // pickEpicMonsterId(자호굴 적호/구미호, 사마귀굴 현랑귀랑/현랑귀와 동일한 방식)로 굴 내 개별 확률을
   // 적용함. 백현귀는 이 던전의 스테이지10(가장 깊은 스테이지)에서만 등장(epicSpawnStages:[10]).
   spider: {
-    id: 'spider', name: '거미', icon: '🕷️', grade: 'normal', level: 40, image: 'spider',
+    id: 'spider', name: '거미', icon: '🕷️', grade: 'normal', level: 40, image: 'spider1',
     defense: -10, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '호박', chance: 15 } ],
   },
@@ -4551,7 +4586,7 @@ const MONSTERS = {
 // levelRange: 일반 등급 몬스터의 등장 레벨 = 몬스터 자체 레벨 ~ (몬스터 자체 레벨 + levelRange), 그 구간 내에서
 //   레벨별 등장 확률은 모두 동일함. 에픽(그 외 등급) 몬스터는 이 범위를 적용하지 않고 몬스터 데이터의
 //   고정 레벨(level)로만 등장함.
-// dropTable(마석 파편 드랍 규칙)은 더 이상 던전별로 관리하지 않고, 아래 전역 설정(STONE_* / STONE_GRADE_RULES)으로 통일됨.
+// dropTable(마석 파편 드랍 규칙)은 더 이상 던전별로 관리하지 않고, 아래 전역 설정(STONE_DROP_CHANCE / STONE_DROP_TABLE)으로 통일됨.
 // 모험가의 유해(무기) 드랍도 마찬가지로 던전별 설정을 쓰지 않고 위의 RELIC_* 전역 설정값으로 통일됨.
 // region: 던전이 속한 지역 이름(예: '일반', 추후 '일본' 등). 몬스터 데이터에는 지역을 두지 않고, 던전의 region +
 //   그 던전의 monsters 목록으로 "이 몬스터가 어느 지역에 나오는지"를 판단함(몬스터 도감의 세로 탭이 이 값으로 자동 생성됨).
@@ -4941,7 +4976,7 @@ const SETTINGS_SCHEMA = [
       {
         id: 'inventoryUi',
         label: '인벤토리 UI',
-        desc: '신버전(박스)은 준비 중이며, 선택해도 현재는 구버전과 동일하게 표시됩니다.',
+        desc: '구버전(세로)은 일부 기능을 지원하지 않습니다.',
         type: 'radio',
         default: 'box', // 저장된 선택값이 없을 때(새 게임/설정값이 없는 저장 데이터)의 기본값 = 신버전(박스). 이미 저장된 선택은 ensureSettingsDefaults가 덮어쓰지 않음
         options: INVENTORY_UI_OPTIONS,

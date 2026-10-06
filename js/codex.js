@@ -311,6 +311,7 @@ function codexShowTip(slotEl){
 function codexShowTipHtml(anchorEl, html, tipKey){
   const tip = el('codexTip');
   if(!anchorEl || !tip) return;
+  if(typeof releaseGlossaryTooltip === 'function') releaseGlossaryTooltip(); // 다른 툴팁이 새로 열리면 열려 있던 용어사전 포함 툴팁(main.js)은 바로 닫음
   tip.innerHTML = html;
   tip.classList.add('show');
   codexUI.tipKey = tipKey;

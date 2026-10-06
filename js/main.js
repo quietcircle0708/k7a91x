@@ -756,9 +756,28 @@ let activeTooltipTip = null;
 // 쪽으로 이동하는 도중 그 간격을 지나는 짧은 순간 host도 tooltip도 아닌 지점을 지나며 mouseout이
 // 먼저 발생할 수 있음 — 이 타이머로 실제로 완전히 벗어난 경우에만 닫히도록 유예를 둠(요구사항 4번).
 let glossaryTooltipHideTimer = null;
+// 지금 JS로 강제 표시 중인(pointer-events/visibility/opacity 인라인 고정) 용어사전 포함 툴팁. 동시에 하나만 유지함.
+// 예전에는 타이머 하나를 모든 툴팁이 공유해서, 용어 툴팁 A의 닫힘 대기 중에 다른 용어 툴팁 B를 열면 A의 타이머가
+// 취소되어 A가 인라인 고정 상태로 영원히 남는 문제가 있었음 → 강제 표시 중인 툴팁을 변수로 추적해 새 툴팁이 열리거나
+// 바깥을 클릭하면 기존 유예(200ms)를 기다리지 않고 즉시 닫음.
+let glossaryHeldTip = null;
+let glossaryHeldHost = null;
+function releaseGlossaryTooltip(){ // 강제 표시를 즉시 해제(그 뒤에는 일반 툴팁과 같이 CSS :hover가 표시 여부를 결정함)
+  clearTimeout(glossaryTooltipHideTimer);
+  const tip = glossaryHeldTip;
+  glossaryHeldTip = null;
+  glossaryHeldHost = null;
+  if(!tip) return;
+  tip.style.pointerEvents = '';
+  tip.style.visibility = '';
+  tip.style.opacity = '';
+  resetTooltipPosition(tip);
+}
 document.addEventListener('mouseover', (e) => {
   const found = findTooltipHost(e.target);
   if(!found) return;
+  // 다른 아이템의 툴팁이 새로 열리면, 열려 있던 용어사전 포함 툴팁은 유예 없이 바로 닫음
+  if(glossaryHeldTip && found.tip !== glossaryHeldTip) releaseGlossaryTooltip();
   activeTooltipTip = found.tip;
   adjustTooltipPosition(found.host, found.tip);
   // 요구사항 2~4번: 툴팁 안에 .glossary-term(용어)이 있으면, 일반 .tooltip의 pointer-events:none
@@ -768,6 +787,8 @@ document.addEventListener('mouseover', (e) => {
   // (요구사항: pointer-events를 전체 .tooltip에 일괄 auto로 바꾸지 않음).
   if(found.tip.querySelector('.glossary-term')){
     clearTimeout(glossaryTooltipHideTimer);
+    glossaryHeldTip = found.tip;
+    glossaryHeldHost = found.host;
     found.tip.style.pointerEvents = 'auto';
     found.tip.style.visibility = 'visible';
     found.tip.style.opacity = '1';
@@ -778,17 +799,26 @@ document.addEventListener('mouseout', (e) => {
   if(!found) return;
   if(e.relatedTarget && found.host.contains(e.relatedTarget)) return; // 여전히 같은 호버 대상 내부(tooltip 포함, DOM상 host의 자손이므로)
   resetTooltipPosition(found.tip);
-  if(found.tip.style.pointerEvents === 'auto'){
+  if(found.tip === glossaryHeldTip){
     const tip = found.tip;
     clearTimeout(glossaryTooltipHideTimer);
     glossaryTooltipHideTimer = setTimeout(() => {
-      tip.style.pointerEvents = '';
-      tip.style.visibility = '';
-      tip.style.opacity = '';
-    }, 200); // host→gap→tooltip 이동 중 발생하는 순간적 mouseout을 흡수하기 위한 짧은 유예(ms)
+      if(glossaryHeldTip === tip) releaseGlossaryTooltip();
+    }, 200); // host→gap→tooltip 이동 중 발생하는 순간적 mouseout을 흡수하기 위한 짧은 유예(ms) — 다른 툴팁이 열리거나 바깥을 클릭하면 이 유예보다 즉시 닫힘이 우선
   }
   if(activeTooltipTip === found.tip) activeTooltipTip = null;
 });
+// 툴팁 영역(호스트 + 툴팁 + 용어사전 팝업) 밖을 누르면 용어사전 포함 툴팁을 즉시 닫음. 마우스가 그대로 호스트 위에 있지 않은 경우
+// (터치 등 mouseout이 오지 않는 환경 포함)에도 남지 않도록 pointerdown과 click 둘 다 캡처 단계에서 확인함.
+function closeGlossaryTooltipOnOutsideEvent(e){
+  if(!glossaryHeldTip) return;
+  const t = e.target;
+  if(glossaryHeldHost && glossaryHeldHost.contains(t)) return;       // 호스트/툴팁 내부(툴팁 안의 용어 포함)
+  if(glossaryPopupEl && glossaryPopupEl.contains(t)) return;          // 용어사전 팝업 내부
+  releaseGlossaryTooltip();
+}
+document.addEventListener('pointerdown', closeGlossaryTooltipOnOutsideEvent, true);
+document.addEventListener('click', closeGlossaryTooltipOnOutsideEvent, true);
 
 // ---- 용어사전 팝업 ----
 // 스킬 설명/고유 옵션 텍스트 안의 {term:id}단어{/term}가 resolveGlossaryTermsHtml(formulas.js)에 의해

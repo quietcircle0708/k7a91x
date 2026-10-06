@@ -327,6 +327,18 @@ function itemIconHtml(itemDefLike, className){
   const bgCls = gradeIconBgClass(itemDefLike.grade);
   return bgCls ? `<span class="${bgCls}">${img}</span>` : img;
 }
+// 골드/경험치/모험가의 유해 공통 아이콘 <img> HTML. kind는 UI_ICONS의 키('gold'/'exp'/'relic'), className은 화면별 크기 클래스.
+// 드랍 아이콘 칸처럼 글자 크기(1em)를 따르는 곳은 'item-icon-img', 글 사이에 끼는 곳은 'ui-icon-inline'을 넘김.
+// 로드 실패 시 itemImgError가 이모지로 대체하므로 PNG가 없어도 이전처럼 표시됨.
+function uiIconHtml(kind, className){
+  const d = UI_ICONS[kind];
+  if(!d) return '';
+  return `<img src="${UI_ICON_DIR + d.image + UI_ICON_EXT}" class="${className || 'ui-icon-inline'}" alt="" draggable="false" data-fallback-emoji="${d.icon}" onerror="itemImgError(this)">`;
+}
+// 골드 아이콘 + 공백 + 내용(이미 포맷된 금액 문자열이나 라벨). 기존 '🪙 ' + 금액 문자열 조합을 그대로 대체하며 innerHTML에 넣어 씀.
+function goldHtml(text){
+  return uiIconHtml('gold', 'ui-icon-inline') + ' ' + text;
+}
 // itemIconHtml의 <img onerror>에서 호출됨: PNG 로드 실패 시 오류 없이 이모지 텍스트로 즉시 대체.
 function itemImgError(img){
   img.replaceWith(document.createTextNode(img.dataset.fallbackEmoji || ''));
@@ -414,11 +426,11 @@ function tipUniqueWrap(html){ return html ? `<div data-tip="unique" style="displ
 // 새로운 판매 가격 공식을 만들지 않고 기존 sellValueFor(강화 단계별 판매가) → durabilityAdjustedSellValue
 // (내구도 비율 보정) 순서를 그대로 재사용함(실제 판매 로직 actions.js와 동일한 호출). 각 buildXxxTooltipHtml은
 // 자기 마지막 항목을 전부 출력한 뒤 </div>로 닫기 직전에 이 함수의 결과를 이어붙이기만 하면 되므로, 항목이
-// 추가/변경되어도 판매 가격은 항상 최하단에 위치함. 항목명("판매 가격")은 표시하지 않고 금액+🪙만 출력.
+// 추가/변경되어도 판매 가격은 항상 최하단에 위치함. 항목명("판매 가격")은 표시하지 않고 금액+골드 아이콘만 출력.
 // 스타일은 style.css의 .tooltip-sell-price(노란색)/.reduced(빨간색) 클래스로 관리(중앙 정렬·점선 구분선 포함).
 function tooltipSellPriceHtml(value, reduced){
   if(value == null || isNaN(value)) return '';
-  return `<div class="tooltip-sell-price${reduced ? ' reduced' : ''}">${Math.round(value).toLocaleString()}🪙</div>`;
+  return `<div class="tooltip-sell-price${reduced ? ' reduced' : ''}">${Math.round(value).toLocaleString()}${uiIconHtml('gold', 'ui-icon-inline')}</div>`;
 }
 // 장비(무기/방어구/장신구/보조) 툴팁용. currentDurability를 넘기지 않는 화면(상점/도감/미리보기 등 실제
 // 인스턴스가 없는 곳)은 다른 내구도 표시와 동일하게 항상 최대 내구도(=감소 없음)로 취급함. 내구도 감소 여부는
@@ -838,7 +850,7 @@ function buildStoneTooltipHtml(id){
   // 4. 아이템 분류
   html += wtipRow('아이템 분류', ITEM_CLASS_LABELS[item.itemClass] || '');
 
-  // 5. 판매 가격 — 장비 툴팁과 같은 최하단 판매 가격 블록(항목명 없이 금액+🪙, 점선 구분)
+  // 5. 판매 가격 — 장비 툴팁과 같은 최하단 판매 가격 블록(항목명 없이 금액+골드 아이콘, 점선 구분)
   html += tooltipSellPriceHtml(item.sellPrice, false);
 
   html += `</div>`;
@@ -865,7 +877,7 @@ function buildMiscTooltipHtml(id){
   // 4. 아이템 분류
   html += wtipRow('아이템 분류', ITEM_CLASS_LABELS[item.itemClass] || '');
 
-  // 5. 판매 가격 — 장비 툴팁과 같은 최하단 판매 가격 블록(항목명 없이 금액+🪙, 점선 구분)
+  // 5. 판매 가격 — 장비 툴팁과 같은 최하단 판매 가격 블록(항목명 없이 금액+골드 아이콘, 점선 구분)
   html += tooltipSellPriceHtml(item.sellPrice, false);
 
   html += `</div>`;
@@ -2289,7 +2301,7 @@ function shopBuyItemDisplay(action, typeId){
     const item = MISC_ITEMS[typeId];
     const isStone = item.itemClass === 'stone';
     return {
-      iconHtml: isStone ? item.icon : itemIconHtml(item, 'shop-icon-img'),
+      iconHtml: itemIconHtml(item, 'shop-icon-img'),
       tooltipHtml: isStone ? buildStoneTooltipHtml(typeId) : buildMiscTooltipHtml(typeId),
       borderColor: '#4fa3d1',
     };
@@ -2400,27 +2412,42 @@ function rollGoldDrop(level, multiplier){
   const spread = base * MONSTER_GOLD_VARIANCE;
   return Math.round(base - spread + Math.random() * spread * 2);
 }
-// 마석 등급 선택(전역 공식). STONE_GRADE_RULES(data.js)를 위에서부터 순서대로 검사해 몬스터 레벨이
-// 속하는 첫 구간의 등급을 반환함 — 레벨 구간이나 등급을 바꾸고 싶으면 데이터(STONE_GRADE_RULES)만
-// 수정하면 되고, 이 함수나 드랍 판정 로직은 건드릴 필요가 없음.
-function pickStoneGrade(level){
-  const rule = STONE_GRADE_RULES.find(r => level >= r.minLevel && (r.maxLevel == null || level <= r.maxLevel));
-  return rule ? rule.grade : STONE_GRADE_RULES[STONE_GRADE_RULES.length - 1].grade;
+// 마석 드랍 구간 조회(전역 공식). STONE_DROP_TABLE(data.js)에서 몬스터 최종 레벨이 속하는 첫 구간을 돌려줌.
+// 어느 구간에도 안 걸리면(표 범위 밖) 레벨이 낮으면 첫 구간, 높으면 마지막 구간을 씀.
+function stoneBracketFor(level){
+  const hit = STONE_DROP_TABLE.find(r => level >= r.minLevel && (r.maxLevel == null || level <= r.maxLevel));
+  if(hit) return hit;
+  return level < STONE_DROP_TABLE[0].minLevel ? STONE_DROP_TABLE[0] : STONE_DROP_TABLE[STONE_DROP_TABLE.length - 1];
 }
-// 마석 드랍 판정(전역 공식). 1) STONE_DROP_CHANCE 확률로 드랍 판정 → 2) 성공 시 pickStoneGrade로 등급 결정
-// → 3) 해당 등급의 마석 아이템(MISC_ITEMS 중 itemClass:'stone')을 조회 → 4) 기본 수량(STONE_DROP_BASE_QTY),
-// 단 에픽 등급 몬스터는 수량 2배. 실패하면 null을 반환.
-function rollStoneDrop(level, monsterGrade){
+// 이 레벨에서 나올 수 있는(확률 0 초과) 마석 등급 목록. 던전 카드·몬스터 도감의 드랍 안내가 사용함(추첨 없음).
+function stonePossibleGrades(level){
+  const g = stoneBracketFor(level).grades;
+  return Object.keys(g).filter(k => g[k].chance > 0);
+}
+// 마석 등급 추첨(전역 공식): 이 레벨 구간의 chance(%)를 가중치로 등급 하나를 뽑음(합계 100, 0%인 등급은 제외).
+function pickStoneGrade(level){
+  const g = stoneBracketFor(level).grades;
+  const keys = stonePossibleGrades(level);
+  const total = keys.reduce((s, k) => s + g[k].chance, 0);
+  let r = Math.random() * total;
+  for(const k of keys){ r -= g[k].chance; if(r < 0) return k; }
+  return keys[keys.length - 1];
+}
+// 마석 드랍 판정(전역 공식, 몬스터 등급은 쓰지 않음). 1) STONE_DROP_CHANCE 확률로 드랍 판정 → 2) 성공 시 실제 몬스터 최종 레벨의
+// 구간표로 pickStoneGrade가 등급 결정 → 3) 해당 등급의 마석 아이템(MISC_ITEMS 중 itemClass:'stone') 조회 →
+// 4) 그 구간·등급의 min~max 사이 정수를 균등 확률로 뽑아 수량 결정. 실패하면 null을 반환.
+function rollStoneDrop(level){
   if(Math.random() * 100 >= STONE_DROP_CHANCE) return null;
   const grade = pickStoneGrade(level);
   const item = Object.values(MISC_ITEMS).find(m => m.itemClass === 'stone' && m.grade === grade);
   if(!item) return null;
-  const qty = monsterGrade === 'epic' ? STONE_DROP_BASE_QTY * 2 : STONE_DROP_BASE_QTY;
+  const rule = stoneBracketFor(level).grades[grade];
+  const qty = rule.min + Math.floor(Math.random() * (rule.max - rule.min + 1));
   return { itemId: item.id, qty };
 }
 
 // 플라스크 단계(tier) 선택(전역 공식). FLASK_TIER_RULES(data.js)를 위에서부터 순서대로 검사해 몬스터
-// 레벨이 속하는 첫 구간의 tier를 반환함 — pickStoneGrade와 완전히 동일한 구간 조회 패턴을 재사용함.
+// 레벨이 속하는 첫 구간의 tier를 반환함 — stoneBracketFor와 동일한 구간 조회 패턴을 재사용함.
 function pickFlaskTier(level){
   const rule = FLASK_TIER_RULES.find(r => level >= r.minLevel && (r.maxLevel == null || level <= r.maxLevel));
   return rule ? rule.tier : FLASK_TIER_RULES[FLASK_TIER_RULES.length - 1].tier;
@@ -2545,6 +2572,33 @@ function scrollsAvailableInDungeon(d){
     return lv >= range.min && (lv - 10) <= range.max;
   });
 }
+// ---- 던전 카드 「획득 가능 아이템」 정렬(설정: data.js DUNGEON_DROP_KINDS / DUNGEON_DROP_DEFAULT_SORT) ----
+// 아이콘 항목마다 kind(분류 id)와 sortInfo { grade, levelReq, price, name }가 붙어 있어야 함(buildDungeonDropIcons가 채움).
+// 정렬 기준 비교 함수(음수=a가 먼저). 새 기준이 필요하면 여기에 이름과 비교 함수만 추가하고 설정 표에서 이름으로 사용.
+const DUNGEON_DROP_SORT_COMPARATORS = {
+  grade:    (a, b) => dungeonDropGradeRank(b.grade) - dungeonDropGradeRank(a.grade),        // 높은 등급 먼저
+  levelReq: (a, b) => DUNGEON_DROP_LEVEL_REQ_DESC ? (b.levelReq || 0) - (a.levelReq || 0) : (a.levelReq || 0) - (b.levelReq || 0),
+  price:    (a, b) => (b.price || 0) - (a.price || 0),                                      // 판매가 높은 순
+  name:     (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'),       // 가나다 순
+};
+function dungeonDropGradeRank(grade){ // 등급이 없으면 일반 등급과 같은 순위
+  return (grade && WEAPON_GRADE_RANK[grade] != null) ? WEAPON_GRADE_RANK[grade] : WEAPON_GRADE_RANK.normal;
+}
+// icons를 분류 순서 → 분류별 정렬 기준 순으로 정렬한 새 배열을 돌려줌(동점이면 원래 순서 유지).
+function sortDungeonDropIcons(icons){
+  const kindIndex = (kind) => { const i = DUNGEON_DROP_KINDS.findIndex(k => k.id === kind); return i < 0 ? DUNGEON_DROP_KINDS.length : i; }; // 설정에 없는 분류는 가장 뒤
+  const criteriaOf = (kind) => { const k = DUNGEON_DROP_KINDS.find(x => x.id === kind); return (k && k.sort) || DUNGEON_DROP_DEFAULT_SORT; };
+  return icons.map((it, i) => ({ it, i })).sort((a, b) => {
+    const ka = kindIndex(a.it.kind), kb = kindIndex(b.it.kind);
+    if(ka !== kb) return ka - kb;
+    for(const name of criteriaOf(a.it.kind)){
+      const cmp = DUNGEON_DROP_SORT_COMPARATORS[name];
+      const d = cmp ? cmp(a.it.sortInfo || {}, b.it.sortInfo || {}) : 0;
+      if(d) return d;
+    }
+    return a.i - b.i;
+  }).map(x => x.it);
+}
 // 던전이 속한 지역 이름(던전 데이터의 region, 비어 있으면 DEFAULT_DUNGEON_REGION). 몬스터 도감이 지역별 몬스터 목록을
 // 만들 때 사용함 — 몬스터 자체에는 지역 데이터가 없고 항상 던전을 거쳐서 판단함.
 function dungeonRegionOf(d){
@@ -2618,7 +2672,7 @@ function invLockToggle(src, id){
 const INV_LOCKED_REASON = '잠긴 장비는 사용할 수 없습니다. 잠금을 해제해주세요.';
 // 잠금 버튼 HTML(구버전 페이저/신버전 툴바 공용). 데스크톱 화면 프리셋에서만 마우스를 올리면 안내가 표시됨(CSS가 모바일 프리셋에서 숨김).
 function invLockButtonHtml(){
-  return `<span class="equip-req-wrap inv-lock-wrap"><button class="inv-box-btn inv-lock-btn ${invLockMode ? 'active' : ''}" data-lock-toggle="1">잠금</button>`
+  return `<span class="equip-req-wrap inv-lock-wrap"><button class="inv-box-btn inv-lock-btn ${invLockMode ? 'active' : ''}" data-lock-toggle="1" aria-label="잠금">잠금</button>`
     + `<span class="tooltip">해당 아이템의 일부 기능을 제한합니다.</span></span>`;
 }
 // 잠금 아이콘 오버레이(아이콘 왼쪽 상단 최상단 레이어) — 잠긴 아이템에만. 해제 이미지는 잠금 모드 + 마우스 오버(CSS)에서만 보임.
@@ -2843,7 +2897,7 @@ function assignMonsterPositions(monsters){
   monsters.forEach((m, i) => { m.pos = positions[i]; });
 }
 // 구간표(min/max/qty 배열)를 위에서부터 순서대로 검사해 value가 속하는 첫 구간의 qty를 반환함
-// (STONE_GRADE_RULES와 동일한 구간 조회 패턴). 어느 구간에도 안 걸리면 0(해당 없음)을 반환함.
+// (STONE_DROP_TABLE과 동일한 구간 조회 패턴). 어느 구간에도 안 걸리면 0(해당 없음)을 반환함.
 function tierQty(rules, value){
   const r = rules.find(x => value >= x.min && value <= x.max);
   return r ? r.qty : 0;
@@ -2972,7 +3026,7 @@ function resolveDrops(monsterDef, dungeon, level, options){
 
   let weaponDrop = resolveWeaponRelicDrop(level); // { type, level } 또는 null
 
-  const stoneDrop = rollStoneDrop(level, grade); // { itemId, qty } 또는 null(전역 공식, 던전/등급별 개별 설정 없음)
+  const stoneDrop = rollStoneDrop(level); // { itemId, qty } 또는 null(전역 공식 — 실제 처치 몬스터의 최종 레벨 기준, 몬스터 등급·던전별 개별 설정 없음)
   const flaskDrop = rollFlaskDrop(level); // { itemId, qty } 또는 null(전역 공식, 마석 드랍과 완전히 독립적으로 판정)
 
   // drops 중 artifactId가 있는 항목은 각 항목마다 독립적으로 확률을 판정함(재료류 미스크 드랍과 동일한

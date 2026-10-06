@@ -47,7 +47,10 @@
   .brand span{ color: var(--forge-ember); }
   .topbar-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   /* 상단 메뉴 영역 — [공지사항][메뉴 버튼] 오른쪽 정렬, 메뉴 버튼을 누르면 아래로 그리드가 펼쳐짐(아래 .menu-grid) */
-  .main-nav{ display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:18px; position:relative; z-index:20; }
+  /* z-index 40: .main-nav는 stacking context라 안에 있는 .menu-grid(z-index:60)의 우선순위가 이 값 안에서만 의미를 가짐.
+     도감 정보창/비교 화면(z-index:20, 문서상 더 뒤에 있음)이 메뉴 그리드 하단을 덮던 문제를 막기 위해 그보다 높게,
+     아이템 클릭 팝업(45)·모달(50) 아래로 둠(기존 표시 순서 유지). */
+  .main-nav{ display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:18px; position:relative; z-index:40; }
   .gold-badge{
     display:flex; align-items:center; gap:6px;
     background: var(--forge-panel); border:1px solid var(--forge-line);
@@ -1531,6 +1534,19 @@
   .inv-lock-wrap{ display:inline-block; }
   .inv-lock-wrap .tooltip{ width:auto; white-space:nowrap; left:0; transform:none; }
   body.mobile-preset .inv-lock-wrap .tooltip{ display:none !important; } /* 안내 문구는 데스크톱 화면 프리셋에서만 */
+  /* 신버전(박스) 인벤토리 + 모바일 화면 프리셋에서만: 좁은 폭에서 '잠금' 글자가 두 줄로 꺾이므로 글자 대신 기존 잠금 아이콘(icon_item_locked,
+     아이템 잠금 배지/커서와 같은 파일)을 버튼 안에 배경으로 표시함. 버튼 높이는 데스크톱 한 줄 버튼과 같게(27px) 유지하고, 클릭/활성(active)/비활성
+     (disabled) 표시와 위치는 그대로(.inv-box-btn 규칙을 그대로 따름). 구버전 페이저의 잠금 버튼(#invBoxLockWrap 밖)과 데스크톱은 적용되지 않음. */
+  body.mobile-preset #invBoxLockWrap .inv-lock-btn{
+    font-size:0; width:32px; height:27px; padding:0; box-sizing:border-box;
+    background-image:url(../assets/ui/icon_item_locked.png); background-repeat:no-repeat; background-position:center; background-size:16px 16px;
+  }
+  /* 아이템 비교 모드의 [종료] 버튼(잠금 버튼 자리를 재사용): 글자 대신 X 아이콘(assets/ui/menu_icon_x.png)을 표시해 좁은 폭에서도 두 줄로 꺾이지 않게 함.
+     크기는 잠금 버튼 아이콘 모드와 같은 32×27px, 클릭/위치/활성 표시는 기존 .inv-box-btn 규칙 그대로. */
+  #invBoxLockWrap .inv-compare-end{
+    font-size:0; width:32px; height:27px; padding:0; box-sizing:border-box;
+    background-image:url(../assets/ui/menu_icon_x.png); background-repeat:no-repeat; background-position:center; background-size:12px 12px;
+  }
   /* 잠금 아이콘: 아이콘 왼쪽 상단의 작은 최상단 오버레이 — 기존 아이템 아이콘/테두리/등급 색/강화 이펙트는 그대로 두고 위에 얹음 */
   .inv-lock-badge, .inv-unlock-badge{
     position:absolute; left:1px; top:1px; width:16px; height:16px; z-index:6; pointer-events:none;
@@ -1751,7 +1767,7 @@
   /* ---- 도감: 몬스터 ----
      아이콘 크기는 여기 변수 두 개로만 정함(JS에 크기를 쓰지 않음). 나중에 크기를 바꾸려면 이 값만 수정하면 됨.
      --codex-monster-icon-size: 몬스터 도감 목록/정보 화면의 몬스터 아이콘, --codex-mdrop-icon-size: 정보 화면의 드랍 아이콘. */
-  #codexWrap{ --codex-monster-icon-size:32px; --codex-mdrop-icon-size:32px; }
+  #codexWrap{ --codex-monster-icon-size:32px; --codex-mdrop-icon-size:24px; }
   /* 몬스터 슬롯: 이미지(1em)와 이모지 모두 슬롯의 font-size를 따라가므로 font-size로 크기를 지정 */
   .codex-mslot{ font-size: var(--codex-monster-icon-size); line-height:1; }
   .codex-mslot .codex-monster-icon{ max-width:100%; max-height:100%; }
@@ -1785,3 +1801,6 @@
   .codex-mdrop:hover{ background:#352b1d; }
   .codex-drop-img{ width: var(--codex-mdrop-icon-size); height: var(--codex-mdrop-icon-size); }
   .cmi-foot{ display:flex; justify-content:center; padding-top:6px; border-top:1px solid var(--forge-line); }
+
+/* 골드/경험치/모험가의 유해 공통 아이콘(uiIconHtml) — 글 사이에 끼는 PNG는 글자 크기에 맞춰 이모지처럼 인라인으로 표시 */
+.ui-icon-inline{ display:inline-block; width:1.1em; height:1.1em; vertical-align:-0.2em; object-fit:contain; margin:0 1px; -webkit-user-drag:none; user-select:none; }

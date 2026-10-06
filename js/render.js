@@ -684,8 +684,8 @@ function renderCraftPopup(){
   }).join('');
 
   el('craftPopupSuccessRate').textContent = `성공 확률 ${item.successChance}%`;
-  el('craftPopupCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
-  el('craftPopupCost').textContent = '🪙 ' + (item.craftCost || 0).toLocaleString();
+  el('craftPopupCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
+  el('craftPopupCost').innerHTML = goldHtml((item.craftCost || 0).toLocaleString());
 
   el('craftPopupMakeBtn').disabled = !craftPopupCanCraft(craftPopup);
   // 제작 결과물을 담을 인벤토리 슬롯이 없어 제작이 막힌 경우 그 이유를 카테고리별로 안내함
@@ -715,7 +715,7 @@ function renderCraftConfirmModal(){
   el('craftConfirmFailWrap').style.display = failHtml ? 'block' : 'none';
   el('craftConfirmFailArea').innerHTML = failHtml;
 
-  el('craftConfirmCost').textContent = '🪙 ' + (item.craftCost || 0).toLocaleString();
+  el('craftConfirmCost').innerHTML = goldHtml((item.craftCost || 0).toLocaleString());
 }
 
 // ---- 제작소: 제작 연출 UI(요청사항 1~11번) ----
@@ -902,7 +902,7 @@ function renderStoneList(){
   }
   wrap.innerHTML = invSortList('stone', entries, e => invSortInfoMisc(e.item, 'stone')).map(({ item, count }) => `
     <div class="inv-card">
-      <div class="inv-icon" style="border-color: var(--forge-line);">${item.icon}</div>
+      <div class="inv-icon" style="border-color: var(--forge-line);">${itemIconHtml(item)}</div>
       <div class="inv-info">
         <div class="inv-name weapon-name-wrap">
           <span style="color:${stoneNameColor(item.id)};">${item.name}</span> ×${count}
@@ -1291,8 +1291,8 @@ function renderRepairIndividualModal(){
     `수리 비용 : 내구도 1당 <span class="repair-cost-per-point-value">${costPerPoint.toLocaleString()}골드</span>`;
   el('repairIndivAmountInput').max = repairAmountToFull(item);
   el('repairIndivAmountInput').value = amount;
-  el('repairIndivGold').textContent = '🪙 ' + state.gold.toLocaleString();
-  el('repairIndivCost').textContent = '🪙 ' + cost.toLocaleString();
+  el('repairIndivGold').innerHTML = goldHtml(state.gold.toLocaleString());
+  el('repairIndivCost').innerHTML = goldHtml(cost.toLocaleString());
   el('repairIndivConfirmBtn').disabled = amount <= 0 || state.gold < cost;
 }
 // ---- 수리 탭: 모두 수리 팝업(요구사항 3~8번) ----
@@ -1316,7 +1316,7 @@ function renderRepairAllList(targets){
           <div class="inv-sub">내구도 ${cur}/${max} (${pct}%)</div>
         </div>
         <div class="inv-actions">
-          <span class="txt-gold">🪙 ${entry.cost.toLocaleString()}</span>
+          <span class="txt-gold">${goldHtml(entry.cost.toLocaleString())}</span>
         </div>
       </div>`;
   }).join('');
@@ -1326,8 +1326,8 @@ function renderRepairAllModal(){
   const targets = repairAllTargetList();
   const totalCost = repairAllTotalCost(targets);
   el('repairAllList').innerHTML = renderRepairAllList(targets);
-  el('repairAllGold').textContent = '🪙 ' + state.gold.toLocaleString();
-  el('repairAllCost').textContent = '🪙 ' + totalCost.toLocaleString();
+  el('repairAllGold').innerHTML = goldHtml(state.gold.toLocaleString());
+  el('repairAllCost').innerHTML = goldHtml(totalCost.toLocaleString());
   el('repairAllConfirmBtn').disabled = targets.length === 0 || state.gold < totalCost;
 }
 // ---- 수리 탭: "인벤토리에서 선택" 팝업(요구사항 5~11·18~19번) ----
@@ -1381,8 +1381,8 @@ function renderRestorePopup(){
     nameWrap.innerHTML = '<span class="inv-name" style="color:var(--forge-cream-dim);">복구할 손상 장비를 선택하세요</span>';
     el('restorePopupSlots').innerHTML = '<div class="inv-empty">장비를 선택하면 필요한 재료가 표시됩니다.</div>';
     el('restorePopupSuccessRate').textContent = '복구 확률 -';
-    el('restorePopupCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
-    el('restorePopupCost').textContent = '🪙 0';
+    el('restorePopupCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
+    el('restorePopupCost').innerHTML = goldHtml('0');
     el('restorePopupMakeBtn').disabled = true;
     return;
   }
@@ -1401,8 +1401,8 @@ function renderRestorePopup(){
         return resource ? craftAutoMaterialSlotHtml(resource, m.need) : '';
       }).join('');
   el('restorePopupSuccessRate').textContent = `복구 확률 ${restoreChanceFor(type)}%`;
-  el('restorePopupCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
-  el('restorePopupCost').textContent = '🪙 ' + restoreCostFor(type).toLocaleString();
+  el('restorePopupCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
+  el('restorePopupCost').innerHTML = goldHtml(restoreCostFor(type).toLocaleString());
   el('restorePopupMakeBtn').disabled = !restoreCanProceed(restorePopup.target);
 }
 // 복구 장비 선택 목록 — 수리 장비 선택 목록(renderRepairSelectList)과 같은 마크업/페이지네이션. 손상 장비만 나옴.
@@ -1453,7 +1453,7 @@ function renderRestoreConfirmModal(){
   el('restoreConfirmFailName').innerHTML =
     `<span style="color:${failDisplay.color};">${restoreItemLabel(item, failDisplay)}</span>` +
     `<span class="tooltip">${failDisplay.tooltipHtml}</span>`;
-  el('restoreConfirmCost').textContent = '🪙 ' + restoreCostFor(type).toLocaleString();
+  el('restoreConfirmCost').innerHTML = goldHtml(restoreCostFor(type).toLocaleString());
 }
 // 복구 결과 — 제작 결과 UI(craftAnimModal revealed 단계)와 같은 구성. 제작 연출 없이 처리 직후 바로 표시됨.
 function renderRestoreResultModal(){
@@ -1883,7 +1883,7 @@ function gradeSpan(grade){
 // (모험가의 유해·마석 드랍 안내는 이제 buildDungeonDropIcons에서 하드코딩 문구 또는 자동 생성 방식으로
 // 대체되어, 이 던전별 동적 문구 생성 함수들은 더 이상 쓰이지 않아 정리함)
 // 이 던전의 몬스터들이 실제로 등장 가능한 레벨(정상 등급은 레벨~레벨+levelRange 구간, 그 외 등급은 고정 레벨)을
-// 전부 모아서, 그 레벨들에서 나올 수 있는 마석 등급(pickStoneGrade, 전역 공식 재사용)을 중복없이 반환.
+// 전부 모아서, 그 레벨들에서 나올 수 있는 마석 등급(stonePossibleGrades, 전역 공식 재사용)을 중복없이 반환.
 function dungeonStoneGrades(d){
   const grades = new Set();
   d.monsters.forEach(id => {
@@ -1891,7 +1891,7 @@ function dungeonStoneGrades(d){
     const levels = m.grade === 'normal'
       ? Array.from({ length: (d.levelRange || 0) + 1 }, (_, i) => m.level + i)
       : [m.level];
-    levels.forEach(lv => grades.add(pickStoneGrade(lv)));
+    levels.forEach(lv => stonePossibleGrades(lv).forEach(g => grades.add(g)));
   });
   return grades;
 }
@@ -1923,15 +1923,15 @@ function buildDungeonDropIcons(d){
   const icons = [];
 
   // 1. 골드 — 하드코딩 고정 안내
-  icons.push({ icon: '🪙', borderColor: 'var(--forge-gold)',
+  icons.push({ kind: 'gold', iconHtml: uiIconHtml('gold', 'item-icon-img'), borderColor: 'var(--forge-gold)',
     tooltip: `<span class="txt-gold">골드</span><br>몬스터 처치 시 골드를 획득합니다.` });
 
   // 2. 경험치 — 하드코딩 고정 안내
-  icons.push({ icon: '✨', borderColor: 'var(--forge-purple)',
+  icons.push({ kind: 'exp', iconHtml: uiIconHtml('exp', 'item-icon-img'), borderColor: 'var(--forge-purple)',
     tooltip: `<span class="txt-exp">경험치</span><br>몬스터 처치 시 경험치를 획득합니다.` });
 
   // 3. 모험가의 유해 — 하드코딩 고정 안내(어떤 무기가 나올지는 표시하지 않음)
-  icons.push({ icon: '💀', borderColor: 'var(--forge-green)',
+  icons.push({ kind: 'relic', iconHtml: uiIconHtml('relic', 'item-icon-img'), borderColor: 'var(--forge-green)',
     tooltip: `<span class="txt-relic">모험가의 유해</span><br>낮은 확률로 쓰러진 모험가의 장비를 획득합니다.` });
 
   // 3-1. 비급 — 이 던전 몬스터 레벨 구간과 겹치는 비급이 있을 때만 표시(요구사항 14~16번), 모험가의 유해
@@ -1943,7 +1943,7 @@ function buildDungeonDropIcons(d){
       .sort((a, b) => scrollBaseLevel(a) - scrollBaseLevel(b))
       .map(item => { const g = scrollGradeInfo(item); return `<span style="color:${g ? g.color : '#fff'};">${item.name}</span>`; })
       .join('<br>');
-    icons.push({ iconHtml: itemIconHtml({ image: SCROLL_DEFAULT_IMAGE, icon: '📜' }), borderColor: WEAPON_GRADES.epic.color,
+    icons.push({ kind: 'scroll', iconHtml: itemIconHtml({ image: SCROLL_DEFAULT_IMAGE, icon: '📜' }), borderColor: WEAPON_GRADES.epic.color,
       tooltip: `<div style="text-align:center;">몬스터 처치 시 획득 가능한 비급<br><br>${nameLines}</div>` });
   }
 
@@ -1961,7 +1961,9 @@ function buildDungeonDropIcons(d){
         : equipType === 'accessory' ? buildAccessoryTooltipHtml(drop.weaponId, 0)
         : equipType === 'sub' ? buildSubTooltipHtml(drop.weaponId, 0)
         : buildWeaponTooltipHtml(drop.weaponId, 0);
+      const equipDef = wpn(drop.weaponId);
       icons.push({
+        kind: 'equipment', sortInfo: { grade: equipDef.grade, levelReq: equipDef.levelReq, price: 0, name: equipDef.name },
         iconHtml: weaponIconHtml(drop.weaponId, 'drop-icon-img'),
         borderColor: weaponGradeColor(drop.weaponId),
         tooltip,
@@ -1975,7 +1977,10 @@ function buildDungeonDropIcons(d){
     (MONSTERS[id].drops || []).forEach(drop => {
       if(!drop.artifactId || seenArtifactIds.has(drop.artifactId)) return;
       seenArtifactIds.add(drop.artifactId);
+      const artifactDef = ARTIFACTS[drop.artifactId];
+      // 정렬 위치/기준은 data.js DUNGEON_DROP_KINDS의 'artifact' 항목을 따름(비급 뒤·장비 앞, 등급 높은 순 → 이름 가나다순)
       icons.push({
+        kind: 'artifact', sortInfo: { grade: artifactDef.grade, price: artifactDef.sellPrice || 0, name: artifactDef.name },
         iconHtml: itemIconHtml(ARTIFACTS[drop.artifactId]),
         borderColor: artifactGradeColor(drop.artifactId),
         tooltip: buildArtifactTooltipHtml(drop.artifactId),
@@ -1993,7 +1998,8 @@ function buildDungeonDropIcons(d){
       const item = miscItemByName(drop.name);
       if(!item || item.itemClass !== 'misc' || seenMiscIds.has(item.id)) return;
       seenMiscIds.add(item.id);
-      icons.push({ iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltip: buildMiscTooltipHtml(item.id) });
+      icons.push({ kind: 'misc', sortInfo: { grade: item.grade, price: item.sellPrice || 0, name: item.name },
+        iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltip: buildMiscTooltipHtml(item.id) });
     });
   });
 
@@ -2004,7 +2010,8 @@ function buildDungeonDropIcons(d){
     const item = Object.values(MISC_ITEMS).find(m => m.itemClass === 'stone' && m.grade === grade);
     if(!item || seenStoneIds.has(item.id)) return;
     seenStoneIds.add(item.id);
-    icons.push({ icon: item.icon, borderColor: stoneNameColor(item.id), tooltip: buildStoneTooltipHtml(item.id) });
+    icons.push({ kind: 'stone', sortInfo: { grade: item.grade, price: item.sellPrice || 0, name: item.name },
+      iconHtml: itemIconHtml(item), borderColor: stoneNameColor(item.id), tooltip: buildStoneTooltipHtml(item.id) });
   });
 
   // 8. 플라스크 — 마석(7번)과 완전히 동일한 방식으로, 이 던전 몬스터들의 레벨 구간에서 실제로 나올 수
@@ -2012,10 +2019,15 @@ function buildDungeonDropIcons(d){
   dungeonFlaskItems(d).forEach(itemId => {
     const item = CONSUMABLES[itemId];
     if(!item) return;
-    icons.push({ iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltip: buildConsumableTooltipHtml(itemId) });
+    icons.push({ kind: 'consumable', sortInfo: { grade: item.grade, price: item.sellPrice || 0, name: item.name },
+      iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltip: buildConsumableTooltipHtml(itemId) });
   });
 
-  const iconHtmls = icons.map(it => `
+  // 분류 순서(골드 → 경험치 → 유해 → 비급 → 장비 → 기타 → 마석 → 소비 → 그 외)와 분류별 정렬은 data.js DUNGEON_DROP_KINDS 설정을 따름.
+  // 표시할 아이템 계산(위의 각 단계)은 그대로이고 여기서 순서만 정함. 페이지 나누기는 정렬된 목록 기준.
+  const sortedIcons = sortDungeonDropIcons(icons);
+
+  const iconHtmls = sortedIcons.map(it => `
     <span class="drop-icon-wrap">
       <span class="drop-icon" style="border-color:${it.borderColor};">${it.iconHtml || it.icon}</span>
       <span class="tooltip">${it.tooltip}</span>
@@ -2808,7 +2820,7 @@ function buildStoneShopCardHtml(id){
     <div class="scroll-card">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${item.icon}</div>
+          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${itemIconHtml(item)}</div>
           <span class="weapon-name-wrap">
             <span class="scroll-name" style="color:${stoneNameColor(id)};">${item.name}</span>
             <span class="tooltip">${buildStoneTooltipHtml(id)}</span>

@@ -788,7 +788,7 @@ function grantTreasureRewards(){
   if(weaponDrop && !grantRelicEquipDrop(weaponDrop)){
     weaponDrop = null; // 해당 장비 타입의 인벤토리가 가득 차 드랍 무산
   }
-  let stoneDrop = rollStoneDrop(minLevel, 'normal');
+  let stoneDrop = rollStoneDrop(minLevel);
   if(stoneDrop){
     const item = MISC_ITEMS[stoneDrop.itemId];
     if(!grantMiscStack(item, stoneDrop.qty)){ stoneDrop = null; fullCategories[miscItemCategory(item)] = true; }

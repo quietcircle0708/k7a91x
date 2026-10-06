@@ -81,7 +81,7 @@ function codexMonsterBuildDrops(e){
   // 1. 모험가의 유해(전역 드랍) — 던전 카드와 같은 아이콘/문구
   if(levels.some(codexRelicPossibleAt)){
     add({ group: 'relic', id: 'relic', name: '모험가의 유해', searchName: '모험가의 유해', gradeRank: -1,
-      iconHtml: '💀', borderColor: 'var(--forge-green)',
+      iconHtml: uiIconHtml('relic', 'item-icon-img'), borderColor: 'var(--forge-green)',
       tooltipHtml: `<span class="txt-relic">모험가의 유해</span><br>낮은 확률로 쓰러진 모험가의 장비를 획득합니다.` });
   }
 
@@ -118,14 +118,13 @@ function codexMonsterBuildDrops(e){
     }
   });
 
-  // 4. 마석(전역 드랍) — pickStoneGrade(전역 공식)가 이 레벨들에서 고르는 등급의 마석
-  levels.forEach(L => {
-    const grade = pickStoneGrade(L);
+  // 4. 마석(전역 드랍) — stonePossibleGrades(전역 구간표)가 이 레벨들에서 낼 수 있는 모든 등급의 마석
+  levels.forEach(L => stonePossibleGrades(L).forEach(grade => {
     const item = Object.values(MISC_ITEMS).find(m => m.itemClass === 'stone' && m.grade === grade);
     if(!item) return;
     add({ group: 'stone', id: item.id, name: item.name, searchName: item.name, gradeRank: codexGradeRankOf(item.grade),
       iconHtml: itemIconHtml(item), borderColor: stoneNameColor(item.id), tooltipHtml: buildStoneTooltipHtml(item.id) });
-  });
+  }));
 
   // 5. 플라스크(전역 드랍) — pickFlaskTier가 이 레벨들에서 고르는 단계의 체력/마나 두 종류 모두(종류는 레벨과 무관)
   levels.forEach(L => {
@@ -140,7 +139,7 @@ function codexMonsterBuildDrops(e){
 
   // 6. 골드 — 실제 금액은 표시하지 않고 아이콘만(던전 카드와 같은 아이콘/문구)
   add({ group: 'gold', id: 'gold', name: '골드', searchName: '골드', gradeRank: -1,
-    iconHtml: '🪙', borderColor: 'var(--forge-gold)',
+    iconHtml: uiIconHtml('gold', 'item-icon-img'), borderColor: 'var(--forge-gold)',
     tooltipHtml: `<span class="txt-gold">골드</span><br>몬스터 처치 시 골드를 획득합니다.` });
 
   // 정렬: 그룹 순서 → 등급 내림차순 → 이름 가나다순

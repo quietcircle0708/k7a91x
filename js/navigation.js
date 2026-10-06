@@ -1035,8 +1035,8 @@ function renderTraceRestoreModal(){
   const cost = traceRecoveryCost(trace.forType);
   el('traceRestoreIconBox').innerHTML = weaponIconHtml(trace.forType, 'shop-icon-img');
   el('traceRestoreName').textContent = `${weaponName(trace.forType)}의 흔적`;
-  el('traceRestoreCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
-  el('traceRestoreCost').textContent = '🪙 ' + cost.toLocaleString();
+  el('traceRestoreCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
+  el('traceRestoreCost').innerHTML = goldHtml(cost.toLocaleString());
   el('traceRestoreConfirmBtn').disabled = state.gold < cost;
 }
 function confirmTraceRestore(){
@@ -1454,19 +1454,19 @@ function renderBuyQtyModal(){
   iconBox.innerHTML = display.iconHtml + `<span class="tooltip" id="buyQtyTooltip">${display.tooltipHtml}</span>`;
   el('buyQtyInput').value = qty;
   el('buyQtyInput').max = maxQty;
-  el('buyQtyCurrentGold').textContent = '🪙 ' + state.gold.toLocaleString();
-  el('buyQtyTotalGold').textContent = '🪙 ' + (unitPrice * qty).toLocaleString();
+  el('buyQtyCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
+  el('buyQtyTotalGold').innerHTML = goldHtml((unitPrice * qty).toLocaleString());
   el('buyQtyUpBtn').disabled = qty >= maxQty;
   el('buyQtyDownBtn').disabled = qty <= 1;
   // 판매 모드(상점 소비/마석/기타 판매)면 문구를 판매용으로 바꾸고, 구매 모드면 항상 기존 문구로 되돌림(같은 모달 재사용)
   const sellMode = isShopSellAction(action);
   el('buyQtyTitle').textContent = sellMode ? '아이템 판매' : '아이템 구매';
   el('buyQtyLabel').textContent = sellMode ? '판매 개수' : '구매 개수';
-  el('buyQtyGoldLabel').textContent = sellMode ? '🪙 개당 판매 가격' : '🪙 현재 보유 골드';
-  el('buyQtyTotalLabel').textContent = sellMode ? '🪙 총 지급 골드' : '🪙 총 지불 골드';
+  el('buyQtyGoldLabel').innerHTML = goldHtml(sellMode ? '개당 판매 가격' : '현재 보유 골드');
+  el('buyQtyTotalLabel').innerHTML = goldHtml(sellMode ? '총 지급 골드' : '총 지불 골드');
   el('buyQtyCancelBtn').textContent = sellMode ? '판매 취소' : '구매 취소';
   el('buyQtyConfirmBtn').textContent = sellMode ? '판매' : '구매';
-  if(sellMode) el('buyQtyCurrentGold').textContent = '🪙 ' + unitPrice.toLocaleString(); // 판매 모드: 보유 골드 대신 개당 판매 가격
+  if(sellMode) el('buyQtyCurrentGold').innerHTML = goldHtml(unitPrice.toLocaleString()); // 판매 모드: 보유 골드 대신 개당 판매 가격
   // 빠른 수량 버튼: 소비 아이템 구매창=[초기화][10][50][100], 판매창=[초기화][5][10][100][최대], 그 외 구매창은 숨김
   el('buyQtyQuickBtns').style.display = (action === 'buy-consumable' || sellMode) ? 'flex' : 'none';
   el('buyQtyAdd5Btn').style.display = sellMode ? '' : 'none';

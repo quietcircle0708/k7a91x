@@ -409,7 +409,7 @@ function renderInventoryBox(){
   if(lockWrap){
     // 비교 모드 중에는 잠금 버튼 자리를 \'종료\' 버튼(아이템 비교 모드 종료)으로 재활용함 — 비교 모드와 잠금 모드는 동시에 쓸 수 없으므로 같은 위치를 공유.
     // 모바일에서도 Esc 없이 비교 모드를 끝낼 수 있고, 버튼을 누르면 [닫기]/Esc와 같은 초기화(invCompareReset)가 실행됨.
-    lockWrap.innerHTML = invCompare.on ? '<button class="inv-box-btn inv-compare-end" data-cmp="end">종료</button>' : invLockButtonHtml();
+    lockWrap.innerHTML = invCompare.on ? '<button class="inv-box-btn inv-compare-end" data-cmp="end" aria-label="종료" title="종료">종료</button>' : invLockButtonHtml();
     const lb = lockWrap.querySelector('button[data-lock-toggle]');
     if(lb && !invBoxTabLockable(tab) && !invLockMode) lb.disabled = true;
   }
