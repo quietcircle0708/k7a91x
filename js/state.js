@@ -101,10 +101,7 @@ let repairConfirmState = null;
 // { category, itemId, slots: [ { name, qty }, ... ] } — slots 길이는 해당 제작 아이템의 materials
 // 개수와 동일하게 시작. 재료는 이름(name)으로 findCraftResource(formulas.js)를 거쳐 자동 연동됨.
 let craftPopup = null;
-// "투입 개수 선택" 팝업 상태. null이면 닫혀있음.
-// { name, qty, maxQty(=해당 재료의 need) } — 재료는 자동 배정되므로 슬롯 인덱스가 아니라 재료
-// 이름(name) 자체로 어느 슬롯인지 찾음(craftPopup.slots.find(s=>s.name===name)).
-let craftMaterialQtyState = null;
+let craftSelectState = null; // 제작 재료 장비 선택 팝업이 열려 있을 때 { name }(어느 재료 슬롯을 고르는 중인지)
 // 제작 연출 UI 상태. null이면 닫혀있음.
 // { category, itemId, phase: 'animating'|'awaitClick'|'revealed', progress(0~100, 소수2자리),
 //   startTime(연출 시작 시각, Date.now()), resultSuccess(연출 완료 시점에 결정된 성공/실패, 그 전까진 null),
@@ -130,6 +127,7 @@ let pageState = {
   forgeSelect: 1,
   repairSelect: 1,
   restoreSelect: 1,
+  craftSelect: 1,
   shopWeapon: 1, shopArmor: 1, shopSub: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
   skillPage: 1,

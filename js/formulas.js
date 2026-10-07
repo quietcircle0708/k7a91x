@@ -2297,13 +2297,13 @@ function shopBuyItemDisplay(action, typeId){
     return { iconHtml: itemIconHtml(item, 'shop-icon-img'), tooltipHtml: buildConsumableTooltipHtml(typeId), borderColor: '#c13c3c' };
   }
   if(action === 'sell-misc'){
-    // 마석/기타 상점 카드(buildStoneShopCardHtml/buildMiscShopCardHtml)와 같은 아이콘·툴팁·테두리색을 그대로 재사용
+    // 마석/기타 상점 카드(buildStoneShopCardHtml/buildMiscShopCardHtml)와 같은 아이콘·툴팁·등급 테두리색을 그대로 재사용
     const item = MISC_ITEMS[typeId];
     const isStone = item.itemClass === 'stone';
     return {
       iconHtml: itemIconHtml(item, 'shop-icon-img'),
       tooltipHtml: isStone ? buildStoneTooltipHtml(typeId) : buildMiscTooltipHtml(typeId),
-      borderColor: '#4fa3d1',
+      borderColor: isStone ? stoneNameColor(typeId) : miscNameColor(typeId), // 등급 색상(상점 카드·인벤토리와 동일)
     };
   }
   if(action === 'buy-artifact'){
@@ -2411,6 +2411,17 @@ function rollGoldDrop(level, multiplier){
   const base = monsterGoldBase(level) * (multiplier || 1);
   const spread = base * MONSTER_GOLD_VARIANCE;
   return Math.round(base - spread + Math.random() * spread * 2);
+}
+// 레벨 차이에 따른 골드·경험치 획득량 보정(피해량용 playerDamageMultiplier/monsterDamageMultiplier와 완전히 별개이며 서로 연동하지 않음).
+// 반환값은 최종 획득량이 몇 %로 남는지(100 = 보정 없음). 값(기준/감소율/최대 감소율)은 data.js의 LEVEL_DIFF_REWARD_* 상수.
+function rewardLevelRetentionPercent(playerLevel, monsterLevel){
+  const adjust = playerLevel - LEVEL_DIFF_REWARD_BASE - monsterLevel;
+  if(adjust <= 0) return 100;
+  return 100 - Math.min(LEVEL_DIFF_REWARD_MAX_REDUCTION, adjust * LEVEL_DIFF_REWARD_STEP);
+}
+// 이미 최종 결정된 골드/경험치에 마지막 단계로 적용(소수점 이하 버림). 기존 골드·경험치 계산 자체는 바꾸지 않음.
+function applyRewardLevelPenalty(amount, playerLevel, monsterLevel){
+  return Math.floor(amount * rewardLevelRetentionPercent(playerLevel, monsterLevel) / 100);
 }
 // 마석 드랍 구간 조회(전역 공식). STONE_DROP_TABLE(data.js)에서 몬스터 최종 레벨이 속하는 첫 구간을 돌려줌.
 // 어느 구간에도 안 걸리면(표 범위 밖) 레벨이 낮으면 첫 구간, 높으면 마지막 구간을 씀.
@@ -2708,7 +2719,7 @@ function invCompareParseTooltip(html){
   Array.from(box.children).forEach((ch, idx) => {
     const tip = ch.getAttribute('data-tip');
     if(ch.classList.contains('tooltip-sell-price')){
-      add('sell', INV_COMPARE_TIP_LABELS.sell, ch.textContent.trim(), { sell: true, reduced: ch.classList.contains('reduced') });
+      add('sell', INV_COMPARE_TIP_LABELS.sell, ch.innerHTML.trim(), { sell: true, reduced: ch.classList.contains('reduced') });
     } else if(tip === 'unique'){
       Array.from(ch.children).forEach(line => add('unique', INV_COMPARE_TIP_LABELS.unique, line.innerHTML));
     } else if(tip === 'name' || tip === 'grade' || tip === 'desc'){
@@ -3522,8 +3533,15 @@ function craftResourceOwnedCount(resource){
   return state[resource.def.stateKey] || 0;
 }
 
+// 제작 팝업 재료 슬롯에 직접 등록해 둔 장비 인스턴스 id 중 "지금도 재료로 쓸 수 있는" 것만 반환(등록 후 잠금/착용/손상 등으로 조건이
+// 바뀐 경우를 걸러냄). 등록 가능 여부 판단은 기존 craftEligibleEquipInstances를 그대로 사용하며 새 조건을 만들지 않음.
+function craftSlotValidPicks(slot, resource){
+  if(!slot || !slot.picks || !resource || resource.kind !== 'equip') return [];
+  const eligible = new Set(craftEligibleEquipInstances(resource).map(it => it.id));
+  return slot.picks.filter(id => eligible.has(id));
+}
 // 장비가 아닌 일반 재료(현재는 MISC_ITEMS)는 제작 팝업에서 직접 투입하지 않고 "현재 보유 수량"만으로 자동 인식함
-// (장비 재료는 기존처럼 슬롯을 눌러 투입 개수를 직접 정해야 함). 장비/일반 구분은 findCraftResource가 돌려주는
+// (장비 재료는 슬롯을 눌러 실제 인벤토리 장비를 직접 선택해 등록해야 함). 장비/일반 구분은 findCraftResource가 돌려주는
 // resource.kind(기존 데이터 구조)를 그대로 사용하므로 아이템 이름을 하드코딩하지 않음.
 function craftResourceIsAutoMaterial(resource){
   return !!resource && resource.kind !== 'equip';
@@ -3682,12 +3700,12 @@ function craftPopupCanCraft(popup){
   const item = findCraftItem(popup.category, popup.itemId);
   if(!item) return false;
   const materialsOk = item.materials.every(m => {
-    // 일반 재료: 투입 개수(slot.qty)와 무관하게 "현재 보유 수량 >= 필요 수량"이면 충족(실제 소모는 openCraftAnim에서 기존 그대로)
+    // 일반 재료: 슬롯 등록과 무관하게 "현재 보유 수량 >= 필요 수량"이면 충족(실제 소모는 openCraftAnim에서 기존 그대로)
     const resource = findCraftResource(m.name);
     if(craftResourceIsAutoMaterial(resource)) return craftResourceOwnedCount(resource) >= m.need;
-    // 장비 재료: 기존 투입 조건 그대로 유지
+    // 장비 재료: 사용자가 직접 선택해 등록한 실제 장비 인스턴스가 필요 개수만큼 있어야 함(지금도 재료 조건을 만족하는 것만 인정)
     const slot = popup.slots.find(s => s.name === m.name);
-    return slot && slot.qty === m.need;
+    return !!slot && craftSlotValidPicks(slot, resource).length === m.need;
   });
   const goldOk = state.gold >= (item.craftCost || 0);
   return materialsOk && goldOk && !craftResultInventoryBlock(item);

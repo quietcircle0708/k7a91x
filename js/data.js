@@ -3262,6 +3262,7 @@ const PAGE_SIZE = {
   forgeSelect: 6,       // 대장간 "강화 장비 선택" 팝업
   repairSelect: 6,      // 수리 탭 "인벤토리에서 선택" 팝업
   restoreSelect: 6,     // 수리 탭 "손상 복구" 장비 선택 팝업
+  craftSelect: 6,       // 제작소 "재료 장비 선택" 팝업
   shopWeapon: 6,        // 상점 무기 탭
   shopArmor: 6,          // 상점 방어구 탭
   shopSub: 6,             // 상점 보조 탭
@@ -4847,6 +4848,12 @@ const TREASURE_GOLD_VARIANCE = 0.25;  // 골드 보상 랜덤 편차 ±25%(일�
 const MONSTER_BASE_GOLD = 100;       // 1레벨 몬스터의 기본 드랍 골드
 const MONSTER_GOLD_GROWTH = 0.04;    // 레벨당 골드 가중치 (+4%)
 const MONSTER_GOLD_VARIANCE = 0.15;  // 최종 드랍 골드 랜덤 편차 (±15%)
+// ---- 레벨 차이에 따른 골드·경험치 획득량 보정(몬스터 개체별, 피해량 레벨 차이 보정과는 별개 시스템) ----
+// 보정값 = 플레이어 레벨 - LEVEL_DIFF_REWARD_BASE - 몬스터 레벨. 0 이하면 100% 획득, 1 이상이면 1당 LEVEL_DIFF_REWARD_STEP(%)씩 감소하며
+// 감소율은 LEVEL_DIFF_REWARD_MAX_REDUCTION(%)을 넘지 않음. 밸런스 조정은 이 세 값만 바꾸면 됨(formulas.js rewardLevelRetentionPercent).
+const LEVEL_DIFF_REWARD_BASE = 5;            // 기준값(플레이어가 몬스터보다 이 정도까지 높아도 패널티 없음)
+const LEVEL_DIFF_REWARD_STEP = 2.5;          // 보정값 1당 감소율(%)
+const LEVEL_DIFF_REWARD_MAX_REDUCTION = 50;  // 최대 감소율(%)
 const MONSTER_ATTACK_SPEED = 1.0;    // 몬스터 공격속도(초당 공격 횟수) = 1초에 1번
 
 // 강화단계 그룹별 표시 이름(대장간 화면 상단 라벨, 인벤토리 카드 등에서 사용)

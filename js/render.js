@@ -658,7 +658,7 @@ function renderCraftPopup(){
     `<span class="tooltip">${craftItemTooltipHtml(item)}</span>`;
 
   // 재료 슬롯: 더 이상 플레이어가 재료를 직접 고르지 않고, 제작 아이템 데이터에 등록된 재료를
-  // 등급 높은 순으로 자동 배치함(요청사항 3-1). 슬롯 클릭 시 바로 그 재료의 투입 개수 팝업으로 감.
+  // 등급 높은 순으로 자동 배치함(요청사항 3-1). 장비 재료 슬롯 클릭 시 재료 장비 선택 팝업으로 감.
   const sortedMaterials = craftMaterialsSortedByGradeDesc(item.materials);
   el('craftPopupSlots').innerHTML = sortedMaterials.map(material => {
     const slot = craftPopup.slots.find(s => s.name === material.name);
@@ -669,15 +669,21 @@ function renderCraftPopup(){
     // 표시하고, 보유수량/필요수량을 기존 서식(craft-slot-qty-ok=노랑 / craft-slot-qty-short=빨강)으로 보여줌.
     // 클릭해도 아무 동작이 없도록 data-action 없는 일반 요소로 렌더링(레이아웃은 기존 .craft-slot 그대로).
     if(craftResourceIsAutoMaterial(resource)) return craftAutoMaterialSlotHtml(resource, material.need);
+    // 장비 재료: 사용자가 직접 선택해 등록한 실제 장비 인스턴스를 슬롯에 표시함. 아직 등록 전이면 "+" 아이콘(누르면 장비 선택 팝업).
+    // 등록된 장비가 여러 개(필요 개수 2개 이상)면 첫 번째 장비 아이콘을 보여주고 개수는 n/필요 개수로 표시함.
+    const picks = craftSlotValidPicks(slot, resource);
+    slot.picks = picks; slot.qty = picks.length; // 등록 후 조건이 바뀐 장비는 자동으로 등록 해제
     const qtyCls = slot.qty < material.need ? 'craft-slot-qty-short' : 'craft-slot-qty-ok';
-    // 요청사항 3-3: 아이콘 / 투입개수 / 이름을 하나의 슬롯에 뭉치지 않고 각각 분리된 줄로 표시.
-    // 투입 개수가 0(아직 손대지 않음)일 때는 "+" 아이콘, 1 이상 투입했으면 실제 재료 아이콘으로 전환.
-    const iconInner = slot.qty > 0
-      ? `${craftResourceIconHtml(resource, 'inv-icon-img')}<span class="tooltip">${craftResourceTooltipHtml(resource)}</span>`
-      : `<span class="craft-slot-plus">+</span>`;
+    const found = picks.length ? inventoryInstanceByKindAndId(resource.equipType, picks[0]) : null;
+    let iconInner = `<span class="craft-slot-plus">+</span>`, iconBorder = '';
+    if(found){
+      const display = equipInstanceDisplayInfo(found.item, found.type);
+      iconInner = `${display.iconHtml}<span class="tooltip">${display.tooltipHtml}</span>`;
+      iconBorder = display.color;
+    }
     return `
-      <button class="craft-slot" data-action="open-craft-material-qty" data-name="${material.name}">
-        <span class="inv-icon craft-slot-icon-box weapon-name-wrap" style="border-color:${slot.qty > 0 ? matColor : ''};">${iconInner}</span>
+      <button class="craft-slot" data-action="open-craft-equip-select" data-name="${material.name}">
+        <span class="inv-icon craft-slot-icon-box weapon-name-wrap" style="border-color:${iconBorder};">${iconInner}</span>
         <span class="${qtyCls}">${slot.qty}/${material.need}</span>
         <span class="craft-slot-name" style="color:${matColor};">${resource.def.name}</span>
       </button>`;
@@ -694,6 +700,40 @@ function renderCraftPopup(){
   if(noteEl){ noteEl.textContent = blockedCategory ? inventoryFullMessage(blockedCategory) : ''; noteEl.style.display = blockedCategory ? 'block' : 'none'; }
 }
 
+// 제작 재료 장비 선택 목록 — 복구 장비 선택 목록(renderRestoreSelectList)과 같은 마크업/페이지네이션. 현재 고르는 재료로 실제 등록할 수 있는
+// 장비(craftEligibleEquipInstances: 잠금/손상/착용 중/내구도 온전하지 않음/종류 불일치 제외 — 기존 재료 등록 조건 그대로)만 나옴.
+// 이미 이 슬롯에 등록한 장비는 선택 상태(.active)로 표시됨.
+function renderCraftSelectList(){
+  const wrap = el('craftSelectList');
+  if(!wrap) return;
+  const pagerWrap = el('craftSelectPager');
+  const resource = craftSelectState ? findCraftResource(craftSelectState.name) : null;
+  const slot = craftPopup && craftSelectState ? craftPopup.slots.find(s => s.name === craftSelectState.name) : null;
+  const items = resource && resource.kind === 'equip' ? craftEligibleEquipInstances(resource) : [];
+  if(items.length === 0){
+    wrap.innerHTML = `<div class="inv-empty">재료로 사용할 수 있는 장비가 없습니다.</div>`;
+    if(pagerWrap) pagerWrap.innerHTML = '';
+    return;
+  }
+  const picked = new Set(craftSlotValidPicks(slot, resource));
+  const pageSize = PAGE_SIZE.craftSelect;
+  const totalPageCount = pageCount(items.length, pageSize);
+  pageState.craftSelect = clampPage(pageState.craftSelect, totalPageCount);
+  if(pagerWrap) pagerWrap.innerHTML = pagerHtml('craftSelect', pageState.craftSelect, totalPageCount);
+  const pageItems = pageSlice(items, pageState.craftSelect, pageSize);
+  wrap.innerHTML = `<div class="forge-select-list">${pageItems.map(item => {
+    const itemColor = weaponNameColor(item.type, item.level);
+    const display = equipInstanceDisplayInfo(item, item.type);
+    return `
+      <button class="forge-select-item${picked.has(item.id) ? ' active' : ''}" data-action="pick-craft-equip" data-id="${item.id}">
+        <span class="inv-icon weapon-name-wrap" style="border-color:${itemColor};">${weaponIconHtml(item.type, 'inv-icon-img', item.level)}<span class="tooltip">${display.tooltipHtml}</span></span>
+        <span class="forge-select-info">
+          <span class="forge-select-name" style="color:${itemColor};">${restoreItemLabel(item, display)}</span>
+          ${picked.has(item.id) ? '<span class="inv-badge">선택됨</span>' : ''}
+        </span>
+      </button>`;
+  }).join('')}</div>`;
+}
 // ---- 제작소: 제작 최종 확인 UI ----
 // 성공/실패 영역 모두 "아이콘/이름을 하나의 슬롯으로 묶지 않는다"(요청사항)는 원칙에 따라,
 // 아이콘과 이름을 각각 별도의 줄(craft-confirm-icon-row / craft-confirm-item-name)로 렌더링함.
@@ -805,23 +845,6 @@ function spawnCraftAnimOrb(){
     iconBox.classList.add('craft-anim-icon-shake');
     setTimeout(() => iconBox.classList.remove('craft-anim-icon-shake'), 200);
   });
-}
-
-// ---- 제작소: 투입 개수 선택 팝업(상점 buyQtyModal 재사용/개조) ----
-function renderCraftMaterialQtyModal(){
-  if(!craftMaterialQtyState) return;
-  const { name, qty, maxQty } = craftMaterialQtyState;
-  const resource = findCraftResource(name);
-  if(!resource) return;
-  const color = craftResourceColor(resource);
-  el('craftMaterialQtyIconBox').innerHTML = craftResourceIconHtml(resource, 'inv-icon-img');
-  el('craftMaterialQtyName').textContent = resource.def.name;
-  el('craftMaterialQtyName').style.color = color;
-  el('craftMaterialQtyInput').value = qty;
-  el('craftMaterialQtyInput').max = maxQty;
-  el('craftMaterialQtyOwned').textContent = craftResourceOwnedCount(resource).toLocaleString();
-  el('craftMaterialQtyUpBtn').disabled = qty >= maxQty;
-  el('craftMaterialQtyDownBtn').disabled = qty <= 0;
 }
 
 function renderArtifactList(){
@@ -2760,7 +2783,7 @@ function buildConsumableShopCardHtml(id){
       </div>
       <div class="scroll-body">
         ${item.buyPrice != null ? `<button class="scroll-buy" data-action="buy-consumable" data-type="${id}" style="flex:1;" ${(state.gold < item.buyPrice || !canAcquireInCategory('consumable', owned > 0)) ? 'disabled' : ''}>${!canAcquireInCategory('consumable', owned > 0) ? '소비 인벤토리 가득참' : `구매 (${item.buyPrice} G)`}</button>` : ''}
-        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice.toLocaleString()} G)</button>
+        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice.toLocaleString()}${uiIconHtml('gold', 'ui-icon-inline')})</button>
       </div>
     </div>`;
 }
@@ -2797,16 +2820,16 @@ function buildMiscShopCardHtml(id){
     <div class="scroll-card">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${itemIconHtml(item)}</div>
+          <div class="artifact-icon-box" style="background:#242424; border-color:${miscNameColor(id)};">${itemIconHtml(item)}</div>
           <span class="weapon-name-wrap">
-            <span class="scroll-name txt-shard">${item.name}</span>
+            <span class="scroll-name" style="color:${miscNameColor(id)};">${item.name}</span>
             <span class="tooltip">${buildMiscTooltipHtml(id)}</span>
           </span>
         </div>
         <span class="scroll-count">보유 ${owned}개</span>
       </div>
       <div class="scroll-body">
-        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice} G)</button>
+        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice}${uiIconHtml('gold', 'ui-icon-inline')})</button>
       </div>
     </div>`;
 }
@@ -2820,7 +2843,7 @@ function buildStoneShopCardHtml(id){
     <div class="scroll-card">
       <div class="scroll-head">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#1c2b2c; border-color:#4fa3d1;">${itemIconHtml(item)}</div>
+          <div class="artifact-icon-box" style="background:#242424; border-color:${stoneNameColor(id)};">${itemIconHtml(item)}</div>
           <span class="weapon-name-wrap">
             <span class="scroll-name" style="color:${stoneNameColor(id)};">${item.name}</span>
             <span class="tooltip">${buildStoneTooltipHtml(id)}</span>
@@ -2829,7 +2852,7 @@ function buildStoneShopCardHtml(id){
         <span class="scroll-count">보유 ${owned}개</span>
       </div>
       <div class="scroll-body">
-        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice} G)</button>
+        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice}${uiIconHtml('gold', 'ui-icon-inline')})</button>
       </div>
     </div>`;
 }

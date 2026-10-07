@@ -52,13 +52,13 @@
      아이템 클릭 팝업(45)·모달(50) 아래로 둠(기존 표시 순서 유지). */
   .main-nav{ display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-bottom:18px; position:relative; z-index:40; }
   .gold-badge{
-    display:flex; align-items:center; gap:6px;
+    display:flex; align-items:center; gap:4px;
     background: var(--forge-panel); border:1px solid var(--forge-line);
     border-radius:999px; padding:7px 14px;
     font-family:'JetBrains Mono', monospace; font-weight:700; font-size:14px;
     color: var(--forge-gold);
   }
-  .gold-badge .dot{ width:8px; height:8px; border-radius:50%; background: var(--forge-gold); box-shadow:0 0 8px var(--forge-gold); }
+  .gold-badge .ui-icon-inline{ width:1.3em; height:1.3em; margin:0; vertical-align:baseline; flex:0 0 auto; } /* 예전 'G' 자리에 놓는 골드 아이콘(숫자 오른쪽, 세로 가운데) */
   .icon-svg{ display:inline-block; vertical-align:-2px; fill:currentColor; margin-right:1px; }
   .txt-normal{ color:#ffffff; font-weight:700; }
   .txt-epic{ color: var(--forge-purple); font-weight:700; }
@@ -1489,7 +1489,7 @@
     background:#2c2415; border:1px solid var(--forge-gold); border-radius:0 0 12px 12px; padding:10px 12px 12px;
     position:relative;
   }
-  .inv-box-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding-bottom:8px; }
+  .inv-box-toolbar{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding-bottom:8px; }
   .inv-box-tools{ display:flex; gap:6px; }
   .inv-box-btn{
     background:#2a231f; border:1px solid var(--forge-line); color: var(--forge-cream); border-radius:6px;
@@ -1499,7 +1499,7 @@
   .inv-box-btn.active{ border-color: var(--forge-gold); color: var(--forge-gold); }
   /* ---- 신버전 인벤토리 아이템 비교 ---- */
   .inv-box-gridwrap{ position:relative; }
-  .inv-box-slot.compare-disabled{ opacity:.3; pointer-events:none; } /* 비교할 수 없는 장비(다른 대분류/비장비 탭)는 흐리게, 클릭 불가 */
+  .inv-box-slot.compare-disabled, .inv-box-slot.search-dim{ opacity:.3; pointer-events:none; } /* 비교할 수 없는 장비(다른 대분류/비장비 탭)와 검색어와 일치하지 않는 아이템은 같은 방식으로 흐리게, 클릭 불가 */
   .inv-box-slot.compare-base{ box-shadow:0 0 0 2px var(--forge-gold); } /* 비교 기준 장비 강조 */
   .inv-compare-cursor{ position:fixed; left:0; top:0; width:28px; height:28px; transform:translate(-30%, -30%); pointer-events:none; z-index:100000; display:none; -webkit-user-drag:none; user-select:none; }
   @media (hover:hover) and (pointer:fine){
@@ -1526,6 +1526,7 @@
   .cmp-delta.bad{ color:#ff6b6b; }  /* 능력치 관점에서 더 나빠짐(빨강) */
   .cmp-sellval{ color: var(--forge-gold); }
   .cmp-sellval.reduced{ color:#ff6b6b; }
+  .cmp-sellval .ui-icon-inline{ vertical-align:-0.2em; margin-left:2px; } /* 판매 가격 숫자 오른쪽, 같은 줄에 맞춤 */
   .cmp-foot{ display:flex; justify-content:center; padding-top:6px; border-top:1px solid var(--forge-line); }
   .inv-box-btn:disabled{ opacity:.45; cursor:not-allowed; }
   .inv-box-btn:disabled:hover{ border-color: var(--forge-line); color: var(--forge-cream); }
@@ -1577,13 +1578,16 @@
   .inv-sort-select:hover, .inv-sort-select.active{ border-color: var(--forge-gold); color: var(--forge-gold); }
   .inv-sort-select option{ background:#2a231f; color: var(--forge-cream); }
   .inv-box-tools{ align-items:flex-start; }
-  .inv-box-sort-area{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+  .inv-box-sort-area{ display:flex; align-items:flex-start; }
   .inv-box-sort-area .inv-sort-select{ padding:4px 12px; }
   .inv-box-check{ display:flex; align-items:center; gap:5px; font-size:12px; color: var(--forge-cream-dim); cursor:pointer; user-select:none; }
   .inv-box-check input{ margin:0; cursor:pointer; accent-color: var(--forge-gold); }
-  .inv-box-pager .pager-btn:disabled{ opacity:.4; cursor:not-allowed; }
-  .inv-box-pager .pager-btn:disabled:hover{ border-color: var(--forge-line); color: var(--forge-cream); }
 
+  /* 슬롯 영역 스크롤: 슬롯이 8줄 표시 영역(64칸)을 넘을 때만 .scrollable이 붙어 이 안에서 스크롤됨(높이는 inventory_box.js가 슬롯 크기로 계산). */
+  .inv-box-gridscroll{ position:relative; }
+  .inv-box-gridscroll.scrollable{ overflow-y:auto; overflow-x:hidden; }
+  .inv-box-gridscroll.scrollable .inv-box-slot .tooltip{ display:none !important; } /* 스크롤 영역 안에서는 잘리므로 고정 위치 툴팁(#codexTip)을 대신 사용 */
+  .inv-box-slot.flash{ box-shadow:0 0 0 2px var(--forge-gold); } /* 검색 결과로 이동한 아이템 강조 */
   .inv-box-grid{
     display:grid; grid-template-columns: repeat(8, minmax(0, 42px)); gap:4px; justify-content:center; padding:4px 0 2px;
   }
@@ -1604,14 +1608,16 @@
     color:#1a140c; background: var(--forge-gold);
   }
   .inv-box-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
-  .inv-box-slotcount{ font-size:13px; color: var(--forge-cream-dim); }
+  .inv-box-footer-left{ display:flex; align-items:center; gap:14px; min-width:0; } /* '50 / 64' 오른쪽에 착용 장비 우선 정렬 체크 */
+  .inv-box-slotcount{ font-size:13px; color: var(--forge-cream-dim); white-space:nowrap; }
   .inv-box-slotcount b{ color: var(--forge-cream); font-weight:700; }
   .inv-box-gold{
     display:flex; justify-content:flex-end; align-items:center; gap:6px;
     font-size:13px; color: var(--forge-cream-dim);
   }
   .inv-box-gold b{ color: var(--forge-gold); font-weight:700; }
-  .inv-box-gold .dot{ width:8px; height:8px; border-radius:50%; background: var(--forge-gold); box-shadow:0 0 8px var(--forge-gold); }
+  .inv-box-gold-val{ display:inline-flex; align-items:center; gap:3px; } /* 숫자 + 골드 아이콘(예전 'G' 자리) */
+  .inv-box-gold-val .ui-icon-inline{ width:1.3em; height:1.3em; margin:0; vertical-align:baseline; flex:0 0 auto; }
 
   /* 아이템 클릭 팝업(선택한 슬롯 우측, inventory_box.js가 위치 보정). 모달(z-index 50)보다 아래에 둠 */
   .inv-box-popup{

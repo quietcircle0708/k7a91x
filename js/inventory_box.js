@@ -9,8 +9,8 @@
 // ---- 레이아웃 상수 ----
 const INV_BOX_COLUMNS = 8;
 const INV_BOX_ROWS = 8;
-const INV_BOX_SLOTS_PER_PAGE = INV_BOX_COLUMNS * INV_BOX_ROWS; // 화면 한 페이지 = 8×8 = 64칸. 실제 카테고리별 최대 슬롯(INV_MAX, data.js)도 64라
-                                                               // 평소에는 항상 1 / 1 페이지(용량 규칙은 구버전과 공용 — formulas.js 참고)
+const INV_BOX_SLOTS_PER_PAGE = INV_BOX_COLUMNS * INV_BOX_ROWS; // 슬롯 영역에 한 번에 보이는 칸 수 = 8×8 = 64칸(이름은 예전 페이지 구조의 흔적). 이 칸 수를 넘는 슬롯이 생길 때만
+                                                               // 슬롯 영역이 스크롤됨. 실제 카테고리별 최대 슬롯(INV_MAX, data.js)은 현재 64라 평소에는 스크롤이 생기지 않음(용량 규칙은 구버전과 공용 — formulas.js 참고)
 const INV_BOX_DOUBLE_CLICK_MS = 320; // 같은 슬롯을 이 시간 안에 두 번 누르면 더블 클릭(마우스/터치 공통)으로 처리
 
 // 신버전 탭 5개. 장비 소분류(무기/방어구/보조/장신구)는 쓰지 않고 장비 탭 하나에 전부 표시하며, 아티팩트는
@@ -37,7 +37,7 @@ function invBoxSortEntries(entries, tab){
   }
   return list;
 }
-// 정렬 드롭다운(탭별 기준)과 장비 탭 전용 착용 우선 체크 영역을 현재 탭에 맞게 채움.
+// 정렬 드롭다운(탭별 기준)과 장비 탭 전용 착용 우선 체크(하단 슬롯 수량 오른쪽에 있음)를 현재 탭에 맞게 채움.
 function invBoxRenderSortControls(tab){
   const wrap = el('invBoxSortWrap');
   if(wrap){
@@ -53,16 +53,17 @@ function invBoxRenderSortControls(tab){
 }
 
 // ---- UI 상태(저장하지 않는 화면 상태) ----
-// page: 탭별 현재 페이지(탭마다 독립). entriesByKey: 마지막으로 그린 슬롯 key → 엔트리(클릭 처리용).
-let invBoxUI = { tab: 'equipment', page: {}, popupKey: null, lastClick: { key: null, time: 0 }, entriesByKey: {} };
+// entriesByKey: 마지막으로 그린 슬롯 key → 엔트리(클릭 처리용). query/resultsOpen: 인벤토리 검색어와 결과 드롭다운 열림 여부(탭을 옮겨도 유지,
+// 인벤토리 메뉴를 나가면 invBoxSearchReset으로 초기화). focusKey: 검색 결과로 이동한 아이템(한 번만 강조). lastTab/resetScroll: 슬롯 영역 스크롤 위치 복원용.
+let invBoxUI = { tab: 'equipment', query: '', resultsOpen: false, focusKey: null, lastTab: null, resetScroll: false, cellCount: 0, searchByKey: {}, popupKey: null, lastClick: { key: null, time: 0 }, entriesByKey: {} };
 
 // ---- 아이템 비교 모드(신버전·장비 전용, 저장하지 않는 일시적 조작 모드) ----
 // on: 비교 모드 여부 / baseKey: 비교 기준 장비 A(최초에 \'아이템 비교\'를 누른 장비) / group: A의 장비 대분류(invCompareGroup) /
 // targetKey: 비교 대상 장비 B(없으면 \'비교 대상 선택 상태\', 있으면 비교 팝업이 열려 있음). [변경]은 targetKey만 비우고 A는 유지함.
 // 인벤토리 메뉴를 벗어나면 navigation.js showView가 invCompareReset()을 호출해 모드·기준·대상·커서를 모두 초기화함.
-let invCompare = { on: false, baseKey: null, group: null, targetKey: null };
+let invCompare = { on: false, baseKey: null, group: null, targetKey: null, levelA: null, levelB: null }; // levelA/levelB: 비교 화면에서만 쓰는 A/B 표시용 강화 단계(실제 장비 데이터는 바꾸지 않음)
 function invCompareReset(){
-  invCompare = { on: false, baseKey: null, group: null, targetKey: null };
+  invCompare = { on: false, baseKey: null, group: null, targetKey: null, levelA: null, levelB: null };
   if(typeof invCompareCursorSync === 'function') invCompareCursorSync(); // 돋보기 커서 원상복구
   const panel = document.getElementById('invBoxCompare');
   if(panel){ panel.style.display = 'none'; panel.innerHTML = ''; }
@@ -71,7 +72,7 @@ function invCompareStart(entry){
   const group = invCompareGroup(entry);
   if(!group) return;
   invBoxClosePopup();
-  invCompare = { on: true, baseKey: entry.key, group, targetKey: null };
+  invCompare = { on: true, baseKey: entry.key, group, targetKey: null, levelA: entry.item.level || 0, levelB: null }; // A의 시작 단계 = 실제 강화 단계([변경]으로 B만 바꿔도 A의 단계는 유지)
   if(typeof invCompareCursorSync === 'function') invCompareCursorSync();
   render();
 }
@@ -94,7 +95,7 @@ function invBoxEquipEntries(){
       const def = wpn(type);
       const info = equipInstanceDisplayInfo(item, type); // 아이콘/등급색/툴팁 — 구버전 카드와 동일 함수
       out.push({
-        key: src + ':' + item.id, src, id: item.id, item, type, def,
+        key: src + ':' + item.id, src, id: item.id, item, type, def, name: info.name, nameSuffix: `${item.damaged ? '(손상)' : ''}${item.level > 0 ? ' +' + item.level : ''}`, // name: 검색 대상(기본 이름)
         ...invSortInfoEquip(src, item), // kindKey/gradeRank/price/level — 구버전 정렬과 같은 공용 함수
         iconHtml: info.iconHtml, tooltipHtml: info.tooltipHtml, borderColor: info.color, qty: null,
         nameHtml: `<span style="color:${info.color};">${info.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ' +' + item.level : ''}</span>`,
@@ -109,7 +110,7 @@ function invBoxArtifactEntries(){
     const a = ARTIFACTS[id];
     const color = artifactNameColor(id);
     return {
-      key: 'artifact:' + id, src: 'artifact', id, item: a, type: id,
+      key: 'artifact:' + id, src: 'artifact', id, item: a, type: id, name: a.name,
       ...invSortInfoArtifact(id),
       iconHtml: itemIconHtml(a, 'inv-icon-img'), tooltipHtml: buildArtifactTooltipHtml(id), borderColor: color, qty: null,
       nameHtml: `<span style="color:${color};">${a.name}</span>`,
@@ -125,7 +126,7 @@ function invBoxConsumableEntries(){
     const scroll = isScrollItem(item);
     const g = scroll ? scrollGradeInfo(item) : null;
     out.push({
-      key: 'consumable:' + item.id, src: 'consumable', id: item.id, item, type: item.id,
+      key: 'consumable:' + item.id, src: 'consumable', id: item.id, item, type: item.id, name: item.name,
       ...invSortInfoConsumable(item),
       iconHtml: itemIconHtml(item, 'inv-icon-img'), tooltipHtml: buildConsumableTooltipHtml(item.id),
       borderColor: g ? g.color : 'var(--forge-line)', qty: count,
@@ -136,7 +137,7 @@ function invBoxConsumableEntries(){
   (state.traceInventory || []).forEach(t => {
     const name = `${weaponName(t.forType)}의 흔적`;
     out.push({
-      key: 'trace:' + t.id, src: 'trace', id: t.id, item: t, type: t.forType,
+      key: 'trace:' + t.id, src: 'trace', id: t.id, item: t, type: t.forType, name,
       ...invSortInfoTrace(),
       iconHtml: weaponIconHtml(t.forType, 'inv-icon-img'),
       tooltipHtml: `<div>${name}</div><div style="color:var(--forge-cream-dim);">단련의 힘을 견디지 못한 ${weaponName(t.forType)}의 흔적</div>`,
@@ -154,7 +155,7 @@ function invBoxMiscEntries(itemClass){
     .map(({ item, count }) => {
       const color = isStone ? stoneNameColor(item.id) : miscNameColor(item.id);
       return {
-        key: itemClass + ':' + item.id, src: itemClass, id: item.id, item, type: item.id,
+        key: itemClass + ':' + item.id, src: itemClass, id: item.id, item, type: item.id, name: item.name,
         ...invSortInfoMisc(item, itemClass),
         iconHtml: itemIconHtml(item, 'inv-icon-img'),
         tooltipHtml: isStone ? buildStoneTooltipHtml(item.id) : buildMiscTooltipHtml(item.id),
@@ -359,7 +360,7 @@ function invBoxTabLockable(tab){
   const sample = invBoxBuildEntries(tab)[0];
   return tab === 'equipment' || (!!sample && isInvLockable(sample.src));
 }
-function invBoxSlotHtml(entry){
+function invBoxSlotHtml(entry, query){
   const qtyHtml = entry.qty != null ? `<span class="reward-item-qty">${entry.qty}</span>` : ''; // 보상창 획득 아이템 슬롯과 같은 수량 표시
   const equipHtml = entry.equipped ? '<span class="inv-box-equip-mark">E</span>' : '';
   // 잠금 가능한 탭(INV_LOCKABLE_SRCS)의 슬롯에는 data-lock-src/id를 붙여 잠금 모드 클릭(main.js)이 이 슬롯을 잠금 대상으로 인식하게 하고,
@@ -368,8 +369,82 @@ function invBoxSlotHtml(entry){
   // 비교 모드: 기준 장비는 강조(compare-base), 같은 장비 대분류는 그대로(클릭해 비교), 그 외(다른 장비 종류/비장비 탭)는 흐리게 비활성(compare-disabled)
   let cmpCls = '';
   if(invCompare.on) cmpCls = entry.key === invCompare.baseKey ? ' compare-base' : (invCompareGroup(entry) === invCompare.group ? '' : ' compare-disabled');
-  return `<div class="inv-box-slot filled ${entry.locked ? 'locked' : ''}${cmpCls}" data-key="${entry.key}"${lockAttrs} style="border-color:${entry.borderColor};">`
+  // 검색어가 있으면 일치하지 않는 아이템은 숨기지 않고 비교 모드의 비활성 표시와 같은 방식(흐림)으로 표시 — 슬롯 위치는 그대로.
+  const dimCls = query && !invBoxMatches(entry, query) ? ' search-dim' : '';
+  const flashCls = entry.key === invBoxUI.focusKey ? ' flash' : '';
+  return `<div class="inv-box-slot filled ${entry.locked ? 'locked' : ''}${cmpCls}${dimCls}${flashCls}" data-key="${entry.key}"${lockAttrs} style="border-color:${entry.borderColor};">`
     + `${entry.iconHtml}${qtyHtml}${equipHtml}${invLockBadgeHtml(entry.locked)}<span class="tooltip">${entry.tooltipHtml}</span></div>`;
+}
+// ---- 인벤토리 검색 / 슬롯 영역 스크롤 ----
+// 검색창·결과 드롭다운은 도감 검색 UI(.codex-search/.codex-results/.codex-result/.codex-hl, codexHighlightHtml/codexEsc)를 그대로 재사용함.
+// 검색 대상은 인벤토리 전체(모든 탭)이지만, 슬롯 영역에는 항상 현재 탭의 아이템만 표시하고 검색어와 맞지 않는 슬롯은 흐리게만 표시함.
+function invBoxQueryNorm(){ return (invBoxUI.query || '').trim().toLowerCase(); }
+function invBoxMatches(entry, q){ return !q || (entry.name || '').toLowerCase().includes(q); }
+// 검색 결과 = 모든 탭의 엔트리(탭 순서 → 각 탭의 정렬 순서), 각 엔트리에 속한 탭(tab/tabLabel)을 붙임.
+function invBoxSearchResults(q){
+  const out = [];
+  INV_BOX_TABS.forEach(t => {
+    invBoxSortEntries(invBoxBuildEntries(t.id), t.id).forEach(e => { if(invBoxMatches(e, q)) out.push(Object.assign({}, e, { tab: t.id, tabLabel: t.label })); });
+  });
+  return out;
+}
+function invBoxRenderResults(){
+  const box = el('invBoxResults');
+  if(!box) return;
+  const q = invBoxQueryNorm();
+  invBoxUI.searchByKey = {};
+  if(!q || !invBoxUI.resultsOpen){ box.style.display = 'none'; return; }
+  const results = invBoxSearchResults(q);
+  if(results.length === 0){
+    box.innerHTML = '<div class="codex-result-empty">검색 결과가 없습니다.</div>';
+  } else {
+    box.innerHTML = results.slice(0, CODEX_SEARCH_MAX_RESULTS).map(e => {
+      invBoxUI.searchByKey[e.key] = e;
+      const color = String(e.borderColor || '').startsWith('var(--forge-line') ? 'var(--forge-cream)' : e.borderColor;
+      return `<button class="codex-result" data-key="${e.key}"><span style="color:${color};">${codexHighlightHtml(e.name, invBoxUI.query)}${codexEsc(e.nameSuffix || '')}</span>`
+        + `<span class="codex-result-cat">${codexEsc(e.tabLabel)}</span></button>`;
+    }).join('');
+  }
+  box.style.display = 'block';
+}
+// 검색 결과에서 아이템을 고르면 그 아이템이 속한 탭으로 이동(검색어는 유지)하고 슬롯을 강조함.
+function invBoxGoToEntry(key){
+  const e = invBoxUI.searchByKey[key];
+  if(!e) return;
+  invBoxClosePopup();
+  if(typeof codexHideTip === 'function') codexHideTip();
+  if(invCompare.on) invCompare.targetKey = null; // 탭 이동과 같은 처리(비교 팝업이 열려 있었다면 대상 선택 상태로)
+  invBoxUI.tab = e.tab;
+  invBoxUI.focusKey = e.key;
+  invBoxUI.resultsOpen = false;
+  renderInventoryBox();
+}
+// 인벤토리 메뉴를 나가면(navigation.js showView) 검색어·결과 상태를 초기화함.
+function invBoxSearchReset(){
+  invBoxUI.query = '';
+  invBoxUI.resultsOpen = false;
+  invBoxUI.focusKey = null;
+  const input = document.getElementById('invBoxSearchInput');
+  if(input) input.value = '';
+  const box = document.getElementById('invBoxResults');
+  if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+}
+// 슬롯 영역: 칸 수가 8줄 표시 영역(64칸)을 넘을 때만 .scrollable을 붙여 그 안에서 스크롤함(넘지 않으면 스크롤바·클리핑이 전혀 생기지 않음).
+// 슬롯은 칸 폭에 맞춰 줄어들 수 있으므로 도감(codexSyncGridHeight)처럼 실제 슬롯 높이를 측정해 8줄 높이를 계산함.
+function invBoxSyncScroll(total){
+  const sc = el('invBoxGridScroll'), grid = el('invBoxGrid');
+  if(!sc || !grid) return;
+  const need = total > INV_BOX_SLOTS_PER_PAGE;
+  sc.classList.toggle('scrollable', need);
+  sc.style.maxHeight = '';
+  if(!need) return;
+  const slot = grid.querySelector('.inv-box-slot');
+  const h = slot ? slot.getBoundingClientRect().height : 0;
+  if(!h) return; // 화면이 숨겨진 상태 — 다시 그리거나 크기가 바뀔 때 계산됨
+  const cs = getComputedStyle(grid);
+  const gap = parseFloat(cs.rowGap) || 4;
+  const padTop = parseFloat(cs.paddingTop) || 0, padBottom = parseFloat(cs.paddingBottom) || 0;
+  sc.style.maxHeight = Math.round(INV_BOX_ROWS * h + (INV_BOX_ROWS - 1) * gap + padTop + padBottom) + 'px';
 }
 function renderInventoryBox(){
   const wrap = el('invBoxWrap');
@@ -382,26 +457,33 @@ function renderInventoryBox(){
   invBoxUI.entriesByKey = {};
   entries.forEach(e => { invBoxUI.entriesByKey[e.key] = e; });
 
-  // 페이지: 슬롯 64개가 한 페이지. 지금은 대부분 1/1이지만, 64개를 넘는 아이템은 숨기지 않고 다음 페이지로 표시함
-  // (슬롯 확장/보유 제한 기능은 이번 단계 범위가 아님 — 구조만 준비).
-  const totalPages = Math.max(1, Math.ceil(entries.length / INV_BOX_SLOTS_PER_PAGE));
-  const page = Math.min(Math.max(1, invBoxUI.page[tab] || 1), totalPages);
-  invBoxUI.page[tab] = page;
-  const pageEntries = entries.slice((page - 1) * INV_BOX_SLOTS_PER_PAGE, page * INV_BOX_SLOTS_PER_PAGE);
+  // 슬롯 영역: 현재 탭의 아이템만 표시(검색어가 있어도 다른 탭 아이템은 가져오지 않음). 페이지 대신 스크롤 — 칸 수는 기본 64칸(8×8)이고,
+  // 아이템 수/카테고리 슬롯 용량(inventorySlotMax)이 그보다 커지면(슬롯 확장 대비) 8칸 단위로 늘어나 스크롤됨. 용량 자체는 제한 그대로.
+  const q = invBoxQueryNorm();
+  const total = Math.max(INV_BOX_SLOTS_PER_PAGE, Math.ceil(Math.max(entries.length, inventorySlotMax(tab)) / INV_BOX_COLUMNS) * INV_BOX_COLUMNS);
 
   el('invBoxTabs').innerHTML = INV_BOX_TABS.map(t =>
     `<button class="inv-box-tab ${t.id === tab ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('');
 
   let cells = '';
-  for(let i = 0; i < INV_BOX_SLOTS_PER_PAGE; i++){
-    cells += i < pageEntries.length ? invBoxSlotHtml(pageEntries[i]) : '<div class="inv-box-slot empty"></div>';
+  for(let i = 0; i < total; i++){
+    cells += i < entries.length ? invBoxSlotHtml(entries[i], q) : '<div class="inv-box-slot empty"></div>';
   }
+  const scroller = el('invBoxGridScroll');
+  const keepScroll = invBoxUI.lastTab === tab && !invBoxUI.resetScroll; // 같은 탭을 다시 그릴 때(판매/착용 등)는 스크롤 위치 유지
+  const prevScroll = scroller.scrollTop;
   el('invBoxGrid').innerHTML = cells;
-
-  el('invBoxPager').innerHTML =
-    `<span class="pager-label">${page} / ${totalPages}</span>`
-    + `<button class="pager-btn" data-act="page-prev" ${page <= 1 ? 'disabled' : ''}>이전</button>`
-    + `<button class="pager-btn" data-act="page-next" ${page >= totalPages ? 'disabled' : ''}>다음</button>`;
+  invBoxUI.cellCount = total;
+  invBoxSyncScroll(total);
+  scroller.scrollTop = keepScroll ? prevScroll : 0;
+  if(invBoxUI.focusKey){ // 검색 결과로 이동한 아이템이 보이도록 스크롤(강조는 이번 렌더에서만)
+    const fs = el('invBoxGrid').querySelector(`[data-key="${invBoxUI.focusKey}"]`);
+    if(fs) scroller.scrollTop = Math.max(0, fs.offsetTop - 4);
+    invBoxUI.focusKey = null;
+  }
+  invBoxUI.lastTab = tab;
+  invBoxUI.resetScroll = false;
+  invBoxRenderResults();
   invBoxRenderSortControls(tab);
   // 잠금 버튼: 잠금 모드 상태(active)를 반영해 매번 다시 그림. 잠금은 장비 탭에서만 쓸 수 있으므로 잠금 불가 탭에서는 (모드가 꺼져 있을 때) 비활성 —
   // 잠금 모드가 켜진 채 탭을 옮겨도 모드는 유지되고(요구사항 5번), 버튼은 계속 눌러 끌 수 있음.
@@ -417,7 +499,7 @@ function renderInventoryBox(){
   // 현재 보고 있는 카테고리의 슬롯 사용량(실제 인벤토리 용량 규칙 — formulas.js의 inventorySlotsUsed/inventorySlotMax를 구버전과
   // 똑같이 사용함). 탭 id가 인벤토리 카테고리 id와 같아 그대로 넘김. 골드 표시는 기존 그대로 유지.
   el('invBoxSlotCount').innerHTML = `<b>${inventorySlotsUsed(tab)}</b> / ${inventorySlotMax(tab)}`;
-  el('invBoxGold').innerHTML = `소유 골드 <span class="dot"></span> <b>${state.gold.toLocaleString()}</b> G`;
+  el('invBoxGold').innerHTML = `소유 골드 <span class="inv-box-gold-val"><b>${state.gold.toLocaleString()}</b>${uiIconHtml('gold', 'ui-icon-inline')}</span>`;
   invBoxRefreshPopup();
   invCompareRenderPanel();
 }
@@ -442,13 +524,26 @@ function invCompareRenderPanel(){
   invBoxBuildEntries('equipment').forEach(e => { all[e.key] = e; }); // 정렬/탭과 무관하게 현재 보유 장비 전체에서 A/B를 다시 찾음(상태 변경 반영)
   const a = all[invCompare.baseKey], b = all[invCompare.targetKey];
   if(!a || !b || invCompareGroup(b) !== invCompare.group){ invCompareReset(); return; } // 대상 아이템이 사라진 경우 안전하게 종료
+  // A/B의 표시 단계(없으면 실제 단계)로 도감 정보와 같은 방식(codexDisplayFor: 실제 장비 표시 함수가 단계에 맞춰 아이콘·툴팁 생성)으로 표시용 엔트리를 만듦.
+  // 실제 아이템(a.item/b.item)은 복사본으로만 쓰므로 인벤토리의 강화 단계는 바뀌지 않음.
+  const lvA = invCompare.levelA != null ? invCompare.levelA : (a.item.level || 0), lvB = invCompare.levelB != null ? invCompare.levelB : (b.item.level || 0);
+  const da = codexDisplayFor(a.type, lvA, a.item), db = codexDisplayFor(b.type, lvB, b.item);
   const icon = e => `<div class="inv-box-slot filled cmp-slot" style="border-color:${e.borderColor};">${e.iconHtml}</div>`;
-  const rows = invCompareRowsHtml(invCompareBuildRows(a, b));
+  const rowsData = invCompareBuildRows(da, db);
+  // '강화' 항목: 도감 정보와 같은 단계 선택 UI(codexEnhCell), 이름 아래 / 등급 위. 강화 불가 장비는 '-'
+  const enhRow = { label: '강화', aHtml: codexEnhCell('a', lvA, codexEnhanceable(a.src)), bHtml: codexEnhCell('b', lvB, codexEnhanceable(b.src)) };
+  const nameIdx = rowsData.findIndex(r => r.label === INV_COMPARE_TIP_LABELS.name);
+  rowsData.splice(nameIdx + 1, 0, enhRow);
+  const rows = invCompareRowsHtml(rowsData);
   // 아이콘 머리글은 스크롤 영역(.cmp-body) 안에 두고 CSS sticky로 맨 위에 고정함 — 항목 행과 같은 폭을 쓰기 때문에, 스크롤바가 생겨
   // 행의 열 폭이 줄어들어도 아이콘이 이름/값 열의 가운데에 계속 맞음(머리글이 스크롤 영역 밖이면 오른쪽 열이 스크롤바 폭만큼 어긋남).
-  panel.innerHTML = `<div class="cmp-body"><div class="cmp-head"><div class="cmp-head-label"></div><div class="cmp-head-side">${icon(a)}</div>`
-    + `<div class="cmp-head-side">${icon(b)}<button class="inv-box-btn cmp-change" data-cmp="change">변경</button></div></div>${rows}</div>`
+  const prevBody = panel.querySelector('.cmp-body');
+  const prevTop = prevBody ? prevBody.scrollTop : 0; // 단계를 바꿔도 보고 있던 스크롤 위치 유지
+  panel.innerHTML = `<div class="cmp-body"><div class="cmp-head"><div class="cmp-head-label"></div><div class="cmp-head-side">${icon(da)}</div>`
+    + `<div class="cmp-head-side">${icon(db)}<button class="inv-box-btn cmp-change" data-cmp="change">변경</button></div></div>${rows}</div>`
     + `<div class="cmp-foot"><button class="inv-box-btn" data-cmp="close">닫기</button></div>`;
+  const nb = panel.querySelector('.cmp-body');
+  if(nb) nb.scrollTop = prevTop;
   panel.style.display = 'flex';
 }
 
@@ -465,16 +560,16 @@ function invCompareRenderPanel(){
       renderInventoryBox();
       return;
     }
-    const actBtn = e.target.closest('button[data-act]');
-    if(actBtn && !actBtn.disabled){
-      const act = actBtn.dataset.act;
-      if(act === 'page-prev' || act === 'page-next'){
-        invBoxClosePopup();
-        if(invCompare.on) invCompare.targetKey = null;
-        invBoxUI.page[invBoxUI.tab] = (invBoxUI.page[invBoxUI.tab] || 1) + (act === 'page-next' ? 1 : -1);
-        renderInventoryBox();
-      }
-      // 잠금 버튼([data-lock-toggle])과 잠금 모드 중 슬롯 클릭은 main.js의 공용 잠금 처리(캡처 단계)가 먼저 처리함.
+    // 잠금 버튼([data-lock-toggle])과 잠금 모드 중 슬롯 클릭은 main.js의 공용 잠금 처리(캡처 단계)가 먼저 처리함.
+    // 비교 화면의 강화 단계 ◀▶(도감 정보와 같은 버튼 마크업 codexEnhCell): A/B 표시 단계만 바꾸고 실제 장비는 그대로 둠
+    const enhBtn = e.target.closest('button[data-cdx="enh"]');
+    if(enhBtn){
+      if(enhBtn.disabled || !invCompare.on || !invCompare.targetKey) return;
+      const d = Number(enhBtn.dataset.d);
+      const clamp = v => Math.max(0, Math.min(MAX_LEVEL, v));
+      if(enhBtn.dataset.side === 'a') invCompare.levelA = clamp((invCompare.levelA || 0) + d);
+      else invCompare.levelB = clamp((invCompare.levelB || 0) + d);
+      invCompareRenderPanel();
       return;
     }
     const cmpBtn = e.target.closest('button[data-cmp]');
@@ -499,6 +594,7 @@ function invCompareRenderPanel(){
       if(key === invCompare.baseKey){ invCompareReset(); render(); return; }
       if(invCompareGroup(entry) !== invCompare.group) return;
       invCompare.targetKey = key;
+      invCompare.levelB = entry.item.level || 0; // B의 시작 단계 = 그 장비의 실제 강화 단계
       if(typeof invCompareCursorSync === 'function') invCompareCursorSync(); // 팝업이 열려 있는 동안은 일반 커서(버튼을 누를 수 있게)
       render();
       return;
@@ -518,7 +614,46 @@ function invCompareRenderPanel(){
     if(invBoxUI.popupKey === key) invBoxClosePopup();
     else invBoxOpenPopup(key, slotEl);
   });
+  // ---- 검색 ----
+  const input = el('invBoxSearchInput');
+  input.addEventListener('input', () => {
+    invBoxUI.query = input.value;
+    invBoxUI.resultsOpen = true;
+    invBoxClosePopup();
+    renderInventoryBox();
+  });
+  // 검색어가 입력된 상태에서 검색창을 다시 선택하면 입력 내용을 비우고 새로 검색할 수 있게 함(탭 이동만으로는 지우지 않음).
+  input.addEventListener('focus', () => {
+    if(!input.value && !invBoxUI.query) return;
+    input.value = '';
+    invBoxUI.query = '';
+    invBoxUI.resultsOpen = false;
+    invBoxClosePopup();
+    renderInventoryBox();
+  });
+  el('invBoxResults').addEventListener('click', (e) => {
+    const b = e.target.closest('.codex-result');
+    if(b) invBoxGoToEntry(b.dataset.key);
+  });
+  // ---- 스크롤 모드(슬롯이 64칸을 넘을 때)에서는 슬롯 안 CSS 툴팁이 잘리므로 도감과 같은 고정 위치 툴팁(#codexTip)을 사용 ----
+  const gridEl = el('invBoxGrid');
+  gridEl.addEventListener('mouseover', (e) => {
+    if(!el('invBoxGridScroll').classList.contains('scrollable')) return;
+    const s = e.target.closest('.inv-box-slot.filled');
+    const entry = s && invBoxUI.entriesByKey[s.dataset.key];
+    if(entry && typeof codexShowTipHtml === 'function') codexShowTipHtml(s, entry.tooltipHtml, entry.key);
+  });
+  gridEl.addEventListener('mouseout', (e) => {
+    if(e.target.closest('.inv-box-slot') && typeof codexHideTip === 'function') codexHideTip();
+  });
+  el('invBoxGridScroll').addEventListener('scroll', () => { if(typeof codexHideTip === 'function') codexHideTip(); });
   // 팝업/슬롯 밖을 누르거나 Esc, 화면 크기 변경, 스크롤 시 팝업을 닫음
+  document.addEventListener('click', (e) => { // 검색창/결과 밖을 누르면 결과 드롭다운만 닫음(검색어는 유지)
+    if(invBoxUI.resultsOpen && !e.target.closest('#invBoxSearch')){
+      invBoxUI.resultsOpen = false;
+      el('invBoxResults').style.display = 'none';
+    }
+  });
   document.addEventListener('click', (e) => {
     if(!invBoxUI.popupKey) return;
     if(e.target.closest('#invBoxPopup') || e.target.closest('.inv-box-slot.filled')) return;
@@ -529,7 +664,7 @@ function invCompareRenderPanel(){
     invBoxClosePopup();
     if(invCompare.on){ invCompareReset(); render(); } // Esc = 아이템 비교 모드 종료(대상 선택 중이든 비교 팝업이 열려 있든 동일)
   });
-  window.addEventListener('resize', invBoxClosePopup);
+  window.addEventListener('resize', () => { invBoxClosePopup(); if(invBoxUI.cellCount) invBoxSyncScroll(invBoxUI.cellCount); });
   window.addEventListener('scroll', () => { if(invBoxUI.popupKey) invBoxClosePopup(); }, true);
 })();
 

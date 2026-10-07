@@ -13,7 +13,7 @@
 
   <div class="topbar">
     <div class="brand">Enhance <span>&</span> Slay</div>
-    <div class="gold-badge"><span class="dot"></span><span id="goldText">0</span> G</div>
+    <div class="gold-badge"><span id="goldText">0</span><img class="ui-icon-inline" src="assets/ui/ui_gold_icon.png" alt="G" draggable="false"></div>
   </div>
   <div class="main-nav" id="mainNav">
     <button class="back-btn back-from-shop" id="backFromShopBtn" style="display:none;">← 대장간으로 돌아가기</button>
@@ -249,15 +249,22 @@
           <div class="inv-box-tools">
             <div class="inv-box-sort-area">
               <span class="inv-sort-wrap" id="invBoxSortWrap"></span>
-              <label class="inv-box-check" id="invBoxWornFirstWrap" style="display:none;"><input type="checkbox" id="invBoxWornFirst"> 착용 장비 우선 정렬</label>
             </div>
             <span id="invBoxLockWrap"></span>
           </div>
-          <div class="pager inv-box-pager" id="invBoxPager"></div>
+          <!-- 인벤토리 검색(도감 검색창 .codex-search / .codex-results 스타일 재사용) — 인벤토리 전체 아이템이 검색 대상 -->
+          <div class="codex-search inv-box-search" id="invBoxSearch">
+            <input type="text" id="invBoxSearchInput" placeholder="클릭하여 검색..." autocomplete="off" autocapitalize="off" spellcheck="false">
+            <img src="assets/ui/icon_item_comparison.png" class="codex-search-icon" alt="" draggable="false">
+            <div class="codex-results" id="invBoxResults" style="display:none;"></div>
+          </div>
         </div>
-        <div class="inv-box-gridwrap"><div class="inv-box-grid" id="invBoxGrid"></div><div class="inv-box-compare" id="invBoxCompare" style="display:none;"></div></div>
+        <div class="inv-box-gridwrap"><div class="inv-box-gridscroll" id="invBoxGridScroll"><div class="inv-box-grid" id="invBoxGrid"></div></div><div class="inv-box-compare" id="invBoxCompare" style="display:none;"></div></div>
         <div class="inv-box-footer">
-          <div class="inv-box-slotcount" id="invBoxSlotCount"></div>
+          <div class="inv-box-footer-left">
+            <div class="inv-box-slotcount" id="invBoxSlotCount"></div>
+            <label class="inv-box-check" id="invBoxWornFirstWrap" style="display:none;"><input type="checkbox" id="invBoxWornFirst"> 착용 장비 우선 정렬</label>
+          </div>
           <div class="inv-box-gold" id="invBoxGold"></div>
         </div>
       </div>
@@ -829,6 +836,21 @@
     </div>
   </div>
 
+  <!-- [제작] 장비 재료 직접 선택 팝업 — 강화/수리/복구 장비 선택 팝업과 같은 구조·클래스(forge-select-*). 목록에는 이 재료로 실제 등록할 수 있는
+       장비 인스턴스(craftEligibleEquipInstances)만 나옴. -->
+  <div id="craftSelectModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box forge-select-modal">
+      <div class="char-stats-title-row">
+        <div class="modal-title">재료 장비 선택</div>
+        <div class="pager" id="craftSelectPager"></div>
+      </div>
+      <div id="craftSelectList"></div>
+      <div class="modal-actions">
+        <button class="nav-btn" id="closeCraftSelectBtn">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 촉매 선택창(요청사항 4번) — 출력까지만 구현, 실제 촉매 등록/효과는 미구현 -->
   <div id="craftCatalystModal" class="modal-overlay" style="display:none;">
     <div class="modal-box">
@@ -948,36 +970,7 @@
     </div>
   </div>
 
-  <!-- 재료 투입 개수 선택 팝업. 상점 개수구매 팝업(buyQtyModal)의 스테퍼 UI를 재사용/개조함. -->
-  <div id="craftMaterialQtyModal" class="modal-overlay" style="display:none;">
-    <div class="modal-box">
-      <div class="modal-title">투입 개수 설정</div>
-      <div class="buy-qty-icon-row">
-        <span class="artifact-icon-box buy-qty-icon-box" id="craftMaterialQtyIconBox"></span>
-      </div>
-      <div class="craft-popup-name" id="craftMaterialQtyName"></div>
-      <div class="buy-qty-field-row">
-        <span class="settings-item-label">투입 개수</span>
-        <div class="settings-stepper">
-          <input type="number" id="craftMaterialQtyInput" class="buy-qty-input" min="0" value="0" inputmode="numeric" />
-          <div class="settings-stepper-arrows">
-            <button class="settings-stepper-btn" id="craftMaterialQtyUpBtn">▲</button>
-            <button class="settings-stepper-btn" id="craftMaterialQtyDownBtn">▼</button>
-          </div>
-        </div>
-      </div>
-      <div class="buy-qty-gold-row">
-        <span>보유 개수</span>
-        <span id="craftMaterialQtyOwned"></span>
-      </div>
-      <div class="modal-actions">
-        <button class="nav-btn" id="craftMaterialQtyCancelBtn">취소</button>
-        <button class="btn btn-main" id="craftMaterialQtyConfirmBtn" style="width:auto; padding:10px 18px;">확인</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 수리 시스템: 개별 수리 팝업(요구사항 9~18번) — 제작 재료 투입 UI(craftPopupModal/craftMaterialQtyModal)의
+  <!-- 수리 시스템: 개별 수리 팝업(요구사항 9~18번) — 제작 재료 UI(craftPopupModal)의
        구조(아이콘+이름 중앙 배치, buy-qty-gold-row 골드/비용 표시, modal-actions 버튼)를 그대로 재사용함. -->
   <div id="repairIndividualModal" class="modal-overlay" style="display:none;">
     <div class="modal-box craft-popup-box">

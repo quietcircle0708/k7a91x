@@ -6,7 +6,7 @@
 
 function showView(name){
   if(currentView === 'collection' && name !== 'collection' && typeof codexOnLeave === 'function') codexOnLeave(); // 도감 툴팁/검색 결과창은 도감 화면 안에서만 유지됨
-  if(currentView === 'inventory' && name !== 'inventory' && typeof invCompareReset === 'function') invCompareReset(); // 비교 모드도 인벤토리 메뉴 안에서만 유지됨(나가면 모드·기준·팝업·돋보기 커서 초기화)
+  if(currentView === 'inventory' && name !== 'inventory' && typeof invCompareReset === 'function') invCompareReset(); if(currentView === 'inventory' && name !== 'inventory' && typeof invBoxSearchReset === 'function') invBoxSearchReset(); // 인벤토리 검색어도 메뉴를 나가면 초기화 // 비교 모드도 인벤토리 메뉴 안에서만 유지됨(나가면 모드·기준·팝업·돋보기 커서 초기화)
   if(currentView === 'inventory' && name !== 'inventory') invLockModeSet(false); // 잠금 모드는 인벤토리 메뉴 안에서만 유지됨(나가면 해제 + 일반 커서 복원)
   if(currentView === 'hunt' && name !== 'hunt'){
     stopHuntLoop();
@@ -35,7 +35,6 @@ function showView(name){
     // 함께 정리함(팝업이 열린 채로 화면을 벗어나는 경로는 없지만, 혹시 모를 상태 잔류를 방지).
     craftUI.openMaterialIds = new Set();
     craftPopup = null;
-    craftMaterialQtyState = null;
     if(craftAnim){
       restoreHeldCraftEquip(); // 이탈로 중단되는 경우 홀딩 장비를 잃지 않도록 되돌림
       clearInterval(craftAnim.tickInterval);
@@ -43,7 +42,8 @@ function showView(name){
       craftAnim = null;
     }
     el('craftPopupModal').style.display = 'none';
-    el('craftMaterialQtyModal').style.display = 'none';
+    el('craftSelectModal').style.display = 'none';
+    craftSelectState = null;
     el('craftCatalystModal').style.display = 'none';
     el('craftConfirmModal').style.display = 'none';
     el('craftAnimModal').style.display = 'none';
@@ -394,65 +394,56 @@ function openCraftPopup(category, itemId){
   const item = findCraftItem(category, itemId);
   if(!item) return;
   // 재료를 직접 고르지 않고, 제작 아이템 데이터에 등록된 재료를 자동으로 전부 배정한 채로 팝업을 염
-  // (투입 개수만 0부터 직접 설정). 슬롯은 이름(name) 기준으로 관리 — findCraftResource가 이름으로
+  // (장비 재료는 슬롯을 눌러 실제 장비를 직접 골라 등록). 슬롯은 이름(name) 기준으로 관리 — findCraftResource가 이름으로
   // 무기/방어구/장신구/보조/MISC_ITEMS 어디에 있는지 자동으로 찾아줌.
   craftPopup = {
     category, itemId,
-    slots: item.materials.map(m => ({ name: m.name, qty: 0 })),
+    slots: item.materials.map(m => ({ name: m.name, qty: 0, picks: [] })), // picks: 장비 재료로 직접 선택해 등록한 실제 인벤토리 인스턴스 id 목록(qty는 그 개수)
   };
   renderCraftPopup();
   el('craftPopupModal').style.display = 'flex';
 }
 function closeCraftPopup(){
   el('craftPopupModal').style.display = 'none';
+  el('craftSelectModal').style.display = 'none';
+  craftSelectState = null;
   craftPopup = null;
 }
 
-// ---- 제작소: 투입 개수 선택 팝업(상점 "개수 지정 구매" buyQtyModal 재사용/개조) ----
-// 재료가 이미 데이터로 정해져 있으므로 슬롯을 누르면 바로 그 재료의 투입 개수 팝업으로 감.
-function openCraftMaterialQty(name){
-  const item = findCraftItem(craftPopup.category, craftPopup.itemId);
-  const slot = craftPopup.slots.find(s => s.name === name);
-  const material = item.materials.find(m => m.name === name);
+// ---- 제작소: 재료 장비 직접 선택 ----
+// 장비 재료 슬롯을 누르면 그 재료로 실제 등록할 수 있는 장비 인스턴스(craftEligibleEquipInstances)만 나열하는 선택 팝업이 열림. 장비를 누르면 그
+// 인스턴스(고유 id)가 슬롯에 등록되고, 이미 등록한 장비를 다시 누르면 등록이 해제됨(필요 개수가 다 차 있는 상태에서 새 장비를 누르면 가장 먼저
+// 등록한 장비가 교체됨). 필요 개수가 다 채워지면 팝업이 자동으로 닫힘. 제작 시작 시에는 이 id의 장비만 소모됨(openCraftAnim).
+function openCraftEquipSelect(name){
+  if(!craftPopup) return;
   const resource = findCraftResource(name);
-  if(craftResourceIsAutoMaterial(resource)) return; // 일반 재료는 보유 수량으로 자동 인식 — 투입 수량 팝업 없음
-  // 버그 수정: 이전엔 maxQty를 "필요 개수"로만 잡아서, 실제로 보유하지 않은 개수까지도 투입 개수를
-  // 계속 올릴 수 있었음(보유량 검증 없이 슬롯 숫자만 늘어남). 이제 "필요 개수"와 "실제 보유량" 중
-  // 더 작은 값으로 제한해서, 가진 만큼만 투입할 수 있도록 함.
-  const owned = resource ? craftResourceOwnedCount(resource) : 0;
-  const maxQty = Math.min(material.need, owned);
-  craftMaterialQtyState = { name, qty: Math.min(slot.qty, maxQty), maxQty };
-  el('craftPopupModal').style.display = 'none';
-  renderCraftMaterialQtyModal();
-  el('craftMaterialQtyModal').style.display = 'flex';
+  if(!resource || craftResourceIsAutoMaterial(resource)) return; // 일반 재료는 기존대로 보유 수량 자동 인식
+  craftSelectState = { name };
+  pageState.craftSelect = 1; // 열 때마다 1페이지부터(다른 장비 선택 팝업과 같은 관례)
+  renderCraftSelectList();
+  el('craftSelectModal').style.display = 'flex';
 }
-// [취소] → 제작 진행 팝업으로 복귀(재료 선택 단계가 없어졌으므로 곧바로 팝업으로 돌아감)
-function closeCraftMaterialQty(){
-  el('craftMaterialQtyModal').style.display = 'none';
-  craftMaterialQtyState = null;
+function closeCraftEquipSelect(){
+  el('craftSelectModal').style.display = 'none';
+  craftSelectState = null;
+  if(craftPopup) renderCraftPopup();
+}
+function pickCraftEquip(itemId){
+  if(!craftPopup || !craftSelectState) return;
+  const item = findCraftItem(craftPopup.category, craftPopup.itemId);
+  const material = item && item.materials.find(m => m.name === craftSelectState.name);
+  const slot = craftPopup.slots.find(s => s.name === craftSelectState.name);
+  const resource = findCraftResource(craftSelectState.name);
+  if(!material || !slot || !resource) return;
+  if(!craftEligibleEquipInstances(resource).some(it => it.id === itemId)) return; // 기존 재료 등록 조건을 통과한 장비만
+  let picks = craftSlotValidPicks(slot, resource);
+  if(picks.includes(itemId)) picks = picks.filter(id => id !== itemId);
+  else { if(picks.length >= material.need) picks.shift(); picks.push(itemId); }
+  slot.picks = picks;
+  slot.qty = picks.length;
+  if(picks.length >= material.need){ closeCraftEquipSelect(); return; }
+  renderCraftSelectList();
   renderCraftPopup();
-  el('craftPopupModal').style.display = 'flex';
-}
-function setCraftMaterialQty(val){
-  if(!craftMaterialQtyState) return;
-  const num = parseInt(val, 10);
-  const clamped = Number.isFinite(num) ? Math.max(0, Math.min(craftMaterialQtyState.maxQty, num)) : 0;
-  craftMaterialQtyState.qty = clamped;
-  renderCraftMaterialQtyModal();
-}
-function stepCraftMaterialQty(dir){
-  if(!craftMaterialQtyState) return;
-  setCraftMaterialQty(craftMaterialQtyState.qty + (dir === 'up' ? 1 : -1));
-}
-// 투입 개수 확정 → 제작 진행 팝업으로 복귀
-function confirmCraftMaterialQty(){
-  if(!craftMaterialQtyState || !craftPopup) return;
-  const slot = craftPopup.slots.find(s => s.name === craftMaterialQtyState.name);
-  if(slot) slot.qty = craftMaterialQtyState.qty;
-  el('craftMaterialQtyModal').style.display = 'none';
-  craftMaterialQtyState = null;
-  renderCraftPopup();
-  el('craftPopupModal').style.display = 'flex';
 }
 
 // ---- 제작소: 촉매 선택창(출력만 구현, 실제 촉매 등록/효과는 미구현) ----
@@ -481,6 +472,11 @@ function closeCraftConfirm(){
 // [진행] → 제작 최종 확인 UI를 닫고 제작 연출 화면으로 이동(요청사항: "제작 연출 UI 및 결과 확인
 // 기능" 작업에서 실제로 구현됨). 재료차감/성공-실패 최종 반영 등은 여전히 연출이 끝나는 시점에 처리됨.
 function proceedCraftConfirm(){
+  if(!craftPopup || !craftPopupCanCraft(craftPopup)){ // 등록한 장비 재료가 더는 유효하지 않으면(방어) 진행하지 않고 제작 진행 팝업으로 복귀
+    el('craftConfirmModal').style.display = 'none';
+    if(craftPopup){ renderCraftPopup(); el('craftPopupModal').style.display = 'flex'; }
+    return;
+  }
   el('craftConfirmModal').style.display = 'none';
   el('craftPopupModal').style.display = 'none';
   openCraftAnim();
@@ -513,14 +509,16 @@ function openCraftAnim(){
     if(resource.kind === 'misc'){
       state[resource.def.stateKey] = Math.max(0, (state[resource.def.stateKey] || 0) - m.need);
     } else {
+      // 자동으로 같은 종류의 장비를 찾지 않고, 사용자가 슬롯에 직접 등록한 실제 인스턴스(id)만 소모함(같은 종류의 다른 장비는 건드리지 않음).
       const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
       const arr = pool.items();
-      for(let i = 0; i < m.need; i++){
-        const idx = arr.findIndex(it => it.type === resource.typeId && !it.damaged && !it.locked && !isEquipInstanceWorn(resource.equipType, it.id)); // 잠긴 장비는 재료로 소모하지 않음
-        if(idx === -1) break; // craftPopupCanCraft가 이미 보유량을 검증했으므로 이론상 발생하지 않음
+      const slot = craftPopup.slots.find(s => s.name === m.name);
+      craftSlotValidPicks(slot, resource).slice(0, m.need).forEach(pickId => {
+        const idx = arr.findIndex(it => it.id === pickId);
+        if(idx === -1) return; // craftPopupCanCraft가 이미 검증했으므로 이론상 발생하지 않음
         const [inst] = arr.splice(idx, 1); // 홀딩: 인벤토리에서 제거
         heldEquip.push({ equipType: resource.equipType, typeId: inst.type, level: inst.level });
-      }
+      });
     }
   });
   craftAnim = {
@@ -665,6 +663,7 @@ const PAGE_RENDER_FN = {
   forgeSelect: renderForgeSelectList,
   repairSelect: renderRepairSelectList,
   restoreSelect: renderRestoreSelectList,
+  craftSelect: renderCraftSelectList,
   shopWeapon: renderShopTab, shopArmor: renderShopTab, shopSub: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
   charInfoEquip: renderCharacterMenu,

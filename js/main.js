@@ -36,7 +36,7 @@ document.addEventListener('change', (e)=>{
     state.invSortWornFirst = e.target.checked;
   }
   if(INV_SORT_PAGE_KEY[tab]) pageState[INV_SORT_PAGE_KEY[tab]] = 1;
-  if(typeof invBoxUI !== 'undefined'){ invBoxUI.page[tab] = 1; invBoxClosePopup(); }
+  if(typeof invBoxUI !== 'undefined'){ invBoxUI.resetScroll = true; invBoxClosePopup(); } // 정렬 기준이 바뀌면 슬롯 영역은 맨 위부터
   render();
   saveState();
 });
@@ -231,9 +231,22 @@ el('craftSubTabs').addEventListener('click', (e)=>{
 // ---- 제작 진행 팝업 ----
 el('craftPopupCancelBtn').addEventListener('click', closeCraftPopup);
 el('craftPopupSlots').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action="open-craft-material-qty"]');
+  const btn = e.target.closest('button[data-action="open-craft-equip-select"]');
   if(!btn) return;
-  openCraftMaterialQty(btn.dataset.name);
+  openCraftEquipSelect(btn.dataset.name); // 장비 재료 슬롯 → 실제 인벤토리 장비 직접 선택
+});
+// ---- 제작 재료 장비 선택 팝업(강화/수리/복구 장비 선택 팝업과 같은 구조) ----
+el('closeCraftSelectBtn').addEventListener('click', closeCraftEquipSelect);
+el('craftSelectList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="pick-craft-equip"]');
+  if(!btn) return;
+  pickCraftEquip(Number(btn.dataset.id));
+});
+el('craftSelectPager').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
+  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
 // ---- 촉매 선택창(요청사항 4번) ----
 el('craftPopupModal').addEventListener('click', (e)=>{
@@ -247,12 +260,6 @@ el('craftPopupMakeBtn').addEventListener('click', openCraftConfirm);
 el('craftConfirmCancelBtn').addEventListener('click', closeCraftConfirm);
 el('craftConfirmProceedBtn').addEventListener('click', proceedCraftConfirm);
 el('craftAnimConfirmBtn').addEventListener('click', closeCraftAnim);
-// ---- 투입 개수 선택 팝업 ----
-el('craftMaterialQtyCancelBtn').addEventListener('click', closeCraftMaterialQty);
-el('craftMaterialQtyConfirmBtn').addEventListener('click', confirmCraftMaterialQty);
-el('craftMaterialQtyUpBtn').addEventListener('click', ()=> stepCraftMaterialQty('up'));
-el('craftMaterialQtyDownBtn').addEventListener('click', ()=> stepCraftMaterialQty('down'));
-el('craftMaterialQtyInput').addEventListener('input', (e)=> setCraftMaterialQty(e.target.value));
 // ---- 상점 탭 / 정렬 ----
 el('shopTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-tab]');

@@ -575,6 +575,8 @@ function killMonsterInstance(instanceId){
   const dropVisualItems = [];
   const curseActive = isDeathCurseActive();
   if(curseActive) result.gold = Math.round(result.gold * DEATH_CURSE_MULTIPLIER);
+  // 최종 골드가 정해진 뒤 마지막 단계: 이 몬스터 개체의 레벨과 플레이어 레벨 차이에 따른 획득량 보정(죽음의 저주 적용 이후, 소수점 버림)
+  result.gold = applyRewardLevelPenalty(result.gold, state.playerLevel, level);
   state.gold += result.gold;
   hunt.pendingRewards.gold += result.gold;
 
@@ -644,6 +646,7 @@ function killMonsterInstance(instanceId){
 
   let expGained = monsterExp(level);
   if(curseActive) expGained = Math.round(expGained * DEATH_CURSE_MULTIPLIER);
+  expGained = applyRewardLevelPenalty(expGained, state.playerLevel, level); // 최종 경험치가 정해진 뒤 마지막 단계(골드와 같은 보정, gainExp 호출 전의 플레이어 레벨 기준)
   const levelsGained = gainExp(expGained);
   hunt.pendingRewards.expGained += expGained;
   hunt.pendingRewards.levelsGained += levelsGained;
