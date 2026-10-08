@@ -15,6 +15,7 @@ function setPrayerButtonState(id, isOn, isDisabled){
 }
 
 function render(){
+  if(typeof craftMenuRefresh === 'function') craftMenuRefresh(); // 새 제작 메뉴(제작소 화면일 때만 동작, 내용이 바뀐 부분만 다시 그림)
   const equipped = getEquipped();
   const stage = el('swordStage');
 

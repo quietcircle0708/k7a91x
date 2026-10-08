@@ -2787,6 +2787,7 @@ const INV_SORT_CRITERIA = {
   value:   { label: '아이템 가치', compare: (a, b) => (b.price || 0) - (a.price || 0) },          // 현재 판매 가격이 높은 순
   grade:   { label: '등급',        compare: (a, b) => b.gradeRank - a.gradeRank },                // 유니크 → 에픽 → 레어 → 일반
   enhance: { label: '높은 강화 순', compare: (a, b) => (b.level || 0) - (a.level || 0) },        // +9 → … → +0(강화 단계가 없는 아이템은 0)
+  craftable: { label: '제작 가능 우선', compare: (a, b) => (b.craftable ? 1 : 0) - (a.craftable ? 1 : 0) }, // 제작소 새 메뉴 전용(info.craftable)
 };
 // 종류 키 → 비교용 숫자(대분류 순서 × 1000 + 세부 종류 순서). 목록에 없는 값은 위 data.js 주석의 규칙대로 뒤로 감.
 function invSortKindRank(kindKey){
@@ -3710,6 +3711,37 @@ function craftPopupCanCraft(popup){
   const goldOk = state.gold >= (item.craftCost || 0);
   return materialsOk && goldOk && !craftResultInventoryBlock(item);
 }
+// ---- 제작소 새 메뉴용 보조 함수(craft_menu.js) — 기존 제작 판정/데이터를 그대로 재사용하고 새 조건은 만들지 않음 ----
+// 제작 아이템이 가리키는 실제 장비 정의(WEAPON_TYPES 등)에서 세부 종류(무기 종류/방어구 종류/장신구 종류/보조 종류)를 읽음.
+// 새 종류가 데이터에 추가되면 표(labels)에 라벨이 없어도 종류 id로 자동 표시됨. category는 CRAFT_SUB_TABS의 id(weapon/armor/sub/accessory).
+const CRAFT_KIND_SOURCES = {
+  weapon:    { table: () => WEAPON_TYPES,    kindOf: d => d.weaponKind,    labels: () => WEAPON_KINDS },
+  armor:     { table: () => ARMOR_TYPES,     kindOf: d => d.armorKind,     labels: () => ARMOR_KINDS },
+  sub:       { table: () => SUB_TYPES,       kindOf: d => d.subKind,       labels: () => SUB_KINDS },
+  accessory: { table: () => ACCESSORY_TYPES, kindOf: d => d.accessoryKind, labels: () => ACCESSORY_KINDS },
+};
+function craftItemKind(category, item){
+  const src = CRAFT_KIND_SOURCES[category];
+  const def = src && src.table()[item.iconRef];
+  const id = def && src.kindOf(def);
+  if(!id) return null;
+  const labels = src.labels() || {};
+  return { id, label: labels[id] || id };
+}
+// 지금 이 아이템을 제작할 수 있는지(메뉴 목록의 제작 가능/불가능 표시용). 제작 팝업의 [제작] 활성화 조건(craftPopupCanCraft)을 그대로 호출함 —
+// 장비 재료는 팝업에서 직접 등록하므로, 지금 재료로 쓸 수 있는 장비(craftEligibleEquipInstances)를 필요 개수만큼 임시로 배정한 팝업 상태를 만들어 넘김.
+function craftItemCanCraft(category, item){
+  const popup = {
+    category, itemId: item.id,
+    slots: item.materials.map(m => {
+      const resource = findCraftResource(m.name);
+      const picks = (resource && resource.kind === 'equip') ? craftEligibleEquipInstances(resource).slice(0, m.need).map(it => it.id) : [];
+      return { name: m.name, qty: picks.length, picks };
+    }),
+  };
+  return craftPopupCanCraft(popup);
+}
+
 // 제작 성공 시 지급될 제작 아이템을 담을 인벤토리 슬롯이 부족하면 해당 카테고리를 반환(막지 않으면 제작 재료/골드만 소모되고
 // 결과물이 지급되지 못함). 제작 시작 때 소모되는 장비 재료는 인벤토리에서 빠지므로 그만큼의 슬롯은 비는 것으로 계산함.
 // 제작 아이템은 모두 장비(무기/방어구/보조/장신구)라 장비 카테고리로 판단함(iconType이 늘어나면 여기에 분기 추가).

@@ -88,7 +88,11 @@ function showView(name){
   if(name === 'collection') codexOpen(); // 도감: 진입할 때마다 현재 장비 데이터로 목록을 새로 구성
   if(name === 'hunt') renderHunt();
   alignHuntHeader();
-  if(name === 'craft'){ renderCraftTabs(); renderCraftList(craftUI.tab); }
+  if(name === 'craft'){
+    if(CRAFT_MENU_UI === 'new') craftMenuOpen(); // 새 제작 메뉴(craft_menu.js). 'legacy'면 예전 메뉴를 그대로 그림
+    else { renderCraftTabs(); renderCraftList(craftUI.tab); }
+  }
+  if(name !== 'craft' && typeof craftMenuSearchReset === 'function') craftMenuSearchReset(); // 제작소를 나가면 검색어/결과 초기화(인벤토리 검색과 동일)
   if(name === 'character'){
     // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
     // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
@@ -615,6 +619,7 @@ function closeCraftAnim(){
   }
   craftAnim = null;
   el('craftAnimModal').style.display = 'none';
+  if(typeof craftMenuRefresh === 'function') craftMenuRefresh(); // 새 제작 메뉴의 보유 재료/제작 가능 표시를 제작 결과(재료·골드 소모) 기준으로 갱신(표시만, 제작 처리와 무관)
 }
 
 // 연출 도중 제작소를 벗어나는 등 비정상적으로 중단되는 경우, 홀딩해뒀던 장비 재료가 그대로 사라지지

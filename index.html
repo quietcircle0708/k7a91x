@@ -316,7 +316,8 @@
   </div>
 
   <div id="craftView" style="display:none;">
-    <div class="inv-card-wrap">
+    <!-- 예전 제작 메뉴(보존): CRAFT_MENU_UI가 'legacy'일 때만 표시됨. 새 메뉴(아래 .craft-new-wrap)와는 body.craft-ui-new 클래스로 전환되어 동시에 보이지 않음 -->
+    <div class="inv-card-wrap craft-legacy-wrap">
       <div class="shop-title">제작소</div>
       <div class="inv-tabs craft-tabs" id="craftTabs">
         <button class="craft-tab-btn active" data-tab="craft">제작</button>
@@ -351,6 +352,42 @@
           <div class="pager" id="craftAccessoryPager"></div>
         </div>
         <div id="craftTabAccessoryList"></div>
+      </div>
+    </div>
+
+    <!-- 새 제작 메뉴(리메이크) — 내용은 craft_menu.js가 채움. 탭/세로 탭/검색/정렬/툴팁 스타일은 도감·신버전 인벤토리(.inv-box-*, .codex-*)를 재사용 -->
+    <div class="craft-new-wrap" id="craftNewWrap">
+      <div class="shop-title">제작소</div>
+      <div class="craft-cat-tabs" id="craftCatTabs"></div>
+      <div class="inv-box-panel craft-panel">
+        <div class="craft-body">
+          <div class="codex-vtabs craft-vtabs" id="craftVTabs"></div>
+          <div class="craft-main">
+            <div class="craft-toolbar">
+              <span class="inv-sort-wrap" id="craftSortWrap"></span>
+              <div class="codex-search craft-search" id="craftSearch">
+                <input type="text" id="craftSearchInput" placeholder="클릭하여 검색..." autocomplete="off" autocapitalize="off" spellcheck="false">
+                <img src="assets/ui/icon_item_comparison.png" class="codex-search-icon" alt="" draggable="false">
+                <div class="codex-results" id="craftResults" style="display:none;"></div>
+              </div>
+            </div>
+            <div class="craft-listscroll" id="craftListScroll"><div class="craft-list" id="craftList"></div></div>
+          </div>
+        </div>
+        <!-- 고정 하단 영역: 목록을 스크롤해도 항상 표시됨(선택 아이템 / 필요 재료[내부 스크롤] / 천장 / 제작 확률 / 제작 버튼) -->
+        <div class="craft-bottom" id="craftBottom">
+          <!-- 윗줄: 선택 아이템(좌우 전체 한 줄). 아랫줄: [필요 재료 박스 | 제작 확률 → 천장 → 제작 버튼(항상 맨 아래)] -->
+          <div class="craft-sel" id="craftSel"></div>
+          <div class="craft-mat-box">
+            <div class="craft-mat-title">필요 재료</div>
+            <div class="craft-mat-scroll" id="craftMatScroll"><div class="craft-mat-grid" id="craftMatGrid"></div></div>
+          </div>
+          <div class="craft-act">
+            <div class="craft-rate" id="craftRate"></div>
+            <div class="craft-pity" id="craftPity"><div class="craft-pity-fill" id="craftPityFill"></div><span class="craft-pity-text" id="craftPityText">천장</span></div>
+            <button class="craft-make-btn" id="craftMakeBtn" disabled><span class="craft-make-label">제작</span><span class="craft-make-cost" id="craftMakeCost"></span></button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1091,6 +1128,7 @@
 <script src="js/inventory_box.js"></script>
 <script src="js/codex.js"></script>
 <script src="js/codex_monster.js"></script>
+<script src="js/craft_menu.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -3112,6 +3112,12 @@ const CRAFT_ANIM_STAGE_TEXT = [
   { max: 100, text: '마지막 공정을 준비 중...' },
 ];
 
+// 제작소 메뉴 UI 선택(제작 버튼을 누르기 전의 메뉴 화면만 해당 — 제작 팝업/연출/결과 등 이후 과정은 어느 쪽이든 동일).
+// 'new'    = 리메이크한 새 메뉴(craft_menu.js: 가로 분류 탭 + 세로 세부 분류 + 검색/정렬 + 고정 하단 제작 영역)
+// 'legacy' = 예전 메뉴(index.html .craft-legacy-wrap + render.js renderCraftTabs/renderCraftList). 코드는 그대로 보존돼 있으며
+//            이 값을 'legacy'로 바꾸기만 하면 예전 메뉴로 복구됨(두 UI는 동시에 표시되지 않음, body.craft-ui-new 클래스로 전환).
+const CRAFT_MENU_UI = 'new';
+
 const CRAFT_PAGE_KEY = {
   weapon: 'craftWeapon', armor: 'craftArmor', sub: 'craftSub', accessory: 'craftAccessory',
 };
@@ -3196,6 +3202,7 @@ const INV_SORT_TAB_CRITERIA = {
   consumable: ['kind', 'value'],
   stone: ['grade', 'value'],
   misc: ['grade', 'value'],
+  craft: ['grade', 'craftable'], // 제작소 새 메뉴(craft_menu.js)의 정렬 드롭다운. 새 정렬 기준은 INV_SORT_CRITERIA에 항목 추가 후 여기에 id만 넣으면 됨
 };
 // 아이템 종류 정렬 순서. 종류 키는 `대분류:세부종류` 형태(무기는 `weapon:무기종류:손수`)이며 데이터의 weaponKind/handType/armorKind/
 // accessoryKind/subKind 값을 그대로 씀. 대분류(group) 순서 → 대분류 안의 세부 종류(kinds) 순서로 비교하고,
