@@ -2521,8 +2521,10 @@ function buildKillRewardItemSectionHtml(rewards){
   const pagerHtmlOut = totalPageCount > 1
     ? `<div class="reward-item-pager">${pagerHtml('killRewardItems', pageState.killRewardItems, totalPageCount)}</div>`
     : '';
+  // 6개 이상(줄이 2개 이상)이면 .multi-row — 모든 줄이 같은 5열 격자를 쓰도록 해서 2줄째가 1줄째 첫 아이콘과 같은 X 위치에서 시작함(css 참고)
+  const gridClass = pageItems.length > 5 ? 'reward-item-grid multi-row' : 'reward-item-grid';
   return `<div class="reward-item-section" id="krRewardItemSection">
-    <div class="reward-item-grid">${rowsHtml.join('')}</div>
+    <div class="${gridClass}">${rowsHtml.join('')}</div>
     ${pagerHtmlOut}
   </div>`;
 }

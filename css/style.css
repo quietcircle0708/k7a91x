@@ -1248,6 +1248,10 @@
      (4번 문서 "정렬 규칙") — 줄 단위 div가 달라서 줄마다 다른 정렬을 줄 수 있음. */
   .reward-item-row{ display:flex; gap:6px; }
   .reward-item-row-first{ justify-content:center; }
+  /* 아이템이 6개 이상일 때(두 줄 이상): 줄 div는 격자에 풀어 놓고(display:contents) 5열 격자 하나로 가운데 정렬 — 1줄째가 꽉 찬 5개라
+     2줄째 아이콘도 1줄째 첫 아이콘과 같은 가로 위치에서 시작하고 간격(6px)도 동일. 5개 이하일 때는 위의 기존 정렬(1줄 가운데) 그대로. */
+  .reward-item-grid.multi-row{ display:grid; grid-template-columns:repeat(5, max-content); justify-content:center; gap:6px; }
+  .reward-item-grid.multi-row .reward-item-row{ display:contents; }
   .reward-item-slot{
     position:relative; flex-shrink:0; width:42px; height:42px; border-radius:9px;
     border:1.5px solid var(--forge-line); background: var(--forge-panel);
@@ -1580,6 +1584,12 @@
   .inv-box-tools{ align-items:flex-start; }
   .inv-box-sort-area{ display:flex; align-items:flex-start; }
   .inv-box-sort-area .inv-sort-select{ padding:4px 12px; }
+  /* 모바일 화면 프리셋 전용(데스크톱 프리셋은 그대로): 정렬 드롭다운·잠금 버튼·검색창을 한 줄에 두고 세로 중심을 맞춤.
+     검색창은 가로만 약 절반(170px → 85px)으로 줄이고 높이/내부 아이콘/결과 드롭다운(.codex-results)은 기존 그대로. */
+  body.mobile-preset .inv-box-toolbar{ flex-wrap:nowrap; }
+  body.mobile-preset .inv-box-tools{ flex:none; align-items:center; }
+  body.mobile-preset .inv-box-sort-area{ align-items:center; }
+  body.mobile-preset .inv-box-search{ flex:0 0 85px; min-width:0; }
   .inv-box-check{ display:flex; align-items:center; gap:5px; font-size:12px; color: var(--forge-cream-dim); cursor:pointer; user-select:none; }
   .inv-box-check input{ margin:0; cursor:pointer; accent-color: var(--forge-gold); }
 
