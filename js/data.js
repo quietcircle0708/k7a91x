@@ -134,6 +134,9 @@ const UI_ICONS = {
   gold:  { image: 'ui_gold_icon',  icon: '🪙' },
   exp:   { image: 'ui_xp_icon',    icon: '✨' },
   relic: { image: 'ui_relic_icon', icon: '💀' },
+  huntLeave:  { image: 'menu_leave_icon',     icon: '🚪' }, // 던전 화면 하단 [던전 나가기] 버튼 이미지
+  huntReward: { image: 'menu_current_reward', icon: '🎒' }, // 던전 화면 하단 [보상창] 버튼 이미지 + 누적 보상창 헤더 아이콘
+  huntNextStage: { image: 'menu_enter_next_stage', icon: '⏩' }, // 스테이지 클리어 후 준비시간 중 [다음 스테이지 즉시 이동] 버튼 이미지
 };
 
 // 기타/아티팩트/소비 아이템 이미지 파일 경로 규칙(무기·몬스터와 동일한 방식). ARTIFACTS/CONSUMABLES/
@@ -4838,6 +4841,9 @@ const STAGE_RETURN_MSG = '지친 몸을 이끌고 마을로 귀환했습니다.'
 // 몬스터 처치 연출
 const MONSTER_DEAD_ANIM_MS = 400;     // 몬스터 사망(scale/rotate/fade) 애니메이션 재생 시간(css .monster-icon.dead와 동일)
 const REWARD_MODAL_DELAY_MS = 500;    // 마지막 몬스터의 사망 애니메이션이 끝난 뒤 보상 창을 띄우기까지의 대기 시간
+// 스테이지 자동 진행: 스테이지 클리어(마지막 몬스터의 사망 애니메이션이 끝난 뒤) → 이 시간만큼 준비 → 다음 스테이지 자동 진입.
+// 준비 시간을 바꾸고 싶으면 이 값 하나만 수정하면 됨(ms). 11스테이지(숨겨진 장소)는 자동 진행 대상이 아님(기존 종료 흐름 유지).
+const STAGE_AUTO_ADVANCE_DELAY_MS = 10000;
 
 // 11스테이지(숨겨진 장소) 보물 상자 설정
 const TREASURE_SHAKE_MS = 1000;       // 상자 클릭 후 흔들림 애니메이션 시간

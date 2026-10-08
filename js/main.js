@@ -512,11 +512,39 @@ el('traceSlotFullOkBtn').addEventListener('click', closeTraceSlotFullModal);
 el('skillResetCancelBtn').addEventListener('click', cancelSkillReset);
 el('skillResetConfirmBtn').addEventListener('click', confirmSkillReset);
 el('krStopBtn').addEventListener('click', returnToVillage);
+// 처치 몬스터 툴팁(클릭으로 열어둔 경우): 툴팁/마리수 영역 밖을 누르면 닫음
+el('killResultModal').addEventListener('click', (e)=>{
+  if(e.target.closest('.kill-count-host')) return;
+  const open = el('krRewards').querySelector('.kill-count-host.open');
+  if(open) open.classList.remove('open');
+});
+el('krCloseBtn').addEventListener('click', closeKillResultModal);
+el('krResumeBtn').addEventListener('click', resumeFromRewardModal);
+el('krLeaveBtn').addEventListener('click', leaveFromRewardModal);
+el('huntLeaveBtn').innerHTML = uiIconHtml('huntLeave', 'hunt-img-btn-icon');
+el('huntRewardBtn').innerHTML = uiIconHtml('huntReward', 'hunt-img-btn-icon');
+el('huntLeaveBtn').addEventListener('click', openHuntLeaveFlow);
+// 스테이지 클리어 후 준비시간 버튼(몬스터 상단 슬롯 위치): 44×44 슬롯 안에 이미지, 남은 시간은 스킬 쿨타임과 같은 .quickslot-cooldown으로 표시
+el('huntPrepLeaveBtn').innerHTML = `<span class="quickslot-icon">${uiIconHtml('huntLeave', 'hunt-prep-icon')}</span>`;
+el('huntPrepNextBtn').innerHTML = `<span class="quickslot-icon">${uiIconHtml('huntNextStage', 'hunt-prep-icon')}</span><span class="quickslot-cooldown" id="huntPrepCountdown"></span>`;
+el('huntPrepLeaveBtn').addEventListener('click', openHuntLeaveFlow); // 기존 [던전 나가기] 기능 그대로 재사용(전투 일시정지 → 누적 보상창 → 기존 중단 확인 UI)
+el('huntPrepNextBtn').addEventListener('click', skipHuntPrep);
+setInterval(updateHuntPrepUi, 100);
+el('huntRewardBtn').addEventListener('click', openLiveRewardView);
 el('krContinueBtn').addEventListener('click', advanceStage);
 el('krRetryBtn').addEventListener('click', retryDungeon);
 // 보상창 "획득 아이템" 그리드의 페이지 이동 버튼 — #krRewards는 innerHTML로 매번 다시 그려지므로
 // (그 안의 .reward-item-pager는 정적 요소가 아님), 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.
 el('krRewards').addEventListener('click', (e)=>{
+  // 처치 몬스터 돋보기 아이콘 클릭/터치: 몬스터별 누적 처치 수 툴팁을 열고 닫음(PC는 호버로도 열림, 터치 환경용 보조)
+  const killHost = e.target.closest('.kill-count-host');
+  if(killHost){
+    killHost.classList.toggle('open');
+    const tip = killHost.querySelector(':scope > .tooltip');
+    if(tip && killHost.classList.contains('open')) adjustTooltipPosition(killHost, tip);
+    else if(tip) resetTooltipPosition(tip);
+    return;
+  }
   const btn = e.target.closest('.pager-btn');
   if(!btn) return;
   if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);

@@ -404,6 +404,13 @@
       <div class="hunt-buff-ui" id="huntBuffUi"></div>
 
       <div class="monster-stage" id="monsterStage">
+        <!-- [던전 나가기]/[보상창] 이미지 버튼(32×32 이미지 자체가 버튼) — 플레이어 정보 패널 바로 아래 왼쪽, 스테이지 메시지(#spawnToast)와
+             같은 줄에 절대좌표로 배치해 다른 요소의 위치/크기에 영향을 주지 않음. [던전 나가기] = 전투 일시정지 후 누적 보상창,
+             [보상창] = 전투를 멈추지 않고 현재까지의 누적 보상 보기 -->
+        <div class="hunt-bottom-actions" id="huntBottomActions">
+          <button type="button" class="hunt-img-btn" id="huntLeaveBtn" title="던전 나가기" aria-label="던전 나가기"></button>
+          <button type="button" class="hunt-img-btn" id="huntRewardBtn" title="보상창" aria-label="보상창"></button>
+        </div>
         <div id="spawnToast"></div>
       </div>
 
@@ -431,6 +438,13 @@
                clickTreasureChest 리스너)·표시 로직(renderHunt)은 기존 그대로 재사용. -->
           <div class="monster-icon treasure-chest" id="treasureChest" style="display:none;"></div>
           <div class="monster-row" id="monsterRow"></div>
+          <!-- 스테이지 클리어 후 준비시간 전용 버튼 2개(던전 나가기 / 다음 스테이지 즉시 이동) — 몬스터 상단 슬롯(grid-area: top)에
+               가운데 정렬로 겹쳐 둔 오버레이. 준비시간이 아닐 때는 display:none이라 클릭/포인터 입력이 전혀 전달되지 않음(몬스터 타겟팅 보호).
+               위치를 다시 옮기고 싶으면 css의 .hunt-prep-actions만 조정하면 됨. 표시/남은 시간 갱신: dungeon.js updateHuntPrepUi -->
+          <div class="hunt-prep-actions" id="huntPrepActions">
+            <div class="quickslot-wrap"><button type="button" class="quickslot-btn filled hunt-prep-btn" id="huntPrepLeaveBtn" title="던전 나가기" aria-label="던전 나가기"></button></div>
+            <div class="quickslot-wrap"><button type="button" class="quickslot-btn filled hunt-prep-btn" id="huntPrepNextBtn" title="다음 스테이지로 바로 이동" aria-label="다음 스테이지로 바로 이동"></button></div>
+          </div>
         </div>
         <div class="skill-quickslot-row">
           <div class="quickslot-row skill-quickslot-grid" id="huntSkillQuickSlotRow"></div>
@@ -467,9 +481,12 @@
       </div>
       <div class="kill-rewards" id="krRewards"></div>
       <div class="modal-actions">
+        <button class="nav-btn" id="krLeaveBtn" style="display:none;">던전 나가기</button>
+        <button class="btn btn-main" id="krResumeBtn" style="display:none; width:auto; padding:10px 18px;">계속 전투</button>
+        <button class="btn btn-main" id="krCloseBtn" style="display:none; width:auto; padding:10px 18px;">닫기</button>
         <button class="nav-btn" id="krRetryBtn" style="display:none;">재탐험</button>
-        <button class="nav-btn" id="krStopBtn">마을 귀환</button>
-        <button class="btn btn-main" id="krContinueBtn" style="width:auto; padding:10px 18px;">탐험 계속</button>
+        <button class="nav-btn" id="krStopBtn" style="display:none;">마을 귀환</button>
+        <button class="btn btn-main" id="krContinueBtn" style="display:none; width:auto; padding:10px 18px;">탐험 계속</button>
       </div>
     </div>
   </div>

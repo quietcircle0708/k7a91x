@@ -2311,7 +2311,7 @@ function renderHuntBuffUi(){
   existing.forEach(node => node.remove()); // 이번에 더 이상 나오지 않은(만료된) 버프 노드만 제거
 }
 
-// 개체 하나의 몬스터 슬롯 HTML을 생성(이름/등급색/레벨·공격력/체력바/체력텍스트/상태배지 틀).
+// 개체 하나의 몬스터 슬롯 HTML을 생성(이름/등급색/레벨/체력바/체력텍스트/상태배지 틀 — 공격력은 몬스터 도감에서 확인).
 // 새로 등장할 때만 사용(전투 중 매 틱마다 이걸로 다시 그리면 진행 중이던 애니메이션이 끊기므로,
 // 이미 떠 있는 슬롯의 체력 등은 updateMonsterSlot()으로 가볍게만 갱신함).
 function buildMonsterSlotHtml(instance){
@@ -2331,7 +2331,7 @@ function buildMonsterSlotHtml(instance){
       <div class="monster-icon spawn-in" id="monster-icon-${instance.instanceId}">${monsterIconHtml(monsterDef)}</div>
       <div class="monster-name-row">
         <span class="monster-name" style="color:${grade.color};">${monsterDef.name}</span>
-        <span class="monster-lv" id="monster-lv-${instance.instanceId}">Lv.${instance.level} · 공격력 ${instance.atk}</span>
+        <span class="monster-lv" id="monster-lv-${instance.instanceId}">Lv.${instance.level}</span>
       </div>
     </div>`;
 }
@@ -2522,7 +2522,6 @@ function buildKillRewardItemSectionHtml(rewards){
     ? `<div class="reward-item-pager">${pagerHtml('killRewardItems', pageState.killRewardItems, totalPageCount)}</div>`
     : '';
   return `<div class="reward-item-section" id="krRewardItemSection">
-    <div class="reward-item-title">획득 아이템</div>
     <div class="reward-item-grid">${rowsHtml.join('')}</div>
     ${pagerHtmlOut}
   </div>`;

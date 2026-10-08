@@ -830,7 +830,11 @@ function canUseSkillNow(id){
   const s = SKILLS[id];
   if(!s) return false;
   if(skillKindOf(s) === 'passive') return false; // 패시브는 항상 자동 적용이라 "사용" 개념이 없음
-  if(currentView !== 'hunt' || !hunt.started || hunt.paused || hunt.monsters.length === 0) return false;
+  // 전투 중에는 모든 스킬, 스테이지 클리어 후 다음 스테이지 자동 진입 전 준비시간(isStagePrepWindow)에는 "버프" 계열 스킬만 사용 가능
+  // (공격 스킬은 대상 몬스터가 없으므로 준비시간 중 사용 불가 — 아래 조건이 그대로 막음).
+  const inCombat = hunt.started && !hunt.paused && hunt.monsters.length > 0;
+  const inPrep = skillKindOf(s) === 'buff' && isStagePrepWindow();
+  if(currentView !== 'hunt' || !(inCombat || inPrep)) return false;
   if(isStunned(hunt.player)) return false; // 기절 중에는 스킬 사용 불가
   if(isSkillOnCooldown(id)) return false;
   const pool = s.resourceType === 'hp' ? (state.playerHp || 0) : (state.playerMp || 0);
@@ -859,7 +863,10 @@ function useSkill(id){
 function resolveSkillEffect(id){
   const s = SKILLS[id];
   if(!s) return;
-  if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return;
+  // 시전 시간 동안 스테이지가 넘어가 몬스터가 아직 없는 상태가 될 수 있으므로, 버프 스킬은 던전 안이기만 하면 효과를 적용함
+  // (준비시간 중 시전한 버프가 다음 스테이지 전투에 적용되도록). 공격 스킬은 기존처럼 전투 중일 때만 적용됨.
+  if(currentView !== 'hunt') return;
+  if(skillKindOf(s) !== 'buff' && (!hunt.started || hunt.monsters.length === 0)) return;
   // 스킬이 여기까지 도달했다는 것은 자원/쿨타임/기절 조건을 모두 통과해 "정상적으로 시전이 완료"됐다는
   // 뜻이므로(useSkill의 canUseSkillNow 가드 + 이 함수 진입부의 전투 상태 재확인), 무기 내구도를 딱 1만
   // 감소시킴(요구사항 8번 — 다단히트 스킬이어도 시전 1회당 1만 감소, 타격 횟수와 무관).

@@ -18,6 +18,10 @@ function showView(name){
     hunt.chestOpened = false;
     hunt.paused = false;
     hunt.started = false;
+    hunt.prepPausedFireMs = null;
+    hunt.manualPause = false; // 수동 일시정지/누적 보상창 상태도 던전을 벗어나면 정리(stopHuntLoop가 보관된 타이머 동작·자동 진행 대기를 이미 폐기함)
+    hunt.deferredActions = [];
+    hunt.rewardModalMode = null;
     // 던전 화면 좌우 패널 레이아웃(레이아웃 개편 요구사항 13번) — 패널이 열린 채로 화면을 벗어나도
     // .wrap의 확장 클래스가 남아 다른 화면에 영향을 주지 않도록 항상 제거함.
     const wrapEl = document.querySelector('.wrap');
@@ -126,12 +130,16 @@ function alignHuntHeader(){
 
 let pendingNavTarget = null;
 function isActivelyFighting(){
-  return currentView === 'hunt' && hunt.started && hunt.monsters.length > 0 && el('killResultModal').style.display !== 'flex';
+  if(currentView !== 'hunt' || el('killResultModal').style.display === 'flex') return false;
+  if(hunt.started && hunt.monsters.length > 0) return true;
+  // 스테이지가 자동으로 이어지므로(보상창 없음), 클리어 직후 준비 시간·다음 스테이지 입장/조우 메시지 구간(2스테이지 이후)에도
+  // 던전 진행 중으로 보고 이탈 시 같은 확인창을 띄움(첫 입장 직후의 메시지 구간은 잃을 진행이 없어 기존처럼 바로 이동).
+  return !!hunt.nextStageTimeout || (hunt.stage > 1 && (!!hunt.stageEnterTimeout || !!hunt.encounterTimeout));
 }
 function guardedNav(name){
   if(isActivelyFighting()){
     pendingNavTarget = name;
-    hunt.paused = true;
+    beginHuntManualPause(); // 전투 중에는 기존처럼 hunt.paused = true, 스테이지 사이에는 진행 타이머도 함께 보류
     el('leaveConfirmModal').style.display = 'flex';
     return;
   }
@@ -146,7 +154,7 @@ function confirmLeaveBattle(){
 function cancelLeaveBattle(){
   el('leaveConfirmModal').style.display = 'none';
   pendingNavTarget = null;
-  if(currentView === 'hunt') hunt.paused = false;
+  if(currentView === 'hunt') resumeHuntFromManualPause(); // 수동 일시정지 해제 후 중단했던 진행을 그대로 이어감
 }
 
 function openShop(){ if(isEnhancing) return; guardedNav('shop'); }

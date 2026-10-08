@@ -5,6 +5,96 @@
 // → 다음 스테이지 ... → 11스테이지(숨겨진 장소, 보물 상자)
 // ============================================================
 
+// 스테이지 클리어 후 다음 스테이지로 자동 진입하기 전의 준비시간인지(마지막 몬스터 사망 직후 ~ 자동 진입 직전).
+// 이 동안은 플라스크(원래 가능)에 더해 버프 스킬도 사용할 수 있음(actions.js canUseSkillNow).
+function isStagePrepWindow(){
+  return currentView === 'hunt' && !!hunt.dungeon && !!hunt.nextStageTimeout;
+}
+
+// 준비시간이 끝났거나(자동) [다음 스테이지 즉시 이동]을 눌렀을 때(수동) 똑같이 거치는 다음 스테이지 진입 처리.
+// 남은 타이머를 정리하고 준비시간 UI를 즉시 숨긴 뒤 기존 enterStage로 진행(보상/스테이지 진행 방식은 기존과 동일).
+function advanceFromPrep(){
+  if(hunt.nextStageTimeout){ clearTimeout(hunt.nextStageTimeout); hunt.nextStageTimeout = null; }
+  hunt.prepStartAt = 0; hunt.prepDeadline = 0;
+  updateHuntPrepUi();
+  huntRunOrDefer(() => {
+    if(!hunt.dungeon) return;
+    enterStage(hunt.stage + 1);
+  });
+}
+// 준비시간 버튼이 화면에 보여야 하는지: 던전 안 + 클리어 후 자동 진입 대기 중 + 사망 애니메이션이 끝난 뒤(= 준비시간이 실제로 시작된 뒤)
+function isHuntPrepButtonsVisible(){
+  return currentView === 'hunt' && !!hunt.dungeon && !!hunt.nextStageTimeout && Date.now() >= (hunt.prepStartAt || 0);
+}
+// 준비시간 버튼 표시/숨김 + 남은 시간(스킬 쿨타임과 같은 .quickslot-cooldown, toFixed(1)) 갱신. 100ms 주기(main.js) 및 상태 전환 시점마다 호출.
+// 숨길 땐 display:none(클릭 불가)로 처리하고, 남은 시간은 hunt.prepDeadline(실제 자동 진입 시각) 기준이라 타이머와 어긋나지 않음.
+function updateHuntPrepUi(){
+  const box = el('huntPrepActions');
+  if(!box) return;
+  const visible = isHuntPrepButtonsVisible();
+  box.classList.toggle('show', visible);
+  if(!visible) return;
+  const cd = el('huntPrepCountdown');
+  if(cd) cd.textContent = (Math.max(0, hunt.prepDeadline - Date.now()) / 1000).toFixed(1);
+}
+// [다음 스테이지 즉시 이동]: 남은 준비시간을 기다리지 않고 바로 다음 스테이지로 진입
+function skipHuntPrep(){
+  if(!isHuntPrepButtonsVisible()) return;
+  advanceFromPrep();
+}
+
+// 던전 한 번의 진행 동안 누적되는 보상 표시용 데이터의 빈 그릇(구조는 예전 스테이지별 pendingRewards와 동일).
+function newDungeonRewards(){
+  return {
+    gold: 0, expGained: 0, levelsGained: 0, newPlayerLevel: state.playerLevel,
+    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, flaskDrops: {}, artifactDrops: [], miscDrops: {}, scrollDrops: {}, killedMonsters: [],
+    fullCategories: {}, // 인벤토리 카테고리가 가득 차 지급하지 못한 드랍이 있었던 카테고리(보상창 안내용, 예: { stone: true })
+  };
+}
+
+// ---- 수동 일시정지(던전 나가기 버튼/전투 중단 확인) ----
+// 전투 중에는 기존처럼 hunt.paused만 켜면 되지만, 스테이지 사이(입장 메시지·조우 메시지·자동 진행 대기)에는
+// 이미 걸려 있는 setTimeout이 계속 흘러가 일시정지 중에 다음 단계로 넘어가버릴 수 있음. 수동 일시정지 중 도착한
+// 타이머 동작은 huntRunOrDefer가 보관해 두었다가, 재개할 때 그대로 순서대로 실행함(타이머를 새로 만들지 않음).
+function huntRunOrDefer(fn){
+  if(hunt.manualPause){ hunt.deferredActions.push(fn); return; }
+  fn();
+}
+function beginHuntManualPause(){
+  hunt.manualPause = true;
+  hunt.paused = true;
+  // 준비시간(다음 스테이지 자동 진입 대기) 중이었다면 남은 시간을 멈춰 둠 — 보상창/나가기 확인창을 보는 동안 준비시간이
+  // 흘러가 버려 재개하자마자 바로 다음 스테이지로 넘어가는 일이 없도록, 재개할 때 남은 시간 그대로 이어서 셈.
+  if(hunt.nextStageTimeout){
+    const now = Date.now();
+    hunt.prepPausedFireMs = Math.max(0, hunt.prepDeadline - now);
+    hunt.prepPausedStartMs = Math.max(0, hunt.prepStartAt - now);
+    clearTimeout(hunt.nextStageTimeout); hunt.nextStageTimeout = null;
+    hunt.prepStartAt = 0; hunt.prepDeadline = 0;
+    updateHuntPrepUi();
+  }
+}
+function resumeHuntFromManualPause(){
+  if(!hunt.manualPause){
+    if(currentView === 'hunt') hunt.paused = false; // 수동 일시정지가 아닌 경로(기존 동작과 동일)
+    return;
+  }
+  hunt.manualPause = false;
+  if(hunt.prepPausedFireMs !== null && hunt.dungeon){ // 멈춰 둔 준비시간 재개(남은 시간 그대로)
+    const now = Date.now();
+    hunt.prepStartAt = now + hunt.prepPausedStartMs;
+    hunt.prepDeadline = now + hunt.prepPausedFireMs;
+    hunt.nextStageTimeout = setTimeout(advanceFromPrep, hunt.prepPausedFireMs);
+  }
+  hunt.prepPausedFireMs = null; hunt.prepPausedStartMs = 0;
+  updateHuntPrepUi();
+  const actions = hunt.deferredActions;
+  hunt.deferredActions = [];
+  // 전투 중이던 경우에만 전투를 다시 진행(스테이지 사이였다면 보관된 동작이 알아서 다음 단계로 이어짐)
+  if(hunt.started && hunt.monsters.length > 0) hunt.paused = false;
+  actions.forEach(fn => fn());
+}
+
 function enterDungeon(id){
   const d = DUNGEONS.find(x => x.id === id);
   if(!d || !getEquippedWeapon()) return; // 던전 입장은 실제 착용 무기 기준(대장간 화면 선택 대상과 무관)
@@ -15,6 +105,13 @@ function enterDungeon(id){
   hunt.started = false;
   hunt.player = { statusEffects: [] }; // 새 던전 진입 시 플레이어의 전투용 상태 이상(기절/둔화 등)도 초기화
   hunt.topUiExpanded = false; // 던전 입장 시 상단 UI는 항상 접힌 상태로 시작
+  // 던전 한 번의 진행 전체를 기준으로 보상(표시용 누적 데이터)을 모으는 그릇 — 입장할 때 한 번만 만들고 스테이지가
+  // 넘어가도 초기화하지 않음(재탐험도 enterDungeon을 거치므로 새로 시작). 실제 지급은 killMonsterInstance 등이 그대로
+  // 처리하고, 여기에는 이미 지급이 끝난 결과가 합산되기만 함.
+  hunt.pendingRewards = newDungeonRewards();
+  hunt.manualPause = false;
+  hunt.deferredActions = [];
+  hunt.rewardModalMode = null;
   updateHuntTopUiToggle();
   showView('hunt');
   enterStage(1);
@@ -23,6 +120,7 @@ function enterDungeon(id){
 // 스테이지 진입: 입장 메시지를 DUNGEON_MSG_DURATION_MS(1초)만큼 보여준 뒤,
 // 전투 스테이지(1~10)면 몬스터를 생성하고, 11스테이지(숨겨진 장소)면 보물 상자를 연다.
 function enterStage(stageNum){
+  updateHuntPrepUi(); // 스테이지 입장 메시지가 뜨는 시점에는 준비시간 버튼을 확실히 숨김(숨기면 클릭도 전달되지 않음)
   hunt.stage = stageNum;
   hunt.monsters = [];
   hunt.targetId = null;
@@ -51,11 +149,14 @@ function enterStage(stageNum){
   if(playerIcon){ playerIcon.classList.remove('hit', 'dead'); } // 이전 전투의 피격/사망 애니메이션 잔재 제거
   showDungeonMsg(stageEnterMessage(stageNum, hunt.dungeon.name));
   hunt.stageEnterTimeout = setTimeout(() => {
-    if(stageNum === DUNGEON_TREASURE_STAGE){
-      openTreasureStage();
-    } else {
-      spawnMonsters();
-    }
+    hunt.stageEnterTimeout = null;
+    huntRunOrDefer(() => {
+      if(stageNum === DUNGEON_TREASURE_STAGE){
+        openTreasureStage();
+      } else {
+        spawnMonsters();
+      }
+    });
   }, DUNGEON_MSG_DURATION_MS);
 }
 
@@ -71,12 +172,7 @@ function spawnMonsters(){
   assignMonsterPositions(hunt.monsters); // 각 개체에 상/하/좌/우 중 겹치지 않는 위치를 무작위 배정(instance.pos)
   hunt.targetId = hunt.monsters.length ? hunt.monsters[0].instanceId : null;
   syncPlayerDirectionToTarget(); // 스테이지 시작 시 초기 타겟 기준으로 플레이어 방향을 바로 맞춤(요구사항 3·4번)
-  // 이번 전투(그룹 전멸까지)에서 처치한 모든 몬스터의 보상을 합산해 담아둘 그릇
-  hunt.pendingRewards = {
-    gold: 0, expGained: 0, levelsGained: 0, newPlayerLevel: state.playerLevel,
-    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, flaskDrops: {}, artifactDrops: [], miscDrops: {}, scrollDrops: {}, killedMonsters: [],
-    fullCategories: {}, // 인벤토리 카테고리가 가득 차 지급하지 못한 드랍이 있었던 카테고리(보상창 안내용, 예: { stone: true })
-  };
+  // 보상 누적 그릇(hunt.pendingRewards)은 던전 입장 시 한 번만 만들어 던전 전체에서 계속 쓰므로 여기서 초기화하지 않음.
   hunt.scrollGrantedThisBattle = false; // 비급은 한 전투(그룹 전멸까지)에서 최대 1회만 지급(요구사항 9번) — 새 전투가 시작될 때마다 초기화
 
   renderHunt();
@@ -99,7 +195,8 @@ function spawnMonsters(){
   showEncounterToast(MONSTERS[hunt.monsters[0].monsterId]);
   // 조우 메시지 노출이 끝나면 전투를 자동으로 시작함(수동 "탐험 시작" 버튼 없음)
   hunt.encounterTimeout = setTimeout(() => {
-    beginStageCombat();
+    hunt.encounterTimeout = null;
+    huntRunOrDefer(beginStageCombat);
   }, DUNGEON_MSG_DURATION_MS);
 }
 // 몬스터 개체 하나 생성(레벨/체력/공격력 계산은 기존 단일 몬스터 로직과 동일, 개체별로 독립된 객체를 만듦)
@@ -248,6 +345,11 @@ function stopHuntLoop(flaskEndMode = 'flush'){
   hunt.deathAnimTimeouts.forEach(t => clearTimeout(t));
   hunt.deathAnimTimeouts = [];
   if(hunt.rewardModalTimeout){ clearTimeout(hunt.rewardModalTimeout); hunt.rewardModalTimeout = null; }
+  if(hunt.nextStageTimeout){ clearTimeout(hunt.nextStageTimeout); hunt.nextStageTimeout = null; } // 다음 스테이지 자동 진입 대기도 함께 취소
+  hunt.deferredActions = []; // 수동 일시정지 중 보관돼 있던 타이머 동작도 폐기(이탈/사망 후 뒤늦게 실행되지 않도록)
+  hunt.prepStartAt = 0; hunt.prepDeadline = 0;
+  hunt.prepPausedFireMs = null; hunt.prepPausedStartMs = 0;
+  updateHuntPrepUi();
   stopStatusTicker();
   stopAutoHealTicker(); // 전투 종료/사망/던전 이탈/새 전투 시작 시 항상 정리 — 타이머가 남거나 중복 생성되지 않음
   if(flaskEndMode === 'discard') resetFlaskStateOnDeath();
@@ -656,56 +758,122 @@ function killMonsterInstance(instanceId){
   state.totalKills = (state.totalKills || 0) + 1;
   render();
   saveState();
+  refreshLiveRewardModal(); // 보상창을 열어둔 채 전투가 진행 중이면 방금 반영된 누적 보상을 즉시 갱신
 
   if(hunt.monsters.length === 0){
     // 그룹 전멸 = 이번 전투의 종료 시점. 보상 창에 머무는 동안 회복 틱이 계속 반복되던 버그 수정:
     // 진행 중인 플라스크 회복이 있으면 남은 회복량을 즉시 전부 적용한 뒤 확실히 종료함.
     hunt.paused = true;
     stopFlaskHealTimers();
-    // 보상 창은 마지막으로 죽은 몬스터의 사망 애니메이션이 완전히 끝난 뒤 0.5초 후에 표시함
-    // (죽은 몬스터의 사망 애니메이션이 화면에서 잘리지 않고 다 보이도록 보장).
-    hunt.rewardModalTimeout = setTimeout(() => {
-      hunt.rewardModalTimeout = null;
-      openKillResultModal(hunt.pendingRewards);
-    }, MONSTER_DEAD_ANIM_MS + REWARD_MODAL_DELAY_MS);
+    // 스테이지 클리어: 보상창을 띄우지 않고, 마지막으로 죽은 몬스터의 사망 애니메이션이 끝난 뒤 준비 시간
+    // (STAGE_AUTO_ADVANCE_DELAY_MS)이 지나면 다음 스테이지로 자동 진입함(10스테이지 클리어 시 11스테이지=숨겨진 장소로 이어짐).
+    // 준비시간(STAGE_AUTO_ADVANCE_DELAY_MS)은 마지막 몬스터의 사망 애니메이션이 끝난 시점부터 셈 — 준비시간 버튼과 남은 시간 표시도 그때부터 나타남.
+    hunt.prepStartAt = Date.now() + MONSTER_DEAD_ANIM_MS;
+    hunt.prepDeadline = hunt.prepStartAt + STAGE_AUTO_ADVANCE_DELAY_MS;
+    hunt.nextStageTimeout = setTimeout(advanceFromPrep, MONSTER_DEAD_ANIM_MS + STAGE_AUTO_ADVANCE_DELAY_MS);
+    updateHuntPrepUi();
   }
 }
 
-function openKillResultModal(rewards){
+// ---- 던전 누적 보상창 ----
+// 던전 입장 이후 지금까지(스테이지 구분 없이) 실제로 획득한 보상을 보여주는 창. 실제 지급은 이미 끝난 결과를
+// hunt.pendingRewards에 합산해 둔 것을 읽어 그리기만 하며, 창을 열고 닫는 것은 보상/전투 진행에 영향을 주지 않음.
+// mode: 'view'  = 전투 중 [보상창] 버튼으로 연 보기 전용 창(전투는 계속 진행, 내용은 실시간 갱신, [닫기]만 있음)
+//       'leave' = [던전 나가기] 버튼으로 연 창(전투 일시정지 상태, [계속 전투]/[던전 나가기])
+//       'final' = 11스테이지(숨겨진 장소) 완료 후 최종 보상창([재탐험]/[마을 귀환], 기존 종료 선택 그대로)
+// 처치 몬스터 툴팁(돋보기 아이콘에 연결): 같은 몬스터는 이름 기준으로 합산해 많이 처치한 순(같으면 가나다)으로 나열.
+function buildKillCountTooltipHtml(killed){
+  const map = new Map();
+  killed.forEach(k => {
+    const e = map.get(k.name);
+    if(e) e.count += 1; else map.set(k.name, { name: k.name, color: k.color, count: 1 });
+  });
+  return [...map.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ko'))
+    .map(e => `<div><span style="color:${e.color};">${e.name}</span> × ${e.count}</div>`)
+    .join('');
+}
+function buildDungeonRewardHtml(rewards, opts){
+  opts = opts || {};
+  let html = '';
+  if(opts.treasure) html += `<div style="color:var(--forge-gold); font-weight:700;">숨겨진 보물을 발견했습니다!</div>`; // 11스테이지 최종 보상창 전용 안내(기존 제목 문구)
+  html += `<div><span class="txt-gold">골드</span> +${rewards.gold.toLocaleString()}G</div>`;
+  html += `<div><span class="txt-exp">경험치</span> +${rewards.expGained.toLocaleString()}</div>`;
   const killed = rewards.killedMonsters;
-  if(killed.length === 1){
-    el('krIcon').innerHTML = monsterIconHtml(killed[0]);
-    el('krTitle').textContent = killed[0].name + ' 처치!';
-    el('krTitle').style.color = killed[0].color;
-  } else {
-    el('krIcon').textContent = '⚔️';
-    el('krTitle').textContent = `몬스터 ${killed.length}마리 처치!`;
-    el('krTitle').style.color = 'var(--forge-gold)';
-  }
-  el('krLevel').textContent = '';
-
-  let rewardsHtml = `<div><span class="txt-gold">골드</span> +${rewards.gold.toLocaleString()}G</div>`;
-  rewardsHtml += `<div><span class="txt-exp">경험치</span> +${rewards.expGained.toLocaleString()}</div>`;
+  // 처치 마리수: 던전 전체 누적(killedMonsters는 던전 입장 때 한 번만 만들어져 계속 쌓임). 호버(PC)/클릭·터치(모바일)로 몬스터별 합산 툴팁 확인.
+  // 처치 몬스터 : n [돋보기] — 글자 자체에는 툴팁이 없고, 몬스터별 누적 처치 수 툴팁은 돋보기 아이콘(icon_item_comparison, 축소 표시)에만 연결됨.
+  html += `<div class="kill-count-row">처치 몬스터 : <b>${killed.length.toLocaleString()}</b>${killed.length > 0 ? `<span class="kill-count-host" id="krKillCountHost" tabindex="0"><img src="${INV_COMPARE_IMG}" class="kill-count-search-icon" alt="처치 내역" draggable="false"><span class="tooltip kill-count-tip">${buildKillCountTooltipHtml(killed)}</span></span>` : ''}</div>`;
   if(rewards.levelsGained > 0){
-    rewardsHtml += `<div class="reward-levelup">🎉 레벨업! Lv.${rewards.newPlayerLevel - rewards.levelsGained} → Lv.${rewards.newPlayerLevel}</div>`;
+    html += `<div class="reward-levelup">🎉 레벨업! Lv.${rewards.newPlayerLevel - rewards.levelsGained} → Lv.${rewards.newPlayerLevel}</div>`;
   }
   // 경험치/골드(및 레벨업) 줄 바로 아래 조건부 안내 문구(모험가의 유해/아티팩트 등, render.js 참고).
-  rewardsHtml += buildKillRewardMessagesHtml(rewards);
-  // 획득 아이템 표시 영역: 기존 텍스트 나열 방식을 5열×3행 아이콘 그리드로 교체(실제 지급/드랍 로직은
-  // 그대로이며, buildRewardDisplayItems/buildKillRewardItemSectionHtml은 이미 지급된 rewards를 표시용
-  // 슬롯으로 변환만 함). 보상창을 새로 열 때마다 그리드는 항상 1페이지부터 시작.
+  html += buildKillRewardMessagesHtml(rewards);
+  // 획득 아이템 표시 영역: 5열×3행 아이콘 그리드(15칸 초과 시 페이지). 페이지 상태는 창을 새로 열 때만 1페이지로 되돌림.
+  html += buildKillRewardItemSectionHtml(rewards);
+  html += buildInventoryFullNotesHtml(rewards.fullCategories, opts.equipState !== false);
+  return html;
+}
+function openKillResultModal(rewards, mode, opts){
+  mode = mode || 'view';
+  hunt.rewardModalMode = mode;
+  hunt.rewardModalOpts = opts || {};
+  el('krIcon').innerHTML = uiIconHtml('huntReward', 'kill-header-icon');
+  el('krTitle').textContent = '획득 아이템';
+  el('krTitle').style.color = '';
+  el('krLevel').textContent = '';
   pageState.killRewardItems = 1;
-  rewardsHtml += buildKillRewardItemSectionHtml(rewards);
-  rewardsHtml += buildInventoryFullNotesHtml(rewards.fullCategories, true);
-  el('krRewards').innerHTML = rewardsHtml;
+  hunt.rewardHtmlCache = buildDungeonRewardHtml(rewards, hunt.rewardModalOpts);
+  el('krRewards').innerHTML = hunt.rewardHtmlCache;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
-  // 10스테이지 이하를 클리어한 경우에만 "탐험 계속"으로 다음 스테이지를 진행할 수 있음(11=숨겨진 장소는 별도 처리)
-  el('krContinueBtn').style.display = 'inline-block';
-  el('krRetryBtn').style.display = 'none'; // "재탐험"은 11스테이지(숨겨진 장소) 보상 팝업 전용
+  const show = (id, on) => { el(id).style.display = on ? 'inline-block' : 'none'; };
+  show('krCloseBtn', mode === 'view');
+  show('krResumeBtn', mode === 'leave');
+  show('krLeaveBtn', mode === 'leave');
+  show('krRetryBtn', mode === 'final'); // "재탐험"은 11스테이지(숨겨진 장소) 최종 보상창 전용
+  show('krStopBtn', mode === 'final');
+  show('krContinueBtn', false);         // 스테이지가 자동 진행되므로 "탐험 계속" 버튼은 더 이상 쓰이지 않음(함수/요소는 유지)
   el('killResultModal').style.display = 'flex';
+}
+// 보기 전용 창이 열린 채 전투가 진행되는 동안 누적 보상이 바뀌면 내용만 다시 그림(내용이 같으면 건드리지 않아
+// 호버 중인 툴팁이 불필요하게 깜빡이지 않음). 처치 몬스터 툴팁을 클릭으로 열어둔 상태는 다시 그린 뒤에도 유지함.
+function refreshLiveRewardModal(){
+  if(el('killResultModal').style.display !== 'flex' || hunt.rewardModalMode !== 'view' || !hunt.pendingRewards) return;
+  const html = buildDungeonRewardHtml(hunt.pendingRewards, hunt.rewardModalOpts);
+  if(html === hunt.rewardHtmlCache) return;
+  hunt.rewardHtmlCache = html;
+  const wasOpen = !!el('krRewards').querySelector('.kill-count-host.open');
+  el('krRewards').innerHTML = html;
+  if(wasOpen){ const h = el('krKillCountHost'); if(h) h.classList.add('open'); }
+  el('krInvTooltip').innerHTML = buildInvPeekHtml();
 }
 function closeKillResultModal(){
   el('killResultModal').style.display = 'none';
+  hunt.rewardModalMode = null;
+}
+// 던전 화면 하단 [보상창] 버튼: 전투는 그대로 진행한 채 현재까지의 누적 보상만 보여줌.
+function openLiveRewardView(){
+  if(currentView !== 'hunt' || !hunt.dungeon || !hunt.pendingRewards) return;
+  if(el('killResultModal').style.display === 'flex') return;
+  openKillResultModal(hunt.pendingRewards, 'view');
+}
+// 던전 화면 하단 [던전 나가기] 버튼: 전투 일시정지 → 누적 보상창([계속 전투]/[던전 나가기]).
+function openHuntLeaveFlow(){
+  if(currentView !== 'hunt' || !hunt.dungeon || !hunt.pendingRewards) return;
+  if(el('killResultModal').style.display === 'flex') return;
+  beginHuntManualPause();
+  openKillResultModal(hunt.pendingRewards, 'leave');
+}
+// 누적 보상창 [계속 전투]: 창을 닫고 일시정지를 해제(던전 진행 상태/누적 보상은 그대로)
+function resumeFromRewardModal(){
+  closeKillResultModal();
+  resumeHuntFromManualPause();
+}
+// 누적 보상창 [던전 나가기]: 새 확인창을 만들지 않고 기존 "전투 중단 확인" 팝업을 그대로 사용함.
+// [전투 중단] → confirmLeaveBattle(던전 목록으로 이동), [탐험 계속] → cancelLeaveBattle(일시정지 해제, 던전 이어서 진행)
+function leaveFromRewardModal(){
+  closeKillResultModal(); // 일시정지(hunt.manualPause)는 유지한 채 보상창만 닫음
+  pendingNavTarget = 'dungeonlist';
+  el('leaveConfirmModal').style.display = 'flex';
 }
 // "탐험 계속": 다음 스테이지로 진행 (10스테이지를 클리어했으면 자동으로 11스테이지=숨겨진 장소로 이어짐)
 function advanceStage(){
@@ -749,9 +917,12 @@ function clickTreasureChest(){
   if(hint) hint.style.display = 'none'; // 안내 문구는 즉시 숨김(재클릭 방지 신호). 상자 자체는 흔들림 애니메이션 동안 계속 보여줌
   if(chest) chest.classList.add('shake');
   hunt.treasureShakeTimeout = setTimeout(() => {
-    if(chest) chest.classList.remove('shake');
-    const result = grantTreasureRewards();
-    openTreasureResultModal(result);
+    hunt.treasureShakeTimeout = null;
+    huntRunOrDefer(() => { // 흔들림 중 [던전 나가기]로 일시정지했다면 재개할 때 이어서 열림
+      if(chest) chest.classList.remove('shake');
+      const result = grantTreasureRewards();
+      openTreasureResultModal(result);
+    });
   }, TREASURE_SHAKE_MS);
 }
 // 모험가의 유해로 지급받은 장비를 장비 타입(무기/방어구/장신구)에 맞는 인벤토리에 추가.
@@ -809,40 +980,19 @@ function grantTreasureRewards(){
   return { gold, weaponDrop, stoneDrop, miscDrop, scrollDrop, fullCategories };
 }
 function openTreasureResultModal(result){
-  el('krIcon').textContent = '🎁';
-  el('krTitle').textContent = '숨겨진 보물을 발견했습니다!';
-  el('krTitle').style.color = 'var(--forge-gold)';
-  el('krLevel').textContent = '';
-
-  let rewardsHtml = `<div><span class="txt-gold">골드</span> +${result.gold.toLocaleString()}G</div>`;
-  // 11스테이지는 기존 로직상 경험치 보상이 없으므로 경험치 줄은 추가하지 않음(요구사항 그대로 유지).
-
-  // 11스테이지 보상(gold/weaponDrop/stoneDrop/miscDrop 개별 값)을 일반 전투 보상창과 동일한
-  // buildKillRewardItemSectionHtml()에 그대로 넣을 수 있도록, hunt.pendingRewards와 같은 버킷
-  // 구조(weaponDrops/weaponIdDrops/stoneDrops/flaskDrops/artifactDrops/miscDrops)로 "표시용"
-  // 변환만 함 — grantTreasureRewards()의 실제 지급 로직이나 state는 전혀 건드리지 않음.
-  // (11스테이지 드랍은 모험가의 유해/마석/기타 각각 최대 1개뿐이라 15개를 넘을 일이 없어 페이지네이션이
-  // 실제로 동작하지는 않지만, 일반 전투 보상 누적치인 hunt.pendingRewards를 오염시키지 않기 위해
-  // 이 변환 객체는 hunt.pendingRewards에 쓰지 않고 이 함수 지역 변수로만 buildKillRewardItemSectionHtml에 전달함.)
-  const displayRewards = {
-    weaponDrops: result.weaponDrop ? [result.weaponDrop] : [],
-    weaponIdDrops: [],
-    stoneDrops: result.stoneDrop ? { [result.stoneDrop.itemId]: result.stoneDrop.qty } : {},
-    flaskDrops: {},
-    artifactDrops: [],
-    miscDrops: result.miscDrop
-      ? { [result.miscDrop.itemId]: { icon: MISC_ITEMS[result.miscDrop.itemId].icon, name: MISC_ITEMS[result.miscDrop.itemId].name, qty: result.miscDrop.qty } }
-      : {},
-    scrollDrops: result.scrollDrop ? { [result.scrollDrop.itemId]: 1 } : {},
-  };
-  pageState.killRewardItems = 1;
-  rewardsHtml += buildKillRewardMessagesHtml(displayRewards);
-  rewardsHtml += buildKillRewardItemSectionHtml(displayRewards);
-
-  rewardsHtml += buildInventoryFullNotesHtml(result.fullCategories, !result.weaponDrop);
-  el('krRewards').innerHTML = rewardsHtml;
-  el('krInvTooltip').innerHTML = buildInvPeekHtml();
-  el('krContinueBtn').style.display = 'none'; // 11스테이지 다음은 없으므로 "탐험 계속" 버튼은 숨김
-  el('krRetryBtn').style.display = 'inline-block'; // "재탐험": 마을을 거치지 않고 같은 던전 1스테이지로 즉시 재입장
-  el('killResultModal').style.display = 'flex';
+  // 11스테이지 보상(gold/weaponDrop/stoneDrop/miscDrop/scrollDrop)을 던전 누적 보상(hunt.pendingRewards)에 합산한 뒤,
+  // 1~11스테이지 전체 누적 보상을 최종 보상창으로 표시함. 합산은 이미 끝난 grantTreasureRewards()의 결과를 표시용 데이터에
+  // 옮겨 담는 것뿐이며 실제 지급 로직이나 state는 전혀 건드리지 않음. (11스테이지는 경험치 보상이 없어 expGained는 그대로)
+  const r = hunt.pendingRewards;
+  r.gold += result.gold;
+  if(result.weaponDrop) r.weaponDrops.push(result.weaponDrop);
+  if(result.stoneDrop) r.stoneDrops[result.stoneDrop.itemId] = (r.stoneDrops[result.stoneDrop.itemId] || 0) + result.stoneDrop.qty;
+  if(result.miscDrop){
+    const m = MISC_ITEMS[result.miscDrop.itemId];
+    if(!r.miscDrops[result.miscDrop.itemId]) r.miscDrops[result.miscDrop.itemId] = { icon: m.icon, name: m.name, qty: 0 };
+    r.miscDrops[result.miscDrop.itemId].qty += result.miscDrop.qty;
+  }
+  if(result.scrollDrop) r.scrollDrops[result.scrollDrop.itemId] = (r.scrollDrops[result.scrollDrop.itemId] || 0) + 1;
+  Object.keys(result.fullCategories || {}).forEach(c => { r.fullCategories[c] = true; });
+  openKillResultModal(r, 'final', { treasure: true, equipState: !result.weaponDrop });
 }

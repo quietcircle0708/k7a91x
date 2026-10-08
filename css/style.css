@@ -888,7 +888,7 @@
      100px)를 따로 가짐 — 이 값만 바꾸면 몬스터 크기에 영향 없이 플레이어 이미지 크기만 조절됨.
      (참고: .monster-icon-img가 부모 font-size를 1em 기준으로 그대로 물려받는 방식이라, 여기서도
      font-size로 크기를 조절함 — 몬스터와 동일한 방식.) */
-  .combat-arena .monster-icon{ font-size:46px; }
+  .combat-arena .monster-icon{ font-size:54px; } /* 몬스터 슬롯에서 공격력 표시를 뺀 만큼 이미지에 여유를 줌(46px → 54px, 그리드 트랙/전체 배치는 그대로) */
   .combat-arena .player-icon{ font-size:100px; }
   .player-slot .hp-bar-wrap{ width:100%; margin-bottom:1px; }
   .player-slot .mp-bar-wrap{ margin-top:-2px; margin-bottom:-20px; }
@@ -1810,3 +1810,37 @@
 
 /* 골드/경험치/모험가의 유해 공통 아이콘(uiIconHtml) — 글 사이에 끼는 PNG는 글자 크기에 맞춰 이모지처럼 인라인으로 표시 */
 .ui-icon-inline{ display:inline-block; width:1.1em; height:1.1em; vertical-align:-0.2em; object-fit:contain; margin:0 1px; -webkit-user-drag:none; user-select:none; }
+
+
+/* ---- 던전 [던전 나가기]/[보상창] 이미지 버튼 ---- 32×32 이미지 자체가 버튼(별도 슬롯/테두리/배경 없음).
+   #monsterStage(position:relative, 스테이지 메시지가 뜨는 줄) 왼쪽 끝에 절대좌표로 둬서 레이아웃에 영향이 없음. */
+.hunt-bottom-actions{ position:absolute; left:0; top:2px; z-index:3; display:flex; gap:8px; }
+.hunt-img-btn{ width:32px; height:32px; padding:0; margin:0; border:0; background:none; cursor:pointer; display:block; line-height:0; }
+.hunt-img-btn:hover{ filter:brightness(1.25); }
+.hunt-img-btn:active{ transform:translateY(1px); }
+.hunt-img-btn-icon{ width:32px; height:32px; display:block; object-fit:contain; image-rendering:pixelated; -webkit-user-drag:none; user-select:none; } /* 원본 32×32 비율 그대로 */
+
+/* ---- 스테이지 클리어 후 준비시간 버튼(몬스터 상단 슬롯 위치, 가운데 정렬) ----
+   .combat-arena의 grid-area:top(몬스터 상단 슬롯과 같은 자리)에 겹쳐 두고 평소엔 display:none. 스킬 퀵슬롯 스타일(.quickslot-btn/.quickslot-cooldown)을 재활용하되
+   슬롯 크기만 44×44로 지정. 남은 시간 오버레이는 스킬 쿨타임(검은 55%·아이콘 숨김)과 달리 아이콘이 함께 보이도록 배경을 옅게 하고 글자에 외곽선을 줌. */
+.hunt-prep-actions{ display:none; grid-area:top; justify-self:center; align-self:center; gap:10px; z-index:4; }
+.hunt-prep-actions.show{ display:flex; }
+.hunt-prep-btn{ width:44px; height:44px; }
+.hunt-prep-btn:hover{ border-color: var(--forge-gold); }
+.hunt-prep-icon{ width:32px; height:32px; display:block; object-fit:contain; image-rendering:pixelated; -webkit-user-drag:none; user-select:none; }
+.hunt-prep-btn .quickslot-cooldown{
+  background: rgba(0,0,0,.28); color:#fff; font-size:14px;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
+}
+
+/* ---- 누적 보상창 헤더 아이콘 / 처치 몬스터 마리수 + 툴팁 ---- */
+.kill-header-icon{ width:32px; height:32px; object-fit:contain; image-rendering:pixelated; display:block; -webkit-user-drag:none; user-select:none; }
+.kill-modal-header .kill-monster-icon{ display:flex; align-items:center; }
+.kill-count-row{ line-height:1.9; }
+.kill-count-row b{ color: var(--forge-cream); }
+/* 툴팁은 돋보기 아이콘(.kill-count-host)에만 연결됨 — '처치 몬스터 : n' 글자에는 hover/click 동작 없음 */
+.kill-count-host{ position:relative; display:inline-block; vertical-align:middle; margin-left:4px; line-height:0; cursor:pointer; outline:none; }
+.kill-count-search-icon{ width:14px; height:14px; display:block; opacity:.85; -webkit-user-drag:none; user-select:none; }
+.kill-count-host:hover .kill-count-search-icon, .kill-count-host.open .kill-count-search-icon{ opacity:1; }
+.kill-count-host .kill-count-tip{ width:200px; left:50%; transform:translateX(-50%); bottom:140%; max-height:220px; overflow-y:auto; line-height:1.7; text-align:left; }
+.kill-count-host:hover .tooltip, .kill-count-host:focus .tooltip, .kill-count-host.open .tooltip{ visibility:visible; opacity:1; }

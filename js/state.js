@@ -69,7 +69,7 @@ let currentView = 'forge';
 // 예외를 던지고, 그 여파로 전투 타이머 자체가 생성되지 않아 공격이 전혀 진행되지 않는" 버그가 발생했음
 // (원인 파악·수정: 2026-09-11). 이제 필드를 추가할 땐 이 함수 한 곳만 고치면 두 경로 모두 자동 반영됨.
 function defaultHuntState(){
-  return { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle', scrollGrantedThisBattle: false };
+  return { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle', scrollGrantedThisBattle: false, nextStageTimeout: null, prepStartAt: 0, prepDeadline: 0, prepPausedFireMs: null, prepPausedStartMs: 0, manualPause: false, deferredActions: [], pendingRewards: null, rewardModalMode: null };
 }
 let hunt = defaultHuntState();
 // 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
