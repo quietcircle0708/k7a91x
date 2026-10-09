@@ -131,9 +131,11 @@ function craftMenuRenderList(){
   if(craftMenuUI.resetScroll){ scroller.scrollTop = 0; craftMenuUI.resetScroll = false; }
   else if(changed) scroller.scrollTop = prev;
 }
-// 천장 표시 영역: 이번 단계에서는 실제 천장 시스템이 없으므로 항상 빈 게이지(자리만 확보). 나중에 천장 시스템을 연결할 때는 이 함수가
-// { current, max }를 돌려주게 하면 게이지 채움과 '현재 시도 / 천장 횟수' 텍스트가 자동으로 표시됨.
-function craftMenuPityState(entry){ return null; }
+// 천장 표시 영역: 선택한 아이템의 천장 { current(누적 실패), max(천장 횟수) } — 천장이 없는 아이템이면 null(바 안에 '-' 표시).
+function craftMenuPityState(entry){
+  const limit = craftPityLimit(entry.item);
+  return limit ? { current: craftPityCount(entry.item), max: limit } : null;
+}
 function craftMenuRenderBottom(){
   const e = craftMenuUI.selectedKey ? craftMenuEntryByKey(craftMenuUI.selectedKey) : null;
   const item = e && e.item;
@@ -169,9 +171,9 @@ function craftMenuRenderBottom(){
   grid.style.setProperty('--craft-mat-n', matCount);
   // 천장(자리만) / 제작 확률 / 제작 버튼
   const pity = e ? craftMenuPityState(e) : null;
-  el('craftPityFill').style.width = pity && pity.max ? Math.min(100, Math.round(pity.current / pity.max * 100)) + '%' : '0%';
-  el('craftPityText').textContent = pity && pity.max ? `${pity.current} / ${pity.max}` : '천장';
-  el('craftRate').textContent = e ? `제작 확률 ${item.successChance}%` : '제작 확률 -';
+  el('craftPityFill').style.width = pity ? Math.min(100, pity.current / pity.max * 100) + '%' : '0%'; // 예: 3/7 → 약 42.9%, 천장 도달 시 100%
+  el('craftPityText').textContent = pity ? `${pity.current}/${pity.max}` : '-';                    // 천장이 없는 아이템/선택 없음은 '-'
+  el('craftRate').textContent = e ? `제작 확률 ${craftEffectiveSuccessChance(item)}%` : '제작 확률 -';
   el('craftMakeCost').innerHTML = e ? goldHtml((item.craftCost || 0).toLocaleString()) : '';
   const btn = el('craftMakeBtn');
   btn.disabled = !e;
@@ -275,6 +277,19 @@ function craftMenuSwitchVTab(vtab){
   craftMenuRender();
 }
 
+// 툴팁 표시: rowKey = 목록 행(제작 아이템 key), tipKey = 선택 아이템('sel')/재료('m0'…) — 다시 그려진 뒤의 현재 요소를 찾아 기준으로 삼음
+function craftMenuShowTip(rowKey, tipKey){
+  const wrap = el('craftNewWrap');
+  if(!wrap) return;
+  if(rowKey){
+    const row = wrap.querySelector(`.craft-row[data-key="${rowKey}"]`);
+    if(row && craftMenuUI.tipByKey[rowKey]) codexShowTipHtml(row.querySelector('.craft-row-icon'), craftMenuUI.tipByKey[rowKey], rowKey);
+  } else if(tipKey){
+    const tipEl = wrap.querySelector(`[data-tip="${tipKey}"]`);
+    if(tipEl && craftMenuUI.tipByKey[tipKey]) codexShowTipHtml(tipEl.querySelector('.inv-icon') || tipEl, craftMenuUI.tipByKey[tipKey], tipKey);
+  }
+}
+
 (function craftMenuInit(){
   document.body.classList.toggle('craft-ui-new', CRAFT_MENU_UI === 'new'); // 새 메뉴/예전 메뉴 중 하나만 표시(css)
   const wrap = el('craftNewWrap');
@@ -306,12 +321,23 @@ function craftMenuSwitchVTab(vtab){
   wrap.addEventListener('mouseover', (ev) => {
     const row = ev.target.closest('.craft-row');
     const tipEl = ev.target.closest('[data-tip]');
-    if(row) codexShowTipHtml(row.querySelector('.craft-row-icon'), craftMenuUI.tipByKey[row.dataset.key] || '', row.dataset.key);
-    else if(tipEl && craftMenuUI.tipByKey[tipEl.dataset.tip]) codexShowTipHtml(tipEl.querySelector('.inv-icon') || tipEl, craftMenuUI.tipByKey[tipEl.dataset.tip], tipEl.dataset.tip);
+    if(row) craftMenuShowTip(row.dataset.key, null);
+    else if(tipEl) craftMenuShowTip(null, tipEl.dataset.tip);
   });
   wrap.addEventListener('mouseout', (ev) => {
     if(ev.target.closest('.craft-row') || ev.target.closest('[data-tip]')) codexHideTip();
   });
+  // 터치(모바일): 탭하면 마우스 이벤트(mouseover)가 먼저 와서 툴팁이 뜨지만, 곧바로 이어지는 click에서 (1) 선택으로 목록이 다시 그려지며
+  // 툴팁이 닫히고 (2) 도감의 전역 click 처리(codex.js)가 '도감 슬롯 밖 클릭'으로 보고 툴팁을 닫아 버림. 그래서 클릭 처리가 모두 끝난 뒤
+  // (setTimeout 0) 눌렀던 대상의 툴팁을 다시 띄움. 다른 곳을 누르면 전역 click 처리가 평소처럼 닫음.
+  wrap.addEventListener('click', (ev) => {
+    const row = ev.target.closest('.craft-row');
+    const tipEl = ev.target.closest('[data-tip]');
+    const rowKey = row ? row.dataset.key : null;
+    const tipKey = !row && tipEl ? tipEl.dataset.tip : null;
+    if(!rowKey && !tipKey) return;
+    setTimeout(() => craftMenuShowTip(rowKey, tipKey), 0);
+  }, true);
   el('craftListScroll').addEventListener('scroll', () => codexHideTip());
   el('craftMatScroll').addEventListener('scroll', () => codexHideTip());
 

@@ -2859,6 +2859,9 @@ const CRAFTABLE_ITEMS = {
 //   iconType, iconRef,  // 기존 등록된 아이템 아이콘을 그대로 재사용하기 위한 참조
 //                        // ('weapon'이면 iconRef는 WEAPON_TYPES 키를 그대로 넣어 weaponIconHtml(iconRef)로 렌더)
 //   successChance,      // 제작 성공 확률(%)
+//   pityLimit,          // (선택) 제작 천장 — 확정 성공 전에 누적할 수 있는 '실패 횟수'. 이 횟수만큼 실패하면 다음 제작은 성공 확률 100%.
+//                        // 생략하면 천장 없음(기존 확률 그대로, 누적도 기록하지 않음). 누적 횟수는 state.craftPity[아이템 id]에 저장
+//                        // (formulas.js craftPity* 함수). 아이템 이름이 아니라 이 데이터 값만 보고 동작함.
 //   craftCost,          // 제작 비용(골드)
 //   materials: [ { name, need } ],  // name은 기존 아이템의 표시 이름 그대로 — findCraftResource
 //                                   // (formulas.js)가 무기/방어구/장신구/보조/MISC_ITEMS를 통틀어
@@ -2878,7 +2881,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_poisonfang', name: '독 송곳니', grade: 'epic',
     iconType: 'weapon', iconRef: 'poisonfang',
-    successChance: 60, craftCost: 4000,
+    successChance: 60, pityLimit: 2, craftCost: 4000,
     materials: [
       { name: '독사의 송곳니', need: 2 },
       { name: '쇠조각', need: 1 },
@@ -2892,7 +2895,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_blacksword', name: '흑색 검', grade: 'epic',
     iconType: 'weapon', iconRef: 'blacksword',
-    successChance: 40, craftCost: 8000,
+    successChance: 40, pityLimit: 2, craftCost: 8000,
     materials: [
       { name: '흑철', need: 3 },
       { name: '쇠조각', need: 2 },
@@ -2907,7 +2910,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_tigersword', name: '척호검', grade: 'epic',
     iconType: 'weapon', iconRef: 'tigersword',
-    successChance: 40, craftCost: 8000,
+    successChance: 40, pityLimit: 2, craftCost: 8000,
     materials: [
       { name: '자호의 송곳니', need: 2 },
       { name: '흑철', need: 4 },
@@ -2923,7 +2926,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_bloodtigerlongsword', name: '혈호대검', grade: 'epic',
     iconType: 'weapon', iconRef: 'bloodtigerlongsword',
-    successChance: 35, craftCost: 18000,
+    successChance: 35, pityLimit: 3, craftCost: 18000,
     materials: [
       { name: '자호의 송곳니', need: 2 },
       { name: '흑철', need: 5 },
@@ -2939,7 +2942,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_eight_knife', name: '팔각비도', grade: 'epic',
     iconType: 'weapon', iconRef: 'eight_knife',
-    successChance: 30, craftCost: 28000,
+    successChance: 30, pityLimit: 3, craftCost: 28000,
     // 재료 중 "독 송곳니"는 MISC_ITEMS가 아니라 실제 무기(poisonfang) 이름 — findCraftResource가
     // 장비로 인식해서 보유한 개체를 홀딩하고, 아래 failReturns에 같은 이름이 등록되어 있어 실패 시
     // 투입했던 그 개체가 강화 단계 그대로 손상 상태로 반환됨(요청사항 "독 송곳니(손상)").
@@ -2957,7 +2960,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_moongreatsword', name: '반월대도', grade: 'epic',
     iconType: 'weapon', iconRef: 'moongreatsword',
-    successChance: 40, craftCost: 8000,
+    successChance: 40, pityLimit: 2, craftCost: 8000,
     materials: [
       { name: '흑철', need: 2 },
       { name: '쇠조각', need: 3 },
@@ -2974,7 +2977,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_moonsword_black', name: "월도'흑", grade: 'epic',
     iconType: 'weapon', iconRef: 'moonsword_black',
-    successChance: 35, craftCost: 30000,
+    successChance: 35, pityLimit: 4, craftCost: 30000,
     materials: [
       { name: '월도', need: 1 },
       { name: '반짝이는 돌', need: 1 },
@@ -2989,7 +2992,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavysword_black', name: '흑철중검', grade: 'epic',
     iconType: 'weapon', iconRef: 'heavysword_black',
-    successChance: 35, craftCost: 30000,
+    successChance: 35, pityLimit: 4, craftCost: 30000,
     materials: [
       { name: '현철중검', need: 1 },
       { name: '반짝이는 돌', need: 1 },
@@ -3004,7 +3007,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavydagger_black', name: '흑철비도', grade: 'epic',
     iconType: 'weapon', iconRef: 'heavydagger_black',
-    successChance: 35, craftCost: 30000,
+    successChance: 35, pityLimit: 4, craftCost: 30000,
     materials: [
       { name: '현철단검', need: 1 },
       { name: '반짝이는 돌', need: 1 },
@@ -3025,7 +3028,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_moonsword_unique', name: '진월도', grade: 'unique',
     iconType: 'weapon', iconRef: 'moonsword_unique',
-    successChance: 15, craftCost: 50000,
+    successChance: 15, pityLimit: 10, craftCost: 50000,
     materials: [
       { name: "월도'흑", need: 1 },
       { name: '원한이 담긴 유서', need: 5 },
@@ -3042,7 +3045,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavysword_unique', name: '진혼검', grade: 'unique',
     iconType: 'weapon', iconRef: 'heavysword_unique',
-    successChance: 15, craftCost: 50000,
+    successChance: 15, pityLimit: 10, craftCost: 50000,
     materials: [
       { name: '흑철중검', need: 1 },
       { name: '원한이 담긴 유서', need: 5 },
@@ -3059,7 +3062,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavydagger_unique', name: '혈영비도', grade: 'unique',
     iconType: 'weapon', iconRef: 'heavydagger_unique',
-    successChance: 15, craftCost: 50000,
+    successChance: 15, pityLimit: 10, craftCost: 50000,
     materials: [
       { name: '흑철비도', need: 1 },
       { name: '원한이 담긴 유서', need: 5 },

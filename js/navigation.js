@@ -570,8 +570,9 @@ function finishCraftAnimProgress(){
   craftAnim.orbInterval = null;
   craftAnim.progress = 100;
   const item = findCraftItem(craftAnim.category, craftAnim.itemId);
-  // 기존 제작 데이터에 등록된 성공 확률(item.successChance)을 그대로 사용 — 새 판정 공식을 만들지 않음.
-  craftAnim.resultSuccess = Math.random() * 100 < (item.successChance || 0);
+  // 기존 판정 방식 그대로 — 다만 기준 확률은 천장 도달 여부를 반영한 craftEffectiveSuccessChance(천장 도달 시 100%, 아니면 기존 successChance).
+  // 제작 팝업/제작 메뉴에 표시되는 확률도 같은 함수를 쓰므로 표시와 실제 판정이 항상 일치함.
+  craftAnim.resultSuccess = Math.random() * 100 < craftEffectiveSuccessChance(item);
   // 실패라면 반환 결과도 이 시점에 함께 확정(요청사항 — 결과는 연출 완료 시점에 결정하고, 결과 확인
   // 단계에서는 이미 결정된 결과만 보여줌). 성공이면 반환 추첨 자체가 필요 없음(반환은 실패 전용).
   craftAnim.resultReturn = craftAnim.resultSuccess ? null : craftRollFailReturn(item);
@@ -593,6 +594,7 @@ function clickCraftAnimIcon(){
     craftAnim.resultReturnDamaged = false;
   }
   craftGrantResultItems(item); // 기존 인벤토리 지급 로직 재사용, craftAnim.resultSuccess/resultReturn을 그대로 적용
+  craftPityRecordResult(item, craftAnim.resultSuccess); // 결과가 확정·지급되는 이 시점에 천장 누적 반영(실패 +1 / 성공 시 초기화, 아래 saveState로 함께 저장)
   craftAnim.phase = 'revealed';
   // 버그 수정: 제작 성공(또는 실패 반환) 아이템이 인벤토리에 지급된 뒤에도 저장이 안 되고 있었음
   // → 결과 공개 직후 새로고침하면 지급된 아이템이 그대로 증발했던 원인. 지급이 확정되는 이 시점에

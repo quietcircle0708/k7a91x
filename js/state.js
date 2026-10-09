@@ -59,6 +59,7 @@ let state = {
   deathCurseUntil: null, // 망자의 저주(사망 패널티) 만료 시각(epoch ms). null이면 미적용
   bestLevel: 0, totalAttempts: 0, totalDestroys: 0, totalSold: 0, legendCount: 0, totalKills: 0,
   codexFavorites: [], // 도감 즐겨찾기한 장비 키 목록(codex.js의 엔트리 key: '장비종류:타입id'). 저장 데이터(state)에 그대로 포함됨
+  craftPity: {}, // 제작 천장 누적 실패 횟수 { 제작 아이템 id: 횟수 } — 천장(pityLimit)이 있는 아이템만 기록됨(formulas.js craftPity* 참고)
 };
 let isEnhancing = false;
 let currentView = 'forge';
@@ -526,6 +527,9 @@ function applyLoadedRaw(raw){
   if(!Array.isArray(state.unlockedAwakeningSkills)) state.unlockedAwakeningSkills = [];
   // 도감 즐겨찾기: 이전 세이브에는 없는 필드 → 빈 목록. 문자열 키만 남기고 중복 제거
   state.codexFavorites = Array.isArray(state.codexFavorites) ? [...new Set(state.codexFavorites.filter(k => typeof k === 'string'))] : [];
+  // 제작 천장 누적: 이전 세이브에는 없는 필드 → 빈 객체. 0 이상 정수 값만 남김(저장/불러오기 후에도 누적 유지)
+  if(!state.craftPity || typeof state.craftPity !== 'object' || Array.isArray(state.craftPity)) state.craftPity = {};
+  Object.keys(state.craftPity).forEach(k => { const v = state.craftPity[k]; if(!Number.isInteger(v) || v <= 0) delete state.craftPity[k]; });
   // 해금 없이 이미 습득된 기연 스킬이 세이브에 있다면(구버전 데이터) 해금된 것으로 취급해 습득 상태와 어긋나지 않게 함
   state.learnedAwakeningSkills.forEach(id => { if(!state.unlockedAwakeningSkills.includes(id)) state.unlockedAwakeningSkills.push(id); });
   if(!Array.isArray(state.skillQuickSlots) || state.skillQuickSlots.length !== SKILL_QUICK_SLOT_COUNT){
@@ -649,7 +653,8 @@ function resetGame(){
     settings: {},
     deathCurseUntil: null,
     bestLevel:0, totalAttempts:0, totalDestroys:0, totalSold:0, legendCount:0, totalKills:0,
-    codexFavorites: []
+    codexFavorites: [],
+    craftPity: {}
   };
   ensurePlayerVitals();
   ensureSettingsDefaults();

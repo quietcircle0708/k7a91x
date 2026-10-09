@@ -3742,6 +3742,38 @@ function craftItemCanCraft(category, item){
   return craftPopupCanCraft(popup);
 }
 
+// ---- 제작 천장 시스템 ----
+// 아이템 데이터의 pityLimit(확정 성공 전에 누적할 수 있는 실패 횟수)만 보고 동작함(이름 예외 처리 없음, pityLimit이 없으면 천장 없음).
+// 누적 실패 횟수는 state.craftPity[아이템 id]에 아이템별로 따로 저장됨. 예) pityLimit 7: 1~7번째 제작에서 실패할 때마다 +1,
+// 7번 실패해 7/7이 되면 다음(8번째) 제작은 성공 확률 100% → 성공하면 0/7로 초기화.
+function craftPityLimit(item){
+  const n = item && item.pityLimit;
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+function craftPityCount(item){
+  const limit = craftPityLimit(item);
+  if(!limit) return 0;
+  const v = state.craftPity && state.craftPity[item.id];
+  return Number.isInteger(v) && v > 0 ? Math.min(v, limit) : 0;
+}
+function craftPityReached(item){
+  const limit = craftPityLimit(item);
+  return limit > 0 && craftPityCount(item) >= limit;
+}
+// 지금 실제로 적용되는 성공 확률(%) — 천장에 도달했으면 100, 아니면 데이터의 기존 확률. 화면 표시(제작 메뉴/제작 팝업)와 실제 판정
+// (navigation.js finishCraftAnimProgress)이 모두 이 함수 하나를 써서 서로 달라질 수 없음.
+function craftEffectiveSuccessChance(item){
+  return craftPityReached(item) ? 100 : (item.successChance || 0);
+}
+// 제작 시도 하나의 결과를 누적에 반영(연속 제작이 생기더라도 각 결과마다 이 함수를 순서대로 호출하면 됨).
+// 천장이 없는 아이템은 아무것도 기록하지 않음. 성공이면 0으로 초기화(기록 삭제), 실패면 천장 한도까지 +1.
+function craftPityRecordResult(item, success){
+  if(!craftPityLimit(item)) return;
+  if(!state.craftPity || typeof state.craftPity !== 'object') state.craftPity = {};
+  if(success){ delete state.craftPity[item.id]; return; }
+  state.craftPity[item.id] = craftPityCount(item) + 1 > craftPityLimit(item) ? craftPityLimit(item) : craftPityCount(item) + 1;
+}
+
 // 제작 성공 시 지급될 제작 아이템을 담을 인벤토리 슬롯이 부족하면 해당 카테고리를 반환(막지 않으면 제작 재료/골드만 소모되고
 // 결과물이 지급되지 못함). 제작 시작 때 소모되는 장비 재료는 인벤토리에서 빠지므로 그만큼의 슬롯은 비는 것으로 계산함.
 // 제작 아이템은 모두 장비(무기/방어구/보조/장신구)라 장비 카테고리로 판단함(iconType이 늘어나면 여기에 분기 추가).

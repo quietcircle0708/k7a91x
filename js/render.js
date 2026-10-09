@@ -690,7 +690,7 @@ function renderCraftPopup(){
       </button>`;
   }).join('');
 
-  el('craftPopupSuccessRate').textContent = `성공 확률 ${item.successChance}%`;
+  el('craftPopupSuccessRate').textContent = `성공 확률 ${craftEffectiveSuccessChance(item)}%`; // 천장 도달 시 100%(실제 판정과 같은 함수)
   el('craftPopupCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
   el('craftPopupCost').innerHTML = goldHtml((item.craftCost || 0).toLocaleString());
 

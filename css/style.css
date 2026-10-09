@@ -1944,8 +1944,9 @@ body.mobile-preset .craft-row-status{ font-size:clamp(9px, 2.6vw, 10.5px); white
 .craft-mat-cell .craft-slot-qty-ok, .craft-mat-cell .craft-slot-qty-short{ font-size:11px; white-space:nowrap; }
 /* 오른쪽: 천장(윗줄, 선택 아이템 줄과 같은 높이) / 제작 확률 + 제작 버튼(아랫줄, 필요 재료 박스와 같은 높이) */
 .craft-pity{ position:relative; flex:none; height:26px; box-sizing:border-box; border:1px solid var(--forge-line); border-radius:0; background:#1b1713; overflow:hidden; display:flex; align-items:center; justify-content:center; margin-top:6px; } /* 천장: 높이 26px·직각, 위쪽은 필요 재료 첫 번째 줄(아이콘 그리드 상단)과 같은 높이 */
-.craft-pity-fill{ position:absolute; left:0; top:0; bottom:0; width:0; background: linear-gradient(90deg, #8a6a2a, var(--forge-gold)); opacity:.75; }
-.craft-pity-text{ position:relative; font-size:11.5px; line-height:1; font-weight:700; color: var(--forge-cream-dim); font-family:'JetBrains Mono', monospace; }
+.craft-pity-fill{ position:absolute; left:0; top:0; bottom:0; width:0; background: linear-gradient(90deg, #ffe9a8, #e0b13c); transition: width .3s ease-out; } /* 경험치 바(.player-bar-fill.exp)와 같은 노란색 */
+.craft-pity-text{ position:relative; font-size:12px; line-height:1; font-weight:800; color:#fff; font-family:'JetBrains Mono', monospace;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000; } /* 흰 글씨 + 검정 외곽선 */
 .craft-act{ display:flex; flex-direction:column; gap:0; min-width:0; } /* 간격은 각 요소의 margin으로 지정(천장 위치를 필요 재료 그리드 상단에 맞추기 위함) */
 .craft-rate{ flex:none; height:26px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; color: var(--forge-gold); padding:0 4px; border:1px solid var(--forge-line); border-radius:0; background: var(--forge-panel-2); } /* 제작 확률: 높이 26px·직각, 위치는 필요 재료 박스 상단과 맞춤 */
 /* 제작 버튼: 직각, 어두운 색(제작소 배경보다 어둡게) — 남은 높이를 채워 아랫줄 아래쪽이 필요 재료 박스와 맞음 */
