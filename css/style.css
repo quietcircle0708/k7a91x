@@ -1900,7 +1900,16 @@ body.mobile-preset .craft-toolbar .codex-search{ flex:1 1 100px; min-width:100px
 .craft-row-status.ok{ color: var(--forge-gold); }
 .craft-row-status.no{ color: var(--forge-cream-dim); }
 body.mobile-preset .craft-row{ gap:8px; padding:7px 8px; }
-body.mobile-preset .craft-row-status{ font-size:10.5px; white-space:normal; width:36px; text-align:center; line-height:1.25; } /* 좁은 화면: '제작 / 불가능'처럼 두 줄로 표시해 이름 자리를 확보 */
+/* 모바일 화면 프리셋 전용 — 제작소 세로 탭/목록 폭 반응형 조정(화면이 좁을수록 세로 탭이 줄고 그만큼 목록이 넓어짐, 데스크톱 프리셋 무변경) */
+body.mobile-preset .craft-vtabs{ width:clamp(60px, 20vw, 96px); }                       /* 최소 60px(가장 긴 탭 '즐겨찾기'가 읽히는 폭) ~ 최대 96px(기존) */
+body.mobile-preset .craft-vtabs .codex-vtab{ width:100%; font-size:clamp(10px, 2.9vw, 12px); white-space:nowrap; }
+body.mobile-preset .craft-main{ padding-left:8px; }
+body.mobile-preset .craft-listscroll{ scrollbar-gutter:auto; scrollbar-width:thin; }   /* 스크롤바 자리를 미리 비워 두지 않음(목록 폭 확보) */
+body.mobile-preset .craft-row{ gap:6px; padding:6px; }
+body.mobile-preset .craft-row-name{ font-size:clamp(11.5px, 3.2vw, 13px); overflow-wrap:anywhere; } /* 이름은 필요하면 줄바꿈하되 잘리거나 상태 문구와 겹치지 않음 */
+body.mobile-preset .craft-row-status{ font-size:clamp(9px, 2.6vw, 10.5px); white-space:nowrap; line-height:1.2; text-align:right; } /* 상태 문구는 한 줄 */
+@media (max-width:380px){ body.mobile-preset .craft-row-icon{ zoom:.8; } }               /* 아주 좁은 화면에서는 행 아이콘을 줄여 이름 자리를 확보 */
+@media (max-width:340px){ body.mobile-preset .craft-row-icon{ zoom:.68; } body.mobile-preset .craft-row-name{ font-size:11px; } body.mobile-preset .craft-row{ gap:5px; padding:6px 5px; } }
 
 /* 고정 하단 영역(목록을 스크롤해도 항상 보임).
    윗줄: 선택 아이템(좌우 전체 한 줄). 아랫줄: 왼쪽 절반 = 필요 재료 박스 / 오른쪽 절반 = 제작 확률 → 천장 → 제작 버튼.
