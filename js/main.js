@@ -503,7 +503,6 @@ el('huntPrepLeaveBtn').addEventListener('click', openHuntLeaveFlow); // 기존 [
 el('huntPrepNextBtn').addEventListener('click', skipHuntPrep);
 setInterval(updateHuntPrepUi, 100);
 el('huntRewardBtn').addEventListener('click', openLiveRewardView);
-el('krContinueBtn').addEventListener('click', advanceStage);
 el('krRetryBtn').addEventListener('click', retryDungeon);
 // 보상창 "획득 아이템" 그리드의 페이지 이동 버튼 — #krRewards는 innerHTML로 매번 다시 그려지므로
 // (그 안의 .reward-item-pager는 정적 요소가 아님), 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.

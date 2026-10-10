@@ -831,7 +831,6 @@ function openKillResultModal(rewards, mode, opts){
   show('krLeaveBtn', mode === 'leave');
   show('krRetryBtn', mode === 'final'); // "재탐험"은 11스테이지(숨겨진 장소) 최종 보상창 전용
   show('krStopBtn', mode === 'final');
-  show('krContinueBtn', false);         // 스테이지가 자동 진행되므로 "탐험 계속" 버튼은 더 이상 쓰이지 않음(함수/요소는 유지)
   el('killResultModal').style.display = 'flex';
 }
 // 보기 전용 창이 열린 채 전투가 진행되는 동안 누적 보상이 바뀌면 내용만 다시 그림(내용이 같으면 건드리지 않아
@@ -874,11 +873,6 @@ function leaveFromRewardModal(){
   closeKillResultModal(); // 일시정지(hunt.manualPause)는 유지한 채 보상창만 닫음
   pendingNavTarget = 'dungeonlist';
   el('leaveConfirmModal').style.display = 'flex';
-}
-// "탐험 계속": 다음 스테이지로 진행 (10스테이지를 클리어했으면 자동으로 11스테이지=숨겨진 장소로 이어짐)
-function advanceStage(){
-  closeKillResultModal();
-  enterStage(hunt.stage + 1);
 }
 // "마을 귀환": 체력/마나 회복 후 메인 화면(대장간)으로 이동 (스테이지 클리어 후 행동 선택 / 숨겨진 장소 보상 이후 공통)
 function returnToVillage(){

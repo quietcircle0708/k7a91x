@@ -3133,6 +3133,12 @@ const SHOP_TABS = [
   { id: 'misc', label: '기타' },
 ];
 
+// ---- 새 게임 시작 지급 소비 아이템 ----
+// 새 게임(저장 데이터가 없는 최초 실행 / [처음부터 다시 시작])에서만 지급됨. 키는 CONSUMABLES의 아이템 id, 값은 개수.
+// 기존 저장 데이터를 불러올 때는 저장된 consumables가 그대로 쓰이므로(applyLoadedRaw의 Object.assign) 이 값이 다시 지급되지 않음.
+// 시작 골드(1,000G)는 state 기본값/초기화 코드에 그대로 있음. 지급 아이템을 바꾸려면 이 표만 수정하면 됨.
+const NEW_GAME_START_CONSUMABLES = { hpFlask1: 5, mpFlask1: 5 }; // 하급 체력 포션 5개, 하급 마나 포션 5개
+
 // ---- 상점 메뉴 UI 전환 플래그 + 구매/판매 모드 ----
 // SHOP_MENU_UI: 'new' = 새 상점 UI(shop_menu.js — 구매/판매 탭·분류 탭·세부 분류·필터/검색·빠른 구매/판매·세로 스크롤 목록),
 //               'legacy' = 예전 상점 UI(카드 목록 + 페이지네이션, render.js renderShopTab 이하 / main.js 상점 리스너 / index.html .shop-legacy-wrap).
@@ -4840,7 +4846,6 @@ const STAGE_RETURN_MSG = '지친 몸을 이끌고 마을로 귀환했습니다.'
 
 // 몬스터 처치 연출
 const MONSTER_DEAD_ANIM_MS = 400;     // 몬스터 사망(scale/rotate/fade) 애니메이션 재생 시간(css .monster-icon.dead와 동일)
-const REWARD_MODAL_DELAY_MS = 500;    // 마지막 몬스터의 사망 애니메이션이 끝난 뒤 보상 창을 띄우기까지의 대기 시간
 // 스테이지 자동 진행: 스테이지 클리어(마지막 몬스터의 사망 애니메이션이 끝난 뒤) → 이 시간만큼 준비 → 다음 스테이지 자동 진입.
 // 준비 시간을 바꾸고 싶으면 이 값 하나만 수정하면 됨(ms). 11스테이지(숨겨진 장소)는 자동 진행 대상이 아님(기존 종료 흐름 유지).
 const STAGE_AUTO_ADVANCE_DELAY_MS = 10000;

@@ -4,6 +4,11 @@
 // 읽고 쓰는 헬퍼 함수들. window.storage 우선, localStorage 폴백.
 // ============================================================
 
+// 새 게임용 소비 아이템 보유 현황: 기본 보유 키(0개) + 시작 지급 아이템(NEW_GAME_START_CONSUMABLES). 기본 state와 [처음부터 다시 시작]이 같은 함수를 씀.
+function newGameConsumables(){
+  return Object.assign({ hpFlask6: 0, mpFlask6: 0 }, NEW_GAME_START_CONSUMABLES);
+}
+
 let state = {
   gold: 1000,
   // (강화 장비 선택 기능 추가 시 제거) 예전엔 새 게임 시작 시 견습 모험가의 대검(양손검, 착용 요구
@@ -53,7 +58,7 @@ let state = {
   learnedSkills: [], learnedAwakeningSkills: [], // 습득한 스킬 id 목록(공용·특화 공용 / 기연 별도)
   unlockedAwakeningSkills: [], // 비급으로 해금된 기연 스킬 id 목록(습득 여부와 별개, 스킬 초기화해도 유지)
   skillQuickSlots: [null, null, null, null, null, null, null, null, null, null], // 스킬 퀵슬롯(2줄×5칸)에 등록된 스킬 id
-  consumables: { hpFlask6: 0, mpFlask6: 0 }, // 보유 플라스크 개수
+  consumables: newGameConsumables(), // 보유 플라스크 개수(새 게임 시작 지급 포함)
   quickSlots: [null, null], // 사냥 화면 퀵슬롯에 등록된 소비 아이템 id
   settings: {}, // 설정값 저장 (키: SETTINGS_SCHEMA의 항목 id). ensureSettingsDefaults()가 누락된 키를 기본값으로 채움
   deathCurseUntil: null, // 망자의 저주(사망 패널티) 만료 시각(epoch ms). null이면 미적용
@@ -468,6 +473,8 @@ function applyLoadedRaw(raw){
   if(!raw) return;
   const loaded = JSON.parse(raw);
   state = Object.assign(state, loaded);
+  // 시작 지급 아이템은 새 게임에만: 아주 오래된 저장 데이터처럼 consumables 항목이 없는 경우 기본 state의 시작 지급분을 물려받지 않도록 빈 값으로 되돌림.
+  if(!loaded.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
   if(!Array.isArray(state.artifacts)) state.artifacts = [];
   // 구버전(ringOwned/batwingOwned) 마이그레이션
   if(loaded.ringOwned && !state.artifacts.includes('ring')) state.artifacts.push('ring');
@@ -648,7 +655,7 @@ function resetGame(){
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
     skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [], unlockedAwakeningSkills: [],
     skillQuickSlots: [null, null, null, null, null, null, null, null, null, null],
-    consumables: { hpFlask6: 0, mpFlask6: 0 },
+    consumables: newGameConsumables(),
     quickSlots: [null, null],
     settings: {},
     deathCurseUntil: null,

@@ -383,7 +383,9 @@ function weaponStatRequirements(type){
   const w = wpn(type);
   const profile = getWeaponProfile(w);
   const formula = profile && profile.statReq;
-  if(!formula || !w.levelReq) return [];
+  // 착용 제한 레벨이 1 이하인 장비(예: 낡은 대검/낡은 검/낡은 비도 등 시작 단계 무기)는 요구 스탯 제한이 없음 — 이름이 아니라
+  // 레벨 데이터만 보는 공통 규칙이며, 착용 판정(meetsWeaponEquipRequirements)·툴팁·착용 불가 안내 문구가 모두 이 함수를 거치므로 한 곳에서 일관되게 적용됨.
+  if(!formula || !w.levelReq || w.levelReq <= 1) return [];
   return formula
     .map(f => ({ stat: f.stat, amount: Math.round(w.levelReq * f.mult) }))
     .filter(r => r.amount > 0);
@@ -395,6 +397,32 @@ function weaponRequirementText(type){
   if(w.levelReq && w.levelReq > 1) parts.push(`레벨 ${w.levelReq} 이상`);
   weaponStatRequirements(type).forEach(r => parts.push(`${STAT_LABELS[r.stat]} ${r.amount} 이상`));
   return parts.length ? parts.join(', ') : null;
+}
+// ---- 요구 조건 표시(툴팁 공용) ----
+// 요구 조건 한 줄의 색상 규칙은 스킬 툴팁(buildSkillTooltipHtml)과 같음: 지금 만족하면 초록(--forge-green), 못하면 빨강(--forge-blood).
+// 저장하지 않고 툴팁을 만들 때마다 현재 레벨/스탯으로 새로 판정함.
+function requirementColor(ok){ return ok ? 'var(--forge-green)' : 'var(--forge-blood)'; }
+function requirementLineHtml(text, ok){ return `<div style="color:${requirementColor(ok)};">${text}</div>`; }
+// 장비의 착용 조건 목록 [{ text, ok }] — 아이템 데이터에 실제로 등록된 조건만 읽음(레벨 제한 + 요구 스탯, 각각 개별 판정).
+// 새 종류의 요구 조건이 생기면 여기에 항목만 추가하면 모든 장비 툴팁에 같은 방식으로 표시됨. 스탯 판정은 장착 판정과 같은 최종 스탯(effectiveStats) 기준.
+function equipRequirementList(type){
+  const w = wpn(type);
+  const list = [];
+  if(w.levelReq && w.levelReq > 1) list.push({ text: `레벨 ${w.levelReq} 이상`, ok: (state.playerLevel || 1) >= w.levelReq });
+  const stats = weaponStatRequirements(type);
+  if(stats.length){
+    const now = effectiveStats();
+    stats.forEach(r => list.push({ text: `${STAT_LABELS[r.stat]} ${r.amount} 이상`, ok: (now[r.stat] || 0) >= r.amount }));
+  }
+  return list;
+}
+// 툴팁용 착용 조건 HTML: 첫 줄은 기존과 같은 "라벨 : 값" 형태, 나머지 조건은 아래 줄에 하나씩. 조건이 없으면 ''(줄 자체를 표시하지 않음).
+function equipRequirementTooltipHtml(type, label){
+  const list = equipRequirementList(type);
+  if(!list.length) return '';
+  return list.map((r, i) => i === 0
+    ? `<div><span style="color:var(--forge-cream-dim);">${label}</span> <span style="color:${requirementColor(r.ok)};">${r.text}</span></div>`
+    : requirementLineHtml(r.text, r.ok)).join('');
 }
 // 착용(장착) 조건 충족 여부 — 아이템 레벨(플레이어 레벨 이상 필요) + 무기 종류별 요구 스탯 모두 확인.
 // playerStats는 { str, agi, int } 형태(호출부에서 effectiveStats()를 넘겨 레벨업 투자 스탯 + 장비/아티팩트
@@ -491,8 +519,7 @@ function buildWeaponTooltipHtml(type, level, damaged, currentDurability){
   html += tipUniqueWrap(weaponUniqueOptionTooltipHtml(type, lvl));
 
   // 7. 착용 제한 (필요한 조건이 있을 때만)
-  const reqText = weaponRequirementText(type);
-  if(reqText) html += wtipRow('착용 제한 :', reqText);
+  html += equipRequirementTooltipHtml(type, '착용 제한 :'); // 조건별 초록/빨강(현재 레벨·스탯 기준), 레벨 1 무기는 조건 없음
 
   html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
@@ -538,7 +565,7 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
   // 방어구에도 그대로 재사용 가능함(무기 전용 필드 미참조).
   html += tipUniqueWrap(weaponUniqueOptionTooltipHtml(type, lvl));
 
-  if(a.levelReq && a.levelReq > 1) html += wtipRow('레벨 제한 :', `레벨 ${a.levelReq} 이상`);
+  html += equipRequirementTooltipHtml(type, '레벨 제한 :');
 
   html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
@@ -745,7 +772,7 @@ function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
 
   html += tipUniqueWrap(weaponUniqueOptionTooltipHtml(type, lvl)); // wpn(type).uniqueOption만 참조하는 범용 함수라 그대로 재사용
 
-  if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
+  html += equipRequirementTooltipHtml(type, '착용 제한 :');
 
   html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
@@ -782,7 +809,7 @@ function buildSubTooltipHtml(type, level, damaged, currentDurability){
 
   html += tipUniqueWrap(subUniqueOptionTooltipHtml(type, lvl)); // 보조 아이템 전용: 고정 옵션 여러 개는 쉼표 기준 한 줄씩 출력(요청사항)
 
-  if(a.levelReq && a.levelReq > 1) html += wtipRow('착용 제한 :', `레벨 ${a.levelReq} 이상`);
+  html += equipRequirementTooltipHtml(type, '착용 제한 :');
 
   html += equipTooltipSellPriceHtml(type, lvl, currentDurability, damaged); // 최하단 판매 가격
 
@@ -1510,7 +1537,7 @@ function buildSkillTooltipHtml(id){
   // (저장하지 않으므로 한 번 만족했다고 영구 초록이 되지 않음). 이름/설명 등 다른 줄 색상은 건드리지 않음.
   // 이미 습득했거나 상위 스킬로 교체돼 습득 표시 중인 스킬은 조건을 모두 충족한 상태로 보고 전부 초록.
   const reqDone = isSkillDisplayedAsLearned(id);
-  const reqRow = (text, ok) => `<div style="color:${(reqDone || ok) ? 'var(--forge-green)' : 'var(--forge-blood)'};">${text}</div>`;
+  const reqRow = (text, ok) => requirementLineHtml(text, reqDone || ok); // 색상 규칙은 장비 툴팁과 공용(requirementLineHtml)
   if(s.levelReq != null) html += reqRow('LV' + s.levelReq, (state.playerLevel || 1) >= s.levelReq);
   // 스킬 업그레이드 요구사항 5-1번: upgradeFrom이 지정된 스킬만 레벨 제한 행 아래에 선행 스킬 습득 조건을
   // 한 줄 더 표시. upgradeFrom이 없는 스킬은 이 행이 아예 없으므로 기존 스킬들의 툴팁 출력은 그대로 유지됨.

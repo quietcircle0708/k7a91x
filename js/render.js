@@ -1487,7 +1487,7 @@ function buildCharCombatStatsHtml(){
     <div class="char-stat-row big"><span>방어도 무시</span>${charStatValueWithTip('defenseIgnore', ctx, '방어도 무시', defenseIgnoreText)}</div>
     <div class="char-stat-divider"></div>
     <div class="char-stat-row big"><span>총 방어도</span>${charStatValueWithTip('defense', ctx, '총 방어도', `${totalDef}`)}</div>
-    <div class="char-stat-row big"><span>회피</span>${charStatValueWithTip('evasion', ctx, '회피', `${effectivePlayerEvasion()}%`)}</div>
+    <div class="char-stat-row big"><span>회피</span>${charStatValueWithTip('evasion', ctx, '회피', `${Math.round(effectivePlayerEvasion() * 100) / 100}%`)}</div>
     <div class="char-stat-row big"><span>재생력</span>${charStatValueWithTip('regen', ctx, '재생력', `${effectivePlayerRegen()}`)}</div>
   `;
 }

@@ -21,7 +21,7 @@ function shopMenuIsMobile(){ return document.body.classList.contains('mobile-pre
 function shopMenuModeDef(){ return SHOP_MODES.find(m => m.id === shopMenuUI.mode) || SHOP_MODES[0]; }
 
 // ---- 데이터 → 행(row) ----
-// 행 공통 필드: key(목록 식별) / mode / cat(최상위 분류 id) / leaf(세부 분류 id) / name(검색 대상) / nameHtml·color / iconHtml·border·bg / tip(툴팁 HTML) /
+// 행 공통 필드: key(목록 식별) / mode / cat(최상위 분류 id) / leaf(세부 분류 id) / name(검색 대상·강조 대상)·namePre/nameSuf(강조하지 않는 앞/뒤 표시)·color / iconHtml·border·bg / tip(툴팁 HTML) /
 //   price(정렬·표시용 단가) / levelReq(정렬용, 없으면 null) / action·typeId(기존 구매·판매 팝업 호출용) / src·id(장비 인스턴스 판매용) / unavailable·tag
 function shopMenuLeafIds(top){ return top.subTabs ? top.subTabs.map(s => s.id) : [top.id]; }
 
@@ -29,6 +29,15 @@ function shopMenuLeafIds(top){ return top.subTabs ? top.subTabs.map(s => s.id) :
 function shopMenuConsumableLook(item){
   if(isScrollItem(item)){ const g = scrollGradeInfo(item); return { border: g ? g.color : 'var(--forge-line)', bg: '#242424', name: null }; }
   return { border: '#c13c3c', bg: '#2a1414', name: 'var(--forge-cream)' };
+}
+// 소비 아이템 이름 표시 조각: 비급은 앞에 굵은 보라색 "[비급]" + 등급 색 이름(consumableNameHtml과 동일한 표시), 그 외는 기본 이름.
+// 검색어 강조는 이름 본문(name)에만 적용하고 접두어/접미어(pre/suf)에는 적용하지 않음.
+function shopMenuConsumableNameParts(item){
+  if(isScrollItem(item)){
+    const g = scrollGradeInfo(item);
+    return { pre: `<span style="color:${WEAPON_GRADES.epic.color}; font-weight:700;">[비급]</span>`, color: g ? g.color : null };
+  }
+  return { pre: '', color: null };
 }
 // 구매 불가 사유(표시용 짧은 문구). 사유가 없으면 ''. 판정 자체는 기존 shopBuyMaxQty(골드·슬롯·보유 여부)를 그대로 사용함.
 function shopMenuBuyBlockedTag(action, typeId){
@@ -49,15 +58,15 @@ function shopMenuBuyRows(leaf){
   else if(leaf === 'artifact') base = shopEntriesForTab(leaf).map(e => ({ ...e, action: 'buy-artifact' }));
   return base.map(b => {
     const d = shopBuyItemDisplay(b.action, b.id); // 아이콘/툴팁은 구매 팝업과 같은 함수
-    let name, nameHtml, color, border = d.borderColor, bg = '#242424';
-    if(b.action === 'buy-weapon'){ name = wpn(b.id).name; color = weaponNameColor(b.id, 0); nameHtml = shopMenuEsc(name); }
-    else if(b.action === 'buy-artifact'){ name = ARTIFACTS[b.id].name; color = artifactNameColor(b.id); nameHtml = shopMenuEsc(name); border = color; }
+    let name, color, pre = '', border = d.borderColor, bg = '#242424';
+    if(b.action === 'buy-weapon'){ name = wpn(b.id).name; color = weaponNameColor(b.id, 0); }
+    else if(b.action === 'buy-artifact'){ name = ARTIFACTS[b.id].name; color = artifactNameColor(b.id); border = color; }
     else {
-      const item = CONSUMABLES[b.id]; const look = shopMenuConsumableLook(item);
-      name = item.name; nameHtml = consumableNameHtml(item); color = look.name; border = look.border; bg = look.bg;
+      const item = CONSUMABLES[b.id]; const look = shopMenuConsumableLook(item); const parts = shopMenuConsumableNameParts(item);
+      name = item.name; pre = parts.pre; color = parts.color || look.name; border = look.border; bg = look.bg;
     }
     const tag = shopMenuBuyBlockedTag(b.action, b.id);
-    return { key: `buy:${b.action}:${b.id}`, mode: 'buy', name, nameHtml, color, iconHtml: d.iconHtml, border, bg, tip: d.tooltipHtml,
+    return { key: `buy:${b.action}:${b.id}`, mode: 'buy', name, namePre: pre, nameSuf: '', color, iconHtml: d.iconHtml, border, bg, tip: d.tooltipHtml,
       price: b.price, levelReq: b.levelReq, action: b.action, typeId: b.id, unavailable: tag !== null, tag: tag || '' };
   });
 }
@@ -68,21 +77,21 @@ function shopMenuBuyRows(leaf){
 function shopMenuSellRows(leaf, ctx){
   const out = [];
   ctx.equip.filter(e => e.src === leaf && !e.locked).forEach(e => {
-    out.push({ key: `sell:equip:${e.src}:${e.id}`, mode: 'sell', name: e.name, nameHtml: e.nameHtml, color: null, iconHtml: e.iconHtml, border: e.borderColor, bg: '#242424',
+    out.push({ key: `sell:equip:${e.src}:${e.id}`, mode: 'sell', name: e.name, namePre: '', nameSuf: shopMenuEsc(`${e.item.damaged ? '(손상)' : ''}${e.item.level > 0 ? ' +' + e.item.level : ''}`), color: e.borderColor, iconHtml: e.iconHtml, border: e.borderColor, bg: '#242424',
       tip: e.tooltipHtml, price: e.price, levelReq: e.def.levelReq || 1, action: 'sell-equip', src: e.src, id: e.id, qty: null, unavailable: false, tag: '' });
   });
   if(leaf === 'consumable'){
     Object.values(CONSUMABLES).forEach(item => {
       const owned = (state.consumables && state.consumables[item.id]) || 0;
       if(owned <= 0 || item.sellPrice == null) return;
-      const d = shopBuyItemDisplay('sell-consumable', item.id); const look = shopMenuConsumableLook(item);
-      out.push({ key: `sell:sell-consumable:${item.id}`, mode: 'sell', name: item.name, nameHtml: consumableNameHtml(item), color: look.name, iconHtml: d.iconHtml, border: look.border, bg: look.bg,
+      const d = shopBuyItemDisplay('sell-consumable', item.id); const look = shopMenuConsumableLook(item); const parts = shopMenuConsumableNameParts(item);
+      out.push({ key: `sell:sell-consumable:${item.id}`, mode: 'sell', name: item.name, namePre: parts.pre, nameSuf: '', color: parts.color || look.name, iconHtml: d.iconHtml, border: look.border, bg: look.bg,
         tip: d.tooltipHtml, price: item.sellPrice, levelReq: null, action: 'sell-consumable', typeId: item.id, qty: owned, unavailable: false, tag: '' });
     });
   }
   Object.values(MISC_ITEMS).filter(m => m.itemClass === leaf && (state[m.stateKey] || 0) > 0).forEach(item => {
     const d = shopBuyItemDisplay('sell-misc', item.id);
-    out.push({ key: `sell:sell-misc:${item.id}`, mode: 'sell', name: item.name, nameHtml: shopMenuEsc(item.name), color: d.borderColor, iconHtml: d.iconHtml, border: d.borderColor, bg: '#242424',
+    out.push({ key: `sell:sell-misc:${item.id}`, mode: 'sell', name: item.name, namePre: '', nameSuf: '', color: d.borderColor, iconHtml: d.iconHtml, border: d.borderColor, bg: '#242424',
       tip: d.tooltipHtml, price: item.sellPrice, levelReq: null, action: 'sell-misc', typeId: item.id, qty: state[item.stateKey] || 0, unavailable: false, tag: '' });
   });
   return out;
@@ -126,6 +135,11 @@ function shopMenuSet(id, html){ // 내용이 같으면 다시 그리지 않음(�
   box.innerHTML = html;
   return true;
 }
+// 검색어와 일치하는 이름 글자 강조 — 도감/신버전 인벤토리 검색과 같은 함수(codexHighlightHtml, .codex-hl)를 그대로 사용.
+// 구매/판매 검색어는 모드별로 따로 저장되므로 그 행이 속한 모드(r.mode)의 검색어만 적용됨.
+function shopMenuHighlight(r){
+  return codexHighlightHtml(r.name, shopMenuUI.query[r.mode] || '');
+}
 function shopMenuRowHtml(r){
   shopMenuUI.tipByKey[r.key] = r.tip;
   shopMenuUI.rowByKey[r.key] = r;
@@ -136,7 +150,7 @@ function shopMenuRowHtml(r){
   const cls = r.unavailable ? ' unavailable' : '';
   return `<div class="shop-row${cls}" data-key="${shopMenuEsc(r.key)}" data-action="${r.action}" data-type="${shopMenuEsc(String(r.typeId != null ? r.typeId : r.id))}">`
     + `<span class="shop-row-icon" style="border-color:${r.border || 'var(--forge-line)'}; background:${r.bg};">${r.iconHtml}</span>`
-    + `<span class="shop-row-info"><span class="shop-row-name"><span class="shop-row-name-in"${nameStyle}>${r.nameHtml}${count}</span></span><span class="shop-row-price">${priceText}${tag}</span></span>`
+    + `<span class="shop-row-info"><span class="shop-row-name"><span class="shop-row-name-in"${nameStyle}>${r.namePre}${shopMenuHighlight(r)}${r.nameSuf}${count}</span></span><span class="shop-row-price">${priceText}${tag}</span></span>`
     + `</div>`;
 }
 function shopMenuQueryNorm(){ return (shopMenuUI.query[shopMenuUI.mode] || '').trim().toLowerCase(); }
