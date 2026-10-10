@@ -142,6 +142,39 @@
   </div>
 
   <div id="shopView" style="display:none;">
+    <!-- 새 상점 메뉴(shop_menu.js, SHOP_MENU_UI='new'): 구매/판매 탭 + 소유 골드 → 분류 탭 → 세부 분류 → 필터·검색 → 빠른 구매/판매 → 아이템 목록(이 영역만 세로 스크롤) -->
+    <div class="shop-new-wrap" id="shopNewWrap">
+      <div class="shop-title">떠돌이 상인의 좌판</div>
+      <div class="shop-fixed-top" id="shopFixedTop">
+        <div class="shop-mode-row">
+          <div class="shop-mode-tabs" id="shopModeTabs"></div>
+          <div class="inv-box-gold shop-gold" id="shopGold"></div>
+        </div>
+        <div class="shop-cat-tabs" id="shopCatTabs"></div>
+      </div>
+      <!-- 패널: 세부 분류 → 필터·검색 → 빠른 구매/판매는 고정, 아이템 목록(#shopListScroll)만 세로 스크롤 -->
+      <div class="inv-box-panel shop-panel">
+        <div class="shop-sub-tabs" id="shopSubTabs"></div>
+        <div class="shop-toolbar">
+          <div class="shop-sort-controls shop-new-sort">
+            <div class="shop-filter-wrap">
+              <button class="shop-filter-btn" id="shopNewFilterBtn">필터: <span id="shopNewFilterLabel">가격</span> ▾</button>
+              <div class="shop-filter-menu" id="shopNewFilterMenu" style="display:none;"></div>
+            </div>
+            <button class="shop-filter-btn" id="shopNewSortDirBtn">↑ 오름차순</button>
+          </div>
+          <div class="codex-search shop-search" id="shopSearch">
+            <input type="text" id="shopSearchInput" placeholder="클릭하여 검색..." autocomplete="off" autocapitalize="off" spellcheck="false">
+            <img src="assets/ui/icon_item_comparison.png" class="codex-search-icon" alt="" draggable="false">
+          </div>
+        </div>
+        <label class="shop-quick-check" id="shopQuickWrap"><input type="checkbox" id="shopQuickTrade"><span class="shop-quick-box" aria-hidden="true"></span><span class="shop-quick-label" id="shopQuickLabel">빠른 구매</span></label>
+        <div class="shop-listscroll" id="shopListScroll"><div class="shop-list" id="shopList"></div></div>
+      </div>
+    </div>
+
+    <!-- 예전 상점 UI(SHOP_MENU_UI='legacy'일 때만 표시) — 삭제하지 않고 보존함 -->
+    <div class="shop-legacy-wrap" id="shopLegacyWrap">
     <div class="shop-card">
       <div class="shop-head-row">
         <div>
@@ -173,6 +206,7 @@
       </div>
 
       <div id="shopItemsList"></div>
+    </div>
     </div>
   </div>
 
@@ -316,46 +350,7 @@
   </div>
 
   <div id="craftView" style="display:none;">
-    <!-- 예전 제작 메뉴(보존): CRAFT_MENU_UI가 'legacy'일 때만 표시됨. 새 메뉴(아래 .craft-new-wrap)와는 body.craft-ui-new 클래스로 전환되어 동시에 보이지 않음 -->
-    <div class="inv-card-wrap craft-legacy-wrap">
-      <div class="shop-title">제작소</div>
-      <div class="inv-tabs craft-tabs" id="craftTabs">
-        <button class="craft-tab-btn active" data-tab="craft">제작</button>
-      </div>
-      <div class="inv-subtabs craft-subtabs" id="craftSubTabs">
-        <button class="craft-subtab-btn active" data-tab="weapon">무기</button>
-        <button class="craft-subtab-btn" data-tab="armor">방어구</button>
-        <button class="craft-subtab-btn" data-tab="sub">보조</button>
-        <button class="craft-subtab-btn" data-tab="accessory">장신구</button>
-      </div>
-
-      <div class="inv-tab-panel" id="craftTabWeapon">
-        <div class="inv-count-row">
-          <div class="pager" id="craftWeaponPager"></div>
-        </div>
-        <div id="craftTabWeaponList"></div>
-      </div>
-      <div class="inv-tab-panel" id="craftTabArmor" style="display:none;">
-        <div class="inv-count-row">
-          <div class="pager" id="craftArmorPager"></div>
-        </div>
-        <div id="craftTabArmorList"></div>
-      </div>
-      <div class="inv-tab-panel" id="craftTabSub" style="display:none;">
-        <div class="inv-count-row">
-          <div class="pager" id="craftSubPager"></div>
-        </div>
-        <div id="craftTabSubList"></div>
-      </div>
-      <div class="inv-tab-panel" id="craftTabAccessory" style="display:none;">
-        <div class="inv-count-row">
-          <div class="pager" id="craftAccessoryPager"></div>
-        </div>
-        <div id="craftTabAccessoryList"></div>
-      </div>
-    </div>
-
-    <!-- 새 제작 메뉴(리메이크) — 내용은 craft_menu.js가 채움. 탭/세로 탭/검색/정렬/툴팁 스타일은 도감·신버전 인벤토리(.inv-box-*, .codex-*)를 재사용 -->
+    <!-- 제작소 메뉴 — 내용은 craft_menu.js가 채움. 탭/세로 탭/검색/정렬/툴팁 스타일은 도감·신버전 인벤토리(.inv-box-*, .codex-*)를 재사용 -->
     <div class="craft-new-wrap" id="craftNewWrap">
       <div class="shop-title">제작소</div>
       <div class="craft-cat-tabs" id="craftCatTabs"></div>
@@ -1129,6 +1124,7 @@
 <script src="js/codex.js"></script>
 <script src="js/codex_monster.js"></script>
 <script src="js/craft_menu.js"></script>
+<script src="js/shop_menu.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

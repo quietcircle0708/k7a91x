@@ -42,6 +42,8 @@ function requestSellQty(){
     setBuyQty(Math.min(qty, owned));
     return;
   }
+  // [빠른 판매]가 켜져 있으면 수량 입력을 마친 뒤 최종 판매 확인창만 생략하고, 같은 검증을 거치는 기존 판매 처리(performSellQty)로 바로 진행함.
+  if(state.settings && state.settings.shopQuickTrade){ performSellQty(); return; }
   const total = (item.sellPrice || 0) * qty;
   el('buyQtyModal').style.display = 'none';
   const sellLabel = (action === 'sell-consumable' && isScrollItem(item)) ? { html: `${consumableNameHtml(item)} ${qty}개` } : `${item.name} ${qty}개`;
@@ -63,7 +65,7 @@ function performSellQty(){
   if(action === 'sell-consumable') state.consumables[typeId] = owned - qty;
   else state[item.stateKey] = owned - qty;
   state.gold += total;
-  const anchor = document.querySelector(`#shopItemsList button[data-action="${action}"][data-type="${typeId}"]`);
+  const anchor = document.querySelector(`#shopList .shop-row[data-action="${action}"][data-type="${typeId}"]`) || document.querySelector(`#shopItemsList button[data-action="${action}"][data-type="${typeId}"]`); // 새 상점 행 / 예전 상점 버튼
   closeBuyQtyModal(); // 판매 수량창 상태 정리(확인창은 confirmSell이 이미 닫음)
   purchaseEffect(anchor);
   render(); saveState();

@@ -200,34 +200,6 @@ el('repairAllConfirmBtn').addEventListener('click', openRepairConfirmFromAll);
 // ---- 수리 탭: 최종 확인 팝업(요구사항 19~21번) ----
 el('repairConfirmCancelBtn').addEventListener('click', closeRepairConfirmPopup);
 el('repairConfirmProceedBtn').addEventListener('click', confirmRepairProceed);
-// ---- 제작소 탭 ----
-el('craftTabs').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-tab]');
-  if(!btn) return;
-  switchCraftTab(btn.dataset.tab);
-});
-el('craftSubTabs').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-tab]');
-  if(!btn) return;
-  switchCraftTab(btn.dataset.tab);
-});
-['craftWeaponPager', 'craftArmorPager', 'craftSubPager', 'craftAccessoryPager'].forEach(pagerId => {
-  el(pagerId).addEventListener('click', (e)=>{
-    const btn = e.target.closest('button[data-action]');
-    if(!btn) return;
-    if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
-    else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
-  });
-});
-// 제작 아이템 목록(4개 탭 패널) 공통 클릭 위임 — [제작 재료] 토글 / [제작] 버튼
-['craftTabWeaponList', 'craftTabArmorList', 'craftTabSubList', 'craftTabAccessoryList'].forEach(listId => {
-  el(listId).addEventListener('click', (e)=>{
-    const btn = e.target.closest('button[data-action]');
-    if(!btn) return;
-    if(btn.dataset.action === 'toggle-craft-mat-info') toggleCraftMaterialInfo(btn.dataset.category, btn.dataset.id);
-    else if(btn.dataset.action === 'open-craft-popup') openCraftPopup(btn.dataset.category, btn.dataset.id);
-  });
-});
 // ---- 제작 진행 팝업 ----
 el('craftPopupCancelBtn').addEventListener('click', closeCraftPopup);
 el('craftPopupSlots').addEventListener('click', (e)=>{

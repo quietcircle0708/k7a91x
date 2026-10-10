@@ -82,8 +82,7 @@ let invUI = { tab: 'weapon', equipTab: 'weapon' };
 // 제작소 탭 UI 상태. invUI/shopUI와 동일한 이유(화면 상태일 뿐 저장 대상 아님)로 별도 관리.
 // 지금은 최상위 탭이 "제작" 하나뿐이라 equipTab과 같은 "최상위 복귀용 기억" 필드는 아직 불필요하지만,
 // 추후 최상위 탭이 늘어나면 invUI/shopUI와 동일한 패턴(예: craftTopTab)을 그대로 추가하면 됨.
-let craftUI = { tab: 'weapon', openMaterialIds: new Set() }; // openMaterialIds: 목록의 [제작 재료] 토글이 열려있는 "category:id" 집합
-// 대장간 강화/수리 탭 UI 상태(내구도 시스템 15번 요구사항). shopUI/invUI/craftUI와 동일한 이유로
+// 대장간 강화/수리 탭 UI 상태(내구도 시스템 15번 요구사항). shopUI/invUI와 동일한 이유로
 // 화면 상태일 뿐 저장 대상 아님. "수리" 탭은 이번 작업에서는 안내 문구만 있는 빈 화면임(요구사항 15·16번).
 let forgeUI = { tab: 'enhance' };
 // ---- 수리 탭 팝업 상태(요구사항 2·3·9번) ----
@@ -141,7 +140,6 @@ let pageState = {
   huntInfoStats: 1,
   // 던전 우측 카드 [스킬] 탭 전용 페이지 상태(퀵슬롯 설정/스킬 목록) — 이번 작업과 무관, 그대로 유지.
   huntCharSkill: 1,
-  craftWeapon: 1, craftArmor: 1, craftSub: 1, craftAccessory: 1,
   // 공지사항(패치노트) 팝업 — 자동 표시든 대장간 버튼으로 수동으로 열든 항상 1페이지부터 시작(요구사항).
   patchNote: 1,
   // 던전 전투 종료 보상창 "획득 아이템" 그리드 — 보상창을 새로 열 때마다 항상 1페이지부터 시작.
@@ -237,6 +235,8 @@ function ensureSettingsDefaults(){
   }
   delete state.settings.desktopInventoryUi;
   delete state.settings.mobileInventoryUi;
+  // 상점 [빠른 구매/판매] 체크(구매·판매 탭 공통 하나의 설정). 저장 데이터에 없으면 꺼짐.
+  if(typeof state.settings.shopQuickTrade !== 'boolean') state.settings.shopQuickTrade = false;
   SETTINGS_SCHEMA.forEach(cat => {
     cat.items.forEach(item => {
       if(item.type === 'stepper-row'){

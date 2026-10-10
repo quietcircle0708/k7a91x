@@ -497,7 +497,7 @@ function renderAccessoryInventoryList(){
 }
 
 // ---- 대장간 강화/수리 탭 표시 갱신(내구도 시스템 15번 요구사항) ----
-// invUI/craftUI의 renderXxxTabs()와 동일한 구조. "수리" 탭은 이번 작업에서는 안내 문구만 있는 빈
+// invUI의 renderXxxTabs()와 동일한 구조. "수리" 탭은 이번 작업에서는 안내 문구만 있는 빈
 // 화면(forgeTabRepair)이라 별도 렌더링 함수 없이 표시/숨김만 전환함.
 function renderForgeTabs(){
   document.querySelectorAll('#forgeTabs .inv-tab-btn').forEach(btn => {
@@ -536,98 +536,6 @@ function renderInvTabs(){
   el('invTabConsumable').style.display = invUI.tab === 'consumable' ? 'block' : 'none';
   el('invTabStone').style.display = invUI.tab === 'stone' ? 'block' : 'none';
   el('invTabMisc').style.display = invUI.tab === 'misc' ? 'block' : 'none';
-}
-
-// ---- 제작소: 탭(제작 최상위+하위탭) 표시 상태 갱신 ----
-// renderInvTabs()와 동일한 구조. 지금은 최상위 탭이 "제작" 하나뿐이라 항상 active로 표시됨.
-function renderCraftTabs(){
-  if(!el('craftTabWeapon')) return; // 제작소 화면 DOM이 아직 없는 초기 타이밍 방어
-  const topId = topTabIdFor(CRAFT_TABS, craftUI.tab);
-  CRAFT_TABS.forEach(t => {
-    const btn = document.querySelector(`.craft-tab-btn[data-tab="${t.id}"]`);
-    if(btn) btn.classList.toggle('active', topId === t.id);
-  });
-  const craftTop = CRAFT_TABS.find(t => t.id === 'craft');
-  if(craftTop && craftTop.subTabs){
-    craftTop.subTabs.forEach(st => {
-      const btn = document.querySelector(`.craft-subtab-btn[data-tab="${st.id}"]`);
-      if(btn) btn.classList.toggle('active', craftUI.tab === st.id);
-    });
-  }
-  CRAFT_SUB_TABS.forEach(st => {
-    const panel = el('craftTab' + st.id.charAt(0).toUpperCase() + st.id.slice(1));
-    if(panel) panel.style.display = craftUI.tab === st.id ? 'block' : 'none';
-  });
-}
-// ---- 제작소: 소분류(무기/방어구/보조/장신구) 탭별 아이템 목록 ----
-// 이번 작업 범위는 UI 골격까지라 CRAFTABLE_ITEMS[kind]가 항상 빈 배열이므로 매번 빈 안내문만 표시됨.
-// 페이지네이션 자체는 인벤토리와 완전히 동일한 공용 시스템(pageCount/clampPage/pagerHtml/pageSlice)을
-// 그대로 사용해서 미리 붙여둠 — 나중에 CRAFTABLE_ITEMS에 실제 아이템이 채워지면(별도 작업) 이 함수의
-// 목록 렌더 부분만 채우면 되고, 탭 전환/페이지 이동 로직은 전혀 손댈 필요가 없음.
-function renderCraftList(kind){
-  const panelId = 'craftTab' + kind.charAt(0).toUpperCase() + kind.slice(1);
-  const wrap = el(panelId + 'List');
-  if(!wrap) return;
-  const pagerWrap = el('craft' + kind.charAt(0).toUpperCase() + kind.slice(1) + 'Pager');
-  // 제작소 목록 전용 정렬: 착용 제한 레벨이 낮은 순(craftItemLevelReq, formulas.js). 원본
-  // CRAFTABLE_ITEMS[kind] 배열 순서(선언 순서)는 그대로 두고, 화면에 쓸 복사본만 정렬함 — 다른 화면
-  // (인벤토리/상점 등)의 정렬에는 전혀 영향 없음.
-  const items = (CRAFTABLE_ITEMS[kind] || []).slice().sort((a, b) => craftItemLevelReq(a) - craftItemLevelReq(b));
-  if(items.length === 0){
-    wrap.innerHTML = `<div class="inv-empty">제작 가능한 아이템이 없습니다.<br>추후 업데이트를 통해 추가될 예정입니다.</div>`;
-    if(pagerWrap) pagerWrap.innerHTML = '';
-    return;
-  }
-  const pageKey = CRAFT_PAGE_KEY[kind];
-  const pageSize = PAGE_SIZE[pageKey];
-  const totalPageCount = pageCount(items.length, pageSize);
-  pageState[pageKey] = clampPage(pageState[pageKey], totalPageCount);
-  if(pagerWrap) pagerWrap.innerHTML = pagerHtml(pageKey, pageState[pageKey], totalPageCount);
-  const pageItems = pageSlice(items, pageState[pageKey], pageSize);
-  // 목록 행 자체는 인벤토리 장비 탭 카드(renderInventoryList)와 동일한 클래스(inv-card/inv-icon/
-  // inv-info/inv-name/inv-sub/inv-actions/inv-btn)를 그대로 재사용함 — 아이콘 크기, 등급 색상, 툴팁,
-  // 이름 표시 방식이 자동으로 인벤토리와 완전히 동일해짐(요청사항 1번). 버튼만 기존 장비 탭의 착용/판매
-  // 대신 제작소 전용 두 버튼(제작 재료/제작)으로 교체하되, 동일한 .inv-btn 크기·스타일을 그대로 씀.
-  wrap.innerHTML = pageItems.map(item => {
-    const color = craftItemNameColor(item);
-    const infoKey = kind + ':' + item.id;
-    const infoOpen = craftUI.openMaterialIds.has(infoKey);
-    const materialsHtml = item.materials.map(m => {
-      const resource = findCraftResource(m.name);
-      if(!resource) return '';
-      const owned = craftResourceOwnedCount(resource);
-      const shortCls = owned < m.need ? 'craft-mat-short' : 'craft-mat-ok';
-      const matColor = craftResourceColor(resource);
-      return `
-        <div class="craft-mat-info-item">
-          <div class="craft-mat-info-icon-col">
-            <span class="inv-icon craft-mat-info-icon weapon-name-wrap" style="border-color:${matColor};">
-              ${craftResourceIconHtml(resource, 'inv-icon-img')}
-              <span class="tooltip">${craftResourceTooltipHtml(resource)}</span>
-            </span>
-            <div class="craft-mat-info-name" style="color:${matColor};">${resource.def.name}</div>
-          </div>
-          <span class="${shortCls} craft-mat-info-count">${owned}/${m.need}</span>
-        </div>`;
-    }).join('');
-    return `
-      <div class="craft-item-row">
-        <div class="inv-card">
-          <div class="inv-icon" style="border-color:${color};">${craftItemIconHtml(item, 'inv-icon-img')}</div>
-          <div class="inv-info">
-            <span class="weapon-name-wrap">
-              <span class="inv-name" style="color:${color};">${item.name}</span>
-              <span class="tooltip">${craftItemTooltipHtml(item)}</span>
-            </span>
-          </div>
-          <div class="inv-actions">
-            <button class="inv-btn" data-action="toggle-craft-mat-info" data-category="${kind}" data-id="${item.id}">제작 재료</button>
-            <button class="inv-btn" data-action="open-craft-popup" data-category="${kind}" data-id="${item.id}">제작</button>
-          </div>
-        </div>
-        <div class="craft-mat-info-panel" style="display:${infoOpen ? 'flex' : 'none'};">${materialsHtml}</div>
-      </div>`;
-  }).join('');
 }
 
 // ---- 제작소: 제작 진행 팝업(요청사항 3~10번) ----
@@ -2668,6 +2576,8 @@ function renderDeathCurseBadge(){
 const SHOP_EMPTY_EQUIP_LABEL = { armor: '방어구', sub: '보조', accessory: '장신구' };
 
 function renderShopTab(){
+  // 새 상점 UI(shop_menu.js)가 켜져 있으면 그쪽이 상점 화면 전체를 그림. 아래의 예전 상점 UI 렌더 코드는 SHOP_MENU_UI='legacy'로 복구할 수 있게 보존함.
+  if(typeof SHOP_MENU_UI !== 'undefined' && SHOP_MENU_UI === 'new'){ if(typeof shopMenuRefresh === 'function') shopMenuRefresh(); return; }
   if(!el('shopItemsList')) return; // 상점 화면 DOM이 아직 없는 초기 타이밍 방어
 
   const topId = topTabIdFor(SHOP_TABS, shopUI.tab);

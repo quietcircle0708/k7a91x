@@ -2835,17 +2835,10 @@ const CRAFT_SUB_TABS = [
   { id: 'sub', label: '보조' },
   { id: 'accessory', label: '장신구' },
 ];
-// 상점(SHOP_TABS)/인벤토리(INVENTORY_TABS)와 동일한 구조(최상위 탭 배열 + "제작" 탭만 하위탭을 가짐).
-// 지금은 최상위 탭이 "제작" 하나뿐이지만, 추후 다른 최상위 메뉴(예: 분해 등)가 필요해지면 이 배열에
-// 항목만 추가하면 상점/인벤토리와 동일한 방식으로 자동 확장됨.
-const CRAFT_TABS = [
-  { id: 'craft', label: '제작', subTabs: CRAFT_SUB_TABS },
-];
-// 제작소 각 소분류 탭에 표시할 "제작 가능한 아이템" 목록. 이번 작업 범위는 UI 골격까지만이라 전부
-// 빈 배열로 시작함 — 이후 별도 작업에서 각 배열에 { id, name, ... , materials: [...] } 형태의 실제
-// 제작 아이템 데이터를 채우면, renderCraftList(render.js)가 이 배열들을 그대로 읽어 자동으로 표시함
-// (탭 UI 쪽은 추가 수정 불필요). 새 제작 분류가 추가되면 CRAFT_SUB_TABS에 탭을 추가하고 여기에 같은
-// id로 빈 배열을 하나 더 추가하기만 하면 됨.
+// 제작소 각 분류에 표시할 "제작 가능한 아이템" 목록. 각 배열에 { id, name, ... , materials: [...] } 형태의 실제
+// 제작 아이템 데이터를 채우면 제작소 메뉴(craft_menu.js)가 이 배열들을 그대로 읽어 가로 분류 탭/세로 세부 분류/목록에
+// 자동으로 표시함(제작 아이템이 있는 분류만 탭으로 나타남). 새 제작 분류가 추가되면 CRAFT_SUB_TABS에 분류를 추가하고
+// 여기에 같은 id로 빈 배열을 하나 더 추가하고, 세부 종류 조회가 필요하면 formulas.js CRAFT_KIND_SOURCES에 대응시키면 됨.
 const CRAFTABLE_ITEMS = {
   weapon: [],
   armor: [],
@@ -3115,16 +3108,6 @@ const CRAFT_ANIM_STAGE_TEXT = [
   { max: 100, text: '마지막 공정을 준비 중...' },
 ];
 
-// 제작소 메뉴 UI 선택(제작 버튼을 누르기 전의 메뉴 화면만 해당 — 제작 팝업/연출/결과 등 이후 과정은 어느 쪽이든 동일).
-// 'new'    = 리메이크한 새 메뉴(craft_menu.js: 가로 분류 탭 + 세로 세부 분류 + 검색/정렬 + 고정 하단 제작 영역)
-// 'legacy' = 예전 메뉴(index.html .craft-legacy-wrap + render.js renderCraftTabs/renderCraftList). 코드는 그대로 보존돼 있으며
-//            이 값을 'legacy'로 바꾸기만 하면 예전 메뉴로 복구됨(두 UI는 동시에 표시되지 않음, body.craft-ui-new 클래스로 전환).
-const CRAFT_MENU_UI = 'new';
-
-const CRAFT_PAGE_KEY = {
-  weapon: 'craftWeapon', armor: 'craftArmor', sub: 'craftSub', accessory: 'craftAccessory',
-};
-
 // ---- 상점/인벤토리 "장비" 탭 공용 하위 분류 ----
 // 무기/방어구/장신구/아티팩트 4종. 인벤토리·상점 양쪽의 "장비" 최상위 탭이 이 배열을 그대로 공유해서
 // 하위탭을 만듦 — 새 장비 소분류가 필요해지면 여기에 항목만 추가하면 양쪽 화면에 자동으로 반영됨.
@@ -3148,6 +3131,17 @@ const SHOP_TABS = [
   { id: 'consumable', label: '소비' },
   { id: 'stone', label: '마석' },
   { id: 'misc', label: '기타' },
+];
+
+// ---- 상점 메뉴 UI 전환 플래그 + 구매/판매 모드 ----
+// SHOP_MENU_UI: 'new' = 새 상점 UI(shop_menu.js — 구매/판매 탭·분류 탭·세부 분류·필터/검색·빠른 구매/판매·세로 스크롤 목록),
+//               'legacy' = 예전 상점 UI(카드 목록 + 페이지네이션, render.js renderShopTab 이하 / main.js 상점 리스너 / index.html .shop-legacy-wrap).
+// 새 UI 확정 전까지 예전 UI 코드는 삭제하지 않고 그대로 보존함 — 이 값만 'legacy'로 바꾸면 예전 UI로 복구됨.
+const SHOP_MENU_UI = 'new';
+// 새 상점 메뉴의 최상위 모드 탭(왼쪽부터 순서대로 표시). 실제로 어떤 아이템이 어느 모드에 뜨는지는 shop_menu.js가 데이터로 판별함.
+const SHOP_MODES = [
+  { id: 'buy', label: '구매', quickLabel: '빠른 구매' },
+  { id: 'sell', label: '판매', quickLabel: '빠른 판매' },
 ];
 
 // ---- 인벤토리 탭 분류 ----
@@ -3284,10 +3278,6 @@ const PAGE_SIZE = {
   shopArtifact: 6,       // 상점 아티팩트 탭
   dungeonList: 3,        // 던전 입구
   dungeonDrop: 11,       // 던전 카드 "획득 가능 아이템 안내" 아이콘 목록(13개 이상인 던전만 적용)
-  craftWeapon: 12,       // 제작소 "제작 > 무기" 탭(요청사항: 페이지당 12개)
-  craftArmor: 12,        // 제작소 "제작 > 방어구" 탭
-  craftSub: 12,          // 제작소 "제작 > 보조" 탭
-  craftAccessory: 12,    // 제작소 "제작 > 장신구" 탭
   killRewardItems: 15,   // 던전 전투 종료 보상창 "획득 아이템" 그리드(5열×3행)
 };
 // 상점 탭 id → PAGE_SIZE/페이지 상태 키 매핑. 페이지네이션 미적용 탭(stone/misc)은 여기 없음.

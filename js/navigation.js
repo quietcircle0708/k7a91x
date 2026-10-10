@@ -35,9 +35,8 @@ function showView(name){
     statAllocActive = { str: false, agi: false, int: false };
   }
   if(currentView === 'craft' && name !== 'craft'){
-    // 제작소를 벗어나면 [제작 재료] 토글 안내를 전부 닫고(요청사항 1번), 제작 진행 팝업 관련 상태도
-    // 함께 정리함(팝업이 열린 채로 화면을 벗어나는 경로는 없지만, 혹시 모를 상태 잔류를 방지).
-    craftUI.openMaterialIds = new Set();
+    // 제작소를 벗어나면 제작 진행 팝업 관련 상태를 정리함(팝업이 열린 채로 화면을 벗어나는 경로는 없지만,
+    // 혹시 모를 상태 잔류를 방지).
     craftPopup = null;
     if(craftAnim){
       restoreHeldCraftEquip(); // 이탈로 중단되는 경우 홀딩 장비를 잃지 않도록 되돌림
@@ -88,10 +87,9 @@ function showView(name){
   if(name === 'collection') codexOpen(); // 도감: 진입할 때마다 현재 장비 데이터로 목록을 새로 구성
   if(name === 'hunt') renderHunt();
   alignHuntHeader();
-  if(name === 'craft'){
-    if(CRAFT_MENU_UI === 'new') craftMenuOpen(); // 새 제작 메뉴(craft_menu.js). 'legacy'면 예전 메뉴를 그대로 그림
-    else { renderCraftTabs(); renderCraftList(craftUI.tab); }
-  }
+  if(name === 'craft') craftMenuOpen(); // 제작소 메뉴(craft_menu.js)
+  if(name === 'shop' && SHOP_MENU_UI === 'new') shopMenuOpen(); // 상점 새 메뉴(shop_menu.js): 진입할 때마다 목록을 현재 데이터로 새로 구성
+  if(name !== 'shop' && typeof shopMenuSearchReset === 'function') shopMenuSearchReset(); // 상점을 나가면 구매/판매 검색어 초기화(인벤토리 검색과 동일)
   if(name !== 'craft' && typeof craftMenuSearchReset === 'function') craftMenuSearchReset(); // 제작소를 나가면 검색어/결과 초기화(인벤토리 검색과 동일)
   if(name === 'character'){
     // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
@@ -187,16 +185,6 @@ function switchInvTab(tabId){
 }
 
 // ---- 제작소 "제작" 탭 소분류 전환 ----
-// switchInvTab/switchShopTab과 동일한 구조. 지금은 최상위 탭이 "제작" 하나뿐이라 top.subTabs 분기
-// (최상위 탭 클릭)은 항상 첫 하위탭으로 이동하지만, 나중에 CRAFT_TABS에 최상위 탭이 늘어나면
-// invUI.equipTab과 동일한 "마지막 하위탭 기억" 패턴을 그대로 추가하면 됨.
-function switchCraftTab(tabId){
-  const top = CRAFT_TABS.find(t => t.id === tabId);
-  craftUI.tab = (top && top.subTabs) ? top.subTabs[0].id : tabId;
-  renderCraftTabs();
-  renderCraftList(craftUI.tab);
-}
-
 // ---- 대장간 강화/수리 탭 전환(내구도 시스템 15번 요구사항) ----
 // "강화" 탭은 기존 화면을 그대로 보여주고, "수리" 탭은 장비창을 재사용한 실제 수리 기능 화면임.
 function switchForgeTab(tabId){
@@ -390,15 +378,6 @@ function proceedRestoreConfirm(){
 function closeRestoreResult(){
   restoreResult = null;
   el('restoreResultModal').style.display = 'none';
-}
-
-// ---- 제작소: [제작 재료] 안내 토글(요청사항 1~2번) ----
-// 아이템별로 독립적으로 켜고 끌 수 있게 "category:id" 키의 Set으로 관리. 다시 클릭하면 숨김(토글).
-function toggleCraftMaterialInfo(category, itemId){
-  const key = category + ':' + itemId;
-  if(craftUI.openMaterialIds.has(key)) craftUI.openMaterialIds.delete(key);
-  else craftUI.openMaterialIds.add(key);
-  renderCraftList(category);
 }
 
 // ---- 제작소: 제작 진행 팝업(요청사항 3번) ----
@@ -689,10 +668,6 @@ const PAGE_RENDER_FN = {
   // 탭 2페이지가 공용 state로 함께 쓰므로, 페이지를 넘기면 둘 다 갱신함(둘 중 실제 존재하는 쪽만 반영됨).
   skillPage: () => { renderCharacterMenu(); renderHuntSidePanel(); },
   huntCharSkill: renderHuntSidePanel,
-  craftWeapon: () => renderCraftList('weapon'),
-  craftArmor: () => renderCraftList('armor'),
-  craftSub: () => renderCraftList('sub'),
-  craftAccessory: () => renderCraftList('accessory'),
   patchNote: renderPatchNote,
   killRewardItems: renderKillRewardItemSection,
 };

@@ -408,48 +408,6 @@
     border-radius:6px; padding:5px 4px; font-size:11px; font-weight:600; cursor:pointer;
   }
   .inv-subtab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
-  /* 제작소 탭 버튼 — 인벤토리 탭(.inv-tab-btn/.inv-subtab-btn)과 완전히 동일한 스타일을 그대로 대응시키되,
-     클래스를 분리함(render.js의 renderInvTabs/renderCraftTabs가 각각 document.querySelector로 전역
-     조회하는데, 인벤토리·제작소 하위탭 id가 weapon/armor/sub/accessory로 겹치므로 같은 클래스를 쓰면
-     서로 다른 화면의 버튼을 잘못 짚을 수 있어 클래스 자체를 나눠 충돌을 피함). 시각적으로는 인벤토리와
-     동일하게 보이도록 스타일 값만 그대로 복사함. */
-  .craft-tabs{ display:flex; gap:8px; margin-bottom:14px; }
-  .craft-tab-btn{
-    flex:1; background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream-dim);
-    border-radius:8px; padding:8px 4px; font-size:12px; font-weight:700; cursor:pointer;
-  }
-  .craft-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
-  .craft-subtabs{ display:flex; gap:6px; margin:-6px 0 14px; flex-wrap:wrap; }
-  .craft-subtab-btn{
-    flex:1; background:transparent; border:1px solid var(--forge-line); color: var(--forge-cream-dim);
-    border-radius:6px; padding:5px 4px; font-size:11px; font-weight:600; cursor:pointer;
-  }
-  .craft-subtab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
-
-  /* ---- 제작소: 제작 아이템 목록 행(요청사항 1번) ----
-     목록 카드 자체(.inv-card/.inv-icon/.inv-info/.inv-name/.inv-actions/.inv-btn)는 인벤토리 장비 탭과
-     완전히 동일한 클래스를 그대로 재사용(render.js 참고) — 여기서는 그 아래 붙는 [제작 재료] 안내
-     패널만 이 화면 전용으로 스타일링함. */
-  .craft-item-row{ margin-bottom:10px; }
-  .craft-item-row .inv-card{ margin-bottom:0; }
-  /* 숨김 상태에서는 높이에 전혀 영향을 주지 않다가([제작 재료] 안 눌렀을 때 기존 슬롯과 동일 높이 유지),
-     펼쳤을 때만 아래로 확장됨(요청사항 "UI 크기" 항목) — display:none/flex 전환만으로 처리. */
-  .craft-mat-info-panel{
-    flex-wrap:wrap; gap:16px; margin-top:0; padding:10px 14px; background: var(--forge-panel-2);
-    border:1px solid var(--forge-line); border-top:none; border-radius:0 0 12px 12px;
-    justify-content:center; /* 요청사항 4: 재료 안내 UI 내용을 패널 중앙으로 출력 */
-  }
-  /* 아이콘 컬럼(아이콘+이름)을 먼저 중앙정렬로 묶고, 개수는 그 옆에 별도로 붙여서
-     "이름이 개수 폭까지 포함한 전체 폭"이 아니라 "아이콘 폭"에 정확히 맞춰 중앙정렬되게 함
-     (요청사항 4: 아이템 이름이 아이콘 중앙으로 오도록). */
-  .craft-mat-info-item{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
-  .craft-mat-info-icon-col{ display:flex; flex-direction:column; align-items:center; gap:4px; width:56px; }
-  .craft-mat-info-count{ font-family:'JetBrains Mono', monospace; font-size:12px; }
-  .craft-mat-info-icon{ width:30px; height:30px; }
-  .craft-mat-info-name{ font-size:11px; font-weight:700; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
-  .craft-mat-short{ color:#ff6a6a; font-weight:700; }
-  .craft-mat-ok{ color: var(--forge-cream-dim); font-weight:700; }
-
   /* ---- 제작소: 제작 진행 팝업(요청사항 3~10번) ---- */
   .craft-popup-box{ width:340px; }
   .craft-popup-name{ text-align:center; margin-bottom:14px; position:relative; }
@@ -1857,16 +1815,12 @@
 
 /* ============================================================
    제작소 새 메뉴 UI (craft_menu.js) — 도감/신버전 인벤토리 스타일(.inv-box-tab, .inv-box-panel, .codex-vtab, .codex-search, .inv-sort-select)을 재사용.
-   예전 메뉴(.craft-legacy-wrap)와는 body.craft-ui-new 클래스(CRAFT_MENU_UI)로 전환되어 동시에 표시되지 않음.
    ============================================================ */
 #craftView{ --craft-list-h: 290px; --craft-mat-h: 134px; } /* --craft-mat-h: 재료 영역 최대 높이 = 2줄이 스크롤 없이 딱 들어가는 높이(아이콘 42 + 수량줄 + 여백) */
 .craft-new-wrap{
-  display:none;
   background: linear-gradient(180deg, var(--forge-panel) 0%, var(--forge-panel-2) 100%);
   border:1px solid var(--forge-line); border-radius:18px; padding:22px 20px;
 }
-body.craft-ui-new #craftView .craft-legacy-wrap{ display:none; }
-body.craft-ui-new #craftView .craft-new-wrap{ display:block; }
 
 /* 가로 분류 탭: 한 줄, 넘치면 가로 스크롤. (스크롤 컨테이너가 활성 탭의 아래 1px 겹침을 자르지 않도록 같은 크기만큼 안쪽 여백+음수 마진) */
 .craft-cat-tabs{
@@ -1967,3 +1921,100 @@ body.mobile-preset .craft-mat-box{ --craft-mat-pad:4px; --craft-mat-h:108px; } /
 body.mobile-preset .craft-mat-cell{ width:30px; }
 body.mobile-preset .craft-mat-icon{ zoom:.72; }
 body.mobile-preset .craft-mat-cell .craft-slot-qty-ok, body.mobile-preset .craft-mat-cell .craft-slot-qty-short{ font-size:9.5px; }
+
+
+/* ============================================================
+   상점 새 메뉴 UI (shop_menu.js) — 신버전 인벤토리/도감/제작소 스타일(.inv-box-tab, .inv-box-panel, .inv-box-gold, .codex-search)을 재사용.
+   SHOP_MENU_UI='new'일 때만 body.shop-ui-new가 붙어 새 UI가 보이고 예전 상점 UI(.shop-legacy-wrap)는 숨겨짐(삭제하지 않고 보존).
+   ============================================================ */
+#shopView .shop-new-wrap{ display:none; }
+body.shop-ui-new #shopView .shop-new-wrap{ display:block; }
+body.shop-ui-new #shopView .shop-legacy-wrap{ display:none; }
+#shopView{ --shop-list-h: 360px; }
+.shop-new-wrap{
+  background: linear-gradient(180deg, var(--forge-panel) 0%, var(--forge-panel-2) 100%);
+  border:1px solid var(--forge-line); border-radius:18px; padding:22px 20px;
+}
+.shop-fixed-top{ margin-top:10px; }
+/* 구매/판매 탭(왼쪽부터) + 오른쪽 소유 골드(신버전 인벤토리 .inv-box-gold 서식 그대로) */
+.shop-mode-row{ display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
+.shop-mode-tabs{ display:flex; gap:4px; align-items:flex-end; }
+.shop-mode-tab{
+  background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+  border-radius:8px; padding:7px 22px; font-size:14px; font-weight:800; cursor:pointer; font-family:inherit;
+}
+.shop-mode-tab:hover{ color: var(--forge-cream); }
+.shop-mode-tab.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
+.shop-gold{ flex:none; padding-bottom:6px; white-space:nowrap; }
+/* 분류 탭: 왼쪽부터, 한 줄, 넘치면 가로 스크롤(활성 탭이 아래 패널과 이어지도록 craft-cat-tabs와 같은 방식) */
+.shop-cat-tabs{
+  display:flex; gap:4px; margin-top:10px; margin-bottom:-1px; padding-bottom:1px; align-items:flex-end;
+  position:relative; z-index:1; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin;
+}
+.shop-cat-tabs .inv-box-tab{ flex:0 0 auto; min-width:76px; padding-left:14px; padding-right:14px; white-space:nowrap; }
+.shop-panel{ padding-bottom:12px; }
+/* 세부 분류 탭 */
+.shop-sub-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.shop-sub-tab{
+  background:#14100b; border:1px solid var(--forge-line); color: var(--forge-cream-dim);
+  border-radius:6px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;
+}
+.shop-sub-tab:hover{ color: var(--forge-cream); border-color: var(--forge-cream-dim); }
+.shop-sub-tab.active{ background:#352b1d; border-color: var(--forge-gold); color: var(--forge-gold); }
+/* 필터(왼쪽) / 검색(오른쪽) */
+.shop-toolbar{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px 8px; padding-bottom:6px; }
+.shop-new-sort .shop-filter-menu{ left:0; right:auto; }
+.shop-search{ margin-left:auto; flex:0 1 170px; min-width:120px; }
+/* 빠른 구매/판매: 어두운 직각 체크박스 + 작은 글씨 */
+.shop-quick-check{ display:inline-flex; align-items:center; gap:6px; margin:0 0 8px; font-size:11.5px; color: var(--forge-cream-dim); cursor:pointer; user-select:none; }
+.shop-quick-check input{ position:absolute; opacity:0; width:0; height:0; margin:0; }
+.shop-quick-box{ position:relative; flex:none; width:14px; height:14px; box-sizing:border-box; background:#14100b; border:1px solid #5d4c31; border-radius:3px; }
+.shop-quick-check:hover .shop-quick-box{ border-color: var(--forge-gold); }
+.shop-quick-check input:checked + .shop-quick-box{ background:#2c2415; border-color: var(--forge-gold); }
+.shop-quick-check input:checked + .shop-quick-box::after{ content:''; position:absolute; left:3.5px; top:0; width:3px; height:7px; border:solid var(--forge-gold); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.shop-quick-check input:focus-visible + .shop-quick-box{ outline:1px solid var(--forge-gold); outline-offset:1px; }
+.shop-quick-label{ font-size:11.5px; line-height:1; }
+/* 아이템 목록: 이 영역만 세로 스크롤(위쪽 탭/필터/검색/빠른 구매는 고정) */
+.shop-listscroll{ position:relative; height:var(--shop-list-h); overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; }
+.shop-list{ display:flex; flex-direction:column; gap:6px; }
+/* 한 줄: 왼쪽 아이콘 칸 + 오른쪽 이름(위)/가격(아래) — 둘의 높이는 항상 같음(아이콘 칸이 오른쪽 높이만큼 늘어남). 이름·가격은 왼쪽 정렬 */
+.shop-row{ position:relative; display:flex; align-items:stretch; gap:6px; }
+.shop-row-icon{
+  position:relative; flex:0 0 56px; min-height:56px; box-sizing:border-box; border:1px solid var(--forge-line); border-radius:9px;
+  display:flex; align-items:center; justify-content:center; font-size:24px;
+}
+.shop-row-icon .shop-icon-img, .shop-row-icon .inv-icon-img{ width:38px; height:38px; }
+.shop-row-info{
+  flex:1; min-width:0; display:flex; flex-direction:column; box-sizing:border-box; cursor:pointer;
+  background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:8px; overflow:hidden;
+}
+.shop-row-info:hover{ border-color: var(--forge-gold); }
+.shop-row-name{ flex:1 1 auto; display:flex; align-items:center; justify-content:flex-start; text-align:left; padding:5px 10px 4px; box-sizing:border-box; min-height:28px; }
+.shop-row-name-in{ display:block; font-size:13px; font-weight:700; line-height:1.3; word-break:keep-all; overflow-wrap:anywhere; color: var(--forge-cream); }
+.shop-row-count{ color: var(--forge-cream-dim); font-weight:600; font-size:12px; }
+.shop-row-price{
+  flex:0 0 auto; display:flex; align-items:center; justify-content:flex-start; gap:4px; text-align:left; box-sizing:border-box; min-height:26px; padding:4px 10px 5px;
+  border-top:1px solid var(--forge-line); font-size:12.5px; font-weight:700; color: var(--forge-gold);
+}
+.shop-row-price .ui-icon-inline{ margin:0; flex:0 0 auto; }
+.shop-row-unit{ font-size:11px; font-weight:600; color: var(--forge-cream-dim); }
+.shop-row-tag{ margin-left:auto; padding-left:8px; font-size:11px; font-weight:600; color: var(--forge-cream-dim); white-space:nowrap; }
+.shop-row.unavailable{ opacity:.5; }
+.shop-row.unavailable .shop-row-info{ cursor:not-allowed; }
+.shop-row.unavailable .shop-row-info:hover{ border-color: var(--forge-line); }
+.shop-row.purchase-flash .shop-row-info{ border-color: var(--forge-gold); }
+@media (min-height:900px){ #shopView{ --shop-list-h: 440px; } }
+/* 모바일 화면 프리셋 전용 — 데스크톱 프리셋에는 영향 없음 */
+body.mobile-preset .shop-new-wrap{ padding:16px 12px; }
+body.mobile-preset .shop-mode-tab{ padding:6px 16px; font-size:13px; }
+body.mobile-preset .shop-gold{ font-size:12px; }
+body.mobile-preset .shop-search{ flex:1 1 110px; min-width:100px; }
+body.mobile-preset .shop-panel{ padding:8px 8px 10px; }
+body.mobile-preset .shop-listscroll{ scrollbar-gutter:auto; scrollbar-width:thin; }
+body.mobile-preset .shop-row{ gap:5px; }
+body.mobile-preset .shop-row-icon{ flex-basis:50px; min-height:50px; }
+body.mobile-preset .shop-row-icon .shop-icon-img, body.mobile-preset .shop-row-icon .inv-icon-img{ width:34px; height:34px; }
+body.mobile-preset .shop-row-name{ padding:4px 8px 3px; }
+body.mobile-preset .shop-row-name-in{ font-size:clamp(11.5px, 3.3vw, 13px); }
+body.mobile-preset .shop-row-price{ padding:3px 8px 4px; font-size:clamp(11px, 3.1vw, 12.5px); }
+body.mobile-preset .shop-row-tag{ font-size:10px; }

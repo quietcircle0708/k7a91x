@@ -1,8 +1,7 @@
 // ============================================================
 // 제작소 새 메뉴 UI (리메이크) — 제작 버튼을 누르기 전의 메뉴 화면과 그 안의 상호작용만 담당함.
 // [제작] 버튼을 누르면 예전과 똑같이 openCraftPopup(category, itemId)(navigation.js)로 넘어가며, 그 이후의 제작 팝업/재료 장비 선택/
-// 확인/연출/결과/재료 소모/지급/저장은 전혀 건드리지 않음. 예전 메뉴(render.js renderCraftList 등)는 그대로 보존돼 있고
-// data.js의 CRAFT_MENU_UI 값('new'/'legacy')으로 전환함.
+// 확인/연출/결과/재료 소모/지급/저장은 전혀 건드리지 않음.
 //
 // 구조: 제목 → 가로 분류 탭(CRAFT_SUB_TABS 중 제작 아이템이 있는 분류) → [왼쪽 세로 탭 | 필터·검색 + 제작 아이템 목록(스크롤)] →
 //       고정 하단(선택 아이템 / 필요 재료[내부 스크롤] / 천장 영역 / 제작 확률 / 제작 버튼).
@@ -204,7 +203,7 @@ function craftMenuOpen(){
 }
 // render()가 불릴 때마다(재료/골드가 바뀐 경우 등) 호출 — 제작소 화면이 아니면 아무것도 안 함. 바뀐 부분만 다시 그림.
 function craftMenuRefresh(){
-  if(currentView !== 'craft' || CRAFT_MENU_UI !== 'new') return;
+  if(currentView !== 'craft') return;
   craftMenuUI.entries = craftMenuBuildEntries();
   craftMenuNormalize();
   craftMenuRender();
@@ -291,7 +290,6 @@ function craftMenuShowTip(rowKey, tipKey){
 }
 
 (function craftMenuInit(){
-  document.body.classList.toggle('craft-ui-new', CRAFT_MENU_UI === 'new'); // 새 메뉴/예전 메뉴 중 하나만 표시(css)
   const wrap = el('craftNewWrap');
   if(!wrap) return;
 
