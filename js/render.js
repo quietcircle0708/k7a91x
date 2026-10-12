@@ -190,6 +190,9 @@ function render(){
     el('openCraftBtn').disabled = false;
     el('openCollectionBtn').disabled = false;
   }
+
+  // 새 강화 탭 UI(forge_menu.js) 갱신 — 기존 강화 화면 계산이 끝난 뒤 같은 state로 그림(강화 화면일 때만 동작)
+  if(typeof forgeEnhNewRefresh === 'function') forgeEnhNewRefresh();
 }
 
 // ---- 대장간 "강화 장비 선택" 팝업 ----
@@ -505,6 +508,7 @@ function renderForgeTabs(){
   });
   el('forgeTabEnhance').style.display = forgeUI.tab === 'enhance' ? '' : 'none';
   el('forgeTabRepair').style.display = forgeUI.tab === 'repair' ? '' : 'none';
+  document.body.classList.toggle('forge-tab-enhance', forgeUI.tab === 'enhance'); // 새 강화 UI에서만 기록부를 숨기기 위한 표시(수리 탭에서는 기록부가 그대로 보임)
   if(forgeUI.tab === 'repair') renderRepairTab();
 }
 

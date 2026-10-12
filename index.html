@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=332">
 </head>
 <body>
 <div class="wrap">
@@ -59,6 +59,37 @@
       </div>
 
       <div id="forgeTabEnhance">
+      <!-- 새 강화 탭 UI(forge_menu.js, FORGE_ENHANCE_UI='new'). 강화 판정/비용/확률/기도 로직은 전부 기존 함수(startEnhance, toggleBlessing, toggleFocus,
+           displayEnhanceOdds, enhanceCostBreakdown ...)를 그대로 호출하고 여기서는 표시와 조작만 함. -->
+      <div class="fe-wrap" id="forgeEnhNew">
+        <div class="fe-tri" id="feTri">
+          <svg class="fe-tri-lines" viewBox="0 0 240 150" aria-hidden="true">
+            <line x1="40" y1="22" x2="200" y2="22"/><line x1="40" y1="22" x2="120" y2="128"/><line x1="200" y1="22" x2="120" y2="128"/>
+          </svg>
+          <button class="fe-slot fe-prayer fe-prayer-left" id="fePrayerBlessing" title="보호의 기도"><img src="assets/ui/prayer_blessing.svg" class="fe-prayer-img" alt="보호의 기도"><span class="tooltip" id="fePrayerBlessingTip"></span></button>
+          <button class="fe-slot fe-prayer fe-prayer-right" id="fePrayerFocus" title="집중의 기도"><img src="assets/ui/prayer_focus.svg" class="fe-prayer-img" alt="집중의 기도"><span class="tooltip" id="fePrayerFocusTip"></span></button>
+          <div class="fe-slot fe-item" id="feItemSlot" title="강화 장비 선택"></div>
+          <button class="fe-slot fe-catalyst" id="feCatalystSlot" title="촉매(추후 업데이트)">+</button>
+        </div>
+        <div class="fe-detail" id="feDetail">
+          <div class="fe-name" id="feName"></div>
+          <div class="fe-grade" id="feGrade"></div>
+          <div class="fe-hint" id="feHint">더블 클릭으로 선택 해제</div>
+          <div class="fe-divider"></div>
+          <div class="fe-lv-arrow" id="feLvArrow"></div>
+          <div class="fe-grow" id="feGrow"></div>
+          <div class="fe-card fe-odds" id="feOdds"></div>
+          <div class="fe-card fe-cost" id="feCost"></div>
+        </div>
+        <div class="fe-skip-row"><button class="skip-toggle" id="feSkipBtn">⏭ 연출 스킵: 꺼짐</button></div>
+        <div class="fe-btn-row">
+          <button class="fe-inv-btn" id="feInvBtn" title="인벤토리"><img src="assets/ui/icon_menu_inventory.png" alt="인벤토리" draggable="false"></button>
+          <button class="fe-enhance-btn" id="feEnhanceBtn">강화 진행</button>
+        </div>
+        <div class="fe-sell" id="feSell"></div>
+      </div>
+      <!-- 예전 강화 탭 UI(FORGE_ENHANCE_UI='legacy'일 때만 표시) — 나중에 삭제할 수 있도록 그대로 보존. render()가 계속 이 요소들을 갱신하므로 숨겨져 있어도 기존 코드가 안전하게 동작함 -->
+      <div class="fe-legacy-wrap" id="forgeEnhLegacy">
       <div id="emptyNotice" class="empty-notice" style="display:none;">
         선택된 강화 대상 장비가 없습니다.<br>대장간 버튼(🔨)에서 강화할 장비를 선택하세요.
         <br>
@@ -112,6 +143,7 @@
       </div>
 
       <button class="btn btn-sell" id="sellBtn">아이템 판매</button>
+      </div><!-- /#forgeEnhLegacy -->
       </div>
 
       <div id="forgeTabRepair" style="display:none;">
@@ -527,8 +559,8 @@
       <div class="modal-title">전투 중단 확인</div>
       <div class="modal-body">이동하면 현재 진행 중인 전투를 포기하게 됩니다!!</div>
       <div class="modal-actions">
-        <button class="nav-btn" id="leaveConfirmStopBtn">전투 중단</button>
-        <button class="btn btn-main" id="leaveConfirmContinueBtn" style="width:auto; padding:10px 18px;">탐험 계속</button>
+        <button class="nav-btn" id="leaveConfirmContinueBtn">탐험 계속</button>
+        <button class="btn btn-main" id="leaveConfirmStopBtn" style="width:auto; padding:10px 18px;">전투 중단</button>
       </div>
     </div>
   </div>
@@ -1111,19 +1143,20 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js"></script>
-<script src="js/formulas.js"></script>
-<script src="js/state.js"></script>
-<script src="js/effects.js"></script>
-<script src="js/render.js"></script>
-<script src="js/actions.js"></script>
-<script src="js/dungeon.js"></script>
-<script src="js/navigation.js"></script>
-<script src="js/inventory_box.js"></script>
-<script src="js/codex.js"></script>
-<script src="js/codex_monster.js"></script>
-<script src="js/craft_menu.js"></script>
-<script src="js/shop_menu.js"></script>
-<script src="js/main.js"></script>
+<script src="js/data.js?v=332"></script>
+<script src="js/formulas.js?v=332"></script>
+<script src="js/state.js?v=332"></script>
+<script src="js/effects.js?v=332"></script>
+<script src="js/render.js?v=332"></script>
+<script src="js/actions.js?v=332"></script>
+<script src="js/dungeon.js?v=332"></script>
+<script src="js/navigation.js?v=332"></script>
+<script src="js/inventory_box.js?v=332"></script>
+<script src="js/codex.js?v=332"></script>
+<script src="js/codex_monster.js?v=332"></script>
+<script src="js/craft_menu.js?v=332"></script>
+<script src="js/shop_menu.js?v=332"></script>
+<script src="js/forge_menu.js?v=332"></script>
+<script src="js/main.js?v=332"></script>
 </body>
 </html>

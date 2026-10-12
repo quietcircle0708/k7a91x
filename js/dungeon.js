@@ -831,6 +831,7 @@ function openKillResultModal(rewards, mode, opts){
   show('krLeaveBtn', mode === 'leave');
   show('krRetryBtn', mode === 'final'); // "재탐험"은 11스테이지(숨겨진 장소) 최종 보상창 전용
   show('krStopBtn', mode === 'final');
+  el('killResultModal').classList.remove('destroy-notice');
   el('killResultModal').style.display = 'flex';
 }
 // 보기 전용 창이 열린 채 전투가 진행되는 동안 누적 보상이 바뀌면 내용만 다시 그림(내용이 같으면 건드리지 않아
@@ -846,6 +847,7 @@ function refreshLiveRewardModal(){
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
 }
 function closeKillResultModal(){
+  el('killResultModal').classList.remove('destroy-notice'); // 파괴 안내 전용 스타일 해제
   el('killResultModal').style.display = 'none';
   hunt.rewardModalMode = null;
 }

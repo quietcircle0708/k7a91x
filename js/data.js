@@ -3139,6 +3139,27 @@ const SHOP_TABS = [
 // 시작 골드(1,000G)는 state 기본값/초기화 코드에 그대로 있음. 지급 아이템을 바꾸려면 이 표만 수정하면 됨.
 const NEW_GAME_START_CONSUMABLES = { hpFlask1: 5, mpFlask1: 5 }; // 하급 체력 포션 5개, 하급 마나 포션 5개
 
+// ---- 대장간 강화 탭 UI 전환 플래그 ----
+// FORGE_ENHANCE_UI: 'new' = 새 강화 탭 UI(forge_menu.js — 기도 2개/강화 장비/촉매 삼각 배치, 성장 수치 비교, 확률 카드, 강화 진행 버튼),
+//                   'legacy' = 예전 강화 탭 UI(index.html #forgeEnhLegacy, render.js render()의 강화 화면 부분).
+// 예전 UI 코드는 삭제하지 않고 그대로 보존함(나중에 지울 수 있도록) — 이 값만 'legacy'로 바꾸면 예전 UI로 복구됨. 수리 탭은 이 값과 무관함.
+const FORGE_ENHANCE_UI = 'new';
+
+// ---- 새 강화 탭 스프라이트 연출 설정 ----
+// 가로로 이어 붙인 프레임을 왼쪽→오른쪽으로 재생. frames(프레임 수)와 frameMs(프레임당 ms)는 서로 독립적으로 조정 가능.
+// w/h는 프레임 1장의 표시 크기(px) — 효과마다 지정된 크기를 그대로 쓰며 서로 맞추려고 확대/축소하지 않음.
+// start는 기존 강화 대기 시간(700/1000ms) 동안 반복 재생(loop), 나머지는 1회 재생.
+const ENCHANT_FX = {
+  start:   { src: 'assets/ui/effect_start_enchant.png',     frames: 12, frameMs: 50, w: 96, h: 96, loop: true },
+  success: { src: 'assets/ui/effect_enchant_success.png',   frames: 7,  frameMs: 70, w: 96, h: 96 },
+  fail:    { src: 'assets/ui/effect_enchant_fail.png',      frames: 31, frameMs: 600 / 31, w: 64, h: 64 }, // 31프레임을 약 0.6초에 균등 배분(약 19.35ms)
+  destroy: { src: 'assets/ui/effect_enchant_destroyed.png', frames: 12, frameMs: 67, w: 96, h: 96 },
+};
+// 선택 장비 아이콘 크기 연출(css .fe-item.charging/.popping과 값을 맞출 것): 시도 중 수축·팽창 주기, 성공 팝 길이
+const ENCHANT_ICON_CHARGE_MS = 350;  // 85~95% 사이를 오가는 1주기(css animation-duration)
+const ENCHANT_ICON_POP_MS = 300;     // 1.0 → 1.15 → 1.0
+const ENCHANT_DESTROY_POPUP_DELAY_MS = 500; // 파괴 보상 지급 확정 후 파괴 안내 팝업을 띄우기까지 대기
+
 // ---- 상점 메뉴 UI 전환 플래그 + 구매/판매 모드 ----
 // SHOP_MENU_UI: 'new' = 새 상점 UI(shop_menu.js — 구매/판매 탭·분류 탭·세부 분류·필터/검색·빠른 구매/판매·세로 스크롤 목록),
 //               'legacy' = 예전 상점 UI(카드 목록 + 페이지네이션, render.js renderShopTab 이하 / main.js 상점 리스너 / index.html .shop-legacy-wrap).

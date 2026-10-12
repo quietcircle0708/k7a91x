@@ -399,7 +399,7 @@ function weaponRequirementText(type){
   return parts.length ? parts.join(', ') : null;
 }
 // ---- 요구 조건 표시(툴팁 공용) ----
-// 요구 조건 한 줄의 색상 규칙은 스킬 툴팁(buildSkillTooltipHtml)과 같음: 지금 만족하면 초록(--forge-green), 못하면 빨강(--forge-blood).
+// 요구 조건 한 줄의 색상 규칙(스킬 툴팁 전용): 지금 만족하면 초록(--forge-green), 못하면 빨강(--forge-blood).
 // 저장하지 않고 툴팁을 만들 때마다 현재 레벨/스탯으로 새로 판정함.
 function requirementColor(ok){ return ok ? 'var(--forge-green)' : 'var(--forge-blood)'; }
 function requirementLineHtml(text, ok){ return `<div style="color:${requirementColor(ok)};">${text}</div>`; }
@@ -417,12 +417,15 @@ function equipRequirementList(type){
   return list;
 }
 // 툴팁용 착용 조건 HTML: 첫 줄은 기존과 같은 "라벨 : 값" 형태, 나머지 조건은 아래 줄에 하나씩. 조건이 없으면 ''(줄 자체를 표시하지 않음).
+// 아이템 툴팁은 알록달록해지지 않도록 "못 채운 조건만" 빨강(--forge-blood)으로 표시하고, 충족한 조건은 색을 바꾸지 않고 기존 값 색(wtipRow의 --forge-gold) 그대로 둠.
+// (스킬 툴팁은 충족=초록/미충족=빨강 규칙을 그대로 유지 — requirementLineHtml)
+function equipRequirementValueColor(ok){ return ok ? 'var(--forge-gold)' : 'var(--forge-blood)'; }
 function equipRequirementTooltipHtml(type, label){
   const list = equipRequirementList(type);
   if(!list.length) return '';
   return list.map((r, i) => i === 0
-    ? `<div><span style="color:var(--forge-cream-dim);">${label}</span> <span style="color:${requirementColor(r.ok)};">${r.text}</span></div>`
-    : requirementLineHtml(r.text, r.ok)).join('');
+    ? `<div><span style="color:var(--forge-cream-dim);">${label}</span> <span style="color:${equipRequirementValueColor(r.ok)};">${r.text}</span></div>`
+    : `<div style="color:${equipRequirementValueColor(r.ok)};">${r.text}</div>`).join('');
 }
 // 착용(장착) 조건 충족 여부 — 아이템 레벨(플레이어 레벨 이상 필요) + 무기 종류별 요구 스탯 모두 확인.
 // playerStats는 { str, agi, int } 형태(호출부에서 effectiveStats()를 넘겨 레벨업 투자 스탯 + 장비/아티팩트

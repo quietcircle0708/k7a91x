@@ -618,6 +618,7 @@ async function saveState(){
 let resetArmed = false;
 let resetArmTimeout = null;
 function resetGame(){
+  if(isEnhancing) return; // 강화 연출·결과 처리 중에는 초기화 불가
   if(!resetArmed){
     resetArmed = true;
     el('resetLink').textContent = '정말 초기화하려면 한 번 더 클릭하세요';

@@ -90,6 +90,15 @@ function startEnhance(){
   showMsg('', '');
   render();
 
+  // 새 강화 탭: 결과는 여기서 딱 한 번 판정해 보관하고, 연출(시도 → 결과)이 끝난 뒤 resolveEnhance가 실제 결과만 반영함.
+  // 연출 스킵이면 시도 연출만 생략(attemptMs=0)하고 결과 연출은 그대로 재생. 입력 잠금(isEnhancing)은 결과 처리까지 유지됨.
+  if(forgeEnhNewActive()){
+    const outcome = weightedOutcome(effectivePrayerOdds(type, level));
+    const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[2] > 0; // 기존 대기 시간 결정 방식 그대로
+    forgeEnhPlay(equipped.id, level, type, outcome, state.skipEffects ? 0 : (highRisk ? 1000 : 700));
+    return;
+  }
+
   if(state.skipEffects){
     resolveEnhance(equipped.id, level);
     return;
@@ -105,27 +114,33 @@ function startEnhance(){
   setTimeout(()=> resolveEnhance(equipped.id, level), delay);
 }
 
-function resolveEnhance(itemId, level){
-  isEnhancing = false;
+// opts(새 강화 탭 전용): { newUi:true, outcome } — 이미 판정된 결과를 받아 반영만 하고, 예전 연출 효과는 호출하지 않으며,
+// 결과 처리가 끝날 때까지(파괴는 안내 팝업이 뜰 때까지) isEnhancing 잠금을 유지함.
+function resolveEnhance(itemId, level, opts){
+  const newUi = !!(opts && opts.newUi);
+  if(!newUi) isEnhancing = false;
   // 대장간 화면에 지금 표시된 대상은 무기/방어구/장신구 인벤토리 중 하나이므로 전부 검색함(getEquipped()와 동일한 검색 범위).
   let item = state.inventory.find(i => i.id === itemId);
   if(!item) item = (state.armorInventory || []).find(i => i.id === itemId);
   if(!item) item = (state.accessoryInventory || []).find(i => i.id === itemId);
-  if(!item){ render(); saveState(); return; }
+  if(!item){ isEnhancing = false; render(); saveState(); return; }
   const type = item.type || 'longsword';
   const equipTypeNow = wpn(type).equipType;
   const isArmorItem = equipTypeNow === 'armor';
   const isAccessoryItem = equipTypeNow === 'accessory';
 
   const odds = effectivePrayerOdds(type, level); // 보호(파괴 확률 감소)+집중(성공 확률 증가) 전부 반영된 최종 확률
-  let outcome = weightedOutcome(odds);
+  let outcome = (opts && opts.outcome) || weightedOutcome(odds);
 
   const stage = el('swordStage');
-  stopEmbers();
-  stage.classList.remove('shake','shake-hard','strike','charging');
-  void stage.offsetWidth;
+  if(!newUi){
+    stopEmbers();
+    stage.classList.remove('shake','shake-hard','strike','charging');
+    void stage.offsetWidth;
+  }
 
   let popLevelDisplay = false;
+  let destroyNotice = null;
 
   // 6단계 개편: 보호의 기도는 더 이상 '파괴' 결과가 나온 뒤 사후적으로 '유지'로 가로채지 않음 —
   // 위 odds 자체가 이미 보호 적용 후의 확률(blessingAdjustedOdds)이라, weightedOutcome이 내놓는
@@ -136,17 +151,18 @@ function resolveEnhance(itemId, level){
   if(outcome === 'success'){
     item.level++;
     if(item.level > state.bestLevel) state.bestLevel = item.level;
-    stage.classList.add('strike');
-    successRing('#ffb37a');
-    setTimeout(()=>successRing('#ffe9a8'), 130);
-    burstRays('#ffd76a', 12);
-    burstSparks('#ff6a3d', 24);
-    flashCard('rgba(255,106,61,0.5)');
-    popLevelDisplay = true;
+    if(!newUi){
+      stage.classList.add('strike');
+      successRing('#ffb37a');
+      setTimeout(()=>successRing('#ffe9a8'), 130);
+      burstRays('#ffd76a', 12);
+      burstSparks('#ff6a3d', 24);
+      flashCard('rgba(255,106,61,0.5)');
+      popLevelDisplay = true;
+    }
     if(item.level >= MAX_LEVEL){
       state.legendCount++;
-      successRing('#e0b13c');
-      burstRays('#ffffff', 14);
+      if(!newUi){ successRing('#e0b13c'); burstRays('#ffffff', 14); }
       showMsg(isArmorItem ? '✨ 전설의 방어구 완성! 판매하여 다음 방어구를 준비하세요'
         : isAccessoryItem ? '✨ 전설의 장신구 완성! 판매하여 다음 장신구를 준비하세요'
         : '✨ 전설의 검 완성! 판매하여 다음 검을 만드세요', 'legend');
@@ -154,21 +170,35 @@ function resolveEnhance(itemId, level){
       showMsg('강화 성공! +' + item.level, 'success');
     }
   } else if(outcome === 'stay'){
-    smokePuff();
+    if(!newUi) smokePuff();
     showMsg('실패... 레벨 유지', 'stay');
   } else if(outcome === 'destroy'){
     state.totalDestroys++;
-    stage.classList.add('shake-hard');
-    burstSparks('#c13c3c', 14);
-    shatterBurst(18);
-    flashCard('rgba(193,60,60,0.55)');
+    if(!newUi){
+      stage.classList.add('shake-hard');
+      burstSparks('#c13c3c', 14);
+      shatterBurst(18);
+      flashCard('rgba(193,60,60,0.55)');
+    }
+    // 새 강화 탭 파괴 안내 팝업용 정보 — 장비가 제거되기 전에 이름/등급색/강화 단계를 확보함
+    destroyNotice = newUi ? { type, level, name: weaponName(type) + levelSuffix(level), color: weaponNameColor(type, level) } : null;
     const rewardMsg = processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem);
+    if(destroyNotice){ destroyNotice.reward = lastDestroyReward; destroyNotice.failMsg = (!lastDestroyReward && rewardMsg) ? rewardMsg : ''; }
     showMsg('💥 아이템이 파괴되었습니다...' + (rewardMsg ? ' ' + rewardMsg : ''), 'destroy');
   }
 
+  if(newUi && outcome !== 'destroy') isEnhancing = false; // 장비 레벨 반영까지 끝난 뒤 잠금 해제(파괴는 아래에서 안내 팝업이 뜰 때 해제)
   clampPlayerVitals(); // 방어구 강화로 체력/마나 보너스가 바뀌었을 수 있으므로 현재값을 새 최대치에 맞춰 정리
   render();
   saveState();
+  if(newUi && outcome === 'destroy'){
+    // 장비 제거·보상 지급은 이미 끝났음(위) — 팝업은 결과 안내용이며, 열고 닫는 것이 지급에 영향을 주지 않음
+    setTimeout(()=>{
+      openDestroyNoticeModal(destroyNotice);
+      isEnhancing = false;
+      render();
+    }, ENCHANT_DESTROY_POPUP_DELAY_MS);
+  }
   if(popLevelDisplay){
     const ld = el('levelDisplay');
     ld.classList.remove('pop'); void ld.offsetWidth;
@@ -185,7 +215,10 @@ function resolveEnhance(itemId, level){
 // 판정이 발생한 "이후"의 처리(소멸+보상)만 담당함. 반환값은 showMsg에 이어붙일 보상 안내 문구(보상이
 // 없으면 null — 일반 등급이거나, 등급별 확률 판정에서 재료 보상이 뽑혔는데 개수 구간표가 0인 경우도
 // 정상적으로 0개 획득 문구를 반환함, 별도로 숨기지 않음).
+// 마지막 파괴 보상 중 "실제로 지급된" 보상(파괴 안내 팝업 표시용): {kind:'trace', type} | {kind:'misc', key, qty} | null(없음/지급 실패)
+let lastDestroyReward = null;
 function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem){
+  lastDestroyReward = null;
   const w = wpn(type);
   const displayName = w.name;
 
@@ -218,6 +251,7 @@ function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem)
   if(rewardKind === 'trace'){
     // 소비 인벤토리가 가득 차 있으면 흔적을 받을 수 없음(파괴된 장비 자체는 이미 제거된 상태 — 기존 흐름 그대로)
     if(!grantTraceItem(type)) return `${inventoryFullMessage('consumable')} '${displayName}의 흔적'을 획득하지 못했습니다.`;
+    lastDestroyReward = { kind: 'trace', type };
     return `'${displayName}의 흔적'을 획득했습니다.`;
   }
   const isScrap = rewardKind === 'scrapmetal';
@@ -225,6 +259,7 @@ function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem)
             + tierQty(isScrap ? DESTROY_SCRAPMETAL_ENHANCE_QTY : DESTROY_SHINYSTONE_ENHANCE_QTY, level);
   const rewardItem = MISC_ITEMS[isScrap ? 'rareScrapmetal' : 'epicShinystone'];
   if(!grantMiscStack(rewardItem, qty)) return `${inventoryFullMessage(miscItemCategory(rewardItem))} ${rewardItem.name} ${qty}개를 획득하지 못했습니다.`;
+  lastDestroyReward = { kind: 'misc', key: isScrap ? 'rareScrapmetal' : 'epicShinystone', qty };
   return `${rewardItem.name} ${qty}개를 획득했습니다.`;
 }
 

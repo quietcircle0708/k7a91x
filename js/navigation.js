@@ -188,6 +188,7 @@ function switchInvTab(tabId){
 // ---- 대장간 강화/수리 탭 전환(내구도 시스템 15번 요구사항) ----
 // "강화" 탭은 기존 화면을 그대로 보여주고, "수리" 탭은 장비창을 재사용한 실제 수리 기능 화면임.
 function switchForgeTab(tabId){
+  if(isEnhancing) return; // 강화 연출·결과 처리 중에는 탭 전환 불가
   forgeUI.tab = tabId === 'repair' ? 'repair' : 'enhance';
   renderForgeTabs();
 }

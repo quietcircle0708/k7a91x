@@ -1570,7 +1570,7 @@
   .inv-box-slot.empty{ opacity:.5; }
   .inv-box-slot.filled{ cursor:pointer; user-select:none; -webkit-user-select:none; }
   .inv-box-slot.filled:hover{ background:#352b1d; }
-  .inv-box-slot .tooltip{ width:210px; left:50%; transform:translateX(-50%); bottom:120%; line-height:1.6; }
+  .inv-box-slot .tooltip{ width:210px; left:50%; transform:translateX(-50%); bottom:120%; line-height:1.6; z-index:45; } /* 첫 줄 슬롯의 툴팁이 위로 길게 뻗어 상단 .main-nav(공지/메뉴/돌아가기 버튼, z-index:40)에 가려지던 문제 — 이 툴팁만 그 위(모달 50 아래)로 */
   .inv-box-slot:hover .tooltip{ visibility:visible; opacity:1; }
   /* 장착 중 표시 — 아이콘 우측 상단 */
   .inv-box-equip-mark{
@@ -2025,3 +2025,109 @@ body.mobile-preset .shop-row-name{ padding:3px 8px 2px; min-height:23px; }
 body.mobile-preset .shop-row-name-in{ font-size:clamp(11.5px, 3.3vw, 13px); }
 body.mobile-preset .shop-row-price{ padding:2px 8px 3px; min-height:22px; font-size:clamp(11px, 3.1vw, 12.5px); }
 body.mobile-preset .shop-row-tag{ font-size:10px; }
+
+
+/* ============================================================
+   대장간 새 강화 탭 UI (forge_menu.js) — FORGE_ENHANCE_UI='new'일 때만 body.forge-enh-new가 붙어 새 UI가 보이고
+   예전 강화 UI(#forgeEnhLegacy)는 숨겨짐(삭제하지 않고 보존). 수리 탭 스타일/마크업은 건드리지 않음.
+   ============================================================ */
+#forgeEnhNew{ display:none; }
+body.forge-enh-new #forgeEnhNew{ display:block; }
+body.forge-enh-new #forgeEnhLegacy{ display:none; }
+/* 새 강화 화면에서는 대장간 기록부를 표시하지 않음(기록 수집/저장은 그대로). 수리 탭에서는 기존처럼 보임 */
+body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
+
+.fe-wrap{ text-align:center; }
+/* 삼각 배치: 기도(왼쪽/오른쪽, 44px) — 위 꼭짓점 2개, 강화 장비(중앙, 52px), 촉매(아래 꼭짓점, 44px). 선은 SVG로 슬롯 뒤에 그림.
+   슬롯 위치는 transform이 아니라 음수 margin으로 중심을 맞춤(transform이 있으면 .tooltip의 position:fixed 위치 보정이 틀어짐). */
+.fe-tri{ position:relative; width:240px; height:150px; margin:6px auto 4px; }
+.fe-tri-lines{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.fe-tri-lines line{ stroke: rgba(255,255,255,.22); stroke-width:1.5; }
+.fe-slot{
+  position:absolute; box-sizing:border-box; display:flex; align-items:center; justify-content:center; padding:0;
+  background: var(--forge-panel-2); border:2px solid var(--forge-line); border-radius:9px; color: var(--forge-cream-dim);
+  font-size:22px; font-weight:700; font-family:inherit; cursor:pointer;
+}
+.fe-prayer, .fe-catalyst{ width:44px; height:44px; margin:-22px 0 0 -22px; }
+.fe-prayer-left{ left:40px; top:22px; }
+.fe-prayer-right{ left:200px; top:22px; }
+.fe-catalyst{ left:120px; top:128px; }
+.fe-item{ width:52px; height:52px; margin:-26px 0 0 -26px; left:120px; top:62px; user-select:none; -webkit-user-select:none; }
+.fe-item.filled .weapon-icon-img, .fe-item.filled .inv-icon-img{ width:38px; height:38px; }
+.fe-slot:hover:not(:disabled){ border-color: var(--forge-cream-dim); }
+.fe-item.filled:hover{ border-color:inherit; }
+.fe-catalyst{ cursor:default; }
+/* 기도: 비활성은 같은 이미지를 흑백+투명도로, 활성(.on)이면 원래 이미지 */
+.fe-prayer-img{ width:26px; height:26px; object-fit:contain; pointer-events:none; filter: grayscale(1); opacity:.4; transition: opacity .15s, filter .15s; }
+.fe-prayer.on{ border-color: var(--forge-gold); }
+.fe-prayer.on .fe-prayer-img{ filter:none; opacity:1; }
+.fe-prayer:disabled{ cursor:not-allowed; }
+.fe-prayer .tooltip{ width:190px; text-align:left; font-size:12px; font-weight:400; }
+.fe-prayer:hover .tooltip{ visibility:visible; opacity:1; }
+
+.fe-item.charging{ animation: fe-icon-charge .35s ease-in-out infinite; } /* 슬롯 전체(테두리+이미지)가 함께 수축·팽창 */
+.fe-item.popping{ animation: fe-icon-pop .3s ease-out; } /* 성공 팝: 슬롯(테두리)+안쪽 장비 이미지가 한 덩어리로 같은 비율 확대·복귀(transform이라 배치는 그대로) */
+@keyframes fe-icon-charge{ 0%,100%{ transform:scale(.95); } 50%{ transform:scale(.85); } } /* 위치·레이아웃은 그대로, 아이콘만 85~95% */
+@keyframes fe-icon-pop{ 0%{ transform:scale(var(--fe-pop-from,1)); } 45%{ transform:scale(1.15); } 100%{ transform:scale(1); } }
+.fe-fx{ position:absolute; display:none; z-index:6; pointer-events:none; background-repeat:no-repeat; }
+.fe-name.pop{ animation: level-pop .5s cubic-bezier(.3,.8,.4,1); } /* 기존 level-pop(확대 후 복귀) 재사용 — 장비 이름+강화 단계 영역 전체에 적용 */
+.fe-name{ font-size:20px; font-weight:800; line-height:1.3; min-height:26px; }
+.fe-grade{ font-size:12px; font-weight:700; margin-top:2px; min-height:16px; }
+.fe-hint{ margin:4px 14px 0; text-align:left; font-size:11px; font-style:italic; color:#8a8a8a; }
+.fe-divider{ height:1px; background: var(--forge-line); margin:8px 4px 10px; }
+/* +5 >>> +6 */
+/* 위쪽 단계 표시와 아래 옵션 영역이 같은 3열(왼쪽 | 화살표 폭 | 오른쪽)을 공유함 — 바깥 프레임 끝에서 --fe-side만큼 안쪽으로 */
+.fe-wrap{ --fe-side:14px; --fe-arrow-w:28px; --fe-pane-max-h:170px; }
+.fe-lv-arrow{ margin:0 var(--fe-side) 8px; font-size:22px; font-weight:800; font-family:'Noto Serif KR', serif; }
+.fe-lv-sep{ color: var(--forge-cream-dim); font-size:16px; letter-spacing:1px; }
+.fe-lv-grid{ display:grid; align-items:center; }
+.fe-lv-grid.two{ grid-template-columns:1fr var(--fe-arrow-w) 1fr; }
+.fe-lv-grid.one{ grid-template-columns:1fr; }
+.fe-lv-l, .fe-lv-r{ text-align:center; min-width:0; }
+.fe-lv-arrow-img{ display:block; width:var(--fe-arrow-w); height:var(--fe-arrow-w); object-fit:contain; pointer-events:none; user-select:none; -webkit-user-drag:none; }
+
+.fe-grow{ margin:0 var(--fe-side) 10px; text-align:center; }
+.fe-grow-title{ padding:5px 8px; font-size:12px; font-weight:700; color: var(--forge-cream-dim); border-bottom:1px solid var(--forge-line); } /* 새 UI에서는 더 이상 출력하지 않음(예전 스타일 보존) */
+.fe-grow-body{ font-size:12.5px; line-height:1.45; display:grid; align-items:start; }
+.fe-grow-body.two{ grid-template-columns:1fr var(--fe-arrow-w) 1fr; }
+.fe-grow-body.one{ grid-template-columns:1fr; }
+.fe-opt-gap{ min-width:0; }
+.fe-opt-pane{ min-width:0; display:flex; flex-direction:column; border:1px solid var(--forge-line); border-radius:8px; background: var(--forge-panel-2); overflow:hidden; }
+.fe-pane-head{ padding:4px 6px; font-size:11px; color: var(--forge-cream-dim); border-bottom:1px dashed var(--forge-line); }
+/* 각 영역이 따로 스크롤: 높이는 늘리지 않고 넘칠 때만 스크롤바 표시 */
+.fe-pane-scroll{ max-height:var(--fe-pane-max-h); overflow-y:auto; overflow-x:hidden; padding:4px 0; }
+.fe-pane-scroll:empty::before{ content:'-'; color: var(--forge-cream-dim); }
+.fe-grow-cell{ padding:3px 8px; min-width:0; word-break:keep-all; overflow-wrap:anywhere; }
+.fe-opt-label{ color: var(--forge-cream-dim); }
+.fe-opt-val{ color: var(--forge-gold); }
+.fe-grow-body:empty::before{ content:'-'; color: var(--forge-cream-dim); }
+.fe-card{ margin-left:var(--fe-side); margin-right:var(--fe-side); border:1px solid var(--forge-line); border-radius:8px; background: var(--forge-panel-2); padding:8px 10px; margin-bottom:10px; font-size:13px; color: var(--forge-cream-dim); }
+.fe-card.fe-odds{ padding:8px 6px; }
+.fe-card.fe-odds:empty{ display:none; }
+.fe-card .odds-row{ margin-bottom:0; }
+.fe-cost{ font-family:'JetBrains Mono', monospace; }
+.fe-cost .ui-icon-inline, .fe-sell .ui-icon-inline{ width:1.15em; height:1.15em; margin-left:3px; vertical-align:-0.2em; }
+.fe-skip-row{ margin:2px 0 8px; display:flex; justify-content:center; }
+/* 강화 진행 버튼: 어두운 색, 모서리는 적당히(8px) */
+/* 버튼 행: 왼쪽 끝=현재 옵션 영역 왼쪽 끝(인벤토리 버튼), 오른쪽 끝=성공 옵션 영역 오른쪽 끝(강화 진행 버튼) */
+.fe-btn-row{ display:flex; align-items:stretch; gap:8px; margin:0 var(--fe-side); }
+.fe-inv-btn{ flex:0 0 auto; width:56px; display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid #5a4a30;
+  background: linear-gradient(180deg, #2b231a 0%, #1a140e 100%); cursor:pointer; padding:0; }
+.fe-inv-btn img{ width:28px; height:28px; object-fit:contain; pointer-events:none; -webkit-user-drag:none; }
+.fe-inv-btn:hover:not(:disabled){ border-color: var(--forge-gold); }
+.fe-inv-btn:disabled{ opacity:.45; cursor:not-allowed; }
+.fe-enhance-btn{
+  display:block; flex:1 1 auto; min-width:0; margin:0; padding:12px 10px; border-radius:8px; border:1px solid #5a4a30;
+  background: linear-gradient(180deg, #2b231a 0%, #1a140e 100%); color: var(--forge-cream); font-size:16px; font-weight:800; font-family:inherit; cursor:pointer;
+  letter-spacing:1px;
+}
+.fe-enhance-btn:hover:not(:disabled){ border-color: var(--forge-gold); color: var(--forge-gold); }
+.fe-enhance-btn:disabled{ opacity:.45; cursor:not-allowed; }
+.fe-sell{ margin-top:6px; font-size:12px; color: var(--forge-gold); font-family:'JetBrains Mono', monospace; min-height:16px; }
+
+/* 파괴 안내 팝업 전용 [닫기] 버튼 — 주황 대신 어두운 톤, 모서리 라운딩 작게 (던전 보상창의 닫기 버튼에는 영향 없음) */
+#killResultModal.destroy-notice #krCloseBtn{
+  background: linear-gradient(180deg, #2b231a 0%, #1a140e 100%); color: var(--forge-cream); border:1px solid #5a4a30;
+  border-radius:4px; box-shadow:none;
+}
+#killResultModal.destroy-notice #krCloseBtn:hover{ border-color: var(--forge-gold); filter:none; }
