@@ -5,14 +5,12 @@
 //   · 확률/비용/판매가 = formulas.js displayEnhanceOdds / enhanceCostBreakdown / enhanceCostTooltipText / sellValueFor / durabilityAdjustedSellValue
 //   · 강화 장비 선택 = 기존 장비 선택 팝업(openForgeSelect → selectForgeTarget → equipItem) / 인벤토리의 "강화 선택"(state.forgeTargetId) 그대로
 //   · 성장 수치 = 인벤토리 아이템 비교 UI와 같은 엔진(codexDisplayFor → invCompareBuildRows → ▲▼/색 규칙 INV_COMPARE_STAT_BETTER)
-// 끈기의 기도는 이 UI에서 쓰지 않음(표시만 안 함 — 기존 코드/저장 데이터는 그대로 둠). 촉매 슬롯은 빈 슬롯 '+'만 있고 기능은 없음.
-// 예전 강화 탭 UI(index.html #forgeEnhLegacy)는 삭제하지 않고 보존됨 — data.js FORGE_ENHANCE_UI='legacy'로 복구 가능.
+// 촉매 슬롯은 빈 슬롯 '+'만 있고 기능은 없음. 기도 툴팁 문구는 index.html의 #fePrayerBlessingTip/#fePrayerFocusTip에 직접 있음.
 // ============================================================
 
 let forgeEnhNew = { growCache: null, tipHtml: '', slotClickTimer: null };
 const FORGE_ENH_DOUBLE_CLICK_MS = 280; // 슬롯 한 번 클릭(선택 팝업) / 더블 클릭(선택 해제) 구분 대기 시간
 
-function forgeEnhNewActive(){ return typeof FORGE_ENHANCE_UI !== 'undefined' && FORGE_ENHANCE_UI === 'new'; }
 function forgeEnhIsMobile(){ return document.body.classList.contains('mobile-preset'); }
 
 // ---- 성장 수치 ----
@@ -173,18 +171,17 @@ function forgeEnhNewRender(){
 }
 // render()가 끝날 때마다 호출(강화 화면일 때만 동작, 바뀐 부분만 다시 그림)
 function forgeEnhNewRefresh(){
-  if(!forgeEnhNewActive()) return;
   forgeEnhNewRender();
 }
 
 // ---- 강화 연출(스프라이트) ----
 // 설정은 data.js ENCHANT_FX. 효과는 새 강화 탭의 실제 장비 슬롯(#feItemSlot) 중앙에 놓이며, 숨겨진 예전 강화 화면 요소는 쓰지 않음.
-function forgeEnhFxBox(){
+function forgeEnhFxBox(id){
   const tri = document.getElementById('feItemSlot').parentElement;
-  let box = document.getElementById('feFx');
+  let box = document.getElementById(id);
   if(!box){
     box = document.createElement('div');
-    box.id = 'feFx'; box.className = 'fe-fx';
+    box.id = id; box.className = 'fe-fx';
     tri.appendChild(box);
   }
   return box;
@@ -194,7 +191,7 @@ function forgeEnhFxRun(key, opts){
   opts = opts || {};
   const cfg = ENCHANT_FX[key];
   const slot = document.getElementById('feItemSlot');
-  const box = forgeEnhFxBox();
+  const box = forgeEnhFxBox(opts.boxId || 'feFx'); // boxId가 다르면 같은 위치에 겹쳐 동시 재생 가능
   box.style.width = cfg.w + 'px'; box.style.height = cfg.h + 'px';
   box.style.left = (slot.offsetLeft + slot.offsetWidth / 2 - cfg.w / 2) + 'px';
   box.style.top = (slot.offsetTop + slot.offsetHeight / 2 - cfg.h / 2) + 'px';
@@ -236,8 +233,9 @@ function forgeEnhIconFx(mode){
     const m = /matrix\(([-\d.]+)/.exec(getComputedStyle(slot).transform || '');
     slot.style.setProperty('--fe-pop-from', m ? m[1] : '1');
   }
-  slot.classList.remove('charging', 'popping');
+  slot.classList.remove('charging', 'popping', 'burst');
   void slot.offsetWidth;
+  if(mode === 'burst') slot.classList.add('burst'); // 파괴: 폭발형 팽창 후 소멸(소멸 상태 유지 — 실제 제거 반영 직전에 'none'으로 정리)
   if(mode === 'charge') slot.classList.add('charging');
   if(mode === 'pop'){
     slot.classList.add('popping');
@@ -247,9 +245,14 @@ function forgeEnhIconFx(mode){
 function forgeEnhPlay(itemId, level, type, outcome, attemptMs){
   const playResult = () => {
     const key = outcome === 'success' ? 'success' : outcome === 'stay' ? 'fail' : 'destroy';
-    forgeEnhIconFx(outcome === 'success' ? 'pop' : 'none'); // 성공: 반복 → 팝으로 전환 / 실패·파괴: 반복 종료 후 원래 크기(1.0)로 복귀
+    // 성공: 반복 → 팝으로 전환 / 실패: 반복 종료 후 원래 크기(1.0)로 복귀 / 파괴: 슬롯 폭발형 팝업 + destroy2 스프라이트 겹쳐 재생
+    forgeEnhIconFx(outcome === 'success' ? 'pop' : outcome === 'destroy' ? 'burst' : 'none');
     if(outcome === 'success') forgeEnhPopName(type, level + 1);
-    forgeEnhFxRun(key, { onDone: () => resolveEnhance(itemId, level, { newUi: true, outcome }) });
+    if(outcome === 'destroy') forgeEnhFxRun('destroy2', { boxId: 'feFx2' });
+    forgeEnhFxRun(key, { onDone: () => {
+      if(outcome === 'destroy') forgeEnhIconFx('none'); // 연출용 임시 스타일 정리 — 바로 이어서 실제 제거가 반영되므로 파괴된 장비가 다시 보이지 않음
+      resolveEnhance(itemId, level, { newUi: true, outcome });
+    } });
   };
   if(attemptMs > 0){ forgeEnhIconFx('charge'); forgeEnhFxRun('start', { loopMs: attemptMs, onDone: playResult }); }
   else playResult();
@@ -313,12 +316,7 @@ function forgeEnhClearTarget(){
   const wrap = document.getElementById('forgeEnhNew');
   if(!wrap) return;
   Object.values(ENCHANT_FX).forEach(c => { const im = new Image(); im.src = c.src; }); // 연출 시작 시 깜빡임 방지용 미리 불러오기
-  document.body.classList.toggle('forge-enh-new', forgeEnhNewActive());
-  // 기도 툴팁 문구는 기존 강화 화면의 것을 그대로 가져옴(문구/수치 중복 작성 방지)
-  // (끈기의 기도는 이 UI에 없으므로 "끈기의 기도와 중복 사용 불가" 안내 줄만 뺌)
-  const copyTip = (srcBtnId, dstId) => { const s = document.querySelector('#' + srcBtnId + ' .tooltip'); const d = document.getElementById(dstId); if(s && d) d.innerHTML = s.innerHTML.replace(/<br><em>[^<]*<\/em>/, ''); };
-  copyTip('prayerBlessingBtn', 'fePrayerBlessingTip');
-  copyTip('prayerFocusBtn', 'fePrayerFocusTip');
+  document.body.classList.add('forge-enh-new');
 
   document.getElementById('fePrayerBlessing').addEventListener('click', toggleBlessing);
   document.getElementById('fePrayerFocus').addEventListener('click', toggleFocus);

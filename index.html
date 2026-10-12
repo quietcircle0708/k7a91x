@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=332">
+<link rel="stylesheet" href="css/style.css?v=333">
 </head>
 <body>
 <div class="wrap">
@@ -59,15 +59,15 @@
       </div>
 
       <div id="forgeTabEnhance">
-      <!-- 새 강화 탭 UI(forge_menu.js, FORGE_ENHANCE_UI='new'). 강화 판정/비용/확률/기도 로직은 전부 기존 함수(startEnhance, toggleBlessing, toggleFocus,
+      <!-- 강화 탭 UI(forge_menu.js). 강화 판정/비용/확률/기도 로직은 전부 기존 함수(startEnhance, toggleBlessing, toggleFocus,
            displayEnhanceOdds, enhanceCostBreakdown ...)를 그대로 호출하고 여기서는 표시와 조작만 함. -->
       <div class="fe-wrap" id="forgeEnhNew">
         <div class="fe-tri" id="feTri">
           <svg class="fe-tri-lines" viewBox="0 0 240 150" aria-hidden="true">
             <line x1="40" y1="22" x2="200" y2="22"/><line x1="40" y1="22" x2="120" y2="128"/><line x1="200" y1="22" x2="120" y2="128"/>
           </svg>
-          <button class="fe-slot fe-prayer fe-prayer-left" id="fePrayerBlessing" title="보호의 기도"><img src="assets/ui/prayer_blessing.svg" class="fe-prayer-img" alt="보호의 기도"><span class="tooltip" id="fePrayerBlessingTip"></span></button>
-          <button class="fe-slot fe-prayer fe-prayer-right" id="fePrayerFocus" title="집중의 기도"><img src="assets/ui/prayer_focus.svg" class="fe-prayer-img" alt="집중의 기도"><span class="tooltip" id="fePrayerFocusTip"></span></button>
+          <button class="fe-slot fe-prayer fe-prayer-left" id="fePrayerBlessing" title="보호의 기도"><img src="assets/ui/prayer_blessing.svg" class="fe-prayer-img" alt="보호의 기도"><span class="tooltip" id="fePrayerBlessingTip">보호의 기도<br>적용 시 <span style="color:var(--forge-blood);">파괴</span> 확률 <b style="color:var(--forge-gold);">30%</b> 감소<br>강화 비용 × <b style="color:var(--forge-gold);">3.5</b></span></button>
+          <button class="fe-slot fe-prayer fe-prayer-right" id="fePrayerFocus" title="집중의 기도"><img src="assets/ui/prayer_focus.svg" class="fe-prayer-img" alt="집중의 기도"><span class="tooltip" id="fePrayerFocusTip">집중의 기도<br>적용 시 <span style="color:var(--forge-green);">성공</span> 확률 <b style="color:var(--forge-gold);">15%</b> 증가<br>강화 비용 × <b style="color:var(--forge-gold);">2.0</b></span></button>
           <div class="fe-slot fe-item" id="feItemSlot" title="강화 장비 선택"></div>
           <button class="fe-slot fe-catalyst" id="feCatalystSlot" title="촉매(추후 업데이트)">+</button>
         </div>
@@ -88,62 +88,6 @@
         </div>
         <div class="fe-sell" id="feSell"></div>
       </div>
-      <!-- 예전 강화 탭 UI(FORGE_ENHANCE_UI='legacy'일 때만 표시) — 나중에 삭제할 수 있도록 그대로 보존. render()가 계속 이 요소들을 갱신하므로 숨겨져 있어도 기존 코드가 안전하게 동작함 -->
-      <div class="fe-legacy-wrap" id="forgeEnhLegacy">
-      <div id="emptyNotice" class="empty-notice" style="display:none;">
-        선택된 강화 대상 장비가 없습니다.<br>대장간 버튼(🔨)에서 강화할 장비를 선택하세요.
-        <br>
-        <div style="display:flex; gap:8px; justify-content:center; margin-top:10px; flex-wrap:wrap;">
-          <button class="nav-btn" id="goInventoryBtn"><svg class="icon-svg" viewBox="0 0 24 24" width="14" height="14"><path d="M9.5 3h5l1.2 3.2H8.3L9.5 3z"/><path d="M6.2 8.4c0-1 .6-1.9 1.5-2.3l.6-.3h7.4l.6.3c.9.4 1.5 1.3 1.5 2.3 0 6.2-2.4 11.6-5.8 11.6s-5.8-5.4-5.8-11.6z"/></svg> 인벤토리로 이동</button>
-          <button class="nav-btn" id="quickBuySwordBtn">🗡️ 검 구매 (100 G)</button>
-        </div>
-      </div>
-
-      <div class="tier-label" id="tierLabel">평범한 검</div>
-      <div class="level-display" id="levelDisplay">+0</div>
-      <div class="item-name" id="itemName">낡은 대검 +0</div>
-
-      <div class="equip-row" id="equipRow"></div>
-
-      <div class="sword-stage" id="swordStage">
-        <div class="prayer-icon-col" id="prayerIconCol">
-          <button class="prayer-icon-btn" id="prayerCharmBtn" title="끈기의 기도">
-            <img src="assets/ui/prayer_charm.svg" class="prayer-icon-img" alt="끈기의 기도">
-            <span class="tooltip">끈기의 기도<br>현재 비활성화(강화 단계 하락 결과가 삭제되어 추후 개편 예정)</span>
-          </button>
-          <button class="prayer-icon-btn" id="prayerBlessingBtn" title="보호의 기도">
-            <img src="assets/ui/prayer_blessing.svg" class="prayer-icon-img" alt="보호의 기도">
-            <span class="tooltip">보호의 기도<br>적용 시 <span style="color:var(--forge-blood);">파괴</span> 확률 <b style="color:var(--forge-gold);">30%</b> 감소<br>강화 비용 × <b style="color:var(--forge-gold);">3.5</b><br><em>*끈기의 기도와 중복 사용 불가</em></span>
-          </button>
-          <button class="prayer-icon-btn" id="prayerFocusBtn" title="집중의 기도">
-            <img src="assets/ui/prayer_focus.svg" class="prayer-icon-img" alt="집중의 기도">
-            <span class="tooltip">집중의 기도<br>적용 시 <span style="color:var(--forge-green);">성공</span> 확률 <b style="color:var(--forge-gold);">15%</b> 증가<br>강화 비용 × <b style="color:var(--forge-gold);">2.0</b></span>
-          </button>
-        </div>
-        <div class="sword-visual" id="swordVisual">
-          <img id="swordImg" class="sword-img" src="assets/sword/longsword.png" alt="장착 무기">
-        </div>
-      </div>
-
-      <div class="stat-rows-wrap" id="statRowsWrap"></div>
-      <div class="stat-row unique-option-row" id="uniqueOptionWrap" style="display:none;">
-        <div id="uniqueOptionText"></div>
-      </div>
-      <div class="odds-row" id="oddsRow"></div>
-
-      <div class="msg" id="msgText"></div>
-
-      <button class="btn btn-main" id="enhanceBtn">강화하기</button>
-      <div class="cost-skip-row">
-        <div class="cost-line" id="costLine">비용: 70 G</div>
-      </div>
-      <div class="skip-row">
-        <button class="skip-toggle" id="skipToggleBtn">⏭ 연출 스킵: 꺼짐</button>
-        <button class="skip-toggle" id="autoRebuyToggleBtn">🗡️ 판매 후 자동 구매: 꺼짐</button>
-      </div>
-
-      <button class="btn btn-sell" id="sellBtn">아이템 판매</button>
-      </div><!-- /#forgeEnhLegacy -->
       </div>
 
       <div id="forgeTabRepair" style="display:none;">
@@ -174,7 +118,7 @@
   </div>
 
   <div id="shopView" style="display:none;">
-    <!-- 새 상점 메뉴(shop_menu.js, SHOP_MENU_UI='new'): 구매/판매 탭 + 소유 골드 → 분류 탭 → 세부 분류 → 필터·검색 → 빠른 구매/판매 → 아이템 목록(이 영역만 세로 스크롤) -->
+    <!-- 상점 메뉴(shop_menu.js): 구매/판매 탭 + 소유 골드 → 분류 탭 → 세부 분류 → 필터·검색 → 빠른 구매/판매 → 아이템 목록(이 영역만 세로 스크롤) -->
     <div class="shop-new-wrap" id="shopNewWrap">
       <div class="shop-title">상점</div>
       <div class="shop-fixed-top" id="shopFixedTop">
@@ -205,41 +149,6 @@
       </div>
     </div>
 
-    <!-- 예전 상점 UI(SHOP_MENU_UI='legacy'일 때만 표시) — 삭제하지 않고 보존함 -->
-    <div class="shop-legacy-wrap" id="shopLegacyWrap">
-    <div class="shop-card">
-      <div class="shop-head-row">
-        <div>
-          <div class="shop-title">떠돌이 상인의 좌판</div>
-          <div class="shop-sub">무기와 강화에 도움을 주는 아티팩트를 판매합니다.</div>
-        </div>
-        <div class="shop-sort-controls">
-          <div class="shop-filter-wrap">
-            <button class="shop-filter-btn" id="shopFilterBtn">필터: <span id="shopFilterLabel">가격</span> ▾</button>
-            <div class="shop-filter-menu" id="shopFilterMenu" style="display:none;"></div>
-          </div>
-          <button class="shop-filter-btn" id="shopSortDirBtn">↑ 오름차순</button>
-          <div class="pager" id="shopPager"></div>
-        </div>
-      </div>
-
-      <div class="shop-tabs" id="shopTabs">
-        <button class="shop-tab-btn active" data-tab="equipment">장비</button>
-        <button class="shop-tab-btn" data-tab="consumable">소비</button>
-        <button class="shop-tab-btn" data-tab="stone">마석</button>
-        <button class="shop-tab-btn" data-tab="misc">기타</button>
-      </div>
-      <div class="shop-subtabs" id="shopEquipSubTabs">
-        <button class="shop-subtab-btn active" data-tab="weapon">무기</button>
-        <button class="shop-subtab-btn" data-tab="armor">방어구</button>
-        <button class="shop-subtab-btn" data-tab="sub">보조</button>
-        <button class="shop-subtab-btn" data-tab="accessory">장신구</button>
-        <button class="shop-subtab-btn" data-tab="artifact">아티팩트</button>
-      </div>
-
-      <div id="shopItemsList"></div>
-    </div>
-    </div>
   </div>
 
   <div id="inventoryView" style="display:none;">
@@ -1143,20 +1052,20 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=332"></script>
-<script src="js/formulas.js?v=332"></script>
-<script src="js/state.js?v=332"></script>
-<script src="js/effects.js?v=332"></script>
-<script src="js/render.js?v=332"></script>
-<script src="js/actions.js?v=332"></script>
-<script src="js/dungeon.js?v=332"></script>
-<script src="js/navigation.js?v=332"></script>
-<script src="js/inventory_box.js?v=332"></script>
-<script src="js/codex.js?v=332"></script>
-<script src="js/codex_monster.js?v=332"></script>
-<script src="js/craft_menu.js?v=332"></script>
-<script src="js/shop_menu.js?v=332"></script>
-<script src="js/forge_menu.js?v=332"></script>
-<script src="js/main.js?v=332"></script>
+<script src="js/data.js?v=333"></script>
+<script src="js/formulas.js?v=333"></script>
+<script src="js/state.js?v=333"></script>
+<script src="js/effects.js?v=333"></script>
+<script src="js/render.js?v=333"></script>
+<script src="js/actions.js?v=333"></script>
+<script src="js/dungeon.js?v=333"></script>
+<script src="js/navigation.js?v=333"></script>
+<script src="js/inventory_box.js?v=333"></script>
+<script src="js/codex.js?v=333"></script>
+<script src="js/codex_monster.js?v=333"></script>
+<script src="js/craft_menu.js?v=333"></script>
+<script src="js/shop_menu.js?v=333"></script>
+<script src="js/forge_menu.js?v=333"></script>
+<script src="js/main.js?v=333"></script>
 </body>
 </html>

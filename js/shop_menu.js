@@ -7,7 +7,6 @@
 // 구조: 제목 → [구매|판매 탭 + 소유 골드] → 분류 탭(장비/소비/마석/기타, 가로 스크롤) → 세부 분류 탭(장비만) → 필터·정렬 방향 / 검색 → 빠른 구매/판매 → 아이템 목록(이 영역만 세로 스크롤).
 // 분류는 이름·아이템 목록에 하드코딩하지 않음: SHOP_TABS(분류 정의)와 각 아이템 데이터/보유 현황에서 "지금 이 모드(구매/판매)에서 실제로 표시 가능한 아이템"을 모아
 // 그 아이템이 하나라도 있는 분류/세부 분류만 탭으로 만듦.
-// 예전 상점 UI(render.js renderShopTab 이하, main.js 상점 리스너, index.html .shop-legacy-wrap)는 삭제하지 않고 SHOP_MENU_UI='legacy'로 복구 가능하게 보존함.
 // ============================================================
 
 // 화면 상태(저장하지 않음. 빠른 구매/판매 체크만 state.settings.shopQuickTrade에 저장)
@@ -291,7 +290,7 @@ function shopMenuShowTip(key){
 (function shopMenuInit(){
   const wrap = el('shopNewWrap');
   if(!wrap) return;
-  document.body.classList.toggle('shop-ui-new', SHOP_MENU_UI === 'new');
+  document.body.classList.add('shop-ui-new');
 
   el('shopModeTabs').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-mode]'); if(b) shopMenuSwitchMode(b.dataset.mode); });
   el('shopCatTabs').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-cat]'); if(b) shopMenuSwitchCat(b.dataset.cat); });

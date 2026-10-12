@@ -313,7 +313,7 @@ function playerCombatIconHtml(direction, motion){
 // 아티팩트(equipType === 'artifact')만 전용 폴더(ARTIFACT_IMAGE_DIR), 그 외는 기존 ITEM_IMAGE_DIR을 그대로 씀. image 필드가
 // 있으면 PNG를 출력하고, 없으면 기존과 동일하게 icon(이모지)을 그대로 반환함. className은 화면별 크기
 // 클래스를 넘겨받지만, item-icon-img 자체가 부모 요소의 font-size를 1em 기준으로 그대로 물려받으므로
-// 대부분의 화면(equip-slot/inv-icon/artifact-icon-box/quickslot-icon 등)은 클래스 없이도 기존 이모지가
+// 대부분의 화면(inv-icon/artifact-icon-box/quickslot-icon 등)은 클래스 없이도 기존 이모지가
 // 쓰던 font-size 기반 크기 규칙에 자동으로 맞춰짐. PNG 파일이 없거나 로드에 실패하면 itemImgError(onerror)가
 // img를 이모지 텍스트로 즉시 대체함 — 오류 없이 항상 무언가는 표시됨. itemDefLike는 { icon, image } 형태면
 // 되므로 ARTIFACTS/CONSUMABLES/MISC_ITEMS 항목뿐 아니라 필요한 필드만 담은 객체를 넘겨도 동일하게 동작함.
@@ -1049,110 +1049,12 @@ function critMultiplierFor(target){
 }
 function atkFor(type, level){ return wpn(type).atk[level]; }
 
-// ---- 강화 화면의 고유 옵션 표시(현재 단계 → 다음 단계 미리보기) ----
-// uniqueOption이 있는 무기라면 자동으로 이 함수가 호출되어 강화 화면에 항목이 표시됨(무기별 개별 코드 없음).
-// textTemplate 작성 규칙: "{chance}%" 형태로 붙여서 써야 함(예: '...{chance}% 확률로...') — 수치가 다음 단계에서
-// 오르는 경우 "{chance}%" 부분 전체를 formatStatDelta 결과(화살표+증가량 표시)로 치환하기 때문.
-// opt.text가 있는 "고정형" 고유 옵션(반월대도처럼 강화해도 수치가 오르지 않는 경우)은 성장 로직을 전부
-// 건너뛰고 항상 같은 문구만 보여줌 — 활성화 여부(activateLevel) 판단과 회색/안내문구 서식은 성장형과
-// 동일하게 재사용됨. 앞으로 추가되는 고정형 고유 옵션 무기도 opt.text만 채우면 자동으로 이 분기를 탐.
-// 반환값이 null이면 무기에 고유 옵션이 없다는 뜻 — 호출부(render.js)에서 이 값으로 표시 여부를 결정함.
-function weaponUniqueOptionForgeHtml(type, level){
-  const opt = wpn(type).uniqueOption;
-  if(!opt) return null;
-
-  const activeNow = weaponUniqueOptionActive(type, level);
-  const hasNext = level < MAX_LEVEL;
-  const activeNext = hasNext ? weaponUniqueOptionActive(type, level+1) : activeNow;
-
-  // 여러 스탯이 동시에 성장하는 옵션(opt.growthStats): 스탯마다 한 줄씩, 다음 단계에서 수치가 오르는 줄만
-  // 화살표+증가량으로 표시(성장형 옵션의 기존 표시 규칙과 동일). 활성화 전 서식/안내 문구도 동일하게 재사용.
-  if(Array.isArray(opt.growthStats)){
-    const nowEntries = uniqueOptionGrowthEntries(opt, level);
-    const nextEntries = hasNext ? uniqueOptionGrowthEntries(opt, level+1) : null;
-    const gsLines = nowEntries.map((g, i) => {
-      const nextVal = nextEntries ? nextEntries[i].value : null;
-      const valueHtml = (activeNow && nextVal != null && nextVal !== g.value)
-        ? formatStatDelta(g.value, nextVal, 0, '') : String(g.value);
-      return `${g.label} +${valueHtml}`;
-    });
-    if(opt.text != null) gsLines.push(opt.text);
-    const gsText = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(gsLines.join('<br>')));
-    if(activeNow) return `<div style="color:var(--forge-cream);">${gsText}</div>`;
-    const gsNote = activeNext ? '고유 옵션 활성화' : `+${opt.activateLevel} 달성 시 활성화`;
-    return `<div style="color:var(--forge-cream-dim);">${gsText}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${gsNote}</div>`;
-  }
-
-  if(opt.text != null){
-    const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(opt.text));
-    if(activeNow) return `<div style="color:var(--forge-cream);">${text}</div>`;
-    const note = activeNext ? '고유 옵션 활성화' : `+${opt.activateLevel} 달성 시 활성화`;
-    return `<div style="color:var(--forge-cream-dim);">${text}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${note}</div>`;
-  }
-
-  const chanceNow = weaponUniqueOptionChance(type, level);
-  const chanceNext = hasNext ? weaponUniqueOptionChance(type, level+1) : null;
-  // 성장형 고유 옵션의 표시 단위(suffix)와 소수 자릿수(decimals) — 등록하지 않으면 기존과 완전히 동일하게
-  // '%'/정수(0자리)로 처리됨(blacksword/firesword/spiderarmor 등 기존 %확률형 전부 무변화).
-  // 방어도 무시/지능처럼 %가 아닌 순수 수치형 성장 옵션(흑령갑옷/흑령투구/인형술사의 옷)은
-  // opt.chanceSuffix:''로, 매의 투구처럼 소수점이 필요한 %는 opt.chanceDecimals:1로 등록해 이 자리에서만
-  // 분기됨 — 값 자체를 계산/합산하는 로직(weaponUniqueOptionChance 등)은 전혀 바뀌지 않음.
-  const suffix = opt.chanceSuffix != null ? opt.chanceSuffix : '%';
-  const decimals = opt.chanceDecimals != null ? opt.chanceDecimals : 0;
-  const fmtChance = v => v.toFixed(decimals);
-
-  if(activeNow){
-    // 이미 활성화된 상태 — 다음 단계에서 수치가 오르면 값 자리에 화살표+증가량만 표시하고(안내 문구 없음),
-    // 수치가 그대로면 평소 무기 툴팁과 동일하게 안내 문구 없이 고정 수치만 표시함.
-    const changed = chanceNext != null && chanceNext !== chanceNow;
-    const valueHtml = changed
-      ? formatStatDelta(chanceNow, chanceNext, decimals, suffix)
-      : (fmtChance(chanceNow) + suffix);
-    const rawText = opt.textTemplate.replace('{chance}' + suffix, valueHtml);
-    const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
-    return `<div style="color:var(--forge-cream);">${text}</div>`;
-  }
-
-  // 아직 비활성화 상태 — 활성화 조건 시점의 미리보기 수치를 회색으로 보여줌(무기 툴팁과 동일한 값).
-  const rawText = opt.textTemplate.replace('{chance}', fmtChance(chanceNow));
-  const text = resolveGlossaryTermsHtml(simplifyUniqueOptionTooltipText(rawText));
-  const note = activeNext
-    ? '고유 옵션 활성화' // 지금 강화하면(다음 단계에서) 바로 활성화되는 경우
-    : `+${opt.activateLevel} 달성 시 활성화`; // 아직 활성화까지 강화가 더 필요한 경우
-  return `<div style="color:var(--forge-cream-dim);">${text}</div><div style="color:var(--forge-cream-dim); font-size:11.5px; margin-top:2px;">${note}</div>`;
-}
 function atkSpeedFor(type, level){ return wpn(type).speed[level]; }
 function critChanceFor(type, level){ return wpn(type).crit[level]; }
 function costFor(type, level){ return wpn(type).cost[level]; }
 function sellValueFor(type, level){ return wpn(type).sell[level]; }
 function oddsFor(type, level){ return wpn(type).odds[level]; }
 
-// ---- 강화 화면 스탯 표시(데이터 기반, 하드코딩 없음) ----
-// 강화 화면에서 선택된 장비가 무기든 방어구든 상관없이, 도감 데이터에 해당 강화단계별 배열이 있는
-// 옵션만 자동으로 표시함. arrKey는 wpn(type) 위의 실제 배열 필드명(atkFor 등 기존 접근자와 동일한
-// 필드를 그대로 참조 — 새 필드를 만들지 않음). 순서 = 공격력→공격속도→치명타 확률→방어도→체력→마나.
-const FORGE_STAT_FIELDS = [
-  { arrKey: 'atk',     label: '공격력',      decimals: null, suffix: '' },
-  { arrKey: 'speed',   label: '공격속도',    decimals: 2,    suffix: '' },
-  { arrKey: 'crit',    label: '치명타 확률', decimals: null, suffix: '%' },
-  { arrKey: 'defArr',  label: '방어도',      decimals: null, suffix: '' },
-  { arrKey: 'hpArr',   label: '체력',        decimals: null, suffix: '' },
-  { arrKey: 'manaArr', label: '마나',        decimals: null, suffix: '' },
-];
-// 현재 선택된 장비(type, level)에 대해, 데이터에 실제로 존재하는 옵션만 "현재 수치 → 다음 단계 수치"
-// 행으로 조립해서 반환. 증가량 색상/기호는 기존 formatStatDelta를 그대로 재사용(요청사항: 그대로 사용).
-function buildForgeStatRowsHtml(type, level){
-  const w = wpn(type);
-  let html = '';
-  FORGE_STAT_FIELDS.forEach(f => {
-    const arr = w[f.arrKey];
-    if(!arr || arr[level] == null) return; // 이 장비 데이터에 해당 옵션이 없으면 행 자체를 생략
-    const now = arr[level];
-    const next = level < MAX_LEVEL ? (arr[level + 1] != null ? arr[level + 1] : null) : null;
-    html += `<div class="stat-row"><span>${f.label} <b>${formatStatDelta(now, next, f.decimals, f.suffix)}</b></span></div>`;
-  });
-  return html;
-}
 
 // ---- 상점 품목 목록 (탭별) ----
 // 각 아이템을 정렬에 필요한 최소 정보 { id, price, levelReq }로 정규화해서 반환.
@@ -2255,7 +2157,7 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
 
 // ---- 상점 "개수 지정 구매" 팝업 공용 헬퍼 ----
 // 상점의 모든 구매 가능 아이템은 buy-weapon(무기/방어구/장신구 공용) / buy-consumable / buy-artifact
-// 세 data-action 중 하나로 처리되므로(buildShopCardHtml 참고), 이 action 값 + typeId만으로 단가·최대
+// 세 data-action 중 하나로 처리되므로(shop_menu.js 참고), 이 action 값 + typeId만으로 단가·최대
 // 구매 가능 개수·아이콘/툴팁을 구하는 범용 함수만 두면 됨 — 새 무기/방어구/장신구/소비 아이템/아티팩트가
 // 추가돼도(즉, 이 세 카테고리 중 하나로 등록되는 한) 별도 코드 없이 개수 지정 구매 UI가 자동으로 적용됨.
 // ---- 상점 판매(소비/마석/기타) — 같은 팝업(buyQtyModal)을 "판매 모드"로 재사용함 ----
@@ -2327,7 +2229,7 @@ function shopBuyItemDisplay(action, typeId){
     return { iconHtml: itemIconHtml(item, 'shop-icon-img'), tooltipHtml: buildConsumableTooltipHtml(typeId), borderColor: '#c13c3c' };
   }
   if(action === 'sell-misc'){
-    // 마석/기타 상점 카드(buildStoneShopCardHtml/buildMiscShopCardHtml)와 같은 아이콘·툴팁·등급 테두리색을 그대로 재사용
+    // 상점 마석/기타 목록과 같은 아이콘·툴팁·등급 테두리색을 그대로 재사용
     const item = MISC_ITEMS[typeId];
     const isStone = item.itemClass === 'stone';
     return {
@@ -3404,18 +3306,12 @@ function displayEnhanceOdds(type, level){
 }
 
 // 사용 가능 조건. 강화 데이터가 없거나 최대 강화인 경우 사용 불가.
-// 끈기의 기도: 2단계 강화 확률 개편으로 하락 결과 자체가 삭제되어 막아줄 대상이 없어짐 — 새로운
-// 역할은 추후 별도로 결정할 예정이므로, 그 전까지는 임의로 새 조건을 만들지 않고 항상 사용
-// 불가로 정리함(버튼은 항상 비활성 상태로 표시됨).
-function prayerCanUseCharm(type, level){
-  return false;
-}
 // 보호의 기도(6단계 개편): 파괴 확률이 존재하는 강화 단계라면 언제든 사용 가능 — 기존에 있던
 // "레벨 7 이하만" 제한을 삭제해 +8 이상(마지막 +8→+9 시도 포함)에서도 사용할 수 있도록 함.
 // 파괴 확률이 원래 0%인 단계에서는 여전히 사용할 수 없음(줄일 파괴 확률 자체가 없으므로).
 function prayerCanUseBlessing(type, level){
   const odds = oddsFor(type, level);
-  return !!odds && odds[2] > 0 && !state.charmActive;
+  return !!odds && odds[2] > 0;
 }
 function prayerCanUseFocus(type, level){
   const base = oddsFor(type, level);
@@ -3431,7 +3327,6 @@ function enhanceCostBreakdown(type, level){
   const base = costFor(type, level);
   if(base === undefined) return { base, total: base, parts: [] };
   const parts = [];
-  if(state.charmActive) parts.push({ key: 'charm', label: PRAYERS.charm.name, mult: PRAYERS.charm.costMult });
   if(state.blessingActive) parts.push({ key: 'blessing', label: PRAYERS.blessing.name, mult: PRAYERS.blessing.costMult });
   if(state.focusActive) parts.push({ key: 'focus', label: PRAYERS.focus.name, mult: PRAYERS.focus.costMult });
   const total = parts.length === 0

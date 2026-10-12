@@ -65,7 +65,7 @@ function performSellQty(){
   if(action === 'sell-consumable') state.consumables[typeId] = owned - qty;
   else state[item.stateKey] = owned - qty;
   state.gold += total;
-  const anchor = document.querySelector(`#shopList .shop-row[data-action="${action}"][data-type="${typeId}"]`) || document.querySelector(`#shopItemsList button[data-action="${action}"][data-type="${typeId}"]`); // 새 상점 행 / 예전 상점 버튼
+  const anchor = document.querySelector(`#shopList .shop-row[data-action="${action}"][data-type="${typeId}"]`);
   closeBuyQtyModal(); // 판매 수량창 상태 정리(확인창은 confirmSell이 이미 닫음)
   purchaseEffect(anchor);
   render(); saveState();
@@ -90,35 +90,16 @@ function startEnhance(){
   showMsg('', '');
   render();
 
-  // 새 강화 탭: 결과는 여기서 딱 한 번 판정해 보관하고, 연출(시도 → 결과)이 끝난 뒤 resolveEnhance가 실제 결과만 반영함.
+  // 결과는 여기서 딱 한 번 판정해 보관하고, 연출(시도 → 결과)이 끝난 뒤 resolveEnhance가 실제 결과만 반영함.
   // 연출 스킵이면 시도 연출만 생략(attemptMs=0)하고 결과 연출은 그대로 재생. 입력 잠금(isEnhancing)은 결과 처리까지 유지됨.
-  if(forgeEnhNewActive()){
-    const outcome = weightedOutcome(effectivePrayerOdds(type, level));
-    const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[2] > 0; // 기존 대기 시간 결정 방식 그대로
-    forgeEnhPlay(equipped.id, level, type, outcome, state.skipEffects ? 0 : (highRisk ? 1000 : 700));
-    return;
-  }
-
-  if(state.skipEffects){
-    resolveEnhance(equipped.id, level);
-    return;
-  }
-
-  const stage = el('swordStage');
-  stage.classList.remove('shake','shake-hard','strike');
-  stage.classList.add('charging');
-  startEmbers();
-
-  const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[2] > 0; // 파괴 확률이 있는 단계는 긴장감 있게 연출을 더 길게
-  const delay = highRisk ? 1000 : 700;
-  setTimeout(()=> resolveEnhance(equipped.id, level), delay);
+  const outcome = weightedOutcome(effectivePrayerOdds(type, level));
+  const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[2] > 0; // 파괴 확률이 있는 단계는 연출을 더 길게(기존 방식 그대로)
+  forgeEnhPlay(equipped.id, level, type, outcome, state.skipEffects ? 0 : (highRisk ? 1000 : 700));
 }
 
-// opts(새 강화 탭 전용): { newUi:true, outcome } — 이미 판정된 결과를 받아 반영만 하고, 예전 연출 효과는 호출하지 않으며,
-// 결과 처리가 끝날 때까지(파괴는 안내 팝업이 뜰 때까지) isEnhancing 잠금을 유지함.
+// 이미 판정된 결과(opts.outcome)를 받아 실제 결과(레벨 변경/파괴/보상)를 반영함 — 강화 연출(forge_menu.js forgeEnhPlay)이
+// 끝난 뒤 호출됨. 결과 처리가 끝날 때까지(파괴는 안내 팝업이 뜰 때까지) isEnhancing 입력 잠금을 유지함.
 function resolveEnhance(itemId, level, opts){
-  const newUi = !!(opts && opts.newUi);
-  if(!newUi) isEnhancing = false;
   // 대장간 화면에 지금 표시된 대상은 무기/방어구/장신구 인벤토리 중 하나이므로 전부 검색함(getEquipped()와 동일한 검색 범위).
   let item = state.inventory.find(i => i.id === itemId);
   if(!item) item = (state.armorInventory || []).find(i => i.id === itemId);
@@ -132,14 +113,6 @@ function resolveEnhance(itemId, level, opts){
   const odds = effectivePrayerOdds(type, level); // 보호(파괴 확률 감소)+집중(성공 확률 증가) 전부 반영된 최종 확률
   let outcome = (opts && opts.outcome) || weightedOutcome(odds);
 
-  const stage = el('swordStage');
-  if(!newUi){
-    stopEmbers();
-    stage.classList.remove('shake','shake-hard','strike','charging');
-    void stage.offsetWidth;
-  }
-
-  let popLevelDisplay = false;
   let destroyNotice = null;
 
   // 6단계 개편: 보호의 기도는 더 이상 '파괴' 결과가 나온 뒤 사후적으로 '유지'로 가로채지 않음 —
@@ -151,18 +124,8 @@ function resolveEnhance(itemId, level, opts){
   if(outcome === 'success'){
     item.level++;
     if(item.level > state.bestLevel) state.bestLevel = item.level;
-    if(!newUi){
-      stage.classList.add('strike');
-      successRing('#ffb37a');
-      setTimeout(()=>successRing('#ffe9a8'), 130);
-      burstRays('#ffd76a', 12);
-      burstSparks('#ff6a3d', 24);
-      flashCard('rgba(255,106,61,0.5)');
-      popLevelDisplay = true;
-    }
     if(item.level >= MAX_LEVEL){
       state.legendCount++;
-      if(!newUi){ successRing('#e0b13c'); burstRays('#ffffff', 14); }
       showMsg(isArmorItem ? '✨ 전설의 방어구 완성! 판매하여 다음 방어구를 준비하세요'
         : isAccessoryItem ? '✨ 전설의 장신구 완성! 판매하여 다음 장신구를 준비하세요'
         : '✨ 전설의 검 완성! 판매하여 다음 검을 만드세요', 'legend');
@@ -170,40 +133,28 @@ function resolveEnhance(itemId, level, opts){
       showMsg('강화 성공! +' + item.level, 'success');
     }
   } else if(outcome === 'stay'){
-    if(!newUi) smokePuff();
     showMsg('실패... 레벨 유지', 'stay');
   } else if(outcome === 'destroy'){
     state.totalDestroys++;
-    if(!newUi){
-      stage.classList.add('shake-hard');
-      burstSparks('#c13c3c', 14);
-      shatterBurst(18);
-      flashCard('rgba(193,60,60,0.55)');
-    }
-    // 새 강화 탭 파괴 안내 팝업용 정보 — 장비가 제거되기 전에 이름/등급색/강화 단계를 확보함
-    destroyNotice = newUi ? { type, level, name: weaponName(type) + levelSuffix(level), color: weaponNameColor(type, level) } : null;
+    // 파괴 안내 팝업용 정보 — 장비가 제거되기 전에 이름/등급색/강화 단계를 확보함
+    destroyNotice = { type, level, name: weaponName(type) + levelSuffix(level), color: weaponNameColor(type, level) };
     const rewardMsg = processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem);
-    if(destroyNotice){ destroyNotice.reward = lastDestroyReward; destroyNotice.failMsg = (!lastDestroyReward && rewardMsg) ? rewardMsg : ''; }
+    destroyNotice.reward = lastDestroyReward;
+    destroyNotice.failMsg = (!lastDestroyReward && rewardMsg) ? rewardMsg : '';
     showMsg('💥 아이템이 파괴되었습니다...' + (rewardMsg ? ' ' + rewardMsg : ''), 'destroy');
   }
 
-  if(newUi && outcome !== 'destroy') isEnhancing = false; // 장비 레벨 반영까지 끝난 뒤 잠금 해제(파괴는 아래에서 안내 팝업이 뜰 때 해제)
+  if(outcome !== 'destroy') isEnhancing = false; // 장비 레벨 반영까지 끝난 뒤 잠금 해제(파괴는 아래에서 안내 팝업이 뜰 때 해제)
   clampPlayerVitals(); // 방어구 강화로 체력/마나 보너스가 바뀌었을 수 있으므로 현재값을 새 최대치에 맞춰 정리
   render();
   saveState();
-  if(newUi && outcome === 'destroy'){
+  if(outcome === 'destroy'){
     // 장비 제거·보상 지급은 이미 끝났음(위) — 팝업은 결과 안내용이며, 열고 닫는 것이 지급에 영향을 주지 않음
     setTimeout(()=>{
       openDestroyNoticeModal(destroyNotice);
       isEnhancing = false;
       render();
     }, ENCHANT_DESTROY_POPUP_DELAY_MS);
-  }
-  if(popLevelDisplay){
-    const ld = el('levelDisplay');
-    ld.classList.remove('pop'); void ld.offsetWidth;
-    ld.classList.add('pop');
-    setTimeout(()=>ld.classList.remove('pop'), 500);
   }
 }
 
@@ -286,26 +237,9 @@ function performSellItem(id){
   if(state.forgeTargetId === id) state.forgeTargetId = null; // 대장간에 표시 중이었다면 함께 정리
   if(state.equippedId === id){
     state.equippedId = null;
-    // "판매 후 자동 구매"는 인벤토리에 새 검을 채워주는 기능이지 강화 대상을 대신 골라주는 기능이
-    // 아님(구조 변경 5번: 강화 화면은 항상 플레이어가 직접 선택한 장비만 표시) — 그래서 구매까지는
-    // 자동으로 하되, 강화 대상으로 자동 지정(forgeTargetId 대입)하지는 않음. 이후 대장간 버튼이나
-    // 인벤토리에서 직접 "강화 선택"해야 강화 화면에 표시됨.
-    if(state.autoRebuy && state.gold >= weaponBuyPrice('longsword') && !equipInventoryFull()){
-      state.gold -= weaponBuyPrice('longsword');
-      const newItem = { id: state.nextItemId++, level: 0, type: 'longsword', currentDurability: freshCurrentDurability('longsword') };
-      state.inventory.push(newItem);
-    }
   }
   render();
   saveState();
-}
-// 대장간 화면 하단 "판매" 버튼 — 지금 대장간에 표시된 대상(getEquipped(), 무기/방어구/장신구)을 판매함.
-function doSell(){
-  const equipped = getEquipped();
-  if(!equipped) return;
-  if(state.inventory.some(i => i.id === equipped.id)) sellItem(equipped.id);
-  else if((state.armorInventory || []).some(i => i.id === equipped.id)) sellArmorItem(equipped.id);
-  else sellAccessoryItem(equipped.id);
 }
 // ---- 착용 요구 스탯 재검사(장비/아티팩트 착용상태 변경, 스탯 초기화 등으로 effectiveStats가 바뀔 때) ----
 // 현재 착용 중인 무기(equippedId)/방어구(equippedArmor.helmet, .armor)/장신구(equippedAccessories 각 슬롯)
@@ -432,19 +366,9 @@ function selectForgeTarget(id){
   closeForgeSelect();
 }
 
-// ---- 보호 장치(기도: 끈기/보호/집중) ----
+// ---- 보호 장치(기도: 보호/집중) ----
 // 더 이상 구매/보유 개수 개념이 없는 ON-OFF 토글. OFF로 끄는 것은 항상 허용하고, ON으로 켤 때만
-// prayerCanUseXXX(formulas.js)의 사용 가능 조건을 검사함(끈기/보호 동시 사용 불가 포함).
-function toggleCharm(){
-  if(isEnhancing) return;
-  const equipped = getEquipped();
-  if(!equipped) return;
-  const type = equipped.type || 'longsword';
-  const level = equipped.level;
-  if(!state.charmActive && !prayerCanUseCharm(type, level)) return;
-  state.charmActive = !state.charmActive;
-  render(); saveState();
-}
+// prayerCanUseXXX(formulas.js)의 사용 가능 조건을 검사함.
 function toggleBlessing(){
   if(isEnhancing) return;
   const equipped = getEquipped();
@@ -522,8 +446,8 @@ function buyWeapon(typeId, btn, silent){
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
   }
-  // 상점 "장비 > 방어구/장신구" 탭 카드도 동일한 data-action="buy-weapon"을 공유해서 호출하므로(buildWeaponShopCardHtml
-  // 참고) 여기서 분기해서 처리함. 방어구/장신구는 각각 별도 인벤토리 배열에 담김.
+  // 상점 "장비 > 방어구/장신구" 탭도 동일한 data-action="buy-weapon"을 공유해서 호출하므로
+  // 여기서 분기해서 처리함. 방어구/장신구는 각각 별도 인벤토리 배열에 담김.
   const a = ARMOR_TYPES[typeId];
   if(a){
     if(!a.purchasable) return false;
@@ -535,8 +459,8 @@ function buyWeapon(typeId, btn, silent){
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
   }
-  // 상점 "장비 > 보조" 탭도 동일한 data-action="buy-weapon"을 공유해서 호출함(buildWeaponShopCardHtml
-  // 참고) — 방어구/장신구와 같은 방식이나, 보조는 강화가 없어 level은 항상 0 그대로 유지됨.
+  // 상점 "장비 > 보조" 탭도 동일한 data-action="buy-weapon"을 공유해서 호출함
+  // — 방어구/장신구와 같은 방식이나, 보조는 강화가 없어 level은 항상 0 그대로 유지됨.
   const sub = SUB_TYPES[typeId];
   if(sub){
     if(!sub.purchasable) return false;
@@ -734,7 +658,7 @@ function buyFlask(id, btn, silent){
   state.gold -= item.buyPrice;
   state.consumables[id] = (state.consumables[id] || 0) + 1;
   if(!silent){
-    purchaseEffect(btn ? (btn.closest('.scroll-card') || btn) : null);
+    purchaseEffect(btn || null);
     render(); saveState();
   }
   return true;
@@ -1134,15 +1058,10 @@ function resetFlaskStateOnDeath(){
   flaskCooldownUntil = {};
 }
 
-// ---- 강화 화면 토글 옵션 ----
+// ---- 강화 화면 토글 옵션(연출 스킵) ----
 function toggleSkip(){
   if(isEnhancing) return;
   state.skipEffects = !state.skipEffects;
-  render(); saveState();
-}
-function toggleAutoRebuy(){
-  if(isEnhancing) return;
-  state.autoRebuy = !state.autoRebuy;
   render(); saveState();
 }
 

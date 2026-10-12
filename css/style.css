@@ -72,7 +72,6 @@
     border-radius:999px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer;
   }
   .nav-btn{ position:relative; }
-  .scroll-buy{ position:relative; }
   .purchase-flash{ animation: purchase-glow .6s ease-out; }
   @keyframes purchase-glow{
     0%{ box-shadow: 0 0 0 0 rgba(224,177,60,0); }
@@ -97,116 +96,19 @@
     border:1px solid var(--forge-line); border-radius: 18px;
     padding: 28px 20px 22px; position: relative; overflow: hidden;
   }
+  .tier-label{ text-align:center; font-size:12px; letter-spacing:3px; text-transform:uppercase; color: var(--forge-cream-dim); margin-bottom: 6px; font-weight:500; } /* 던전(hunt) 화면의 던전 이름 표시에서 사용 */
   .forge-card::before{
     content:''; position:absolute; inset:0;
     background: radial-gradient(circle at 50% 0%, rgba(255,106,61,0.12), transparent 60%);
     pointer-events:none;
   }
-  .forge-card.flash::after{
-    content:''; position:absolute; inset:0;
-    background: radial-gradient(circle at 50% 45%, var(--flash-color, rgba(255,215,106,0.45)), transparent 65%);
-    animation: flash-pulse .9s ease-out; pointer-events:none;
-  }
-  @keyframes flash-pulse{ 0%{opacity:0;} 25%{opacity:1;} 100%{opacity:0;} }
 
-  .tier-label{ text-align:center; font-size:12px; letter-spacing:3px; text-transform:uppercase; color: var(--forge-cream-dim); margin-bottom: 6px; font-weight:500; }
-  .level-display{ text-align:center; font-family:'Noto Serif KR', serif; font-weight:900; font-size: 52px; line-height:1; margin-bottom: 4px; transition: color .3s; }
-  .item-name{ text-align:center; font-size:14px; color: var(--forge-cream-dim); margin-bottom:12px; min-height:18px; }
 
-  .equip-row{ display:flex; justify-content:center; gap:8px; margin-bottom:14px; min-height: 30px; align-items:center; }
-  .equip-slot{
-    width:30px; height:30px; border-radius:8px; background: var(--forge-panel-2);
-    border:1px dashed var(--forge-line); display:flex; align-items:center; justify-content:center;
-    font-size:15px; position:relative; cursor:help;
-  }
-  .equip-slot.filled{ border-style:solid; border-color: var(--forge-gold); background:#2c2415; }
-  .equip-slot .tooltip{ width:210px; left:50%; transform:translateX(-50%); bottom:135%; }
-  .equip-slot:hover .tooltip{ visibility:visible; opacity:1; }
 
-  .sword-stage{ display:flex; justify-content:center; align-items:center; height: 190px; position:relative; margin-bottom: 10px; }
   /* 강화 단계별 발광은 filter(drop-shadow 등)만으로 표현 — 무기 이미지 알파 영역에만 붙어서 배경 전체로 안 번짐 */
-  .sword-visual{ width: 120px; height: 180px; position:relative; z-index:1; transition: filter .25s, opacity .25s; }
-  .sword-img{ width:100%; height:100%; object-fit:contain; display:block; -webkit-user-drag:none; user-select:none; pointer-events:none; transition: transform .2s; }
-  .aura-smoke{
-    position:absolute; width:11px; height:11px; border-radius:50%;
-    filter: blur(4px); opacity:0; pointer-events:none;
-  }
-  .aura-smoke.rise{ animation: smoke-wisp-rise 1.7s ease-out forwards; }
-  @keyframes smoke-wisp-rise{
-    0%{ opacity:0; transform: translate(0,0) scale(.6); }
-    18%{ opacity:.5; }
-    100%{ opacity:0; transform: translate(var(--dx), -65px) scale(2); }
-  }
-  .sword-stage.empty .sword-visual{ opacity:.15; filter: grayscale(1); }
-  .sword-stage.shake .sword-visual{ animation: shake .4s; }
-  .sword-stage.strike .sword-visual{ animation: strike .25s; }
-  @keyframes shake{
-    0%,100%{ transform: translateX(0) rotate(0); }
-    20%{ transform: translateX(-6px) rotate(-3deg); }
-    40%{ transform: translateX(6px) rotate(3deg); }
-    60%{ transform: translateX(-4px) rotate(-2deg); }
-    80%{ transform: translateX(4px) rotate(2deg); }
-  }
-  @keyframes strike{
-    0%{ transform: scale(1); } 40%{ transform: scale(1.08) rotate(2deg); } 100%{ transform: scale(1); }
-  }
-  .spark{ position:absolute; width:5px; height:5px; border-radius:50%; background: var(--forge-ember); opacity:0; pointer-events:none; left:50%; top:45%; }
-  .spark.fire{ animation: spark-fly .6s ease-out forwards; }
-  @keyframes spark-fly{ 0%{ opacity:1; transform: translate(0,0) scale(1); } 100%{ opacity:0; transform: var(--fly) scale(.3); } }
-  .vortex{ position:absolute; width:6px; height:6px; border-radius:50%; opacity:0; pointer-events:none; left:50%; top:45%; }
-  .vortex.spin{ animation: vortex-in .85s cubic-bezier(.3,.6,.3,1) forwards; }
-  @keyframes vortex-in{
-    0%{ opacity:1; transform: var(--p0); }
-    55%{ opacity:1; transform: var(--p1); }
-    100%{ opacity:0; transform: translate(0,-6px) scale(.15); }
-  }
-  .sword-stage.charging::before{
-    content:''; position:absolute; left:50%; top:45%; width:40px; height:40px; margin:-20px 0 0 -20px;
-    border-radius:50%; background: radial-gradient(circle, rgba(255,106,61,0.55), transparent 70%);
-    animation: charge-pulse .5s ease-in-out infinite alternate; pointer-events:none;
-  }
-  @keyframes charge-pulse{ from{ opacity:.35; transform:scale(.8);} to{ opacity:.95; transform:scale(1.5);} }
-  .sword-stage.charging .sword-visual{ animation: charge-shake .12s linear infinite; filter: brightness(1.15) drop-shadow(0 0 10px #ff6a3d99); }
-  @keyframes charge-shake{ 0%,100%{ transform: translateX(0) rotate(0); } 50%{ transform: translateX(1.6px) rotate(.6deg); } }
-  .ember{ position:absolute; bottom:42%; width:4px; height:4px; border-radius:50%; background:#ff9d5c; opacity:.95; pointer-events:none; box-shadow:0 0 6px #ff6a3d; }
-  .ember.rise{ animation: ember-rise .75s ease-out forwards; }
-  @keyframes ember-rise{ 0%{opacity:.95;} 100%{ transform: translate(var(--dx), -75px); opacity:0; } }
-  .success-ring{
-    position:absolute; left:50%; top:45%; width:14px; height:14px; margin:-7px 0 0 -7px;
-    border-radius:50%; border:3px solid #ffb37a; opacity:1; pointer-events:none;
-    animation: ring-expand .55s cubic-bezier(.2,.7,.3,1) forwards;
-  }
-  @keyframes ring-expand{ to{ width:190px; height:190px; margin:-95px 0 0 -95px; opacity:0; border-width:1px; } }
 
-  .burst-ray{
-    position:absolute; left:50%; top:45%; width:3px; height:0px;
-    transform-origin:center bottom; opacity:0; pointer-events:none; border-radius:2px;
-  }
-  .burst-ray.shoot{ animation: ray-shoot .55s ease-out forwards; }
-  @keyframes ray-shoot{
-    0%{ height:0; opacity:1; }
-    55%{ height:75px; opacity:1; }
-    100%{ height:100px; opacity:0; }
-  }
 
-  .level-display.pop{ animation: level-pop .5s cubic-bezier(.3,.8,.4,1); }
   @keyframes level-pop{ 0%{ transform:scale(1); } 35%{ transform:scale(1.4); } 100%{ transform:scale(1); } }
-  .smoke{ position:absolute; left:50%; top:58%; width:9px; height:9px; border-radius:50%; background:#8a8178; opacity:.55; pointer-events:none; }
-  .smoke.rise{ animation: smoke-rise .9s ease-out forwards; }
-  @keyframes smoke-rise{ 0%{opacity:.55;} 100%{ transform: translate(var(--dx), -55px) scale(2.4); opacity:0; } }
-  .frag{ position:absolute; left:50%; top:45%; width:7px; height:7px; opacity:0; pointer-events:none; }
-  .frag.fly{ animation: frag-fly .75s ease-out forwards; }
-  @keyframes frag-fly{ 0%{ opacity:1; transform: translate(0,0) rotate(0deg); } 100%{ opacity:0; transform: var(--fly) rotate(var(--rot)); } }
-  .sword-stage.shake-hard .sword-visual{ animation: shake-hard .5s; }
-  @keyframes shake-hard{
-    0%,100%{ transform: translate(0,0) rotate(0); }
-    15%{ transform: translate(-11px,2px) rotate(-6deg); }
-    30%{ transform: translate(10px,-2px) rotate(6deg); }
-    45%{ transform: translate(-8px,2px) rotate(-4deg); }
-    60%{ transform: translate(8px,-2px) rotate(4deg); }
-    75%{ transform: translate(-4px,1px) rotate(-2deg); }
-    90%{ transform: translate(4px,-1px) rotate(2deg); }
-  }
 
   .empty-notice{
     text-align:center; font-size:13px; color: var(--forge-cream-dim); line-height:1.7;
@@ -216,10 +118,7 @@
   .empty-notice b{ color: var(--forge-gold); }
   .empty-notice .nav-btn{ margin-top:10px; }
 
-  .stat-row{ display:flex; justify-content:center; gap:22px; margin-bottom:14px; font-family:'JetBrains Mono', monospace; font-size:13px; color: var(--forge-cream-dim); }
-  .stat-row b{ color: var(--forge-cream); font-weight:700; }
   /* 고유 옵션 줄은 "라벨 값" 쌍이 아니라 문장 전체이므로 가로 정렬 대신 중앙 정렬된 세로 블록으로 표시 */
-  .unique-option-row{ display:block; text-align:center; font-size:12.5px; line-height:1.5; }
 
   .odds-row{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; font-family:'JetBrains Mono', monospace; font-size:11px; }
   .odds-chip{ padding:3px 8px; border-radius:6px; background: var(--forge-panel-2); border:1px solid var(--forge-line); }
@@ -246,25 +145,13 @@
   .btn-main{ background: linear-gradient(180deg, var(--forge-ember) 0%, var(--forge-ember-dim) 100%); color: #1a0e08; box-shadow: 0 4px 18px rgba(255,106,61,.25); }
   .btn-main:hover:not(:disabled){ filter: brightness(1.08); }
 
-  .cost-skip-row{ display:flex; align-items:center; justify-content:center; gap:10px; margin: 8px 0 4px; flex-wrap:wrap; }
-  .cost-line{ text-align:center; font-size:12px; color: var(--forge-cream-dim); font-family:'JetBrains Mono', monospace; }
-  .cost-line .sell-part{ color: var(--forge-gold); }
   .skip-toggle{
     border:1px solid var(--forge-line); background: var(--forge-panel-2); color: var(--forge-cream-dim);
     border-radius:999px; padding:4px 12px; font-size:11px; cursor:pointer; font-family:'JetBrains Mono', monospace;
   }
   .skip-toggle.on{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
-  .skip-row{ display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
 
-  .btn-sell{ width:100%; background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream); font-size:13px; padding:11px; margin-bottom: 16px; }
-  .btn-sell:hover:not(:disabled){ border-color: var(--forge-ember-dim); }
 
-  .scroll-card{ background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; position:relative; }
-  .scroll-card.artifact{ border-color: #6b5423; }
-  .scroll-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
-  .scroll-name-wrap{ position:relative; display:inline-block; }
-  .scroll-name{ font-weight:700; font-size:13.5px; cursor:help; border-bottom:1px dotted currentColor; }
-  .scroll-name.artifact{ color: var(--forge-gold); }
   .tooltip{
     visibility:hidden; opacity:0; position:absolute; bottom:130%; left:0; z-index:10;
     width:230px; background:#0e0b09; border:1px solid var(--forge-line); border-radius:8px;
@@ -292,12 +179,6 @@
     border-radius:8px; padding:10px 12px; font-size:11.5px; font-weight:400; color: var(--forge-cream-dim);
     line-height:1.5; box-shadow:0 4px 16px rgba(0,0,0,.5);
   }
-  .scroll-name-wrap:hover .tooltip{ visibility:visible; opacity:1; }
-  .scroll-count{ font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--forge-cream-dim); }
-  .scroll-body{ display:flex; gap:8px; align-items:center; }
-  .scroll-buy{ flex:1; border:1px solid var(--forge-line); background: var(--forge-panel); color: var(--forge-cream); border-radius:8px; padding:8px; font-size:12px; font-family:'JetBrains Mono', monospace; cursor:pointer; }
-  .scroll-buy:hover:not(:disabled){ border-color: var(--forge-gold); }
-  .scroll-buy:disabled{ opacity:.4; cursor:not-allowed; }
 
   /* ---- 강화 보호 장치(기도) — 끈기/보호/집중 ---- */
   /* sword-stage(position:relative, height:190px) 왼쪽에 세로로 배치. 3개(34px)+간격(10px)x2=122px이므로
@@ -305,26 +186,10 @@
      transform이 있는 조상은 새로운 containing block이 되어, main.js의 범용 툴팁 재배치 시스템
      (adjustTooltipPosition)이 쓰는 position:fixed 좌표가 viewport가 아닌 이 조상 기준으로 틀어져버림
      (실제로 이 버그로 데스크톱에서 툴팁이 아예 엉뚱한 곳에 그려져 안 보이던 것을 실제 브라우저로 확인함). */
-  .prayer-icon-col{
-    position:absolute; left:6px; top:34px;
-    display:flex; flex-direction:column; gap:10px; z-index:2;
-  }
-  .prayer-icon-btn{
-    width:34px; height:34px; padding:0; border-radius:9px; position:relative;
-    background: var(--forge-panel-2); border:2px solid var(--forge-line); cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
-    transition: border-color .15s;
-  }
-  .prayer-icon-btn.on{ border-color: var(--forge-gold); }
-  .prayer-icon-btn:disabled{ cursor:not-allowed; }
   /* 투명도는 버튼 전체가 아니라 아이콘 이미지에만 적용 — 형제 요소인 .tooltip이 같이 흐려지지 않도록
      함(.skill-icon-btn이 이미 쓰고 있는 것과 동일한 패턴, 990번줄 부근 주석 참고). */
-  .prayer-icon-img{ width:20px; height:20px; object-fit:contain; pointer-events:none; opacity:.3; transition: opacity .15s; }
-  .prayer-icon-btn.on .prayer-icon-img{ opacity:1; }
   /* 왼쪽 끝에 붙어있어 기존처럼 위로 뜨는 툴팁은 화면 밖으로 잘릴 수 있어, 오른쪽으로 펼침 —
      실제 최종 위치는 main.js의 adjustTooltipPosition이 화면 경계에 맞춰 보정함. */
-  .prayer-icon-btn .tooltip{ left:120%; right:auto; bottom:auto; top:50%; transform:translateY(-50%); width:190px; }
-  .prayer-icon-btn:hover .tooltip{ visibility:visible; opacity:1; }
 
   /* 강화 비용에 기도 배율이 적용되어 기본 비용보다 늘어난 경우 초록색으로 강조(요구사항 18) —
      기대 강화 비용/판매가 계산과는 무관한 화면 표시 전용. */
@@ -334,7 +199,6 @@
   .enhance-cost-wrap:hover .tooltip{ visibility:visible; opacity:1; }
 
 
-  .effect-line{ font-size:12.5px; color: var(--forge-cream-dim); line-height:1.5; margin-bottom:10px; }
   .u-tip{ position:relative; border-bottom:1px dotted var(--forge-gold); color: var(--forge-gold); cursor:help; }
   .u-tip .tooltip{ width:100px; left:50%; transform:translateX(-50%); text-align:center; }
   .u-tip:hover .tooltip{ visibility:visible; opacity:1; }
@@ -360,7 +224,6 @@
   .artifact-icon-box{ width:46px; height:46px; border-radius:10px; background:#2c2415; border:1px solid var(--forge-gold); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
 
   /* ---- shop: 탭 / 필터 / 정렬 ---- */
-  .shop-head-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
   .shop-sort-controls{ display:flex; gap:8px; flex-shrink:0; }
   .shop-filter-wrap{ position:relative; }
   .shop-filter-btn{
@@ -378,20 +241,6 @@
   }
   .shop-filter-item:hover{ background: var(--forge-panel-2); color: var(--forge-cream); }
   .shop-filter-item.active{ color: var(--forge-gold); }
-  .shop-tabs{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
-  .shop-tab-btn{
-    flex:1; min-width:60px; background: var(--forge-panel-2); border:1px solid var(--forge-line); color: var(--forge-cream-dim);
-    border-radius:8px; padding:8px 4px; font-size:12px; font-weight:700; cursor:pointer;
-  }
-  .shop-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
-  /* "장비" 최상위 탭 전용 하위탭 행(무기/방어구/장신구/아티팩트). 상위 탭보다 한 단계 옅게 표시해서
-     계층 관계를 시각적으로 드러냄. 장비 탭이 아닐 때는 JS(renderShopTab)가 display:none 처리. */
-  .shop-subtabs{ display:flex; gap:6px; margin:-6px 0 14px; flex-wrap:wrap; }
-  .shop-subtab-btn{
-    flex:1; min-width:50px; background:transparent; border:1px solid var(--forge-line); color: var(--forge-cream-dim);
-    border-radius:6px; padding:5px 4px; font-size:11px; font-weight:600; cursor:pointer;
-  }
-  .shop-subtab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
 
   /* ---- inventory ---- */
   .inv-tabs{ display:flex; gap:8px; margin-bottom:14px; }
@@ -400,8 +249,7 @@
     border-radius:8px; padding:8px 4px; font-size:12px; font-weight:700; cursor:pointer;
   }
   .inv-tab-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
-  /* 인벤토리 쪽 "장비" 하위탭 행. shop-subtabs와 동일한 스타일을 그대로 대응시켜 상점/인벤토리가
-     같은 계층 구조로 보이게 함. */
+  /* 인벤토리 쪽 "장비" 하위탭 행(무기/방어구/보조/장신구). 상위 탭보다 한 단계 옅게 표시해 계층 관계를 드러냄. */
   .inv-subtabs{ display:flex; gap:6px; margin:-6px 0 14px; flex-wrap:wrap; }
   .inv-subtab-btn{
     flex:1; background:transparent; border:1px solid var(--forge-line); color: var(--forge-cream-dim);
@@ -714,7 +562,7 @@
   .item-icon-img{ display:block; width:1em; height:1em; object-fit:contain; -webkit-user-drag:none; user-select:none; }
   /* 버그 수정: 던전 전투화면에서 플레이어/몬스터 이미지를 마우스로 드래그하면 브라우저 네이티브 이미지
      드래그(HTML5 drag)가 시작되는데, 이 드래그가 어중간하게 끝나면 브라우저가 드래그 상태에 걸린 채로
-     멈춰 클릭/우클릭/단축키(F12 등)까지 먹통이 되는 현상이 있었음. 대장간 무기 이미지(.sword-img)에만
+     멈춰 클릭/우클릭/단축키(F12 등)까지 먹통이 되는 현상이 있었음. 대장간 무기 이미지에만
      적용되어 있던 네이티브 드래그 차단(-webkit-user-drag:none; user-select:none;)을 게임 내 모든 PNG
      아이콘(위 두 클래스 + 아래 무기/스킬/상태이상/버프 아이콘)에 동일하게 적용해 근본 차단함. 클릭·hover
      등 기존 상호작용에는 영향 없음(pointer-events는 건드리지 않음). */
@@ -1928,11 +1776,10 @@ body.mobile-preset .craft-mat-cell .craft-slot-qty-ok, body.mobile-preset .craft
 
 /* ============================================================
    상점 새 메뉴 UI (shop_menu.js) — 신버전 인벤토리/도감/제작소 스타일(.inv-box-tab, .inv-box-panel, .inv-box-gold, .codex-search)을 재사용.
-   SHOP_MENU_UI='new'일 때만 body.shop-ui-new가 붙어 새 UI가 보이고 예전 상점 UI(.shop-legacy-wrap)는 숨겨짐(삭제하지 않고 보존).
+   body.shop-ui-new(shop_menu.js가 붙임)가 있을 때 새 UI가 보임.
    ============================================================ */
 #shopView .shop-new-wrap{ display:none; }
 body.shop-ui-new #shopView .shop-new-wrap{ display:block; }
-body.shop-ui-new #shopView .shop-legacy-wrap{ display:none; }
 #shopView{ --shop-list-h: 360px; }
 .shop-new-wrap{
   background: linear-gradient(180deg, var(--forge-panel) 0%, var(--forge-panel-2) 100%);
@@ -2028,12 +1875,11 @@ body.mobile-preset .shop-row-tag{ font-size:10px; }
 
 
 /* ============================================================
-   대장간 새 강화 탭 UI (forge_menu.js) — FORGE_ENHANCE_UI='new'일 때만 body.forge-enh-new가 붙어 새 UI가 보이고
-   예전 강화 UI(#forgeEnhLegacy)는 숨겨짐(삭제하지 않고 보존). 수리 탭 스타일/마크업은 건드리지 않음.
+   대장간 새 강화 탭 UI (forge_menu.js) — body.forge-enh-new(forge_menu.js가 붙임)가 있을 때 새 UI가 보임.
+   수리 탭 스타일/마크업은 건드리지 않음.
    ============================================================ */
 #forgeEnhNew{ display:none; }
 body.forge-enh-new #forgeEnhNew{ display:block; }
-body.forge-enh-new #forgeEnhLegacy{ display:none; }
 /* 새 강화 화면에서는 대장간 기록부를 표시하지 않음(기록 수집/저장은 그대로). 수리 탭에서는 기존처럼 보임 */
 body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
 
@@ -2066,6 +1912,12 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
 .fe-prayer:hover .tooltip{ visibility:visible; opacity:1; }
 
 .fe-item.charging{ animation: fe-icon-charge .35s ease-in-out infinite; } /* 슬롯 전체(테두리+이미지)가 함께 수축·팽창 */
+.fe-item.burst{ animation: fe-icon-burst .16s linear forwards; pointer-events:none; } /* 100ms 팽창 → 60ms 소멸, 소멸 상태 유지 */
+@keyframes fe-icon-burst{
+  0%{ transform:scale(1); opacity:1; animation-timing-function:cubic-bezier(.05,.9,.2,1); }
+  62.5%{ transform:scale(1.6); opacity:1; animation-timing-function:linear; }
+  100%{ transform:scale(1.6); opacity:0; }
+}
 .fe-item.popping{ animation: fe-icon-pop .3s ease-out; } /* 성공 팝: 슬롯(테두리)+안쪽 장비 이미지가 한 덩어리로 같은 비율 확대·복귀(transform이라 배치는 그대로) */
 @keyframes fe-icon-charge{ 0%,100%{ transform:scale(.95); } 50%{ transform:scale(.85); } } /* 위치·레이아웃은 그대로, 아이콘만 85~95% */
 @keyframes fe-icon-pop{ 0%{ transform:scale(var(--fe-pop-from,1)); } 45%{ transform:scale(1.15); } 100%{ transform:scale(1); } }

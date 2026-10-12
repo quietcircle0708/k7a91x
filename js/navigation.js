@@ -88,7 +88,7 @@ function showView(name){
   if(name === 'hunt') renderHunt();
   alignHuntHeader();
   if(name === 'craft') craftMenuOpen(); // 제작소 메뉴(craft_menu.js)
-  if(name === 'shop' && SHOP_MENU_UI === 'new') shopMenuOpen(); // 상점 새 메뉴(shop_menu.js): 진입할 때마다 목록을 현재 데이터로 새로 구성
+  if(name === 'shop') shopMenuOpen(); // 상점 새 메뉴(shop_menu.js): 진입할 때마다 목록을 현재 데이터로 새로 구성
   if(name !== 'shop' && typeof shopMenuSearchReset === 'function') shopMenuSearchReset(); // 상점을 나가면 구매/판매 검색어 초기화(인벤토리 검색과 동일)
   if(name !== 'craft' && typeof craftMenuSearchReset === 'function') craftMenuSearchReset(); // 제작소를 나가면 검색어/결과 초기화(인벤토리 검색과 동일)
   if(name === 'character'){
@@ -168,7 +168,7 @@ function openCollection(){ if(isEnhancing) return; guardedNav('collection'); }
 function closeToForge(){ showView('forge'); }
 
 // ---- 인벤토리 탭 ----
-// 상점(switchShopTab)과 동일한 규칙: "장비" 최상위 탭(subTabs를 가진 탭)을 클릭하면 마지막으로 보던
+// "장비" 최상위 탭(subTabs를 가진 탭)을 클릭하면 마지막으로 보던
 // 하위탭(invUI.equipTab, 없으면 첫 하위탭)으로 이동하고, 하위탭(무기/방어구/장신구/아티팩트)이나
 // 다른 최상위 탭(소비/마석/기타)을 클릭하면 그 탭을 그대로 보여줌. 실제 화면 갱신은 renderInvTabs()가
 // 담당(render() 매 사이클마다도 호출되므로 여기서 직접 DOM을 건드리지 않아도 항상 최신 상태로 반영됨).
@@ -616,36 +616,6 @@ function restoreHeldCraftEquip(){
   craftAnim.heldEquip = [];
 }
 
-// ---- 상점 탭/정렬 ----
-function switchShopTab(tabId){
-  const top = SHOP_TABS.find(t => t.id === tabId);
-  if(top && top.subTabs){
-    shopUI.tab = shopUI.equipTab || top.subTabs[0].id;
-  } else {
-    shopUI.tab = tabId;
-    const equipTop = SHOP_TABS.find(t => t.id === 'equipment');
-    if(equipTop && equipTop.subTabs.some(st => st.id === tabId)) shopUI.equipTab = tabId;
-  }
-  closeShopFilterMenu();
-  renderShopTab();
-}
-function setShopFilter(filterId){
-  shopUI.filter = filterId;
-  // 정렬 기준이 바뀌면 목록 순서 자체가 바뀌므로, 지금 탭의 페이지를 1로 되돌림(범위를 벗어난 빈
-  // 페이지에 머무는 것을 방지). 페이지네이션이 적용되지 않는 탭(마석/기타)은 SHOP_PAGE_KEY에 키가
-  // 없어서 자연스럽게 아무 일도 안 일어남.
-  const pageKey = SHOP_PAGE_KEY[shopUI.tab];
-  if(pageKey) pageState[pageKey] = 1;
-  closeShopFilterMenu();
-  renderShopTab();
-}
-function toggleShopSortDir(){
-  shopUI.dir = shopUI.dir === 'asc' ? 'desc' : 'asc';
-  const pageKey = SHOP_PAGE_KEY[shopUI.tab];
-  if(pageKey) pageState[pageKey] = 1; // setShopFilter와 동일한 이유로 페이지 초기화
-  renderShopTab();
-}
-
 // ---- 페이지네이션 공통 이동 ----
 // target(pageState/PAGE_SIZE의 키)마다 "이동 후 다시 그려야 할 화면"을 매핑해둠. 새 화면을 페이지네이션에
 // 추가할 때 PAGE_SIZE·pageState에 키를 추가한 것과 동일하게, 여기에도 한 줄만 추가하면 이동 버튼이 그
@@ -659,7 +629,6 @@ const PAGE_RENDER_FN = {
   repairSelect: renderRepairSelectList,
   restoreSelect: renderRestoreSelectList,
   craftSelect: renderCraftSelectList,
-  shopWeapon: renderShopTab, shopArmor: renderShopTab, shopSub: renderShopTab, shopAccessory: renderShopTab, shopConsumable: renderShopTab, shopArtifact: renderShopTab,
   dungeonList: renderDungeonList,
   charInfoEquip: renderCharacterMenu,
   charInfoStats: renderCharacterMenu,
@@ -680,14 +649,6 @@ function goPage(target, delta){
   pageState[target] = (pageState[target] || 1) + delta;
   const renderFn = PAGE_RENDER_FN[target] || (target.startsWith('dungeonDrop:') ? renderDungeonList : null);
   if(renderFn) renderFn();
-}
-function toggleShopFilterMenu(){
-  shopFilterMenuOpen = !shopFilterMenuOpen;
-  el('shopFilterMenu').style.display = shopFilterMenuOpen ? 'block' : 'none';
-}
-function closeShopFilterMenu(){
-  shopFilterMenuOpen = false;
-  el('shopFilterMenu').style.display = 'none';
 }
 
 // ---- 퀵슬롯 등록 모달 ----

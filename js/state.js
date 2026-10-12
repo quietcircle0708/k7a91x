@@ -34,10 +34,8 @@ let state = {
                                                   // ARMOR_TYPES/ACCESSORY_TYPES 키. 강화 파괴 시 processDestroyReward가
                                                   // 지급하고, useTraceItem→confirmTraceRestore로 소모해 +0 장비로 복구함)
   // 보호 장치(기도) — 보유 개수/구매 개념 없이 ON/OFF 상태만 존재(강화 보호 장치 시스템 개편).
-  // charmActive="끈기의 기도"(2단계 개편으로 하락 결과 삭제 → 현재 비활성, 6단계에서 새 역할 결정 예정),
   // blessingActive="보호의 기도"(파괴 방지), focusActive="집중의
-  // 기도"(성공률 20% 증가). 이름만 바뀌었을 뿐 charmActive/blessingActive 키 자체는 기존 그대로 재사용.
-  charmActive: false,
+  // 기도"(성공률 증가).
   blessingActive: false,
   focusActive: false,
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
@@ -51,7 +49,6 @@ let state = {
   manaStones: 0,       // 마석 보유 개수
   acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
-  autoRebuy: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
   skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
@@ -78,11 +75,9 @@ function defaultHuntState(){
   return { dungeon: null, monsters: [], targetId: null, nextInstanceId: 1, stage: 1, chestOpened: false, timerId: null, paused: false, started: false, stageEnterTimeout: null, encounterTimeout: null, treasureShakeTimeout: null, deathAnimTimeouts: [], rewardModalTimeout: null, player: { statusEffects: [] }, topUiExpanded: false, playerDirection: 'up', playerMotion: 'idle', scrollGrantedThisBattle: false, nextStageTimeout: null, prepStartAt: 0, prepDeadline: 0, prepPausedFireMs: null, prepPausedStartMs: 0, manualPause: false, deferredActions: [], pendingRewards: null, rewardModalMode: null };
 }
 let hunt = defaultHuntState();
-// 상점 탭/정렬 UI 상태. 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
-// equipTab: "장비" 최상위 탭 안에서 마지막으로 보고 있던 하위탭(weapon/armor/accessory/artifact)을
-// 기억해뒀다가, "장비" 최상위 버튼을 다시 눌렀을 때 그 탭으로 돌아가기 위한 값.
-let shopUI = { tab: 'weapon', equipTab: 'weapon', filter: 'price', dir: 'asc' };
-// 인벤토리 탭 UI 상태. shopUI와 동일한 이유로 equipTab을 따로 기억함(저장 대상 아님).
+// 상점 정렬 UI 상태(filter=정렬 기준, dir=정렬 방향). 저장하지 않는 화면 전용 상태(재접속하면 기본값으로 초기화됨).
+let shopUI = { filter: 'price', dir: 'asc' };
+// 인벤토리 탭 UI 상태. equipTab = "장비" 최상위 탭 안에서 마지막으로 보던 하위탭(저장 대상 아님).
 let invUI = { tab: 'weapon', equipTab: 'weapon' };
 // 제작소 탭 UI 상태. invUI/shopUI와 동일한 이유(화면 상태일 뿐 저장 대상 아님)로 별도 관리.
 // 지금은 최상위 탭이 "제작" 하나뿐이라 equipTab과 같은 "최상위 복귀용 기억" 필드는 아직 불필요하지만,
@@ -133,7 +128,6 @@ let pageState = {
   repairSelect: 1,
   restoreSelect: 1,
   craftSelect: 1,
-  shopWeapon: 1, shopArmor: 1, shopSub: 1, shopAccessory: 1, shopConsumable: 1, shopArtifact: 1,
   dungeonList: 1,
   skillPage: 1,
   // [캐릭터 정보] 탭 안에서 자체 페이지를 갖는 소분류("착용 장비"의 1p 장비창/2p 아티팩트 효과, "세부
@@ -153,7 +147,6 @@ let pageState = {
   // `dungeonDrop:<던전id>` 형태의 동적 키를 이 오브젝트에 필요할 때마다 추가해서 씀(goPage의 범용
   // "pageState[target] = ..." 로직을 그대로 재사용하기 위함, render.js buildDungeonDropIcons 참고).
 };
-let shopFilterMenuOpen = false;
 
 const el = id => document.getElementById(id);
 // 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기든 방어구든 상관없이 state.forgeTargetId가
@@ -648,10 +641,10 @@ function resetGame(){
     subInventory: [], equippedSubId: null,
     accessoryInventory: [], equippedAccessories: [null, null], equippedNecklaceId: null,
     traceInventory: [],
-    charmActive:false, blessingActive:false, focusActive:false,
+    blessingActive:false, focusActive:false,
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
     acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0,
-    skipEffects:false, autoRebuy:false,
+    skipEffects:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
     skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [], unlockedAwakeningSkills: [],

@@ -1279,7 +1279,7 @@ const ARMOR_TYPES = {
       growthStat: 'int',
       activateLevel: 0,
       chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 6, 4: 6, 5: 7, 6: 7, 7: 8, 8: 8, 9: 10 },
-      chanceSuffix: '', // %가 아닌 순수 수치라 단위 없음(forge/tooltip 표시용, formulas.js weaponUniqueOptionForgeHtml 참고)
+      chanceSuffix: '', // %가 아닌 순수 수치라 단위 없음(tooltip 표시용)
       textTemplate: '지능 +{chance}',
     },
   },
@@ -3091,7 +3091,7 @@ CRAFTABLE_ITEMS.accessory.push(
 );
 
 
-// 제작소 탭 id → PAGE_SIZE/페이지 상태 키 매핑(SHOP_PAGE_KEY와 동일한 역할).
+// 제작소 탭 id → PAGE_SIZE/페이지 상태 키 매핑.
 // 제작 연출 UI(요청사항 4번) 진행률 구간별 안내 문구. 진행률(%) 오름차순으로 max값만 넣어두면
 // craftAnimStageText(formulas.js)가 "이 값 이하인 첫 구간"을 찾아 반환함 — 구간을 더 세분화하거나
 // 문구만 바꾸고 싶으면 이 배열만 수정하면 됨(로직 변경 불필요).
@@ -3139,12 +3139,6 @@ const SHOP_TABS = [
 // 시작 골드(1,000G)는 state 기본값/초기화 코드에 그대로 있음. 지급 아이템을 바꾸려면 이 표만 수정하면 됨.
 const NEW_GAME_START_CONSUMABLES = { hpFlask1: 5, mpFlask1: 5 }; // 하급 체력 포션 5개, 하급 마나 포션 5개
 
-// ---- 대장간 강화 탭 UI 전환 플래그 ----
-// FORGE_ENHANCE_UI: 'new' = 새 강화 탭 UI(forge_menu.js — 기도 2개/강화 장비/촉매 삼각 배치, 성장 수치 비교, 확률 카드, 강화 진행 버튼),
-//                   'legacy' = 예전 강화 탭 UI(index.html #forgeEnhLegacy, render.js render()의 강화 화면 부분).
-// 예전 UI 코드는 삭제하지 않고 그대로 보존함(나중에 지울 수 있도록) — 이 값만 'legacy'로 바꾸면 예전 UI로 복구됨. 수리 탭은 이 값과 무관함.
-const FORGE_ENHANCE_UI = 'new';
-
 // ---- 새 강화 탭 스프라이트 연출 설정 ----
 // 가로로 이어 붙인 프레임을 왼쪽→오른쪽으로 재생. frames(프레임 수)와 frameMs(프레임당 ms)는 서로 독립적으로 조정 가능.
 // w/h는 프레임 1장의 표시 크기(px) — 효과마다 지정된 크기를 그대로 쓰며 서로 맞추려고 확대/축소하지 않음.
@@ -3156,16 +3150,16 @@ const ENCHANT_FX = {
   destroy: { src: 'assets/ui/effect_enchant_destroyed.png', frames: 12, frameMs: 67, w: 96, h: 96 },
 };
 // 선택 장비 아이콘 크기 연출(css .fe-item.charging/.popping과 값을 맞출 것): 시도 중 수축·팽창 주기, 성공 팝 길이
+// 파괴 시 destroy와 같은 위치에 겹쳐 동시에 재생되는 추가 스프라이트(10프레임, 64×64). 프레임당 시간은 destroy와 항상 동일하게 따라감.
+ENCHANT_FX.destroy2 = { src: 'assets/ui/effect_enchant_destroyed2.png', frames: 10, frameMs: ENCHANT_FX.destroy.frameMs, w: 64, h: 64 };
+// 파괴 순간 장비 슬롯 폭발형 팝업(css .fe-item.burst와 값을 맞출 것): 100ms 동안 160%까지 팽창 → 60ms 동안 투명해져 소멸
+const ENCHANT_SLOT_BURST_GROW_MS = 100, ENCHANT_SLOT_BURST_FADE_MS = 60, ENCHANT_SLOT_BURST_SCALE = 1.6;
 const ENCHANT_ICON_CHARGE_MS = 350;  // 85~95% 사이를 오가는 1주기(css animation-duration)
 const ENCHANT_ICON_POP_MS = 300;     // 1.0 → 1.15 → 1.0
 const ENCHANT_DESTROY_POPUP_DELAY_MS = 500; // 파괴 보상 지급 확정 후 파괴 안내 팝업을 띄우기까지 대기
 
-// ---- 상점 메뉴 UI 전환 플래그 + 구매/판매 모드 ----
-// SHOP_MENU_UI: 'new' = 새 상점 UI(shop_menu.js — 구매/판매 탭·분류 탭·세부 분류·필터/검색·빠른 구매/판매·세로 스크롤 목록),
-//               'legacy' = 예전 상점 UI(카드 목록 + 페이지네이션, render.js renderShopTab 이하 / main.js 상점 리스너 / index.html .shop-legacy-wrap).
-// 새 UI 확정 전까지 예전 UI 코드는 삭제하지 않고 그대로 보존함 — 이 값만 'legacy'로 바꾸면 예전 UI로 복구됨.
-const SHOP_MENU_UI = 'new';
-// 새 상점 메뉴의 최상위 모드 탭(왼쪽부터 순서대로 표시). 실제로 어떤 아이템이 어느 모드에 뜨는지는 shop_menu.js가 데이터로 판별함.
+// ---- 상점 메뉴 구매/판매 모드 ----
+// 상점 메뉴(shop_menu.js)의 최상위 모드 탭(왼쪽부터 순서대로 표시). 실제로 어떤 아이템이 어느 모드에 뜨는지는 shop_menu.js가 데이터로 판별함.
 const SHOP_MODES = [
   { id: 'buy', label: '구매', quickLabel: '빠른 구매' },
   { id: 'sell', label: '판매', quickLabel: '빠른 판매' },
@@ -3265,8 +3259,6 @@ const RESTORE_MATERIALS_BY_GRADE = {
 // ---- 페이지네이션(공통 시스템) ----
 // 화면(또는 탭)마다 페이지당 최대 출력 개수를 여기서 독립적으로 관리함 — 지금은 전부 6(던전만 3)이지만,
 // 나중에 탭별로 다른 값을 쓰고 싶으면 이 숫자만 바꾸면 됨(다른 코드 수정 불필요).
-// 상점은 무기/방어구/소비/아티팩트 4개 탭에만 적용하고, 마석·기타 탭은 페이지네이션을 적용하지 않음
-// (그 두 탭은 이 객체에 키 자체가 없음 → renderShopTab에서 자동으로 페이지 UI 없이 전체 출력됨).
 // ---- 던전 카드 「획득 가능 아이템」 정렬 설정(render.js buildDungeonDropIcons → formulas.js sortDungeonDropIcons가 사용) ----
 // 분류 순서와 분류별 정렬 기준을 이 두 표에서만 정함. 아이템 이름을 하나씩 지정하지 않고 아이템 데이터(등급/착용 제한 레벨/판매가/이름)만 읽음.
 // DUNGEON_DROP_KINDS: 위에서부터 표시되는 분류 순서. 각 분류의 sort는 정렬 기준 이름의 우선순위 목록(아래 기준 표 참고).
@@ -3297,19 +3289,9 @@ const PAGE_SIZE = {
   repairSelect: 6,      // 수리 탭 "인벤토리에서 선택" 팝업
   restoreSelect: 6,     // 수리 탭 "손상 복구" 장비 선택 팝업
   craftSelect: 6,       // 제작소 "재료 장비 선택" 팝업
-  shopWeapon: 6,        // 상점 무기 탭
-  shopArmor: 6,          // 상점 방어구 탭
-  shopSub: 6,             // 상점 보조 탭
-  shopAccessory: 6,      // 상점 장신구 탭
-  shopConsumable: 6,     // 상점 소비 탭
-  shopArtifact: 6,       // 상점 아티팩트 탭
   dungeonList: 3,        // 던전 입구
   dungeonDrop: 11,       // 던전 카드 "획득 가능 아이템 안내" 아이콘 목록(13개 이상인 던전만 적용)
   killRewardItems: 15,   // 던전 전투 종료 보상창 "획득 아이템" 그리드(5열×3행)
-};
-// 상점 탭 id → PAGE_SIZE/페이지 상태 키 매핑. 페이지네이션 미적용 탭(stone/misc)은 여기 없음.
-const SHOP_PAGE_KEY = {
-  weapon: 'shopWeapon', armor: 'shopArmor', sub: 'shopSub', accessory: 'shopAccessory', consumable: 'shopConsumable', artifact: 'shopArtifact',
 };
 // 캐릭터 정보창 페이지 수. 이 화면은 아이템 목록을 잘라서 보여주는 게 아니라 "1페이지(장비창+캐릭터 정보) /
 // 2페이지(적용 중인 아티팩트 효과)"처럼 완전히 다른 내용을 페이지로 나눈 것이라 PAGE_SIZE(개수 기반 분할)는
@@ -4900,20 +4882,18 @@ const TIER_META = [
 // 강화 단계(+0~+9)별 무기 발광 효과. PNG 이미지 자체는 건드리지 않고, 무기 이미지에 CSS filter만 적용해서 표현함
 // (drop-shadow 기본, 필요 시 brightness/saturate/blur 등을 filter 체인에 추가). 배경 전체가 아니라 무기 이미지 자체에만
 // 적용되므로 이미지 알파(투명 영역)를 넘어서 번지지 않음.
-// - glowColor: 대표 색상(폼멜 보석 색, 연기 색상 등에도 재사용)
-// - glow: swordVisual에 적용할 filter 값
-// - smoke: 연기 파티클 표시 여부
+// - glow: 무기/아이콘 이미지에 적용할 filter 값(formulas.js weaponIconHtml의 강화 발광, effects.js 던전 드랍 발광이 사용)
 const ENHANCE_LEVEL_EFFECTS = [
-  /* +0 */ { glowColor: null,      glow: "none" },
-  /* +1 */ { glowColor: "#ffffff", glow: "drop-shadow(0 0 6px #ffffffb0)" },
-  /* +2 */ { glowColor: "#ffffff", glow: "drop-shadow(0 0 9px #ffffffd0) brightness(1.05)" },
-  /* +3 */ { glowColor: "#8fd0ff", glow: "drop-shadow(0 0 9px #8fd0ffb0)" },
-  /* +4 */ { glowColor: "#8fd0ff", glow: "drop-shadow(0 0 12px #8fd0ffd0) brightness(1.05)", smoke: true },
-  /* +5 */ { glowColor: "#a066d6", glow: "drop-shadow(0 0 12px #a066d6b0)", smoke: true },
-  /* +6 */ { glowColor: "#a066d6", glow: "drop-shadow(0 0 15px #a066d6d0) brightness(1.05) saturate(1.1)", smoke: true },
-  /* +7 */ { glowColor: "#ff6a3d", glow: "drop-shadow(0 0 15px #ff6a3db0)", smoke: true },
-  /* +8 */ { glowColor: "#ff6a3d", glow: "drop-shadow(0 0 18px #ff6a3dd0) brightness(1.08) saturate(1.15)", smoke: true },
-  /* +9 */ { glowColor: "#c9950f", glow: "drop-shadow(0 0 22px #c9950fee) drop-shadow(0 0 10px #f2b90fcc) brightness(1.05) saturate(1.35)", smoke: true },
+  /* +0 */ { glow: "none" },
+  /* +1 */ { glow: "drop-shadow(0 0 6px #ffffffb0)" },
+  /* +2 */ { glow: "drop-shadow(0 0 9px #ffffffd0) brightness(1.05)" },
+  /* +3 */ { glow: "drop-shadow(0 0 9px #8fd0ffb0)" },
+  /* +4 */ { glow: "drop-shadow(0 0 12px #8fd0ffd0) brightness(1.05)" },
+  /* +5 */ { glow: "drop-shadow(0 0 12px #a066d6b0)" },
+  /* +6 */ { glow: "drop-shadow(0 0 15px #a066d6d0) brightness(1.05) saturate(1.1)" },
+  /* +7 */ { glow: "drop-shadow(0 0 15px #ff6a3db0)" },
+  /* +8 */ { glow: "drop-shadow(0 0 18px #ff6a3dd0) brightness(1.08) saturate(1.15)" },
+  /* +9 */ { glow: "drop-shadow(0 0 22px #c9950fee) drop-shadow(0 0 10px #f2b90fcc) brightness(1.05) saturate(1.35)" },
 ];
 
 // ---- 던전 드랍 연출 전용: 이름에 특정 키워드가 포함된 기타 아이템에만 등급별 발광 재적용 ----
@@ -4929,17 +4909,11 @@ const DROP_GLOW_GRADE_LEVEL = { normal: 0, rare: 3, epic: 5, unique: 7 };
 
 // ---- 강화 보호 장치(기도) ----
 // 기존 "네레스의 집념이 서린 쇠조각/축복이 서린 보석"을 이름만 바꾸고(효과 동일), "집중의 기도"를
-// 신규 추가함. 보유 개수/구매가 없는 ON-OFF 방식으로 개편(state.charmActive/blessingActive/focusActive).
-// costMult는 "현재 선택된 강화의 기본 강화 비용" 기준 배율(예: 끈기 ON이면 기본비용×3.0이 추가로 붙음) —
+// 신규 추가함. 보유 개수/구매가 없는 ON-OFF 방식으로 개편(state.blessingActive/focusActive).
+// costMult는 "현재 선택된 강화의 기본 강화 비용" 기준 배율(예: 보호 ON이면 기본비용×3.5가 합산됨) —
 // 이 배율은 실제 강화 1회 비용에만 적용되고, 기대 강화 비용/판매가 계산(computeAverageExpectedCosts,
 // computeWeaponSellPrices)에는 전혀 관여하지 않음(별도 함수 enhanceCostBreakdown에서만 사용, formulas.js).
 const PRAYERS = {
-  charm: {
-    // 2단계 강화 확률 개편으로 하락 결과 자체가 삭제되어 끈기의 기도가 막아줄 대상이 사라짐 — 새 역할은
-    // 6단계에서 별도로 결정할 예정이라, 그 전까지는 desc도 임의로 새 효과를 지어내지 않고 비활성 상태만 안내.
-    key: 'charm', name: '끈기의 기도', desc: '현재 비활성화(추후 개편 예정)', costMult: 2.5,
-    image: 'prayer_charm',
-  },
   blessing: {
     // 6단계 개편: 파괴 결과 자체를 사후에 유지로 가로채는 방식→강화 전에 파괴 확률 자체를 낮추는
     // 방식으로 변경(아래 blessingAdjustedOdds). desc도 그에 맞춰 갱신.

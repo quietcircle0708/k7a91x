@@ -1,23 +1,14 @@
 // ============================================================
 // render.js — 화면(DOM) 렌더링
 // state를 읽어서 화면에 반영하는 함수들. 여기서 state를 직접
-// 바꾸는 경우는 render() 안의 charmActive/blessingActive/focusActive 자동
+// 바꾸는 경우는 render() 안의 blessingActive/focusActive 자동
 // 해제처럼 "표시 조건이 깨졌을 때 정리"하는 최소한의 경우뿐임(원본 그대로 유지).
 // ============================================================
 
-// 기도 아이콘 버튼(끈기/보호/집중) 공통 상태 갱신 — ON이면 불투명+금색 테두리(.on), OFF면 30%
-// 투명도+회색 테두리(기본 CSS), 사용 불가 조건이면 버튼 자체를 disabled 처리.
-function setPrayerButtonState(id, isOn, isDisabled){
-  const btn = el(id);
-  if(!btn) return;
-  btn.classList.toggle('on', isOn);
-  btn.disabled = isDisabled;
-}
 
 function render(){
   if(typeof craftMenuRefresh === 'function') craftMenuRefresh(); // 새 제작 메뉴(제작소 화면일 때만 동작, 내용이 바뀐 부분만 다시 그림)
   const equipped = getEquipped();
-  const stage = el('swordStage');
 
   renderForgeTabs(); // 대장간 강화/수리 탭(내구도 시스템 15번 요구사항) — 정적 토글이라 render() 매 사이클 갱신
   renderHuntCharPanel();
@@ -31,112 +22,13 @@ function render(){
   el('goldText').textContent = state.gold.toLocaleString();
   el('goldLedger').textContent = state.gold.toLocaleString() + ' G';
 
-  // 아티팩트 장비 슬롯 (최대 ARTIFACT_SLOT_MAX개) — 장착 중인 아티팩트만 표시
-  el('equipRow').innerHTML = Array.from({ length: ARTIFACT_SLOT_MAX }, (_, i) => {
-    const id = state.equippedArtifacts[i];
-    if(!id) return `<div class="equip-slot"></div>`;
-    const a = ARTIFACTS[id];
-    return `<div class="equip-slot filled">${itemIconHtml(a)}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
-  }).join('');
-
-  if(!equipped){
-    el('emptyNotice').style.display = 'block';
-    el('quickBuySwordBtn').textContent = `🗡️ 검 구매 (${weaponBuyPrice('longsword').toLocaleString()} G)`;
-    el('quickBuySwordBtn').disabled = state.gold < weaponBuyPrice('longsword') || equipInventoryFull();
-    el('tierLabel').textContent = '장착된 장비 없음';
-    el('levelDisplay').textContent = '-';
-    el('levelDisplay').style.color = 'var(--forge-cream-dim)';
-    el('itemName').textContent = '';
-    el('statRowsWrap').innerHTML = '';
-    el('uniqueOptionWrap').style.display = 'none';
-    el('oddsRow').innerHTML = '';
-    stage.classList.add('empty');
-    applySwordGlow(0);
-    setBladeShape('longsword');
-    updateAuraSmoke(false);
-    el('enhanceBtn').disabled = true;
-    el('enhanceBtn').textContent = '강화하기';
-    el('costLine').innerHTML = '장착된 장비가 없습니다';
-    el('sellBtn').disabled = true;
-    setPrayerButtonState('prayerCharmBtn', false, true);
-    setPrayerButtonState('prayerBlessingBtn', false, true);
-    setPrayerButtonState('prayerFocusBtn', false, true);
-  } else {
-    el('emptyNotice').style.display = 'none';
-    stage.classList.remove('empty');
-    const level = equipped.level;
+  // 기도(보호/집중)가 사용 불가 조건이 되면 자동으로 해제 — 강화 탭(forge_menu.js)은 이 정리를 하지 않고 state만 읽어 표시하므로 여기서 유지함.
+  // (선택된 장비가 없을 때는 기존과 동일하게 아무 것도 바꾸지 않음)
+  if(equipped){
     const type = equipped.type || 'longsword';
-    const tier = tierOf(level);
-    const meta = TIER_META[tier];
-    const levelEffect = ENHANCE_LEVEL_EFFECTS[level] || ENHANCE_LEVEL_EFFECTS[0];
-
-    el('levelDisplay').textContent = '+' + level;
-    el('levelDisplay').style.color = weaponNameColor(type, level);
-    el('tierLabel').textContent = meta.label;
-    el('itemName').textContent = weaponName(type) + levelSuffix(level);
-    el('itemName').style.color = weaponNameColor(type, level);
-
-    // 강화 화면 스탯: 무기/방어구 구분 없이 데이터에 실제로 존재하는 옵션(공격력/공격속도/치명타 확률/
-    // 방어도/체력/마나)만 자동으로 표시(하드코딩 없음, buildForgeStatRowsHtml 참고).
-    el('statRowsWrap').innerHTML = buildForgeStatRowsHtml(type, level);
-
-    // 고유 옵션(에픽/유니크 전용) — 무기 데이터에 uniqueOption이 없으면 자동으로 숨겨짐. 기존 로직 그대로 재사용.
-    const uniqueOptionHtml = weaponUniqueOptionForgeHtml(type, level);
-    el('uniqueOptionWrap').style.display = uniqueOptionHtml ? '' : 'none';
-    if(uniqueOptionHtml) el('uniqueOptionText').innerHTML = uniqueOptionHtml;
-
-    applySwordGlow(level);
-    setBladeShape(type);
-
-    updateAuraSmoke(!!levelEffect.smoke, levelEffect.glowColor || '#ffffff');
-
-    const noEnhanceData = !wpn(type).cost || wpn(type).cost.length === 0; // 아직 강화 단계별 데이터가 없는 장비(숏소드/대거 등)
-    const atMax = noEnhanceData || level >= MAX_LEVEL;
-    // 화면에 보여줄 확률 — 이제 보호(파괴 확률 감소)/집중(성공 확률 증가) 전부 확률표 자체에 반영된
-    // 값이라 displayEnhanceOdds와 effectivePrayerOdds가 완전히 동일함(사후 가로채기 방식이었던 예전과
-    // 달리 표시와 실제 판정이 항상 일치). 사용 가능 조건 판정(prayerCanUseCharm/Blessing)은 이 값이
-    // 아니라 각자 내부에서 별도로 조회하므로 순환 참조 없음.
-    const odds = atMax ? null : displayEnhanceOdds(type, level);
-
-    if(!prayerCanUseCharm(type, level) && state.charmActive) state.charmActive = false;
+    const level = equipped.level;
     if(!prayerCanUseBlessing(type, level) && state.blessingActive) state.blessingActive = false;
     if(!prayerCanUseFocus(type, level) && state.focusActive) state.focusActive = false;
-
-    setPrayerButtonState('prayerCharmBtn', state.charmActive, atMax || !prayerCanUseCharm(type, level) && !state.charmActive);
-    setPrayerButtonState('prayerBlessingBtn', state.blessingActive, atMax || !prayerCanUseBlessing(type, level) && !state.blessingActive);
-    setPrayerButtonState('prayerFocusBtn', state.focusActive, atMax || !prayerCanUseFocus(type, level) && !state.focusActive);
-
-    const oddsRow = el('oddsRow');
-    if(noEnhanceData){
-      oddsRow.innerHTML = '';
-      el('enhanceBtn').disabled = true;
-      el('enhanceBtn').textContent = '강화 준비 중';
-      el('costLine').innerHTML = '이 장비는 아직 강화 데이터가 준비되지 않았습니다';
-    } else if(atMax){
-      oddsRow.innerHTML = '';
-      el('enhanceBtn').disabled = true;
-      el('enhanceBtn').textContent = '최대 강화 완료';
-      el('costLine').innerHTML = '판매하여 새 장비를 시작하세요';
-    } else {
-      // 성공 100%(집중의 기도로 상한에 도달)면 유지/파괴 표시를 전부 숨김(요구사항 3).
-      // 2단계 강화 확률 개편으로 하락 결과 자체가 삭제되어 하락 칩은 어떤 경우에도 출력하지 않음.
-      let chips = `<span class="odds-chip success">성공 ${fmtOddsNum(odds[0])}%</span>`;
-      if(odds[0] < 100){
-        chips += `<span class="odds-chip stay">유지 ${fmtOddsNum(odds[1])}%</span>`;
-        if(odds[2] > 0) chips += `<span class="odds-chip destroy">파괴 ${fmtOddsNum(odds[2])}%</span>`;
-      }
-      oddsRow.innerHTML = chips;
-      const breakdown = enhanceCostBreakdown(type, level);
-      el('enhanceBtn').disabled = state.gold < breakdown.total;
-      el('enhanceBtn').textContent = '강화하기';
-      const sellPart = `<span class="sell-part">판매가: ${durabilityAdjustedSellValue(sellValueFor(type, level), equipped).toLocaleString()} G</span>`;
-      const costTooltip = enhanceCostTooltipText(breakdown);
-      const costText = costTooltip
-        ? `비용: <span class="enhance-cost-wrap enhance-cost-boosted">${breakdown.total.toLocaleString()} G<span class="tooltip">${costTooltip}</span></span>`
-        : `비용: ${breakdown.total.toLocaleString()} G`;
-      el('costLine').innerHTML = `${costText} · ${sellPart}`;
-    }
-    el('sellBtn').disabled = false;
   }
 
   el('bestLevel').textContent = '+' + state.bestLevel;
@@ -146,13 +38,9 @@ function render(){
   el('totalKills').textContent = (state.totalKills||0) + '마리';
   el('totalSold').textContent = state.totalSold.toLocaleString() + ' G';
 
-  el('skipToggleBtn').textContent = '⏭ 연출 스킵: ' + (state.skipEffects ? '켜짐' : '꺼짐');
-  el('skipToggleBtn').classList.toggle('on', state.skipEffects);
-  el('autoRebuyToggleBtn').textContent = '🗡️ 판매 후 자동 구매: ' + (state.autoRebuy ? '켜짐' : '꺼짐');
-  el('autoRebuyToggleBtn').classList.toggle('on', state.autoRebuy);
 
-  // 상점 (탭/정렬 포함 통합 렌더링)
-  renderShopTab();
+  // 상점 화면 갱신(shop_menu.js — 상점 화면이 열려 있을 때만 내용이 바뀐 부분만 다시 그림)
+  if(typeof shopMenuRefresh === 'function') shopMenuRefresh();
 
   // 인벤토리
   // 무기/방어구/장신구가 INV_MAX(50)를 공용으로 나눠 쓰므로, 이 카운트도 무기 탭에 있지만
@@ -170,12 +58,6 @@ function render(){
 
   // 강화 진행 중에는 다른 조작 잠금
   if(isEnhancing){
-    el('enhanceBtn').disabled = true;
-    el('enhanceBtn').textContent = '강화 중...';
-    el('sellBtn').disabled = true;
-    el('prayerCharmBtn').disabled = true;
-    el('prayerBlessingBtn').disabled = true;
-    el('prayerFocusBtn').disabled = true;
     el('openShopBtn').disabled = true;
     el('openInventoryBtn').disabled = true;
     el('openDungeonBtn').disabled = true;
@@ -513,7 +395,7 @@ function renderForgeTabs(){
 }
 
 // ---- 인벤토리: 탭(장비 최상위+하위탭 / 소비 / 마석 / 기타) 표시 상태 갱신 ----
-// 상점의 renderShopTab() 앞부분(탭 active 표시 + 하위탭 행 노출)과 동일한 구조. invUI.tab이 실제 보여줄
+// 탭 active 표시 + 하위탭 행 노출을 갱신함. invUI.tab이 실제 보여줄
 // leaf 탭(weapon/armor/accessory/artifact/consumable/stone/misc)이고, invUI.equipTab은 장비 그룹 안에서
 // 마지막으로 선택했던 하위탭을 기억해뒀다가 "장비" 최상위 버튼을 다시 눌렀을 때 그 탭으로 복귀시키는 데 씀.
 function renderInvTabs(){
@@ -897,11 +779,9 @@ function renderConsumableList(){
   wrap.innerHTML = html;
 }
 
-function showMsg(text, cls){
-  const m = el('msgText');
-  m.textContent = text;
-  m.className = 'msg ' + cls;
-}
+// 강화/판매 결과 등 "한 줄 메시지" 호출부(약 17곳)가 쓰는 함수. 예전 강화 화면의 메시지 줄(#msgText)은 제거되어
+// 현재는 화면에 표시하지 않음 — 추후 팝업 방식으로 처리할 때 이 함수 안에서 연결할 수 있도록 시그니처(text, cls)만 유지함.
+function showMsg(text, cls){}
 
 function showHuntMsg(text){
   const m = el('huntMsg');
@@ -2564,211 +2444,4 @@ function renderDeathCurseBadge(){
       el('curseBadgeForgeDesc').textContent = descText;
     }
   }
-}
-
-// ============================================================
-// ---- 상점: 탭/정렬 통합 렌더링 ----
-// 새 아이템은 각 도감(WEAPON_TYPES/ARMOR_TYPES/CONSUMABLES/ARTIFACTS/MISC_ITEMS)에
-// purchasable:true(또는 기타 탭은 그냥 등록)로 추가하기만 하면 이 함수들이 알아서 상점에 표시함.
-// 아이템 이름/ID로 분기하는 하드코딩은 없음 — 카드 템플릿만 탭별로 다를 뿐, 목록 자체는
-// formulas.js의 shopEntriesForTab()이 데이터 기반으로 뽑아줌.
-// ============================================================
-
-// "아직 데이터가 없어 항상 빈 상태로 표시되는" 장비 소분류(방어구/보조/장신구)의 안내 문구. 새 소분류가
-// 생겨도 이 표에 항목만 추가하면 자동으로 적용됨(그 소분류에 실제 데이터가 등록되면 entries.length가
-// 0이 아니게 되어 이 안내 문구 자체가 더 이상 쓰이지 않게 됨).
-const SHOP_EMPTY_EQUIP_LABEL = { armor: '방어구', sub: '보조', accessory: '장신구' };
-
-function renderShopTab(){
-  // 새 상점 UI(shop_menu.js)가 켜져 있으면 그쪽이 상점 화면 전체를 그림. 아래의 예전 상점 UI 렌더 코드는 SHOP_MENU_UI='legacy'로 복구할 수 있게 보존함.
-  if(typeof SHOP_MENU_UI !== 'undefined' && SHOP_MENU_UI === 'new'){ if(typeof shopMenuRefresh === 'function') shopMenuRefresh(); return; }
-  if(!el('shopItemsList')) return; // 상점 화면 DOM이 아직 없는 초기 타이밍 방어
-
-  const topId = topTabIdFor(SHOP_TABS, shopUI.tab);
-  SHOP_TABS.forEach(t => {
-    const btn = document.querySelector(`.shop-tab-btn[data-tab="${t.id}"]`);
-    if(btn) btn.classList.toggle('active', topId === t.id);
-  });
-  // "장비" 최상위 탭일 때만 하위탭(무기/방어구/장신구/아티팩트) 행을 보여주고, 그 안에서 지금 보고
-  // 있는 탭(shopUI.tab)을 active로 표시함. 다른 최상위 탭(소비/마석/기타)은 하위탭이 없으므로 숨김.
-  const equipTop = SHOP_TABS.find(t => t.id === 'equipment');
-  const subWrap = el('shopEquipSubTabs');
-  if(subWrap) subWrap.style.display = topId === 'equipment' ? 'flex' : 'none';
-  if(equipTop && equipTop.subTabs){
-    equipTop.subTabs.forEach(st => {
-      const btn = document.querySelector(`.shop-subtab-btn[data-tab="${st.id}"]`);
-      if(btn) btn.classList.toggle('active', shopUI.tab === st.id);
-    });
-  }
-  const filterDef = SHOP_SORT_FIELDS.find(f => f.id === shopUI.filter) || SHOP_SORT_FIELDS[0];
-  el('shopFilterLabel').textContent = filterDef.label;
-  el('shopSortDirBtn').textContent = shopUI.dir === 'asc' ? '↑ 오름차순' : '↓ 내림차순';
-  el('shopFilterMenu').innerHTML = SHOP_SORT_FIELDS.map(f => `
-    <button class="shop-filter-item ${shopUI.filter === f.id ? 'active' : ''}" data-filter="${f.id}">${f.label}</button>
-  `).join('');
-
-  const entries = sortShopEntries(shopEntriesForTab(shopUI.tab), shopUI.filter, shopUI.dir);
-  const wrap = el('shopItemsList');
-  const pagerWrap = el('shopPager');
-  if(entries.length === 0){
-    const emptyLabel = SHOP_EMPTY_EQUIP_LABEL[shopUI.tab];
-    wrap.innerHTML = `<div class="inv-empty">${emptyLabel ? `아직 준비된 ${emptyLabel}가 없습니다.` : '표시할 아이템이 없습니다.'}</div>`;
-    if(pagerWrap) pagerWrap.innerHTML = '';
-    return;
-  }
-
-  // 무기/방어구/소비/아티팩트 탭만 페이지네이션 적용(SHOP_PAGE_KEY에 등록된 탭). 마석/기타 탭은
-  // 이 매핑에 키가 없으므로 예전처럼 전체 목록을 그대로 출력함(페이지 UI도 비워둠).
-  const pageKey = SHOP_PAGE_KEY[shopUI.tab];
-  let pageEntries = entries;
-  if(pageKey){
-    const pageSize = PAGE_SIZE[pageKey];
-    const totalPageCount = pageCount(entries.length, pageSize);
-    pageState[pageKey] = clampPage(pageState[pageKey], totalPageCount);
-    if(pagerWrap) pagerWrap.innerHTML = pagerHtml(pageKey, pageState[pageKey], totalPageCount);
-    pageEntries = pageSlice(entries, pageState[pageKey], pageSize);
-  } else if(pagerWrap){
-    pagerWrap.innerHTML = '';
-  }
-
-  wrap.innerHTML = pageEntries.map(entry => buildShopCardHtml(shopUI.tab, entry.id)).join('');
-}
-
-function buildShopCardHtml(tabId, id){
-  if(tabId === 'weapon') return buildWeaponShopCardHtml(WEAPON_TYPES, id);
-  if(tabId === 'armor') return buildWeaponShopCardHtml(ARMOR_TYPES, id);
-  if(tabId === 'sub') return buildWeaponShopCardHtml(SUB_TYPES, id);
-  if(tabId === 'accessory') return buildWeaponShopCardHtml(ACCESSORY_TYPES, id);
-  if(tabId === 'consumable') return buildConsumableShopCardHtml(id);
-  if(tabId === 'artifact') return buildArtifactShopCardHtml(id);
-  if(tabId === 'stone') return buildStoneShopCardHtml(id);
-  if(tabId === 'misc') return buildMiscShopCardHtml(id);
-  return '';
-}
-
-// 무기/방어구 공통 카드(장비류). typesTable을 인자로 받아서 방어구 데이터가 생기면 그대로 재사용됨.
-function buildWeaponShopCardHtml(typesTable, id){
-  const w = typesTable[id];
-  const buyPrice = (w.sellPrice || 0) * 2;
-  // 무기/방어구/장신구가 INV_MAX(50)를 공용으로 나눠 쓰므로(구매 시 실제로 담기는 배열은 여전히
-  // 종류별로 다름 — 무기→state.inventory, 방어구→state.armorInventory, 장신구→state.accessoryInventory),
-  // 용량 확인은 개별 배열이 아니라 세 배열의 합계(equipInventoryFull)로 판단함.
-  const capOk = !equipInventoryFull();
-  // 아이템 레벨(levelReq)은 "착용" 조건일 뿐이라 구매를 막지 않음 — 인벤토리 공간/골드만 확인.
-  const disabled = !capOk || state.gold < buyPrice;
-  const tag = !capOk ? '인벤토리 가득참' : (w.levelReq && w.levelReq > 1 ? `아이템 Lv.${w.levelReq}` : '');
-  const nameColor = weaponNameColor(id, 0);
-  // 방어구/장신구 탭은 무기와 동일한 카드를 공유하지만, 툴팁 내용은 장비 종류별 전용 구성을 써야 함
-  // (무기 툴팁은 공격력/공격속도 등 방어구·장신구에 없는 필드를 참조하므로).
-  const tooltipHtml = w.equipType === 'armor' ? buildArmorTooltipHtml(id, 0)
-    : w.equipType === 'accessory' ? buildAccessoryTooltipHtml(id, 0)
-    : w.equipType === 'sub' ? buildSubTooltipHtml(id, 0)
-    : buildWeaponTooltipHtml(id, 0);
-  return `
-    <div class="scroll-card">
-      <div class="scroll-head">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#242424; border-color:${nameColor};">${weaponIconHtml(id, 'shop-icon-img')}</div>
-          <span class="weapon-name-wrap">
-            <span class="scroll-name" style="color:${nameColor};">${w.name}</span>
-            <span class="tooltip">${tooltipHtml}</span>
-          </span>
-        </div>
-        <span class="scroll-count">${tag}</span>
-      </div>
-      <div class="scroll-body">
-        <button class="scroll-buy" data-action="buy-weapon" data-type="${id}" style="flex:1;" ${disabled ? 'disabled' : ''}>구매 (${buyPrice.toLocaleString()} G)</button>
-      </div>
-    </div>`;
-}
-
-function buildConsumableShopCardHtml(id){
-  const item = CONSUMABLES[id];
-  const owned = (state.consumables && state.consumables[id]) || 0;
-  return `
-    <div class="scroll-card">
-      <div class="scroll-head">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#2a1414; border-color:#c13c3c;">${itemIconHtml(item)}</div>
-          <span class="scroll-name-wrap">
-            <span class="scroll-name" style="color:var(--forge-cream);">${consumableNameHtml(item)}</span>
-            <span class="tooltip">${buildConsumableTooltipHtml(id)}</span>
-          </span>
-        </div>
-        <span class="scroll-count">보유 ${owned}개</span>
-      </div>
-      <div class="scroll-body">
-        ${item.buyPrice != null ? `<button class="scroll-buy" data-action="buy-consumable" data-type="${id}" style="flex:1;" ${(state.gold < item.buyPrice || !canAcquireInCategory('consumable', owned > 0)) ? 'disabled' : ''}>${!canAcquireInCategory('consumable', owned > 0) ? '소비 인벤토리 가득참' : `구매 (${item.buyPrice} G)`}</button>` : ''}
-        <button class="scroll-buy" data-action="sell-consumable" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice.toLocaleString()}${uiIconHtml('gold', 'ui-icon-inline')})</button>
-      </div>
-    </div>`;
-}
-
-function buildArtifactShopCardHtml(id){
-  const a = ARTIFACTS[id];
-  const owned = ownsArtifact(id);
-  const slotFull = !owned && inventoryCategoryFull('artifact');
-  const disabled = owned || slotFull || state.gold < a.buyPrice;
-  const btnText = owned ? '보유 중' : (slotFull ? '아티팩트 인벤토리 가득참' : `구매 (${a.buyPrice.toLocaleString()} G)`);
-  return `
-    <div class="scroll-card artifact">
-      <div class="scroll-head">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box">${itemIconHtml(a)}</div>
-          <span class="scroll-name-wrap">
-            <span class="scroll-name artifact" style="color:${artifactNameColor(id)};">${a.name}</span>
-            <span class="tooltip">${buildArtifactTooltipHtml(id)}</span>
-          </span>
-        </div>
-        <span class="scroll-count">${owned ? '보유함' : ''}</span>
-      </div>
-      <div class="effect-line">${resolveGlossaryTermsHtml(a.effectText)}</div>
-      <div class="scroll-body">
-        <button class="scroll-buy" data-action="buy-artifact" data-type="${id}" style="flex:1;" ${disabled ? 'disabled' : ''}>${btnText}</button>
-      </div>
-    </div>`;
-}
-
-function buildMiscShopCardHtml(id){
-  const item = MISC_ITEMS[id];
-  const owned = state[item.stateKey] || 0;
-  return `
-    <div class="scroll-card">
-      <div class="scroll-head">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#242424; border-color:${miscNameColor(id)};">${itemIconHtml(item)}</div>
-          <span class="weapon-name-wrap">
-            <span class="scroll-name" style="color:${miscNameColor(id)};">${item.name}</span>
-            <span class="tooltip">${buildMiscTooltipHtml(id)}</span>
-          </span>
-        </div>
-        <span class="scroll-count">보유 ${owned}개</span>
-      </div>
-      <div class="scroll-body">
-        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice}${uiIconHtml('gold', 'ui-icon-inline')})</button>
-      </div>
-    </div>`;
-}
-
-// 마석 상점 카드: 기타 탭 카드와 동일한 UI 구조를 사용하되, 이름에 등급 색상을 적용하고
-// 무기 툴팁과 동일한 레이아웃/서식의 전용 툴팁(이름/등급/아이템 분류/설명/판매 가격)을 붙임.
-function buildStoneShopCardHtml(id){
-  const item = MISC_ITEMS[id];
-  const owned = state[item.stateKey] || 0;
-  return `
-    <div class="scroll-card">
-      <div class="scroll-head">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div class="artifact-icon-box" style="background:#242424; border-color:${stoneNameColor(id)};">${itemIconHtml(item)}</div>
-          <span class="weapon-name-wrap">
-            <span class="scroll-name" style="color:${stoneNameColor(id)};">${item.name}</span>
-            <span class="tooltip">${buildStoneTooltipHtml(id)}</span>
-          </span>
-        </div>
-        <span class="scroll-count">보유 ${owned}개</span>
-      </div>
-      <div class="scroll-body">
-        <button class="scroll-buy" data-action="sell-misc" data-type="${id}" style="flex:1;" ${owned <= 0 ? 'disabled' : ''}>판매 (개당 ${item.sellPrice}${uiIconHtml('gold', 'ui-icon-inline')})</button>
-      </div>
-    </div>`;
 }

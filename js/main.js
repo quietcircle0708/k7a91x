@@ -4,11 +4,6 @@
 // DOM 요소에 이벤트 리스너를 걸고, loadState()로 게임을 시작함.
 // ============================================================
 
-el('enhanceBtn').addEventListener('click', startEnhance);
-el('sellBtn').addEventListener('click', doSell);
-el('prayerCharmBtn').addEventListener('click', toggleCharm);
-el('prayerBlessingBtn').addEventListener('click', toggleBlessing);
-el('prayerFocusBtn').addEventListener('click', toggleFocus);
 el('invTabs').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-tab]');
   if(!btn) return;
@@ -232,55 +227,6 @@ el('craftPopupMakeBtn').addEventListener('click', openCraftConfirm);
 el('craftConfirmCancelBtn').addEventListener('click', closeCraftConfirm);
 el('craftConfirmProceedBtn').addEventListener('click', proceedCraftConfirm);
 el('craftAnimConfirmBtn').addEventListener('click', closeCraftAnim);
-// ---- 상점 탭 / 정렬 ----
-el('shopTabs').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-tab]');
-  if(!btn) return;
-  switchShopTab(btn.dataset.tab);
-});
-el('shopEquipSubTabs').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-tab]');
-  if(!btn) return;
-  switchShopTab(btn.dataset.tab);
-});
-el('shopFilterBtn').addEventListener('click', toggleShopFilterMenu);
-el('shopFilterMenu').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-filter]');
-  if(!btn) return;
-  setShopFilter(btn.dataset.filter);
-});
-el('shopSortDirBtn').addEventListener('click', toggleShopSortDir);
-el('shopPager').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action]');
-  if(!btn) return;
-  if(btn.dataset.action === 'page-prev') goPage(btn.dataset.pageTarget, -1);
-  else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
-});
-document.addEventListener('click', (e)=>{
-  if(!shopFilterMenuOpen) return;
-  if(e.target.closest('.shop-filter-wrap')) return;
-  closeShopFilterMenu();
-});
-// 상점 품목 목록: 탭에 관계없이 data-action으로 구매/판매를 한 번에 위임 처리
-// (새 탭/아이템이 추가돼도 render.js가 알맞은 data-action을 붙여주므로 여기는 수정할 필요 없음)
-// 구매(buy-*) 세 종류는 즉시 구매하지 않고 개수 지정 구매 팝업(openBuyQtyModal)을 먼저 띄움 — 실제
-// 구매는 팝업의 "구매" 버튼(confirmBuyQty)에서 이뤄짐.
-el('shopItemsList').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action]');
-  if(!btn || btn.disabled) return;
-  const type = btn.dataset.type;
-  switch(btn.dataset.action){
-    case 'buy-weapon': openBuyQtyModal('buy-weapon', type); break;
-    case 'buy-consumable': openBuyQtyModal('buy-consumable', type); break;
-    // 판매(소비/마석·기타)도 즉시 전부 판매하지 않고, 같은 개수 지정 팝업을 "판매 모드"로 먼저 띄움 —
-    // 실제 판매는 팝업의 [판매] → 판매 확인창 → [판매]에서 이뤄짐(confirmBuyQty, actions.js).
-    case 'sell-consumable': openBuyQtyModal('sell-consumable', type); break;
-    case 'buy-artifact': openBuyQtyModal('buy-artifact', type); break;
-    case 'sell-misc': openBuyQtyModal('sell-misc', type); break;
-  }
-});
-el('skipToggleBtn').addEventListener('click', toggleSkip);
-el('autoRebuyToggleBtn').addEventListener('click', toggleAutoRebuy);
 el('openShopBtn').addEventListener('click', openShop);
 el('openInventoryBtn').addEventListener('click', openInventory);
 el('openDungeonBtn').addEventListener('click', openDungeonList);
@@ -298,8 +244,6 @@ el('menuToggleBtn').addEventListener('click', ()=> setMenuGridOpen(el('menuGrid'
 el('menuGrid').addEventListener('click', (e)=>{ if(e.target.closest('.menu-grid-item')) setMenuGridOpen(false); });
 document.addEventListener('click', (e)=>{ if(!e.target.closest('#menuWrap')) setMenuGridOpen(false); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') setMenuGridOpen(false); });
-el('goInventoryBtn').addEventListener('click', openInventory);
-el('quickBuySwordBtn').addEventListener('click', (e)=> buyWeapon('longsword', e.currentTarget));
 el('resetLink').addEventListener('click', resetGame);
 document.querySelector('.back-from-shop').addEventListener('click', closeToForge);
 document.querySelector('.back-from-inv').addEventListener('click', closeToForge);
@@ -752,7 +696,7 @@ function adjustTooltipPosition(host, tip){
   tip.style.position = 'fixed';
   tip.style.transform = 'none'; // left:50%+translateX(-50%) 등 CSS 좌우정렬용 transform과 겹치면 좌표가 이중으로 밀리므로 무효화
   tip.style.top = top + 'px';
-  tip.style.bottom = 'auto'; // CSS 클래스가 지정한 bottom(예: .equip-slot .tooltip의 bottom:135%, .curse-badge .tooltip의 bottom:130%)이
+  tip.style.bottom = 'auto'; // CSS 클래스가 지정한 bottom(예: .curse-badge .tooltip의 bottom:130%)이
   tip.style.left = left + 'px'; // 빈 문자열로는 지워지지 않고 계속 살아있어 top과 충돌해 위치가 어긋나던 버그 수정 — 명시적으로 auto를 줘야 완전히 무효화됨
   tip.style.right = 'auto'; // 마찬가지로 .curse-badge .tooltip의 right:0도 auto로 명시 무효화(안 그러면 left와 충돌해 화면 밖으로 밀려나 완전히 안 보이게 됨)
 }
