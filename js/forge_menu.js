@@ -1,14 +1,15 @@
 // ============================================================
-// 대장간 새 강화 탭 UI (1단계) — 강화 화면의 "표시와 조작"만 담당함. 강화 판정/확률/비용/기도 효과/장비 선택·저장은 전부 기존 코드를 그대로 호출함:
+// 대장간 새 강화 탭 UI — 강화 화면의 "표시와 조작"만 담당함. 강화 판정/확률/비용/기도 효과/장비 선택·저장은 전부 기존 코드를 그대로 호출함:
 //   · 강화 시도 = actions.js startEnhance (→ resolveEnhance, 기존 딜레이/결과 처리/강화 기록부 수집 그대로)
 //   · 기도 토글 = actions.js toggleBlessing / toggleFocus (활성 상태 저장, 사용 가능 조건 prayerCanUse*, 확률/비용 배율 적용은 기존 그대로)
 //   · 확률/비용/판매가 = formulas.js displayEnhanceOdds / enhanceCostBreakdown / enhanceCostTooltipText / sellValueFor / durabilityAdjustedSellValue
 //   · 강화 장비 선택 = 기존 장비 선택 팝업(openForgeSelect → selectForgeTarget → equipItem) / 인벤토리의 "강화 선택"(state.forgeTargetId) 그대로
 //   · 성장 수치 = 인벤토리 아이템 비교 UI와 같은 엔진(codexDisplayFor → invCompareBuildRows → ▲▼/색 규칙 INV_COMPARE_STAT_BETTER)
-// 촉매 슬롯은 빈 슬롯 '+'만 있고 기능은 없음. 기도 툴팁 문구는 index.html의 #fePrayerBlessingTip/#fePrayerFocusTip에 직접 있음.
+// 모드(기도/촉매): state.forgeMode. 촉매 모드는 고정 슬롯(왼쪽 강화석 = state.forgeStone, 오른쪽 소생석 = state.forgeRevive, 아래는 빈 슬롯)이며 선택창 없이 토글/버튼으로 조작(catalyst.js),
+//   촉매 아이템 데이터/효과/소모 계산은 catalyst.js가 담당(forgeCatalystInfo는 슬롯에 표시할 아이콘만 만듦). 기도 툴팁 문구는 index.html의 #fePrayerBlessingTip/#fePrayerFocusTip에 직접 있음.
 // ============================================================
 
-let forgeEnhNew = { growCache: null, tipHtml: '', slotClickTimer: null };
+let forgeEnhNew = { growCache: null, tipHtml: '', slotClickTimer: null, catClickTimers: [null, null, null] };
 const FORGE_ENH_DOUBLE_CLICK_MS = 280; // 슬롯 한 번 클릭(선택 팝업) / 더블 클릭(선택 해제) 구분 대기 시간
 
 function forgeEnhIsMobile(){ return document.body.classList.contains('mobile-preset'); }
@@ -61,6 +62,55 @@ function forgeEnhGrowthHtml(type, item, level, nextLevel){
   return { lvArrow: head, html: `<div class="fe-grow-body ${hasNext ? 'two' : 'one'}">${body}</div>` };
 }
 
+// ---- 모드 / 촉매 슬롯 ----
+// 촉매 종류 → 표시 정보({ iconHtml }) — 촉매 아이템(MISC_ITEMS)의 아이콘을 그대로 사용함. 모르는 종류면 null('?' 표시).
+function forgeCatalystInfo(id){ const it = catalystDef(id); return it ? { iconHtml: itemIconHtml(it, 'inv-icon-img') } : null; }
+function forgeIsCatalystMode(){ return state.forgeMode === 'catalyst'; }
+// 모드 전환 — 촉매 모드로 들어가면 기도 선택을 해제(기도와 촉매가 동시에 적용되지 않게). 촉매 등록 상태(종류·수량)는 그대로 유지.
+function forgeSetMode(mode){
+  if(isEnhancing || (mode !== 'prayer' && mode !== 'catalyst') || state.forgeMode === mode) return;
+  state.forgeMode = mode;
+  if(mode === 'catalyst'){ state.blessingActive = false; state.focusActive = false; }
+  render(); saveState();
+}
+// 선택 해제 안내 문구: 데스크톱은 우클릭, 모바일은 더블 클릭
+function forgeEnhHintText(){ return forgeEnhIsMobile() ? '더블 클릭으로 선택 해제' : '우클릭으로 선택 해제'; }
+
+// 모드 선택 / 삼각형 슬롯 / 안내 문구 표시(장비 선택 여부와 무관하게 항상 갱신)
+function forgeEnhModeRender(){
+  const catMode = forgeIsCatalystMode();
+  if(catMode && (state.blessingActive || state.focusActive)){ state.blessingActive = false; state.focusActive = false; } // 촉매 모드에서는 기도가 적용되지 않음(방어)
+  document.getElementById('feTri').classList.toggle('mode-catalyst', catMode);
+  document.getElementById('feTri').classList.toggle('mode-prayer', !catMode);
+  document.querySelectorAll('#feMode .fe-mode-btn').forEach(b => {
+    const m = b.dataset.mode;
+    const on = m === state.forgeMode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+    if(m !== 'special') b.disabled = !!isEnhancing; // 특수 모드는 추후 업데이트(항상 비활성)
+  });
+  // 촉매 고정 슬롯(요청: 기도처럼 고정 표시). 상태를 현재 장비/보유량에 먼저 맞춘 뒤 그림.
+  catalystEnhanceSync();
+  const tg = catalystEnhanceTarget();
+  const hideBtn = (slot, dir, hide) => document.querySelectorAll(`.fe-qty-btn[data-slot="${slot}"]`).forEach(b => { if(b.dataset.dir === String(dir)) { b.classList.toggle('hide', !!hide); b.disabled = !!isEnhancing; } });
+  // 왼쪽: 강화석 — 장비가 있을 때만 그 장비 등급의 강화석이 자동 선택되어 표시됨. 클릭 = ON/OFF, 위/아래 = 한 단계 높은/낮은 등급의 (사용 가능한) 강화석으로 변경. 수량은 직접 못 바꿈.
+  { const st = state.forgeStone, it = tg && st.id ? catalystDef(st.id) : null;
+    const btn = document.getElementById('feCat0');
+    const need = it ? catalystRequiredQty({ id: st.id, qty: 1 }, catalystEnhanceCtx(tg.type, tg.level)) : null;
+    btn.classList.toggle('empty', !it); btn.classList.toggle('on', !!(it && st.on)); btn.classList.toggle('off', !!(it && !st.on));
+    forgeEnhSet('feCat0', it ? forgeCatalystInfo(st.id).iconHtml + `<span class="fe-cat-qty">${catalystOwned(st.id)}/${need == null ? '-' : need}</span>` : '');
+    hideBtn(0, 1, !it || !catalystEnhanceStoneNeighbor(1));
+    hideBtn(0, -1, !it || !catalystEnhanceStoneNeighbor(-1)); }
+  // 오른쪽: 소생석 — 항상 표시. 투입 수량/보유 수량, 1개 이상이면 ON(0개면 OFF 표시). 위/아래 = 투입 수량 ±1(보유량 초과·0 미만 불가)
+  { const q = state.forgeRevive, owned = catalystOwned('reviveStone');
+    const btn = document.getElementById('feCat1');
+    btn.classList.toggle('on', q > 0); btn.classList.toggle('off', q <= 0);
+    forgeEnhSet('feCat1', forgeCatalystInfo('reviveStone').iconHtml + `<span class="fe-cat-qty">${q}/${owned}</span>`);
+    hideBtn(1, 1, !catalystEnhanceCanAddRevive());
+    hideBtn(1, -1, q <= 0); }
+  forgeEnhSet('feHint', forgeEnhHintText());
+}
+
 // ---- 렌더 ----
 function forgeEnhSet(id, html){
   const box = document.getElementById(id);
@@ -80,6 +130,7 @@ function forgeEnhSetPrayer(id, isOn, isDisabled){
 function forgeEnhNewRender(){
   const wrap = document.getElementById('forgeEnhNew');
   if(!wrap || currentView !== 'forge') return;
+  forgeEnhModeRender();
   const equipped = getEquipped();
   const slot = document.getElementById('feItemSlot');
   const detail = document.getElementById('feDetail');
@@ -318,17 +369,53 @@ function forgeEnhClearTarget(){
   Object.values(ENCHANT_FX).forEach(c => { const im = new Image(); im.src = c.src; }); // 연출 시작 시 깜빡임 방지용 미리 불러오기
   document.body.classList.add('forge-enh-new');
 
-  document.getElementById('fePrayerBlessing').addEventListener('click', toggleBlessing);
-  document.getElementById('fePrayerFocus').addEventListener('click', toggleFocus);
+  document.getElementById('fePrayerBlessing').addEventListener('click', () => { if(!forgeIsCatalystMode()) toggleBlessing(); });
+  document.getElementById('fePrayerFocus').addEventListener('click', () => { if(!forgeIsCatalystMode()) toggleFocus(); });
   document.getElementById('feEnhanceBtn').addEventListener('click', startEnhance);
   document.getElementById('feInvBtn').addEventListener('click', openInventory); // 기존 인벤토리 열기 그대로(강화 대상 선택 상태는 건드리지 않음)
   document.getElementById('feSkipBtn').addEventListener('click', toggleSkip);
-  document.getElementById('feCatalystSlot').addEventListener('click', () => { /* 촉매 시스템 미구현 — 빈 슬롯만 표시 */ });
+  // 모드 선택 / 촉매 수량 조절 / 촉매 슬롯 조작
+  document.getElementById('feMode').addEventListener('click', e => {
+    const b = e.target.closest('.fe-mode-btn');
+    if(b && !b.disabled) forgeSetMode(b.dataset.mode);
+  });
+  // 위/아래 버튼: 왼쪽 = 강화석 등급 변경, 오른쪽 = 소생석 투입 수량 ±1
+  document.querySelectorAll('.fe-qty-btn').forEach(b => b.addEventListener('click', () => {
+    const dir = Number(b.dataset.dir);
+    if(codexUI.tipKey && String(codexUI.tipKey).startsWith('forge-cat-')) codexHideTip();
+    if(b.dataset.slot === '0') catalystEnhanceShiftStone(dir); else catalystEnhanceAdjustRevive(dir);
+  }));
+  // 촉매 슬롯 툴팁(촉매 아이템 툴팁 그대로): 데스크톱 = 아이콘에 마우스를 올리면 표시, 모바일 = 한 번 터치하면 표시(같은 슬롯을 다시 한 번 터치하거나 다른 곳을 터치하면 닫힘).
+  // 슬롯에 표시 중인 촉매의 id — 강화석 슬롯은 장비가 없으면 비어 있어 null, 소생석 슬롯은 항상 소생석.
+  const catSlotItemId = i => i === 0 ? (document.getElementById('feCat0').classList.contains('empty') ? null : state.forgeStone.id) : 'reviveStone';
+  const showCatTip = i => {
+    const id = catSlotItemId(i); if(!id) return false;
+    codexShowTipHtml(document.getElementById('feCat' + i), buildMiscTooltipHtml(id), 'forge-cat-' + id);
+    return true;
+  };
+  [0, 1].forEach(i => {
+    const btn = document.getElementById('feCat' + i);
+    btn.addEventListener('mouseover', () => { if(!forgeEnhIsMobile()) showCatTip(i); });
+    btn.addEventListener('mouseout', () => { if(!forgeEnhIsMobile()) codexHideTip(); });
+  });
+  // 모바일: 촉매 슬롯 바깥을 터치하면 툴팁이 닫히는 동작은 codex.js의 전역 클릭 처리가 이미 해 줌.
+  // 강화석 슬롯 클릭: 데스크톱 = ON/OFF 전환(툴팁은 호버로) / 모바일 = 한 번 터치로 ON/OFF 전환과 툴팁 표시를 함께 처리(더블 터치·대기 시간 없음).
+  // ON/OFF 판정은 catalystEnhanceToggleStone 그대로(보유 수량이 필요 수량보다 적으면 ON으로 바뀌지 않음) — 바뀐 뒤 슬롯 상태 기준의 툴팁을 보여 줌.
+  // 도감과 같은 전역 클릭 처리(codex.js)가 클릭 직후 툴팁을 닫으므로, 그 처리가 끝난 다음(setTimeout 0)에 표시해 바로 닫히지 않게 함.
+  document.getElementById('feCat0').addEventListener('click', () => {
+    catalystEnhanceToggleStone();
+    if(forgeEnhIsMobile()) setTimeout(() => showCatTip(0), 0);
+  });
+  // 소생석 슬롯: 모바일 = 한 번 터치하면 툴팁 표시(수량은 위/아래 버튼으로만 조절). 데스크톱은 호버 툴팁만.
+  document.getElementById('feCat1').addEventListener('click', () => {
+    if(forgeEnhIsMobile()) setTimeout(() => showCatTip(1), 0);
+  });
 
   // 중앙 슬롯: 빈 슬롯 클릭 = 장비 선택 팝업. 장비가 있으면 한 번 클릭 = 선택 팝업(더블 클릭과 구분하려고 잠깐 기다림), 더블 클릭 = 선택 해제.
   const slot = document.getElementById('feItemSlot');
+  // 데스크톱: 클릭 = 선택 팝업(바로 열림), 우클릭 = 선택 해제 / 모바일: 위 설명 그대로(한 번 = 팝업, 더블 = 해제)
   slot.addEventListener('click', () => {
-    if(!slot.classList.contains('filled')){ forgeEnhOpenSelect(); return; }
+    if(!slot.classList.contains('filled') || !forgeEnhIsMobile()){ forgeEnhOpenSelect(); return; }
     if(forgeEnhNew.slotClickTimer){
       clearTimeout(forgeEnhNew.slotClickTimer); forgeEnhNew.slotClickTimer = null;
       if(typeof codexHideTip === 'function') codexHideTip();
@@ -336,6 +423,12 @@ function forgeEnhClearTarget(){
       return;
     }
     forgeEnhNew.slotClickTimer = setTimeout(() => { forgeEnhNew.slotClickTimer = null; forgeEnhOpenSelect(); }, FORGE_ENH_DOUBLE_CLICK_MS);
+  });
+  slot.addEventListener('contextmenu', e => {
+    if(forgeEnhIsMobile()) return;
+    e.preventDefault();
+    if(typeof codexHideTip === 'function') codexHideTip();
+    forgeEnhClearTarget();
   });
   // 장비 툴팁: 데스크톱에서만 마우스 호버로 표시. 모바일은 아래 성장 수치 영역(현재 장비 옵션)에서 확인하므로 표시하지 않음.
   slot.addEventListener('mouseover', () => {

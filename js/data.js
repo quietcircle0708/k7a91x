@@ -23,10 +23,8 @@ const EQUIPMENT_TYPES = { weapon: '무기', armor: '방어구', sub: '보조', a
 
 // 무기 종류(weaponKind) 구분: 검 / 단검 / 지팡이(향후 도끼/창 등 추가 예정). "이름"과는 별개의 개념.
 // 착용 손수(handType: one_hand=한손 / two_hand=양손)와는 독립된 축이라, 검처럼 한손·양손 둘 다 존재하는
-// 종류도 weaponKind 하나로 표현하고 handType으로만 구분함(과거엔 weaponKind 자체를 'two_handed_sword'
-// 처럼 손수까지 합쳐서 표현했으나, 도끼/창 등 새 종류가 늘어날 때마다 조합이 배로 늘어나는 문제가 있어
-// 이번에 두 속성으로 분리함 — 무기 데이터의 id/이름/등급/수치/드랍 등은 전혀 변경되지 않음).
-const WEAPON_KINDS = { sword: '검', dagger: '단검', staff: '지팡이' };
+// 종류도 weaponKind 하나로 표현하고 handType으로만 구분함(새 종류가 늘어나도 조합이 배로 늘지 않도록 두 속성으로 분리).
+const WEAPON_KINDS = { sword: '검', dagger: '단검', staff: '지팡이', blunt: '둔기', axe: '도끼', spear: '창' };
 const HAND_TYPE_LABELS = { one_hand: '한손', two_hand: '양손' };
 
 // 무기 종류(weaponKind) + 손수(handType) 조합별 강화 프로필: 강화 구간(+1~+9)당 공격속도/치명타
@@ -58,6 +56,14 @@ const WEAPON_PROFILES = {
       statReq: [{ stat: 'str', mult: 1 }, { stat: 'agi', mult: 2 }],
     },
   },
+  // 둔기(한손)/도끼(한손)/창(양손): 아직 등록된 무기는 없지만(신규 무기 유형 — 데이터는 추후 추가), 강화 단계별 옵션 성장 공식(공격속도·치명타 증가량)은
+  // 대응하는 검의 것을 그대로 재사용함 — 둔기 한손 = 한손 검, 도끼 한손 = 한손 검, 창 양손 = 양손 검. 별도의 성장 공식은 만들지 않으며, 성장치 배열은
+  // 검 프로필의 배열을 복사하지 않고 같은 배열을 참조하므로 항상 검과 같은 값을 씀(강화 공격력은 원래 무기 종류와 무관한 ENHANCE_ATK_LEVEL_MULT 공통 공식).
+  // 프로필 객체는 검과 별개라서, 이 무기들의 착용 요구 스탯(statReq)이 나중에 정해지면 검에 영향 없이 이 객체의 statReq만 바꾸면 됨.
+  // statReq는 아직 별도 지정이 없어 대응하는 검의 공식을 임시로 그대로 참조함(무기 데이터가 추가될 때 확정).
+  blunt: { one_hand: { atkSpeedStep: null, critStep: null, statReq: null } }, // 아래에서 검 프로필을 참조해 채움
+  axe:   { one_hand: { atkSpeedStep: null, critStep: null, statReq: null } },
+  spear: { two_hand: { atkSpeedStep: null, critStep: null, statReq: null } },
   // 지팡이: 아직 실제로 등록된 무기가 하나도 없는 "구현 예정" 상태(02번 기획 문서)라 착용 요구 스탯
   // 공식(지능×3, 기존 WEAPON_KIND_STAT_REQ.staff와 동일)만 정해져 있고 강화 성장치는 미확정(null,
   // 기존과 동일). handType은 실제 지팡이 무기가 추가되며 확정될 예정이라 우선 one_hand에 배치했으며,
@@ -70,6 +76,16 @@ const WEAPON_PROFILES = {
     },
   },
 };
+// 신규 무기 유형의 성장치 연결 — 대응하는 검 프로필의 같은 배열을 참조(복사 X): 한손 둔기·한손 도끼 → 한손 검, 양손 창 → 양손 검.
+[
+  [WEAPON_PROFILES.blunt.one_hand, WEAPON_PROFILES.sword.one_hand],
+  [WEAPON_PROFILES.axe.one_hand,   WEAPON_PROFILES.sword.one_hand],
+  [WEAPON_PROFILES.spear.two_hand, WEAPON_PROFILES.sword.two_hand],
+].forEach(([profile, source]) => {
+  profile.atkSpeedStep = source.atkSpeedStep;
+  profile.critStep = source.critStep;
+  profile.statReq = source.statReq; // 임시 — 위 주석 참고
+});
 // 무기 데이터(w) 하나의 강화 프로필 조회. weaponKind/handType 조합에 등록된 프로필이 없으면(방어구 등
 // weaponKind 자체가 없는 아이템 포함) null — 호출부는 기존처럼 "이 조합은 아직 정의 안 됨"으로 처리함.
 function getWeaponProfile(w){
@@ -85,7 +101,7 @@ const WEAPON_GRADES = {
   unique: { label: '유니크', color: '#ff8a3d' },
 };
 
-// ---- 장비 아이템 전역 기본 판매가 공식(1단계) ----
+// ---- 장비 아이템 전역 기본 판매가 공식 ----
 // 최종 기본 판매 가격 = 착용 제한 레벨 × (해당 레벨 구간의 등급별 레벨당 가격). 구간/가격을 이 표
 // 하나로만 관리해 추후 조정이 쉽도록 함(요구사항 8번) — 장비 종류(무기/방어구/장신구/보조)에 따라
 // 별도 공식을 만들지 않고 전부 이 표+함수 하나를 공용으로 씀.
@@ -1542,7 +1558,7 @@ function computeEvasionArray(baseEvasion, stepDelta){
 // 정의되므로, 그 정의 이후(무기 판매가 공식 연결부 바로 다음)에서 이어서 연결함 — 3단계 참고.
 Object.values(ARMOR_TYPES).forEach(a => {
   // 신발(armorKind:'shoes')은 방어도가 강화 대상에서 제외됨 — 모든 강화 단계에서 데이터 값 그대로(10칸 flat).
-  // 다른 방어구는 기존 재귀 공식. (현재 신발 종류/아이템은 미등록 — 신발 추가 시 이 규칙이 자동 적용됨)
+  // 다른 방어구는 기존 재귀 공식. (상점 판매 신발 7종에 이 규칙이 적용됨)
   if(a.defense != null) a.defArr = (a.armorKind === 'shoes') ? new Array(10).fill(a.defense) : computeArmorDefenseArray(a.defense);
   if(a.hp != null) a.hpArr = computeArmorVitalArray(a.hp);
   if(a.mana != null) a.manaArr = computeArmorVitalArray(a.mana);
@@ -2183,14 +2199,11 @@ Object.values(WEAPON_TYPES).forEach(w => {
 });
 
 // ============================================================
-// [1단계] 무기 등급별 강화 확률/강화 비용 — 데이터 테이블만 우선 추가.
-// 아직 어디에도 연결되지 않은 새 데이터임 — 기존 코드(odds/cost 사용처)는 전혀 건드리지 않음.
-// 다음 단계에서 이 데이터로 배열을 계산하는 함수를 추가하고, 마지막 단계에서 WEAPON_TYPES에 연결할 예정.
+// 무기 등급별 강화 확률/강화 비용 데이터 테이블(아래 계산 함수가 이 표로 무기별 배열을 만들어 WEAPON_TYPES에 연결함).
 // ============================================================
 
-// 등급별 강화 확률 표(2단계 개편: 하락 결과 자체를 삭제해 3개 결과만 사용). 각 배열의 index 0=+1,
-// index 8=+9. 값 순서: [성공%, 유지%, 파괴%] — 일반/레어/에픽/유니크가 각각 독립된 표를 사용함
-// (기존엔 일반·레어가 같은 배열을 공유했으나 이번 개편에서 분리).
+// 등급별 강화 확률 표(결과는 성공/유지/파괴 3개뿐, 하락 없음). 각 배열의 index 0=+1,
+// index 8=+9. 값 순서: [성공%, 유지%, 파괴%] — 일반/레어/에픽/유니크가 각각 독립된 표를 사용함.
 const GRADE_ENHANCE_ODDS_NORMAL = [
   [90, 10, 0], [80, 20, 0], [70, 30, 0], [60, 40, 0], [50, 50, 0],
   [40, 60, 0], [30, 68, 2], [25, 70, 5], [20, 72, 8],
@@ -2227,29 +2240,21 @@ const ENHANCE_COST_STEP_MULT = [1, 1, 1.05, 1.07, 1.09, 1.1, 1.2, 1.3, 1.4, 1.5]
 const GRADE_COST_MULT = { normal: 1, rare: 1.015, epic: 1.025, unique: 1.03 };
 
 // ============================================================
-// [2단계] 위 데이터로 실제 배열을 계산하는 함수. 아직 WEAPON_TYPES에는 연결하지 않음(3단계에서 연결 예정).
-// 독립적으로 호출해서 바로 테스트 가능한 순수 함수들.
+// 위 데이터로 실제 배열을 계산하는 순수 함수들(독립적으로 호출해 테스트 가능).
 // ============================================================
 
 // 무기 하나의 강화 비용 배열(길이 9)을 계산.
-// 강화 비용은 반드시 "목표 강화 단계" 기준으로 관리함(강화 비용 단계 매핑 수정) — 즉 배열 index는
-// 여전히 "현재 레벨"(costFor(type,level)이 wpn(type).cost[level]을 그대로 읽는 기존 접근 방식은
-// 안 바뀜)이지만, 그 값 자체는 cost[0](0→1 시도)="+1 강화비용", ..., cost[8](8→9 시도)="+9 강화비용"이
-// 되도록 시드값에서부터 이미 첫 단계(+1) 배율×등급보너스를 적용해서 시작함(이전엔 cost[0]이 배율·
-// 등급보너스 미적용 시드값 그대로였음 — +0 강화비용이라는 별도의 실제 강화 단계 비용은 더 이상 만들지
-// 않고, 시드값은 오직 "+1 강화비용을 계산하기 위한 시작값"으로만 쓰임).
+// 강화 비용은 반드시 "목표 강화 단계" 기준으로 관리함 — 배열 index는 "현재 레벨"(costFor(type,level)이
+// wpn(type).cost[level]을 그대로 읽음)이지만, 값 자체는 cost[0](0→1 시도)="+1 강화비용", ..., cost[8](8→9 시도)=
+// "+9 강화비용"이 되도록 시드값에서부터 첫 단계(+1) 배율×등급보너스를 적용해서 시작함(시드값은 "+1 강화비용을
+// 계산하기 위한 시작값"으로만 쓰이고 비용 배열에는 저장되지 않음).
 // 반올림은 각 단계의 "표시값"에만 적용하고, 다음 단계 계산에는 반올림 전의 정밀한 값을 그대로 이어서 사용함
 // (매 단계마다 반올림된 값을 누적하면 오차가 쌓여 최종 단계에서 결과가 어긋나기 때문).
 // 등급 데이터가 없으면 null 반환.
 function computeGradeCost(sellPrice, grade){
   const gradeMult = GRADE_COST_MULT[grade];
   if(gradeMult == null) return null;
-  // 강화 비용 단계 매핑 수정: cost[level]은 "현재 level에서 시도하는 강화(0→1, 1→2, ... 8→9)에
-  // 드는 비용"으로 그대로 유지하되(costFor(type,level)의 기존 접근 방식은 안 바뀜), 그 "값" 자체는
-  // 반드시 "목표 강화 단계" 기준으로 계산함 — cost[0](0→1 시도)="+1 강화비용", ..., cost[8](8→9 시도)
-  // ="+9 강화비용"이 되도록, 시드값에서부터 이미 첫 단계(+1) 배율과 등급 보너스를 적용해서 시작함
-  // (이전에는 cost[0]이 배율/등급보너스 미적용 시드값 그대로였던 게 문제였음 — 이제 시드값 자체는
-  // "+1 강화비용을 계산하기 위한 시작값"으로만 쓰이고, 실제 강화 비용 배열에는 저장되지 않음).
+  // cost[level] = "현재 level에서 시도하는 강화의 비용"이며, 값은 목표 단계 기준(위 설명 참고).
   const seed = (sellPrice || 0) * ENHANCE_COST_SEED_MULT;
   const cost = [];
   let precise = seed;
@@ -2357,8 +2362,7 @@ function computeAverageExpectedCosts(cost, odds, sellPrice, grade){
 // 평균 기대비용은 w.avgExpectedCost에 캐시해서, 이후 같은 실행(세션) 동안 재계산 없이 재사용.
 function computeWeaponSellPrices(w){
   if(!w.cost || w.cost.length === 0 || !w.odds || w.odds.length === 0) return null; // 강화 데이터가 없으면 계산 불가(예: 강화 준비 중인 무기)
-  // 4단계 개편: 재획득 비용은 이제 computeAverageExpectedCosts 내부에서 등급별 배율로 직접 계산함
-  // (기본 판매가×2 방식은 더 이상 쓰지 않음) — sellPrice/grade를 그대로 넘기기만 하면 됨.
+  // 재획득 비용은 computeAverageExpectedCosts 내부에서 등급별 배율로 직접 계산하므로 sellPrice/grade를 그대로 넘기면 됨.
   const avgCosts = computeAverageExpectedCosts(w.cost, w.odds, w.sellPrice, w.grade);
   w.avgExpectedCost = avgCosts; // 계산 결과 저장(캐시) — 강화 비용/확률이 바뀌지 않는 한 다시 계산하지 않음
   const sell = [w.sellPrice]; // +0 판매가 = 기본 판매 가격 그대로
@@ -2394,9 +2398,8 @@ Object.values(ARMOR_TYPES).forEach(a => {
 });
 
 // ============================================================
-// ACCESSORY_TYPES에 "장비 전역 설정" 연결 — 무기/방어구와 완전히 동일한 등급 기반 공식을 그대로
-// 재사용함. 기존에 있던 "장신구 강화 비용 보정"(×1.3)은 3단계 개편으로 삭제됨(장신구 자체의 강화
-// 비용까지 없애는 것이 아니라, 계산된 강화 비용에 추가로 곱하던 1.3배 보정값만 제거하는 것).
+// ACCESSORY_TYPES에 "장비 전역 설정" 연결 — 무기/방어구와 완전히 동일한 등급 기반 공식을 그대로 재사용함
+// (장신구 전용 강화 비용 보정값은 없음).
 // ============================================================
 Object.values(ACCESSORY_TYPES).forEach(a => {
   const gradeOdds = resolveGradeOdds(a.grade);
@@ -2787,12 +2790,78 @@ const MISC_ITEMS = {
     desc: '오랜 세월을 견딘 주괴<br>장비 제작에 사용된다.',
     sellPrice: 400, stateKey: 'oldIrons',
   },
+  // ---- 촉매 아이템 6종(촉매 시스템 요청글 9번) ----
+  // miscKind: 툴팁의 '아이템 분류'에 기존 분류(기타) 대신 표시되는 세부 분류(요청글 8번) — 실제 분류(itemClass)와 인벤토리 동작은 그대로 '기타'.
+  // catalyst: 촉매 효과 데이터(kind별 필드). 효과 수치·소모량 표는 코드에 고정하지 않고 아래 데이터에서만 읽음(catalyst.js).
+  //   enchantStone — successRatePct(강화 성공 확률 증가율%), baseCost(장비 등급별 기본 소모량 — 키가 없는 등급은 사용 불가),
+  //                  stepExtra(강화 '목표' 단계 1~9별 추가 소모량 — 인덱스 = 목표 단계(+0→+1 시도는 [1], +8→+9 시도는 [9]), [0]은 쓰이지 않음 — 촉매 등급과 장비 등급이 같을 때만 적용), 설명의 [등급]은 baseCost에서 사용 가능한 가장 높은 장비 등급.
+  //   reviveStone  — enhanceDestroyReducePct(장비 등급별 소생석 1개당 파괴 확률 감소%), enhanceDestroyReduceMaxPct(합산 상한%),
+  //                  restoreBonusPct(장비 등급별 소생석 1개당 수리(손상 복구) 성공 확률 증가 %p)
+  //   creationShard — craftSuccessBonusPct(제작 성공 확률 증가 %p, 제작 1회당 최대 craftMaxPerAttempt개)
+  oldEnchantStone: {
+    id: 'oldEnchantStone', name: '빛바랜 강화석', icon: '💎', image: 'misc_old_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'normal',
+    sellPrice: 200, stateKey: 'oldEnchantStones',
+    catalyst: { kind: 'enchantStone', successRatePct: 15, baseCost: { normal: 1 }, stepExtra: [0, 0, 0, 0, 0, 1, 1, 2, 2, 3] },
+  },
+  rareEnchantStone: {
+    id: 'rareEnchantStone', name: '강화석', icon: '💎', image: 'misc_rare_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'rare',
+    sellPrice: 1500, stateKey: 'rareEnchantStones',
+    catalyst: { kind: 'enchantStone', successRatePct: 20, baseCost: { normal: 1, rare: 2 }, stepExtra: [0, 0, 0, 0, 0, 1, 1, 2, 3, 4] },
+  },
+  epicEnchantStone: {
+    id: 'epicEnchantStone', name: '예리한 강화석', icon: '💎', image: 'misc_epic_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'epic',
+    sellPrice: 10000, stateKey: 'epicEnchantStones',
+    catalyst: { kind: 'enchantStone', successRatePct: 25, baseCost: { normal: 1, rare: 1, epic: 2 }, stepExtra: [0, 0, 0, 0, 0, 1, 2, 3, 4, 6] },
+  },
+  uniqueEnchantStone: {
+    id: 'uniqueEnchantStone', name: '빛나는 강화석', icon: '💎', image: 'misc_unique_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'unique',
+    sellPrice: 80000, stateKey: 'uniqueEnchantStones',
+    catalyst: { kind: 'enchantStone', successRatePct: 30, baseCost: { normal: 1, rare: 1, epic: 1, unique: 2 }, stepExtra: [0, 0, 0, 1, 2, 3, 4, 5, 6, 9] },
+  },
+  reviveStone: {
+    id: 'reviveStone', name: '소생석', icon: '💠', image: 'misc_revive_stone', itemClass: 'misc', miscKind: '촉매', grade: 'epic',
+    desc: '응축된 생명력이 담긴 광석.<br>잠재된 힘을 일깨우고,<br>불완전한 것을 온전한 상태로 만든다.',
+    sellPrice: 12000, stateKey: 'reviveStones',
+    catalyst: {
+      kind: 'reviveStone',
+      enhanceDestroyReducePct: { normal: 45, rare: 30, epic: 20, unique: 10 }, enhanceDestroyReduceMaxPct: 90,
+      restoreBonusPct: { normal: 30, rare: 20, epic: 15, unique: 10 },
+    },
+  },
+  creationShard: {
+    id: 'creationShard', name: '창조의 파편', icon: '🔶', image: 'misc_shard_of_creation', itemClass: 'misc', miscKind: '촉매', grade: 'unique',
+    desc: '태초의 힘이 응축된 신비로운 파편.<br>새로운 형태를 탄생시키는 힘이 담겨있다.',
+    sellPrice: 100000, stateKey: 'creationShards',
+    catalyst: { kind: 'creationShard', craftSuccessBonusPct: 15, craftMaxPerAttempt: 1 },
+  },
 };
 
+// 장비 요구 레벨별 강화석 추가 소모량(요청글 4번). [최소 레벨, 추가 소모량] — 해당 레벨 이상 중 가장 큰 구간을 적용.
+// 강화석 계열은 사용 가능한 장비라면 촉매 등급과 관계없이 항상 이 값을 더함.
+const CATALYST_LEVEL_EXTRA = [[1, 0], [31, 1], [50, 2], [70, 3], [90, 4], [99, 5]];
+
+// 강화석 계열 설명(요청글 9번 공통 템플릿) — 아이템별로 문구를 따로 적지 않고 템플릿 + 아이템 데이터 값으로 만듦.
+// [등급]: 이 촉매를 쓸 수 있는 가장 높은 장비 등급(baseCost 키 기준, 등급 색상+볼드) / [%]: successRatePct(초록+볼드).
+const CATALYST_ENCHANT_DESC_TEMPLATE = ['[등급] 등급 이하 장비 강화에 사용 가능한 신비한 보석', '사용 시, 강화 확률이 [%] 증가한다'];
+function catalystEnchantMaxGrade(item){
+  const order = ['normal', 'rare', 'epic', 'unique'];
+  const usable = order.filter(g => item.catalyst.baseCost[g] != null);
+  return usable.length ? usable[usable.length - 1] : item.grade;
+}
+function catalystEnchantDescHtml(item){
+  const g = WEAPON_GRADES[catalystEnchantMaxGrade(item)];
+  const gradeHtml = `<b style="color:${g.color};">${g.label}</b>`;
+  const pctHtml = `<b style="color:var(--forge-green);">${item.catalyst.successRatePct}%</b>`;
+  return CATALYST_ENCHANT_DESC_TEMPLATE.map(line => line.replace('[등급]', gradeHtml).replace('[%]', pctHtml)).join('<br>');
+}
+Object.values(MISC_ITEMS).forEach(item => {
+  if(item.catalyst && item.catalyst.kind === 'enchantStone') item.desc = catalystEnchantDescHtml(item);
+});
+
 // ---- 강화 파괴 및 흔적 시스템 ----
-// 강화 중 파괴 판정이 나면(기존 확률/로직은 그대로) 더 이상 +0으로 초기화하지 않고, 장비를 인벤토리에서
-// 완전히 소멸시킨 뒤 아래 데이터로 파괴 보상을 판정함(무기/방어구/장신구 공통, 아티팩트는 강화 대상이
-// 아니므로 제외). 실제 처리는 actions.js의 resolveEnhance 파괴 분기(processDestroyReward)가 담당함.
+// 강화 중 파괴 판정이 나면 장비를 인벤토리에서 완전히 소멸시킨 뒤 아래 데이터로 파괴 보상을 판정함
+// (무기/방어구/장신구 공통, 아티팩트는 강화 대상이 아니므로 제외). 실제 처리는 actions.js의 resolveEnhance 파괴 분기
+// (processDestroyReward)가 담당함.
 
 // 흔적 복구 비용 배율. 복구 비용 = 파괴된 장비의 기본 판매 가격(sellPrice, 강화 단계 무관) × 이 값.
 const TRACE_RECOVERY_COST_MULT = 3;
@@ -2829,12 +2898,30 @@ const DESTROY_SHINYSTONE_ENHANCE_QTY = [
 // 상점/인벤토리의 EQUIP_SUB_TABS와 동일한 방식(배열에 항목만 추가하면 자동으로 탭이 늘어남)으로 관리.
 // 사용자 요청 4종(무기/방어구/보조/장신구)만 우선 등록 — 이번 작업은 UI 골격만 구현하는 범위라 실제
 // 제작 가능 아이템 데이터(CRAFTABLE_ITEMS)는 전부 빈 배열임.
+// 가로 탭의 표시 순서는 이 배열의 순서로 고정됨(무기 → 방어구 → 보조 → 신발 → 장신구 → 소비 → 재료 → 마석). 제작 아이템이 하나도 없는 분류는
+// 탭이 숨겨지지만 이 순서 안의 자리는 예약되어 있어, 나중에 해당 분류(CRAFTABLE_ITEMS[id])에 제작 데이터를 넣으면 UI 수정 없이 제 위치에 탭이 생김.
+// 기타 아이템 중 제작 가능한 아이템은 'misc'(탭 이름 '재료'), 마석은 'stone'에 등록함.
 const CRAFT_SUB_TABS = [
   { id: 'weapon', label: '무기' },
   { id: 'armor', label: '방어구' },
   { id: 'sub', label: '보조' },
+  { id: 'shoes', label: '신발' },
   { id: 'accessory', label: '장신구' },
+  { id: 'consumable', label: '소비' },
+  { id: 'misc', label: '재료' },
+  { id: 'stone', label: '마석' },
 ];
+// 장비 제작 아이템의 iconType 목록(제작 1회 = 1개, 천장·재료 장비 등록 등 기존 장비 제작 흐름을 그대로 사용). 이 목록에 없는 iconType
+// ('consumable' 소비 / 'misc' 기타·재료 / 'stone' 마석 — iconRef는 CONSUMABLES·MISC_ITEMS의 아이템 id)은 비장비 제작 아이템으로, 제작 개수를 설정함.
+const CRAFT_EQUIP_ICON_TYPES = ['weapon', 'armor', 'sub', 'accessory'];
+// 비장비 제작 개수 상한(재료·골드 조건이 없어 무한정 계산될 때를 막는 안전 상한) / 제작 개수 UI의 [+N] 빠른 추가 버튼 값
+const CRAFT_QTY_HARD_MAX = 9999;
+const CRAFT_QTY_QUICK_ADDS = [5, 10, 100];
+// 비장비 반복 제작 연출 설정(craft_multi.js): 한 회차의 제작 연출 시간(ms) / 회차 사이 대기 시간(ms, 회차 처리·저장이 끝난 뒤 다음 회차 시작 전에만 적용) / 로딩바 갱신 주기(ms) / 1개 제작 시 연출 후 실루엣 공개 연출 시간(ms)
+const CRAFT_MULTI_ROUND_MS = 1000;
+const CRAFT_MULTI_GAP_MS = 200;
+const CRAFT_MULTI_TICK_MS = 40;
+const CRAFT_MULTI_REVEAL_MS = 700;
 // 제작소 각 분류에 표시할 "제작 가능한 아이템" 목록. 각 배열에 { id, name, ... , materials: [...] } 형태의 실제
 // 제작 아이템 데이터를 채우면 제작소 메뉴(craft_menu.js)가 이 배열들을 그대로 읽어 가로 분류 탭/세로 세부 분류/목록에
 // 자동으로 표시함(제작 아이템이 있는 분류만 탭으로 나타남). 새 제작 분류가 추가되면 CRAFT_SUB_TABS에 분류를 추가하고
@@ -2843,8 +2930,14 @@ const CRAFTABLE_ITEMS = {
   weapon: [],
   armor: [],
   sub: [],
+  shoes: [],      // 신발 — 방어구 데이터(iconType 'armor')를 그대로 가리킴
   accessory: [],
+  consumable: [], // 소비 — iconType 'consumable', iconRef = CONSUMABLES 키
+  misc: [],       // 재료(기타 아이템) — iconType 'misc', iconRef = MISC_ITEMS 키
+  stone: [],      // 마석 — iconType 'stone', iconRef = MISC_ITEMS 키(마석)
 };
+// 비장비 제작 아이템({ id, iconType:'consumable'|'misc'|'stone', iconRef, successChance, craftCost, materials, failReturns? })은 name·grade를 생략하면
+// 참조한 아이템의 기존 데이터(이름·등급)를 자동으로 사용함(formulas.js craftNormalizeNonEquipItems). 비장비 제작에는 천장(pityLimit)이 적용되지 않음.
 // 제작 가능한 아이템 하나의 스키마:
 // {
 //   id, name,
@@ -2855,7 +2948,8 @@ const CRAFTABLE_ITEMS = {
 //   pityLimit,          // (선택) 제작 천장 — 확정 성공 전에 누적할 수 있는 '실패 횟수'. 이 횟수만큼 실패하면 다음 제작은 성공 확률 100%.
 //                        // 생략하면 천장 없음(기존 확률 그대로, 누적도 기록하지 않음). 누적 횟수는 state.craftPity[아이템 id]에 저장
 //                        // (formulas.js craftPity* 함수). 아이템 이름이 아니라 이 데이터 값만 보고 동작함.
-//   craftCost,          // 제작 비용(골드)
+//   craftCost,          // 제작 비용(골드) — 비장비 제작 아이템만 직접 지정. 장비 제작 아이템(iconType weapon/armor/sub/accessory)은 생략하며,
+//                        // formulas.js craftNormalizeEquipCosts가 기본 판매 가격과 기본 successChance로 자동 계산해 채움(지정해도 덮어씀).
 //   materials: [ { name, need } ],  // name은 기존 아이템의 표시 이름 그대로 — findCraftResource
 //                                   // (formulas.js)가 무기/방어구/장신구/보조/MISC_ITEMS를 통틀어
 //                                   // 이름으로 찾아 아이콘/등급/색상/툴팁/보유량을 자동 연결함.
@@ -2874,7 +2968,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_poisonfang', name: '독 송곳니', grade: 'epic',
     iconType: 'weapon', iconRef: 'poisonfang',
-    successChance: 60, pityLimit: 2, craftCost: 4000,
+    successChance: 60, pityLimit: 2,
     materials: [
       { name: '독사의 송곳니', need: 2 },
       { name: '쇠조각', need: 1 },
@@ -2888,7 +2982,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_blacksword', name: '흑색 검', grade: 'epic',
     iconType: 'weapon', iconRef: 'blacksword',
-    successChance: 40, pityLimit: 2, craftCost: 8000,
+    successChance: 40, pityLimit: 2,
     materials: [
       { name: '흑철', need: 3 },
       { name: '쇠조각', need: 2 },
@@ -2903,7 +2997,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_tigersword', name: '척호검', grade: 'epic',
     iconType: 'weapon', iconRef: 'tigersword',
-    successChance: 40, pityLimit: 2, craftCost: 8000,
+    successChance: 40, pityLimit: 2,
     materials: [
       { name: '자호의 송곳니', need: 2 },
       { name: '흑철', need: 4 },
@@ -2919,7 +3013,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_bloodtigerlongsword', name: '혈호대검', grade: 'epic',
     iconType: 'weapon', iconRef: 'bloodtigerlongsword',
-    successChance: 35, pityLimit: 3, craftCost: 18000,
+    successChance: 35, pityLimit: 3,
     materials: [
       { name: '자호의 송곳니', need: 2 },
       { name: '흑철', need: 5 },
@@ -2935,7 +3029,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_eight_knife', name: '팔각비도', grade: 'epic',
     iconType: 'weapon', iconRef: 'eight_knife',
-    successChance: 30, pityLimit: 3, craftCost: 28000,
+    successChance: 30, pityLimit: 3,
     // 재료 중 "독 송곳니"는 MISC_ITEMS가 아니라 실제 무기(poisonfang) 이름 — findCraftResource가
     // 장비로 인식해서 보유한 개체를 홀딩하고, 아래 failReturns에 같은 이름이 등록되어 있어 실패 시
     // 투입했던 그 개체가 강화 단계 그대로 손상 상태로 반환됨(요청사항 "독 송곳니(손상)").
@@ -2953,7 +3047,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_moongreatsword', name: '반월대도', grade: 'epic',
     iconType: 'weapon', iconRef: 'moongreatsword',
-    successChance: 40, pityLimit: 2, craftCost: 8000,
+    successChance: 40, pityLimit: 2,
     materials: [
       { name: '흑철', need: 2 },
       { name: '쇠조각', need: 3 },
@@ -2970,7 +3064,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_moonsword_black', name: "월도'흑", grade: 'epic',
     iconType: 'weapon', iconRef: 'moonsword_black',
-    successChance: 35, pityLimit: 4, craftCost: 30000,
+    successChance: 35, pityLimit: 4,
     materials: [
       { name: '월도', need: 1 },
       { name: '반짝이는 돌', need: 1 },
@@ -2985,7 +3079,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavysword_black', name: '흑철중검', grade: 'epic',
     iconType: 'weapon', iconRef: 'heavysword_black',
-    successChance: 35, pityLimit: 4, craftCost: 30000,
+    successChance: 35, pityLimit: 4,
     materials: [
       { name: '현철중검', need: 1 },
       { name: '반짝이는 돌', need: 1 },
@@ -3000,7 +3094,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavydagger_black', name: '흑철비도', grade: 'epic',
     iconType: 'weapon', iconRef: 'heavydagger_black',
-    successChance: 35, pityLimit: 4, craftCost: 30000,
+    successChance: 35, pityLimit: 4,
     materials: [
       { name: '현철단검', need: 1 },
       { name: '반짝이는 돌', need: 1 },
@@ -3021,7 +3115,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_moonsword_unique', name: '진월도', grade: 'unique',
     iconType: 'weapon', iconRef: 'moonsword_unique',
-    successChance: 15, pityLimit: 10, craftCost: 50000,
+    successChance: 15, pityLimit: 10,
     materials: [
       { name: "월도'흑", need: 1 },
       { name: '원한이 담긴 유서', need: 5 },
@@ -3038,7 +3132,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavysword_unique', name: '진혼검', grade: 'unique',
     iconType: 'weapon', iconRef: 'heavysword_unique',
-    successChance: 15, pityLimit: 10, craftCost: 50000,
+    successChance: 15, pityLimit: 10,
     materials: [
       { name: '흑철중검', need: 1 },
       { name: '원한이 담긴 유서', need: 5 },
@@ -3055,7 +3149,7 @@ CRAFTABLE_ITEMS.weapon.push(
   {
     id: 'craft_heavydagger_unique', name: '혈영비도', grade: 'unique',
     iconType: 'weapon', iconRef: 'heavydagger_unique',
-    successChance: 15, pityLimit: 10, craftCost: 50000,
+    successChance: 15, pityLimit: 10,
     materials: [
       { name: '흑철비도', need: 1 },
       { name: '원한이 담긴 유서', need: 5 },
@@ -3079,7 +3173,7 @@ CRAFTABLE_ITEMS.accessory.push(
   {
     id: 'craft_purpleamberpendant', name: '자금연주금패', grade: 'unique',
     iconType: 'accessory', iconRef: 'purpleamberpendant',
-    successChance: 100, craftCost: 1000000,
+    successChance: 100,
     materials: [
       { name: '조화의 목걸이', need: 1 },
       { name: '진호박', need: 300 },
@@ -3087,6 +3181,53 @@ CRAFTABLE_ITEMS.accessory.push(
       { name: '흑철', need: 15 },
       { name: '쇠조각', need: 30 },
     ],
+  },
+);
+
+// ==================== 제작소 비장비 제작 아이템 데이터 ====================
+// 마석(탭 '마석')과 강화석(기타 아이템 — 탭 '재료'). iconRef는 MISC_ITEMS 키, materials/failReturns의 name은 해당 아이템 이름.
+// 모든 수량·골드는 아이템 1개를 제작할 때 필요한 값이며, 비장비 제작은 개수를 설정해 1개씩 반복 제작함(천장 없음).
+CRAFTABLE_ITEMS.stone.push(
+  {
+    id: 'craft_manaShard', iconType: 'stone', iconRef: 'manaShard',
+    successChance: 95, craftCost: 100,
+    materials: [ { name: '마석 파편', need: 10 } ],
+    failReturns: [ { name: '마석 파편', need: 1, chance: 100 } ],
+  },
+  {
+    id: 'craft_manaCrystal', iconType: 'stone', iconRef: 'manaCrystal',
+    successChance: 95, craftCost: 500,
+    materials: [ { name: '마석 조각', need: 10 } ],
+    failReturns: [ { name: '마석 조각', need: 1, chance: 100 } ],
+  },
+  {
+    id: 'craft_manaStone', iconType: 'stone', iconRef: 'manaStone',
+    successChance: 95, craftCost: 1000,
+    materials: [ { name: '마석 결정', need: 10 } ],
+    failReturns: [ { name: '마석 결정', need: 1, chance: 100 } ],
+  },
+);
+// 강화석 4종은 제작 확률 100%라 실패(반환)가 발생하지 않으므로 failReturns는 두지 않음.
+CRAFTABLE_ITEMS.misc.push(
+  {
+    id: 'craft_oldEnchantStone', iconType: 'misc', iconRef: 'oldEnchantStone',
+    successChance: 100, craftCost: 100,
+    materials: [ { name: '마석 조각', need: 10 } ],
+  },
+  {
+    id: 'craft_rareEnchantStone', iconType: 'misc', iconRef: 'rareEnchantStone',
+    successChance: 100, craftCost: 500,
+    materials: [ { name: '빛바랜 강화석', need: 5 }, { name: '마석 조각', need: 10 } ],
+  },
+  {
+    id: 'craft_epicEnchantStone', iconType: 'misc', iconRef: 'epicEnchantStone',
+    successChance: 100, craftCost: 1000,
+    materials: [ { name: '강화석', need: 5 }, { name: '마석 결정', need: 5 } ],
+  },
+  {
+    id: 'craft_uniqueEnchantStone', iconType: 'misc', iconRef: 'uniqueEnchantStone',
+    successChance: 100, craftCost: 5000,
+    materials: [ { name: '예리한 강화석', need: 5 }, { name: '마석 정수', need: 1 } ],
   },
 );
 
@@ -3227,7 +3368,7 @@ const INV_SORT_TAB_CRITERIA = {
 // 목록에 없는 새 세부 종류는 그 대분류의 맨 뒤, 목록에 없는 새 대분류는 전체의 맨 뒤로 감(새 종류가 추가돼도 정렬이 깨지지 않음).
 // 새 무기 종류/장신구 종류(예: 지팡이, 팔찌)는 해당 kinds 배열의 원하는 위치에 키를 끼워 넣으면 됨.
 const INV_SORT_KIND_ORDER = [
-  { group: 'weapon', kinds: ['weapon:sword:two_hand', 'weapon:sword:one_hand', 'weapon:dagger:one_hand'] }, // 양손/검 → 한손/검 → 한손/단검
+  { group: 'weapon', kinds: ['weapon:sword:two_hand', 'weapon:sword:one_hand', 'weapon:dagger:one_hand', 'weapon:blunt:one_hand', 'weapon:axe:one_hand', 'weapon:spear:two_hand'] }, // 양손/검 → 한손/검 → 한손/단검 → 한손/둔기 → 한손/도끼 → 양손/창
   { group: 'armor', kinds: ['armor:helmet', 'armor:armor', 'armor:shoes'] },                                // 투구 → 갑옷 → 신발
   { group: 'accessory', kinds: ['accessory:necklace', 'accessory:ring', 'accessory:bracelet'] },            // 목걸이 → 반지 → (팔찌 예정)
   { group: 'sub', kinds: ['sub:shield', 'sub:sub_weapon'] },                                                // 방패 → 보조 무기
@@ -3274,6 +3415,7 @@ const DUNGEON_DROP_KINDS = [
   { id: 'artifact', sort: ['grade', 'name'] },                   // 아티팩트(등급 높은 순 → 이름 가나다순)
   { id: 'equipment', sort: ['grade', 'levelReq', 'name'] },      // 장비(무기/방어구/보조/장신구를 구분하지 않음)
   { id: 'misc',      sort: ['grade', 'price', 'name'] },         // 기타
+  { id: 'catalyst',  sort: ['grade', 'price', 'name'] },         // 촉매(마석보다 앞)
   { id: 'stone',     sort: ['grade', 'price', 'name'] },         // 마석
   { id: 'consumable', sort: ['grade', 'price', 'name'] },        // 소비(플라스크 — 비급은 별도 분류라 제외)
 ];
@@ -3305,9 +3447,8 @@ const CHARACTER_TABS = [
   { id: 'skill', label: '스킬' },
 ];
 // [캐릭터 정보] 탭의 소분류 탭 — 캐릭터 메뉴/던전 우측 패널이 완전히 동일하게 이 목록을 그대로 순회해
-// 탭 버튼을 만듦(구조 통합: 대장간 전용 캐릭터 정보 팝업은 더 이상 없고, 이 두 화면이 하나의 공통 콘텐츠
-// 빌더 buildCharInfoSubtabBodyHtml를 공유함). 'equip'/'stats' id는 렌더 함수에서 특별히 다뤄지므로 이름을
-// 바꾸면 안 됨.
+// 탭 버튼을 만들며, 이 두 화면이 하나의 공통 콘텐츠 빌더 buildCharInfoSubtabBodyHtml를 공유함.
+// 'equip'/'stats' id는 렌더 함수에서 특별히 다뤄지므로 이름을 바꾸면 안 됨.
 const CHAR_INFO_SUBTABS = [
   { id: 'info', label: '정보' },
   { id: 'equip', label: '착용 장비' },
@@ -3995,6 +4136,29 @@ const STONE_DROP_TABLE = [
   { minLevel: 95, maxLevel: null, grades: { rare: { chance: 20, min: 2, max: 4 }, epic: { chance: 75, min: 2, max: 2 }, unique: { chance: 5, min: 1, max: 1 } } },
 ];
 
+// 촉매 드랍 — 전역 설정값(마석/플라스크와 독립적으로 판정, 한쪽 결과가 다른 쪽에 영향을 주지 않음). 촉매 시스템 요청글 2~4번.
+// 1) 몬스터 등급별 드랍 판정 확률(%) — 목록에 없는 등급은 0%. 유니크 몬스터는 아직 없지만 추후 추가에 대비해 등록함.
+const CATALYST_DROP_CHANCE = { normal: 1, epic: 1.5, unique: 3 };
+// 촉매 드랍 추첨을 하는 최소 몬스터 레벨 — 이 값 미만(1~20레벨)은 추첨 자체를 하지 않음.
+const CATALYST_DROP_MIN_LEVEL = 21;
+// 드랍 성공 시 지급 수량(몬스터 레벨/등급과 무관하게 항상 동일). 아래 선택표는 '무슨 촉매인가'만 정함.
+const CATALYST_DROP_QTY = 1;
+// 숨겨진 장소(11스테이지) 보물상자의 촉매 드랍 판정에 쓰는 몬스터 등급 — 상자에는 몬스터가 없어 등급별 확률(CATALYST_DROP_CHANCE) 중 어느 줄을 쓸지 정하는 값.
+// 모험가의 유해·마석처럼 던전의 최소 몬스터 레벨을 기준 레벨로 쓰며, 확률을 바꾸고 싶으면 이 값을 다른 등급(normal/epic/unique)으로 바꾸면 됨.
+const TREASURE_CATALYST_GRADE = 'normal';
+// 2) 촉매 선택표(실제 처치 몬스터의 최종 레벨 기준 — 몬스터 등급은 구간 결정에 쓰지 않음). 구간마다 독립된 표이고 합계는 100(%)이어야 함.
+//    items = { 촉매 아이템 id: 선택 확률(%) }. 여기에 확률이 등록되지 않았거나 0%인 촉매는 추첨/표시 대상에서 제외됨
+//    (기타 아이템 종류가 '촉매'인 새 아이템이 추가돼도, 아래 표에 확률을 직접 넣기 전에는 드랍되지 않음). 마지막 구간(maxLevel: null)은 상한 없음.
+const CATALYST_PICK_TABLE = [
+  { minLevel: 21, maxLevel: 29,   items: { oldEnchantStone: 50, rareEnchantStone: 40, epicEnchantStone: 10 } },
+  { minLevel: 30, maxLevel: 49,   items: { oldEnchantStone: 50, rareEnchantStone: 43.85, epicEnchantStone: 5, uniqueEnchantStone: 1, reviveStone: 0.1, creationShard: 0.05 } },
+  { minLevel: 50, maxLevel: 69,   items: { oldEnchantStone: 40, rareEnchantStone: 48, epicEnchantStone: 8.4, uniqueEnchantStone: 2, reviveStone: 1.5, creationShard: 0.1 } },
+  { minLevel: 70, maxLevel: 79,   items: { oldEnchantStone: 20, rareEnchantStone: 60, epicEnchantStone: 10, uniqueEnchantStone: 4, reviveStone: 5, creationShard: 1 } },
+  { minLevel: 80, maxLevel: 89,   items: { oldEnchantStone: 4, rareEnchantStone: 69, epicEnchantStone: 13, uniqueEnchantStone: 5, reviveStone: 8, creationShard: 1 } },
+  { minLevel: 90, maxLevel: 98,   items: { oldEnchantStone: 0, rareEnchantStone: 68, epicEnchantStone: 14.5, uniqueEnchantStone: 6, reviveStone: 10, creationShard: 1.5 } },
+  { minLevel: 99, maxLevel: null, items: { oldEnchantStone: 0, rareEnchantStone: 65, epicEnchantStone: 16, uniqueEnchantStone: 6.5, reviveStone: 10.5, creationShard: 2 } },
+];
+
 // 플라스크 드랍 — 전역 설정값. 마석 전역 드랍(STONE_*)과 완전히 동일한 구조를 그대로 재사용해 던전/
 // 몬스터 등급별로 따로 두지 않고 모든 몬스터가 공통으로 사용함. 마석 드랍(STONE_*)과는 독립적으로
 // 별도 판정됨(한쪽 결과가 다른 쪽에 영향을 주지 않음).
@@ -4599,7 +4763,7 @@ const MONSTERS = {
 // levelRange: 일반 등급 몬스터의 등장 레벨 = 몬스터 자체 레벨 ~ (몬스터 자체 레벨 + levelRange), 그 구간 내에서
 //   레벨별 등장 확률은 모두 동일함. 에픽(그 외 등급) 몬스터는 이 범위를 적용하지 않고 몬스터 데이터의
 //   고정 레벨(level)로만 등장함.
-// dropTable(마석 파편 드랍 규칙)은 더 이상 던전별로 관리하지 않고, 아래 전역 설정(STONE_DROP_CHANCE / STONE_DROP_TABLE)으로 통일됨.
+// 마석 파편 드랍 규칙은 던전별 dropTable이 아니라 전역 설정(STONE_DROP_CHANCE / STONE_DROP_TABLE)으로 관리됨.
 // 모험가의 유해(무기) 드랍도 마찬가지로 던전별 설정을 쓰지 않고 위의 RELIC_* 전역 설정값으로 통일됨.
 // region: 던전이 속한 지역 이름(예: '일반', 추후 '일본' 등). 몬스터 데이터에는 지역을 두지 않고, 던전의 region +
 //   그 던전의 monsters 목록으로 "이 몬스터가 어느 지역에 나오는지"를 판단함(몬스터 도감의 세로 탭이 이 값으로 자동 생성됨).
@@ -4763,48 +4927,53 @@ const DUNGEONS = [
 // 던전 내에서 출력되는 모든 팝업 메시지(스테이지 입장 안내, 몬스터 조우 안내, 몬스터 출현 토스트 등)의 공통 노출 시간
 const DUNGEON_MSG_DURATION_MS = 1000;
 
-const DUNGEON_TOTAL_STAGES = 11;     // 1~10: 전투 스테이지, 11: 숨겨진 장소(보상방)
 const DUNGEON_TREASURE_STAGE = 11;
 
 // 스테이지별 몬스터 등급 등장 확률(전역, 모든 던전 공통 적용 + 앞으로 추가되는 던전에도 자동 적용됨).
 // "어떤 레벨로 등장하는지"는 기존처럼 던전의 levelRange 공식을 그대로 쓰고, 여기서는
 // "일반/에픽 중 어느 등급으로 등장할지"만 스테이지 번호를 기준으로 결정함.
-// (몬스터 등급 등장확률은 이제 던전 전역이 아닌 이 표로 완전히 대체됨 — 기존 던전 전역 80/20 고정값은 삭제됨)
+// (몬스터 등급 등장확률은 던전 전역 값이 아니라 이 표로 결정됨)
+// elite = "에픽 이상"(MONSTER_ELITE_GRADES: 에픽·유니크). elite로 정해지면 그 던전에 등록된 에픽 이상 몬스터 중 하나가 pickEpicMonsterId로 선택됨
+// (등록된 몬스터만 후보 — 유니크가 등록되지 않은 던전에서는 유니크가 나올 수 없고, 별도의 전역 유니크 확률은 없음). 11스테이지는 이 표에 없어 기존 규칙(일반 100%) 유지.
 const STAGE_GRADE_CHANCE = {
-  1:  { normal: 95, epic: 5   },
-  2:  { normal: 90, epic: 10  },
-  3:  { normal: 90, epic: 10  },
-  4:  { normal: 90, epic: 10  },
-  5:  { normal: 0,  epic: 100 },
-  6:  { normal: 85, epic: 15  },
-  7:  { normal: 85, epic: 15  },
-  8:  { normal: 85, epic: 15  },
-  9:  { normal: 85, epic: 15  },
-  10: { normal: 0,  epic: 100 },
+  1:  { normal: 100, elite: 0   },
+  2:  { normal: 100, elite: 0   },
+  3:  { normal: 100, elite: 0   },
+  4:  { normal: 100, elite: 0   },
+  5:  { normal: 0,   elite: 100 },
+  6:  { normal: 90,  elite: 10  },
+  7:  { normal: 85,  elite: 15  },
+  8:  { normal: 85,  elite: 15  },
+  9:  { normal: 85,  elite: 15  },
+  10: { normal: 0,   elite: 100 },
 };
+// "에픽 이상" 몬스터 등급 목록 — 한 동시 출현 그룹에는 이 등급 몬스터가 최대 1마리만 포함됨
+const MONSTER_ELITE_GRADES = ['epic', 'unique'];
+// 몬스터 등급별 기본 배율(몬스터별 hpMult/atkMult와 별개로, 등급 배율을 먼저 적용한 뒤 몬스터별 배율을 한 번 곱함). 공격 속도는 등급 배율 없음(몬스터별 speedMult만).
+const MONSTER_GRADE_HP_MULT  = { normal: 1, epic: 3,   unique: 4   };
+const MONSTER_GRADE_ATK_MULT = { normal: 1, epic: 1.3, unique: 1.5 };
+// 경험치 등급 배율 — 레벨별 기본 경험치 → 등급 배율 → (기존) 사망 저주 → 플레이어 레벨 차이 보정 순서로 적용됨(dungeon.js killMonsterInstance)
+const MONSTER_GRADE_EXP_MULT = { normal: 1, epic: 1.1, unique: 1.2 };
 
 // ---- 전투 개편: 복수 몬스터 동시 등장 ----
 const MONSTER_COUNT_MAX = 3; // 전투 중 동시에 등장 가능한 최대 몬스터 수
 
 // 전투 시작 시 동시에 등장하는 몬스터 수 확률(전역 설정, 합계 100). 언제든 쉽게 바꿀 수 있도록 별도 상수로 관리함.
-const MONSTER_COUNT_CHANCE = { 1: 60, 2: 30, 3: 10 };
+const MONSTER_COUNT_CHANCE = { 1: 40, 2: 40, 3: 20 };
 
-// 5·10 스테이지의 "에픽 몬스터 1마리 확정 출현"은 STAGE_GRADE_CHANCE(위 표)가 이 두 스테이지에서
-// epic:100으로 설정되어 있는 것만으로 보장됨(pickStageMonsterGrades, formulas.js) — 몬스터 수 자체는
+// 5·10 스테이지의 "에픽 이상 몬스터 1마리 확정 출현"은 STAGE_GRADE_CHANCE(위 표)가 이 두 스테이지에서
+// elite:100으로 설정되어 있는 것만으로 보장됨(유니크 출현을 별도로 보장하지는 않음 — 등록된 에픽 이상 몬스터 중 선택)(pickStageMonsterGrades, formulas.js) — 몬스터 수 자체는
 // 다른 스테이지와 동일하게 아래 MONSTER_COUNT_CHANCE 확률을 그대로 따르므로, 5·10 스테이지도 에픽 1마리
 // 확정 + 남은 슬롯은 이 확률표로 추가 추첨되는 방식(1마리만 나오면 에픽 단독, 2~3마리면 에픽+일반 혼합).
 
 // ---- 전투 화면 개편: 플레이어 중앙 고정 + 몬스터 상/좌/우 배치 ----
 // 몬스터가 배치될 수 있는 3개 고정 슬롯(하단 슬롯 제거). MONSTER_COUNT_MAX(3)와 슬롯 개수가 같아야 함.
 const MONSTER_COMBAT_POSITIONS = ['top', 'left', 'right'];
-// 전투 화면에 표시할 플레이어 이미지. 파일명만 데이터로 관리해 특정 이미지 파일에 종속되지 않도록 함
-// (추후 다른 이미지로 교체하려면 이 값만 바꾸면 되고, 관련 코드는 전혀 수정할 필요 없음).
-const PLAYER_IMAGE_DIR = 'assets/ui/';
+// 전투 화면 플레이어 이미지 확장자·폴백(이미지 폴더는 아래 PLAYER_POSE_IMAGE_DIR).
 const PLAYER_IMAGE_EXT = '.png';
-const PLAYER_IMAGE_FILE = 'player';
 const PLAYER_IMAGE_FALLBACK_EMOJI = '🧑'; // PNG 로드 실패 시 대체(몬스터 아이콘과 동일한 폴백 방식)
 
-// 11스테이지(숨겨진 장소) 보물상자 PNG. 다른 UI 단일 아이콘(PLAYER_IMAGE_*)과 동일하게 assets/ui/에
+// 11스테이지(숨겨진 장소) 보물상자 PNG. 다른 UI 단일 아이콘과 동일하게 assets/ui/에
 // 파일명만 데이터로 관리 — #treasureChest는 그대로 두고 내부 표시(🎁 → 이 PNG)만 바꾸는 용도.
 const TREASURE_CHEST_IMAGE_PATH = 'assets/ui/treasure_chest.png';
 const TREASURE_CHEST_FALLBACK_EMOJI = '🎁'; // PNG 로드 실패 시 대체(기존 몬스터/플레이어 아이콘과 동일한 폴백 방식)
@@ -4983,9 +5152,8 @@ const SETTINGS_SCHEMA = [
         ],
       },
       // 인벤토리 UI 형식 — 데스크톱/모바일을 구분하지 않는 하나의 공통 설정값(state.settings.inventoryUi). 선택한
-      // 형식이 두 환경 모두에 동일하게 적용됨(PC/모바일에 맞는 슬롯 크기·배치 차이는 이후 신버전 UI를 구현할 때
-      // 반응형 레이아웃으로 처리). 기본값은 box(신버전)이며, 이미 선택해서 저장한 값(legacy/box)은 그대로 유지됨. 신버전(box)은 1단계에서는 선택값/분기 기반만 있고 실제 UI는 아직 없어 선택해도 구버전
-      // 인벤토리가 그대로 표시됨(INVENTORY_UI_RENDERERS, render.js 참고).
+      // 형식이 두 환경 모두에 동일하게 적용됨(PC/모바일에 맞는 슬롯 크기·배치 차이는 이후 반응형 레이아웃으로 처리 예정).
+      // 기본값은 box(신버전)이며, 이미 선택해서 저장한 값(legacy/box)은 그대로 유지됨(렌더러 선택은 render.js INVENTORY_UI_RENDERERS 참고).
       {
         id: 'inventoryUi',
         label: '인벤토리 UI',

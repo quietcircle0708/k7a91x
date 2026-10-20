@@ -11,10 +11,8 @@ function newGameConsumables(){
 
 let state = {
   gold: 1000,
-  // (강화 장비 선택 기능 추가 시 제거) 예전엔 새 게임 시작 시 견습 모험가의 대검(양손검, 착용 요구
-  // 힘 3)을 무조건 지급하고 자동으로 장착했지만, 착용 요구 스탯을 만족 못한 채로 장착되는 모순이
-  // 있었음. 이제는 인벤토리를 비운 채로 시작하고, 시작 골드(1000G)로 상점에서 직접 무기를 사고
-  // 대장간 버튼(또는 인벤토리)에서 직접 강화 대상으로 선택하도록 함.
+  // 새 게임은 인벤토리를 비운 채로 시작함 — 시작 골드(1000G)로 상점에서 직접 무기를 사고
+  // 대장간 버튼(또는 인벤토리)에서 직접 강화 대상으로 선택함.
   inventory: [],
   equippedId: null,   // 실제 전투에 사용되는 착용 무기(대장간 화면과 무관하게 항상 무기만 가리킴)
   // 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기든 방어구든 상관없이 여기에 지정된 아이템이
@@ -38,6 +36,15 @@ let state = {
   // 기도"(성공률 증가).
   blessingActive: false,
   focusActive: false,
+  // 강화 화면 모드('prayer'=기도 / 'catalyst'=촉매; '특수'는 추후) + 촉매 슬롯 3칸 { id: 촉매 종류(없으면 null), qty: 투입 수량 }.
+  // 슬롯은 삼각형 꼭짓점 순서(0=왼쪽 위, 1=오른쪽 위, 2=아래). 모드를 바꿔도 촉매 등록 상태는 유지됨(forge_menu.js 참고).
+  forgeMode: 'prayer',
+  // 강화 화면 촉매 고정 슬롯: 왼쪽 = 강화석(자동 선택된 종류 id, 켜짐 여부 on, 이 선택이 어느 장비 기준인지 forId), 오른쪽 = 소생석 투입 수량. 모드를 바꿔도 유지.
+  forgeStone: { id: null, on: false, forId: null },
+  forgeRevive: 0,
+  // 제작 팝업 / 손상 복구 팝업의 촉매 슬롯 3칸(같은 구조 — 촉매 시스템, catalyst.js)
+  craftCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }],
+  restoreCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }],
   artifacts: [],       // 보유 아티팩트 id 목록 (최대 ARTIFACT_SLOT_MAX)
   equippedArtifacts: [], // 장착 중인 아티팩트 id 목록(최대 ARTIFACT_SLOT_MAX) — 이전엔 저장된 데이터를
                           // 불러올 때(applyLoadedRaw)만 채워졌는데, 저장 데이터가 아예 없는 최초 실행
@@ -47,7 +54,7 @@ let state = {
   manaShards: 0,       // 마석 조각 보유 개수
   manaCrystals: 0,     // 마석 결정 보유 개수
   manaStones: 0,       // 마석 보유 개수
-  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, // 기타(재료) 아이템 보유 개수
+  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
@@ -345,9 +352,6 @@ function grantArtifactSafe(id){
 }
 
 // ---- 상태 이상(디버프) 적용 ----
-function statusEffectById(id){
-  return Object.values(STATUS_EFFECTS).find(e => e.id === id) || null;
-}
 // 대상(target: {maxHp?, statusEffects:[]})에게 상태 이상을 적용(이미 걸려있으면 지속시간 갱신).
 // - 중독(type:'dot')처럼 틱 기반 상태 이상은 def.maxTicks를 그대로 사용(durationMs는 무시 — 기존 로직과 100% 동일)
 // - 기절/둔화처럼 지속시간형(type:'disable'|'atkSpeedMult') 상태 이상은 호출부(스킬/아이템 등)가 durationMs(밀리초)를
@@ -395,13 +399,9 @@ function applyStatusEffect(target, key, durationMs){
   else target.statusEffects.push({ key, expiresAt });
 }
 // 대상에게 걸린 상태 이상 중 "지속 피해형(중독 등, type:'dot')"만 판정해, 이번 호출 시점까지 실제로 발생한
-// 총 피해를 반환. 예전에는 이 함수가 호출될 때마다(=dungeon.js의 1초 고정 루프가 돌 때마다) 무조건 1틱씩
-// 진행시켰는데, 그러면 STATUS_EFFECTS 데이터의 tickIntervalMs 값이 실제로는 전혀 읽히지 않고 항상 "루프
-// 주기(1초)"로만 틱이 도는 문제가 있었음(중독의 tickIntervalMs를 500으로 바꿔도 아무 효과가 없었을 것).
-// 지금은 각 상태 이상 인스턴스가 자신의 lastTickAt을 갖고, "이번 호출 시점 - lastTickAt >= 그 상태 이상의
-// tickIntervalMs"일 때만 실제로 1틱을 진행시키도록 바꿔서, 호출 주기(dungeon.js 루프의 실제 해상도)와
-// 무관하게 데이터에 적힌 tickIntervalMs가 그대로 반영됨 — 앞으로 tickIntervalMs가 다른 dot 상태 이상이
-// 추가돼도(예: 어떤 상태이상은 0.5초마다, 어떤 상태이상은 2초마다) 동시에 정확히 처리됨.
+// 총 피해를 반환. 각 상태 이상 인스턴스가 자신의 lastTickAt을 갖고, "이번 호출 시점 - lastTickAt >= 그 상태 이상의
+// tickIntervalMs"일 때만 1틱을 진행시키므로, 호출 주기(dungeon.js 루프의 실제 해상도)와 무관하게 데이터에 적힌
+// tickIntervalMs가 그대로 반영됨(tickIntervalMs가 서로 다른 dot 상태 이상도 동시에 정확히 처리됨).
 function tickStatusEffects(target){
   if(!target.statusEffects || target.statusEffects.length === 0) return 0;
   const now = Date.now();
@@ -530,6 +530,27 @@ function applyLoadedRaw(raw){
   // 제작 천장 누적: 이전 세이브에는 없는 필드 → 빈 객체. 0 이상 정수 값만 남김(저장/불러오기 후에도 누적 유지)
   if(!state.craftPity || typeof state.craftPity !== 'object' || Array.isArray(state.craftPity)) state.craftPity = {};
   Object.keys(state.craftPity).forEach(k => { const v = state.craftPity[k]; if(!Number.isInteger(v) || v <= 0) delete state.craftPity[k]; });
+  // 강화 시도 선저장(pendingEnhance): { itemId, level, outcome } 형태가 아니면 버림(이전 세이브에는 없는 필드)
+  { const p = state.pendingEnhance;
+    if(!(p && Number.isInteger(p.itemId) && Number.isInteger(p.level) && ['success', 'stay', 'destroy'].includes(p.outcome))) state.pendingEnhance = null; }
+  // 강화 화면 모드/촉매 슬롯: 이전 세이브에는 없는 필드 → 기본값(기도 모드, 빈 슬롯 3칸). 슬롯은 항상 3칸, 수량은 0 이상 정수, 종류가 없으면 수량 0
+  if(state.forgeMode !== 'prayer' && state.forgeMode !== 'catalyst') state.forgeMode = 'prayer';
+  // 강화 화면 고정 촉매 슬롯: 강화석 종류는 실제 강화석 아이템이어야 하고, 켜짐은 종류가 있을 때만, 소생석 투입 수량은 0 이상 정수
+  { const st = state.forgeStone || {};
+    const sd = typeof st.id === 'string' ? MISC_ITEMS[st.id] : null;
+    const id = sd && sd.catalyst && sd.catalyst.kind === 'enchantStone' ? st.id : null;
+    state.forgeStone = { id, on: id != null && st.on === true, forId: id != null && Number.isInteger(st.forId) ? st.forId : null };
+    state.forgeRevive = Number.isInteger(state.forgeRevive) && state.forgeRevive > 0 ? state.forgeRevive : 0; }
+  // 촉매 슬롯(강화/제작/손상 복구): 항상 3칸, 종류가 실제 촉매 아이템이 아니면 비움, 수량은 0 이상 정수(종류가 없으면 0)
+  ['craftCatalysts', 'restoreCatalysts'].forEach(key => {
+    const prev = Array.isArray(state[key]) ? state[key] : [];
+    state[key] = [0, 1, 2].map(i => {
+      const s = prev[i] || {};
+      const id = typeof s.id === 'string' && MISC_ITEMS[s.id] && MISC_ITEMS[s.id].catalyst ? s.id : null;
+      const qty = id != null && Number.isInteger(s.qty) && s.qty > 0 ? s.qty : 0;
+      return { id, qty };
+    });
+  });
   // 해금 없이 이미 습득된 기연 스킬이 세이브에 있다면(구버전 데이터) 해금된 것으로 취급해 습득 상태와 어긋나지 않게 함
   state.learnedAwakeningSkills.forEach(id => { if(!state.unlockedAwakeningSkills.includes(id)) state.unlockedAwakeningSkills.push(id); });
   if(!Array.isArray(state.skillQuickSlots) || state.skillQuickSlots.length !== SKILL_QUICK_SLOT_COUNT){
@@ -588,6 +609,7 @@ async function loadState(){
   ensureSettingsDefaults();
   if(isDeathCurseActive()) startDeathCurseTicker(); else renderDeathCurseBadge();
   render();
+  resumePendingEnhance(); // 연출 도중 새로고침·종료로 반영되지 못한 강화 결과가 있으면 선저장된 결과를 그대로 반영(actions.js)
 }
 async function saveState(){
   const payload = JSON.stringify(state);
@@ -642,8 +664,10 @@ function resetGame(){
     accessoryInventory: [], equippedAccessories: [null, null], equippedNecklaceId: null,
     traceInventory: [],
     blessingActive:false, focusActive:false,
+    forgeMode: 'prayer', forgeStone: { id: null, on: false, forId: null }, forgeRevive: 0,
+    craftCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }], restoreCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }],
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
-    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0,
+    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0,
     skipEffects:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },

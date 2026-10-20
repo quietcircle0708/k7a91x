@@ -20,7 +20,7 @@ const CODEX_MONSTER_SEARCH_MAX_RESULTS = 60;
 const CODEX_MONSTER_DROP_USE_SPAWN_RANGE = true;
 
 // 드랍 아이템 표시 순서(그룹). 같은 그룹 안에서는 등급 내림차순 → 이름 가나다순.
-const CODEX_MONSTER_DROP_GROUPS = ['relic', 'scroll', 'table', 'stone', 'flask', 'gold'];
+const CODEX_MONSTER_DROP_GROUPS = ['relic', 'scroll', 'table', 'catalyst', 'stone', 'flask', 'gold'];
 
 // ---- 화면 상태(저장하지 않음, 즐겨찾기만 state.codexFavorites에 저장) ----
 // cat: 세로 탭 id / grades: 등급 id → 체크 여부(기본 전부 체크) / query: 검색어 / infoKey: 정보 화면에 열린 몬스터 key
@@ -117,6 +117,14 @@ function codexMonsterBuildDrops(e){
         iconHtml: itemIconHtml(item), borderColor: miscNameColor(item.id), tooltipHtml: buildMiscTooltipHtml(item.id) });
     }
   });
+
+  // 3-1. 촉매(전역 드랍) — 던전 카드와 같은 공식(catalystPossibleItemIds): 이 몬스터의 등급 확률 + 실제 등장 가능한 레벨들의 선택표에서 나올 수 있는 촉매(0%는 제외)
+  levels.forEach(L => catalystPossibleItemIds(L, e.def.grade).forEach(itemId => {
+    const item = MISC_ITEMS[itemId];
+    if(!item) return;
+    add({ group: 'catalyst', id: item.id, name: item.name, searchName: item.name, gradeRank: codexGradeRankOf(item.grade),
+      iconHtml: itemIconHtml(item), borderColor: miscNameColor(item.id), tooltipHtml: buildMiscTooltipHtml(item.id) });
+  }));
 
   // 4. 마석(전역 드랍) — stonePossibleGrades(전역 구간표)가 이 레벨들에서 낼 수 있는 모든 등급의 마석
   levels.forEach(L => stonePossibleGrades(L).forEach(grade => {

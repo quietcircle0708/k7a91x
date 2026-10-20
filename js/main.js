@@ -224,9 +224,18 @@ el('craftPopupModal').addEventListener('click', (e)=>{
 el('closeCraftCatalystBtn').addEventListener('click', closeCraftCatalystSelect);
 // ---- 제작 최종 확인 UI ----
 el('craftPopupMakeBtn').addEventListener('click', openCraftConfirm);
+// 비장비 제작 개수 설정(navigation.js craftQty*) — 장비 제작 팝업에서는 이 UI 자체가 숨겨져 있음
+el('craftQtyDecBtn').addEventListener('click', () => craftQtyStep(-1));
+el('craftQtyIncBtn').addEventListener('click', () => craftQtyStep(1));
+el('craftQtyMaxBtn').addEventListener('click', craftQtyFillMax);
+el('craftQtyResetBtn').addEventListener('click', craftQtyReset);
+el('craftQtyBox').querySelectorAll('[data-craft-qty-add]').forEach(b => b.addEventListener('click', () => craftQtyStep(Number(b.dataset.craftQtyAdd))));
+el('craftQtyInput').addEventListener('input', () => craftQtyInputChanged(false));
+el('craftQtyInput').addEventListener('change', () => craftQtyInputChanged(true));
+el('craftQtyInput').addEventListener('blur', () => craftQtyInputChanged(true));
 el('craftConfirmCancelBtn').addEventListener('click', closeCraftConfirm);
 el('craftConfirmProceedBtn').addEventListener('click', proceedCraftConfirm);
-el('craftAnimConfirmBtn').addEventListener('click', closeCraftAnim);
+el('craftAnimConfirmBtn').addEventListener('click', () => { if(craftMultiRun) craftMultiOnButton(); else closeCraftAnim(); }); // 비장비 반복 제작 중이면 [중단]/[확인](craft_multi.js), 아니면 기존 장비 제작 [확인]
 el('openShopBtn').addEventListener('click', openShop);
 el('openInventoryBtn').addEventListener('click', openInventory);
 el('openDungeonBtn').addEventListener('click', openDungeonList);
@@ -707,9 +716,9 @@ let activeTooltipTip = null;
 // 먼저 발생할 수 있음 — 이 타이머로 실제로 완전히 벗어난 경우에만 닫히도록 유예를 둠(요구사항 4번).
 let glossaryTooltipHideTimer = null;
 // 지금 JS로 강제 표시 중인(pointer-events/visibility/opacity 인라인 고정) 용어사전 포함 툴팁. 동시에 하나만 유지함.
-// 예전에는 타이머 하나를 모든 툴팁이 공유해서, 용어 툴팁 A의 닫힘 대기 중에 다른 용어 툴팁 B를 열면 A의 타이머가
-// 취소되어 A가 인라인 고정 상태로 영원히 남는 문제가 있었음 → 강제 표시 중인 툴팁을 변수로 추적해 새 툴팁이 열리거나
-// 바깥을 클릭하면 기존 유예(200ms)를 기다리지 않고 즉시 닫음.
+// 타이머 하나를 모든 툴팁이 공유하면 용어 툴팁 A의 닫힘 대기 중에 다른 툴팁 B를 열 때 A의 타이머가 취소되어
+// A가 인라인 고정 상태로 남으므로, 강제 표시 중인 툴팁을 변수로 추적해 새 툴팁이 열리거나 바깥을 클릭하면
+// 기존 유예(200ms)를 기다리지 않고 즉시 닫음.
 let glossaryHeldTip = null;
 let glossaryHeldHost = null;
 function releaseGlossaryTooltip(){ // 강제 표시를 즉시 해제(그 뒤에는 일반 툴팁과 같이 CSS :hover가 표시 여부를 결정함)

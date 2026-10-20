@@ -45,7 +45,6 @@
   .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap; }
   .brand{ font-family:'Cinzel', 'Noto Serif KR', serif; font-weight:900; font-size:19px; letter-spacing:1.5px; }
   .brand span{ color: var(--forge-ember); }
-  .topbar-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   /* 상단 메뉴 영역 — [공지사항][메뉴 버튼] 오른쪽 정렬, 메뉴 버튼을 누르면 아래로 그리드가 펼쳐짐(아래 .menu-grid) */
   /* z-index 40: .main-nav는 stacking context라 안에 있는 .menu-grid(z-index:60)의 우선순위가 이 값 안에서만 의미를 가짐.
      도감 정보창/비교 화면(z-index:20, 문서상 더 뒤에 있음)이 메뉴 그리드 하단을 덮던 문제를 막기 위해 그보다 높게,
@@ -60,13 +59,9 @@
   }
   .gold-badge .ui-icon-inline{ width:1.3em; height:1.3em; margin:0; vertical-align:baseline; flex:0 0 auto; } /* 예전 'G' 자리에 놓는 골드 아이콘(숫자 오른쪽, 세로 가운데) */
   .icon-svg{ display:inline-block; vertical-align:-2px; fill:currentColor; margin-right:1px; }
-  .txt-normal{ color:#ffffff; font-weight:700; }
-  .txt-epic{ color: var(--forge-purple); font-weight:700; }
   .txt-shard{ color: var(--forge-blue); font-weight:700; }
   .txt-relic{ color: var(--forge-green); font-weight:700; }
   .txt-gold{ color: var(--forge-gold); font-weight:700; }
-  .stat-up{ color: var(--forge-blood); font-weight:700; }
-  .stat-down{ color: var(--forge-blue); font-weight:700; }
   .nav-btn{
     background: var(--forge-panel); border:1px solid var(--forge-line); color: var(--forge-cream);
     border-radius:999px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer;
@@ -199,9 +194,6 @@
   .enhance-cost-wrap:hover .tooltip{ visibility:visible; opacity:1; }
 
 
-  .u-tip{ position:relative; border-bottom:1px dotted var(--forge-gold); color: var(--forge-gold); cursor:help; }
-  .u-tip .tooltip{ width:100px; left:50%; transform:translateX(-50%); text-align:center; }
-  .u-tip:hover .tooltip{ visibility:visible; opacity:1; }
 
   .ledger{ margin-top: 18px; background: var(--forge-panel); border:1px solid var(--forge-line); border-radius: 14px; padding: 16px 18px; }
   .ledger-title{ font-size:12px; letter-spacing:2px; text-transform:uppercase; color: var(--forge-cream-dim); margin-bottom:12px; }
@@ -261,6 +253,16 @@
   .craft-popup-name{ text-align:center; margin-bottom:14px; position:relative; }
   .craft-popup-name .inv-name{ justify-content:center; } /* 요청사항 1: .inv-name이 flex라 text-align만으론 중앙정렬 안 되던 것 보정 */
   .craft-section-label{ font-size:12px; color: var(--forge-cream-dim); font-weight:700; margin:12px 0 8px; }
+  /* 비장비 제작 개수 설정(제작 전용 — 상점 수량창 CSS와 독립) */
+  .craft-qty-box{ margin:-4px 0 6px; }
+  .craft-qty-row{ display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:6px; }
+  .craft-qty-btn{ padding:6px 10px; font-size:12px; min-width:34px; }
+  .craft-qty-input{
+    width:64px; text-align:center; padding:6px 4px;
+    border:1px solid var(--forge-line); background: var(--forge-panel-2); color: var(--forge-cream);
+    border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700;
+  }
+  .craft-qty-btn:disabled{ opacity:.4; cursor:default; }
   .craft-success-rate{ text-align:center; color: var(--forge-gold); font-weight:700; font-size:13px; margin:14px 0; }
   .craft-slots-row{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; } /* 요청사항 2·3: 재료/촉매 슬롯 행 중앙정렬 */
   /* 요청사항 3-3: 아이콘 / 투입개수 / 이름을 각각 분리된 줄로 표시하고, 아이콘 슬롯은 인벤토리
@@ -276,6 +278,7 @@
   .craft-slot-plus{ font-size:20px; font-weight:700; color: var(--forge-cream-dim); }
   .craft-slot-name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
   .craft-slot-qty-short{ color:#ff6a6a; font-weight:700; font-family:'JetBrains Mono', monospace; }
+  .craft-slot-qty-off{ color:var(--forge-cream-dim); font-weight:700; font-family:'JetBrains Mono', monospace; opacity:.7; } /* 창조의 파편: 성공 확률이 이미 100%라 적용되지 않는 상태 */
   .craft-slot-qty-ok{ color: var(--forge-gold); font-weight:700; font-family:'JetBrains Mono', monospace; }
 
   /* ---- 제작소: 제작 최종 확인 UI ----
@@ -284,7 +287,6 @@
   .craft-confirm-box{ width:300px; text-align:center; }
   .craft-confirm-section-label{ font-size:12px; color: var(--forge-cream-dim); font-weight:700; margin:14px 0 8px; text-align:center; }
   .craft-confirm-icon-row{ display:flex; justify-content:center; }
-  .craft-confirm-icon{ width:42px; height:42px; }
   .craft-confirm-item-name{ font-weight:700; font-size:13px; margin-top:6px; display:flex; justify-content:center; position:relative; }
   .craft-confirm-warning{ color:#ff6a6a; font-weight:700; font-size:12px; text-align:center; margin:16px 0; line-height:1.5; }
 
@@ -318,6 +320,11 @@
   @keyframes craftFlashFade{ from{ opacity:1; } to{ opacity:0; } }
 
   .craft-anim-stage-text{ font-size:12px; color: var(--forge-cream-dim); min-height:16px; margin:10px 0 8px; }
+  /* 비장비 반복 제작(craft_multi.js): 결과 화면 횟수 / 획득 아이템 누적 그리드 */
+  .craft-multi-stats{ font-size:13px; font-weight:700; line-height:1.6; margin:10px 0 4px; }
+  .craft-multi-gained-label{ font-size:12px; color: var(--forge-cream-dim); font-weight:700; margin:10px 0 8px; }
+  .craft-multi-grid{ max-height:150px; overflow-y:auto; margin-top:6px; }
+  .craft-multi-none{ font-size:12px; color: var(--forge-cream-dim); }
   .craft-anim-click-hint{ font-size:12.5px; font-weight:700; color: var(--forge-gold); margin:10px 0 4px; }
   .craft-anim-bar-wrap{ margin-top:4px; }
   .craft-anim-bar-fill{ background: linear-gradient(90deg, #ffb84d, #e08a1e); } /* 요청사항 5: 로딩바는 주황색 */
@@ -589,7 +596,6 @@
     75%{ transform: scale(.6) translateX(0); opacity:.7; }
     100%{ transform: scale(0) translateX(0); opacity:0; }
   }
-  .monster-icon.spawn-hidden{ opacity:0; }
   .monster-icon.spawn-in{ animation: monster-spawn-in .5s ease-out; }
   @keyframes monster-spawn-in{
     from{ opacity:0; transform: scale(.8); }
@@ -689,7 +695,7 @@
      그려질 때와 동일한 그리드 자리를 차지하되 화면엔 아무것도 보이지 않게 함(UI 요구사항). */
   .monster-slot.placeholder-slot{ visibility:hidden; pointer-events:none; }
   .player-slot{ grid-area: player; display:flex; flex-direction:column; align-items:center; width:100px; position:relative; z-index:1; }
-  /* 전투 영역 안에서는 몬스터 아이콘을 기본 72px → 46px로 조금 더 작게 표시해 상/좌/우 슬롯이 좁은
+  /* 전투 영역 안에서는 몬스터 아이콘을 기본 72px → 54px로 조금 더 작게 표시해 상/좌/우 슬롯이 좁은
      화면 폭에도 한 번에 들어오도록 함. 플레이어 아이콘은 이 규칙과 분리된 전용 크기(.player-icon,
      100px)를 따로 가짐 — 이 값만 바꾸면 몬스터 크기에 영향 없이 플레이어 이미지 크기만 조절됨.
      (참고: .monster-icon-img가 부모 font-size를 1em 기준으로 그대로 물려받는 방식이라, 여기서도
@@ -902,12 +908,8 @@
   .skill-menu-info-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .skill-reset-btn{ font-size:15px; line-height:1; padding:6px 10px; }
 
-  .char-stats-modal{ max-width:680px; text-align:left; }
   .char-stats-title-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
   .char-stats-title-row .modal-title{ margin-bottom:0; }
-  .char-stats-page1{ display:flex; gap:20px; align-items:flex-start; }
-  .char-stats-left{ flex:1; min-width:0; }
-  .char-stats-right{ flex:1; min-width:0; }
 
   .equip-panel{ display:flex; justify-content:center; gap:10px; margin-bottom:12px; }
   .equip-slots-grid{
@@ -964,7 +966,6 @@
   /* [캐릭터 정보] 탭 소분류([정보]/[착용 장비]/[세부 능력치]) — 기존 상위 탭(.inv-tabs/.inv-tab-btn)과
      같은 스타일을 그대로 재사용하되, 바로 위 상위 탭 아래라 여백만 살짝 좁힘. */
   .char-info-subtabs{ margin-top:2px; }
-  .char-stats-body{ margin: 14px 0 18px; }
   .char-stat-row{
     display:flex; justify-content:space-between; align-items:baseline;
     font-size:13px; padding:6px 0; color: var(--forge-cream-dim);
@@ -987,7 +988,6 @@
   .stat-alloc-btn.wide{ width:auto; padding:0 8px; font-size:12px; }
   .stat-alloc-btn:hover:not(:disabled){ border-color: var(--forge-gold); }
   .stat-alloc-btn:disabled{ opacity:.35; cursor:not-allowed; }
-  .char-stat-note{ font-size:11.5px; color: var(--forge-cream-dim); margin-top:4px; }
   .char-stat-sub-title{ font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color: var(--forge-cream-dim); margin-bottom:8px; }
   .char-stat-artifact{
     font-size:12.5px; color: var(--forge-cream-dim); line-height:1.6;
@@ -1037,9 +1037,7 @@
     background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:10px;
     padding:12px 14px; margin-bottom:18px; font-size:13px; line-height:1.9;
   }
-  .kill-rewards .reward-gold{ color: var(--forge-gold); font-weight:700; }
   .kill-rewards .reward-sword{ color: var(--forge-green); font-weight:700; }
-  .kill-rewards .reward-shard{ color: var(--forge-blue); font-weight:700; }
   .kill-rewards .reward-artifact{ color: var(--forge-purple); font-weight:700; }
   .kill-rewards .reward-note{ color: var(--forge-cream-dim); font-size:11.5px; }
   .txt-exp{ color: var(--forge-purple); font-weight:700; }
@@ -1051,7 +1049,6 @@
      슬롯(.inv-icon)과 같은 구조(테두리색은 인라인 style로 등급/종류별 색을 그대로 받아옴)를 재사용하되
      보상창 전용 크기로만 새로 잡음 — 새 아이콘/등급 표시 규칙은 만들지 않음. */
   .reward-item-section{ margin-top:6px; padding-top:10px; border-top:1px dashed var(--forge-line); }
-  .reward-item-title{ text-align:center; font-size:11px; color: var(--forge-cream-dim); margin-bottom:8px; letter-spacing:.02em; }
   .reward-item-grid{ display:flex; flex-direction:column; gap:6px; }
   /* 첫 번째 줄만 실제 슬롯 개수에 맞춰 가운데 정렬, 두 번째 줄부터는 기본값(왼쪽 정렬)을 그대로 둠
      (4번 문서 "정렬 규칙") — 줄 단위 div가 달라서 줄마다 다른 정렬을 줄 수 있음. */
@@ -1497,7 +1494,6 @@
   .codex-tabs .inv-box-tab.active{ padding-bottom:11px; }
   /* 패널 왼쪽 안쪽 여백 없음 — 세로 탭이 목록 영역 맨 왼쪽에 붙음(필터 줄은 자체 여백) */
   .codex-panel{ padding:10px 12px 12px 0; }
-  .codex-placeholder{ padding:40px 12px; text-align:center; font-size:12px; color: var(--forge-cream-dim); }
 
   /* 등급 필터(체크박스) + 검색 */
   .codex-filter{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:0 0 10px 12px; }
@@ -1894,15 +1890,16 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
   background: var(--forge-panel-2); border:2px solid var(--forge-line); border-radius:9px; color: var(--forge-cream-dim);
   font-size:22px; font-weight:700; font-family:inherit; cursor:pointer;
 }
-.fe-prayer, .fe-catalyst{ width:44px; height:44px; margin:-22px 0 0 -22px; }
+.fe-prayer, .fe-extra, .fe-cat-wrap{ width:44px; height:44px; margin:-22px 0 0 -22px; }
 .fe-prayer-left{ left:40px; top:22px; }
 .fe-prayer-right{ left:200px; top:22px; }
-.fe-catalyst{ left:120px; top:128px; }
+.fe-extra{ left:120px; top:128px; }
 .fe-item{ width:52px; height:52px; margin:-26px 0 0 -26px; left:120px; top:62px; user-select:none; -webkit-user-select:none; }
 .fe-item.filled .weapon-icon-img, .fe-item.filled .inv-icon-img{ width:38px; height:38px; }
 .fe-slot:hover:not(:disabled){ border-color: var(--forge-cream-dim); }
 .fe-item.filled:hover{ border-color:inherit; }
-.fe-catalyst{ cursor:default; }
+.fe-extra{ cursor:default; } /* 기도 모드의 아래 꼭짓점 빈 슬롯(이후 새 기도가 추가되면 여기에 표시) — 클릭 동작 없음 */
+.fe-extra:hover{ border-color: var(--forge-line); }
 /* 기도: 비활성은 같은 이미지를 흑백+투명도로, 활성(.on)이면 원래 이미지 */
 .fe-prayer-img{ width:26px; height:26px; object-fit:contain; pointer-events:none; filter: grayscale(1); opacity:.4; transition: opacity .15s, filter .15s; }
 .fe-prayer.on{ border-color: var(--forge-gold); }
@@ -1931,7 +1928,6 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
 /* 위쪽 단계 표시와 아래 옵션 영역이 같은 3열(왼쪽 | 화살표 폭 | 오른쪽)을 공유함 — 바깥 프레임 끝에서 --fe-side만큼 안쪽으로 */
 .fe-wrap{ --fe-side:14px; --fe-arrow-w:28px; --fe-pane-max-h:170px; }
 .fe-lv-arrow{ margin:0 var(--fe-side) 8px; font-size:22px; font-weight:800; font-family:'Noto Serif KR', serif; }
-.fe-lv-sep{ color: var(--forge-cream-dim); font-size:16px; letter-spacing:1px; }
 .fe-lv-grid{ display:grid; align-items:center; }
 .fe-lv-grid.two{ grid-template-columns:1fr var(--fe-arrow-w) 1fr; }
 .fe-lv-grid.one{ grid-template-columns:1fr; }
@@ -1939,7 +1935,6 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
 .fe-lv-arrow-img{ display:block; width:var(--fe-arrow-w); height:var(--fe-arrow-w); object-fit:contain; pointer-events:none; user-select:none; -webkit-user-drag:none; }
 
 .fe-grow{ margin:0 var(--fe-side) 10px; text-align:center; }
-.fe-grow-title{ padding:5px 8px; font-size:12px; font-weight:700; color: var(--forge-cream-dim); border-bottom:1px solid var(--forge-line); } /* 새 UI에서는 더 이상 출력하지 않음(예전 스타일 보존) */
 .fe-grow-body{ font-size:12.5px; line-height:1.45; display:grid; align-items:start; }
 .fe-grow-body.two{ grid-template-columns:1fr var(--fe-arrow-w) 1fr; }
 .fe-grow-body.one{ grid-template-columns:1fr; }
@@ -1983,3 +1978,53 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
   border-radius:4px; box-shadow:none;
 }
 #killResultModal.destroy-notice #krCloseBtn:hover{ border-color: var(--forge-gold); filter:none; }
+
+/* ---- 모드 선택(기도/촉매/특수): 삼각형 영역 왼쪽 위. 목업의 체크 박스 모양 ---- */
+.fe-wrap{ position:relative; }
+.fe-mode{ position:absolute; left:var(--fe-side,14px); top:8px; z-index:2; display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+.fe-mode-btn{ display:flex; align-items:center; gap:4px; padding:2px 0; background:none; border:0; color: var(--forge-cream-dim); font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+.fe-mode-box{ width:10px; height:10px; box-sizing:border-box; border:1px solid var(--forge-cream-dim); border-radius:2px; background:transparent; }
+.fe-mode-btn.on{ color: var(--forge-gold); }
+.fe-mode-btn.on .fe-mode-box{ border-color: var(--forge-gold); background: var(--forge-gold); }
+.fe-mode-btn:disabled{ opacity:.4; cursor:not-allowed; }
+.fe-mode-btn:hover:not(:disabled):not(.on){ color: var(--forge-cream); }
+
+/* ---- 촉매 모드: 같은 삼각형 꼭짓점 3곳의 슬롯이 '+' 형태로 바뀜. 기도 모드에서는 촉매 슬롯 전체가 숨겨짐 ---- */
+.fe-cat-wrap{ position:absolute; display:none; }
+.fe-cat-left{ left:40px; top:22px; }
+.fe-cat-right{ left:200px; top:22px; }
+.fe-tri.mode-catalyst .fe-cat-wrap{ display:block; }
+.fe-tri.mode-catalyst .fe-prayer{ display:none; } /* 아래 꼭짓점 빈 슬롯(.fe-extra)은 두 모드 모두에서 그대로 표시 */
+.fe-cat{ position:relative; width:100%; height:100%; font-size:22px; }
+.fe-cat.on{ border-color: var(--forge-gold); }
+.fe-cat.off .item-icon-img{ filter:grayscale(1) opacity(.55); } /* OFF(비활성) 표시 */
+.fe-cat.off .fe-cat-qty{ color:#9a9a9a; }
+.fe-cat.empty{ cursor:default; }
+.fe-cat-qty{ position:absolute; right:2px; bottom:0; font-size:11px; font-weight:800; line-height:1; color: var(--forge-cream); text-shadow:0 0 3px #000, 0 0 3px #000; pointer-events:none; }
+/* 수량 조절 버튼: 슬롯 오른쪽에 위(▲)·아래(▼)로 쌓음 — 슬롯 폭 밖(absolute)이라 꼭짓점 슬롯 위치는 그대로. 슬롯이 비어 있으면 숨김 */
+.fe-qty{ position:absolute; left:calc(100% + 3px); top:0; height:100%; display:flex; flex-direction:column; justify-content:space-between; }
+.fe-qty-btn.hide{ visibility:hidden; } /* 더 이상 못 바꾸는 방향의 버튼은 숨기되 자리는 유지(다른 버튼이 움직이지 않게) */
+.fe-qty-btn{ width:20px; height:20px; padding:0; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:10px; line-height:1; border-radius:5px; border:1px solid var(--forge-line); background: var(--forge-panel-2); color: var(--forge-cream-dim); cursor:pointer; }
+.fe-qty-btn:hover:not(:disabled){ border-color: var(--forge-gold); color: var(--forge-gold); }
+.fe-qty-btn:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* 촉매 슬롯: 아이콘 + 오른쪽 아래 '보유/필요' 수량. 보유가 모자라면 회색조 */
+.fe-cat .item-icon-img{ object-fit:contain; image-rendering:pixelated; }
+.fe-cat-qty{ font-size:10px; }
+.forge-select-item.cat-none .item-icon-img{ filter:grayscale(1) opacity(.55); }
+
+/* 제작/손상 복구 팝업의 촉매 슬롯 */
+.craft-cat-cell{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+.craft-cat-qty{ display:flex; gap:6px; }
+.craft-cat-qty-btn{ width:22px; height:20px; padding:0; font-size:10px; border-radius:5px; border:1px solid var(--forge-line); background: var(--forge-panel-2); color: var(--forge-cream-dim); cursor:pointer; }
+.craft-cat-qty-btn:hover:not(:disabled){ border-color: var(--forge-gold); color: var(--forge-gold); }
+.craft-cat-qty-btn:disabled{ opacity:.35; cursor:not-allowed; }
+.craft-cat-slot.short .item-icon-img, .craft-cat-slot.short .inv-icon-img{ filter:grayscale(1) opacity(.55); }
+
+/* 촉매 아이템 아이콘 크기: 화면마다 고정 px로 강제하지 않고, 아이콘이 들어가는 슬롯 크기에 비례해 표시함.
+   기준은 강화 화면의 촉매 슬롯 — 슬롯 안쪽 40px 중 아이콘 24px(0.6)이라 그 비율(--catalyst-icon-ratio)을 그대로 씀.
+   촉매 아이템은 모두 등급이 있어 아이콘이 항상 등급 배경(.icon-grade-bg, 슬롯 안쪽을 100%로 채움) 안에 들어가므로,
+   그 배경 폭의 비율로 정하면 슬롯이 작은 화면(던전 카드/도감)은 작게, 큰 화면은 크게 보임. 촉매 이미지(.catalyst-icon: itemIconHtml이 붙임)에만 적용되고
+   다른 아이템의 크기 규칙은 건드리지 않음. 화면별 크기 규칙(모바일 포함)이 폭을 덮어쓰지 못하도록 !important를 씀. */
+:root{ --catalyst-icon-ratio: 0.6; }
+.icon-grade-bg > img.item-icon-img.catalyst-icon{ width: calc(var(--catalyst-icon-ratio) * 100%) !important; height:auto !important; aspect-ratio:1 / 1; max-width:none; max-height:none; object-fit:contain; }

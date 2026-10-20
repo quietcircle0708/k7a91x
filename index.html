@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=333">
+<link rel="stylesheet" href="css/style.css?v=355">
 </head>
 <body>
 <div class="wrap">
@@ -62,14 +62,22 @@
       <!-- 강화 탭 UI(forge_menu.js). 강화 판정/비용/확률/기도 로직은 전부 기존 함수(startEnhance, toggleBlessing, toggleFocus,
            displayEnhanceOdds, enhanceCostBreakdown ...)를 그대로 호출하고 여기서는 표시와 조작만 함. -->
       <div class="fe-wrap" id="forgeEnhNew">
-        <div class="fe-tri" id="feTri">
+        <!-- 모드 선택(기도/촉매/특수). 특수는 추후 업데이트용 자리만 있고 선택할 수 없음 -->
+        <div class="fe-mode" id="feMode" role="radiogroup" aria-label="강화 모드">
+          <button class="fe-mode-btn" data-mode="prayer" role="radio"><span class="fe-mode-box"></span>기도</button>
+          <button class="fe-mode-btn" data-mode="catalyst" role="radio"><span class="fe-mode-box"></span>촉매</button>
+          <button class="fe-mode-btn" data-mode="special" role="radio" disabled title="추후 업데이트 예정"><span class="fe-mode-box"></span>특수</button>
+        </div>
+        <div class="fe-tri mode-prayer" id="feTri">
           <svg class="fe-tri-lines" viewBox="0 0 240 150" aria-hidden="true">
             <line x1="40" y1="22" x2="200" y2="22"/><line x1="40" y1="22" x2="120" y2="128"/><line x1="200" y1="22" x2="120" y2="128"/>
           </svg>
           <button class="fe-slot fe-prayer fe-prayer-left" id="fePrayerBlessing" title="보호의 기도"><img src="assets/ui/prayer_blessing.svg" class="fe-prayer-img" alt="보호의 기도"><span class="tooltip" id="fePrayerBlessingTip">보호의 기도<br>적용 시 <span style="color:var(--forge-blood);">파괴</span> 확률 <b style="color:var(--forge-gold);">30%</b> 감소<br>강화 비용 × <b style="color:var(--forge-gold);">3.5</b></span></button>
           <button class="fe-slot fe-prayer fe-prayer-right" id="fePrayerFocus" title="집중의 기도"><img src="assets/ui/prayer_focus.svg" class="fe-prayer-img" alt="집중의 기도"><span class="tooltip" id="fePrayerFocusTip">집중의 기도<br>적용 시 <span style="color:var(--forge-green);">성공</span> 확률 <b style="color:var(--forge-gold);">15%</b> 증가<br>강화 비용 × <b style="color:var(--forge-gold);">2.0</b></span></button>
+          <div class="fe-slot fe-extra" id="feExtraSlot"></div>
+          <div class="fe-cat-wrap fe-cat-left" data-slot="0"><button class="fe-slot fe-cat" id="feCat0" data-slot="0" title="강화석 (클릭: ON/OFF)"></button><div class="fe-qty"><button class="fe-qty-btn up" data-slot="0" data-dir="1">▲</button><button class="fe-qty-btn down" data-slot="0" data-dir="-1">▼</button></div></div>
+          <div class="fe-cat-wrap fe-cat-right" data-slot="1"><button class="fe-slot fe-cat" id="feCat1" data-slot="1" title="소생석"></button><div class="fe-qty"><button class="fe-qty-btn up" data-slot="1" data-dir="1">▲</button><button class="fe-qty-btn down" data-slot="1" data-dir="-1">▼</button></div></div>
           <div class="fe-slot fe-item" id="feItemSlot" title="강화 장비 선택"></div>
-          <button class="fe-slot fe-catalyst" id="feCatalystSlot" title="촉매(추후 업데이트)">+</button>
         </div>
         <div class="fe-detail" id="feDetail">
           <div class="fe-name" id="feName"></div>
@@ -740,15 +748,27 @@
       <!-- 이름 아래 툴팁 정상 출력(요청사항 3-2) — 인벤토리와 동일한 weapon-name-wrap+.tooltip 패턴 -->
       <div class="craft-popup-name weapon-name-wrap" id="craftPopupNameWrap"></div>
 
+      <!-- 비장비(소비/재료/마석) 제작 개수 설정 — 장비 제작 팝업에서는 숨김. 상점 수량창과 별개의 제작 전용 UI(craft-qty-*) -->
+      <div class="craft-qty-box" id="craftQtyBox" style="display:none;">
+        <div class="craft-qty-row">
+          <button class="nav-btn craft-qty-btn" id="craftQtyDecBtn" type="button">◀</button>
+          <input class="craft-qty-input" id="craftQtyInput" type="text" inputmode="numeric" autocomplete="off" value="1">
+          <button class="nav-btn craft-qty-btn" id="craftQtyIncBtn" type="button">▶</button>
+          <button class="nav-btn craft-qty-btn craft-qty-max" id="craftQtyMaxBtn" type="button">최대</button>
+        </div>
+        <div class="craft-qty-row">
+          <button class="nav-btn craft-qty-btn" id="craftQtyResetBtn" type="button">초기화</button>
+          <button class="nav-btn craft-qty-btn" data-craft-qty-add="5" type="button">5</button>
+          <button class="nav-btn craft-qty-btn" data-craft-qty-add="10" type="button">10</button>
+          <button class="nav-btn craft-qty-btn" data-craft-qty-add="100" type="button">100</button>
+        </div>
+      </div>
+
       <div class="craft-section-label">재료 등록</div>
       <div class="craft-slots-row" id="craftPopupSlots"></div>
 
       <div class="craft-section-label">촉매 추가</div>
-      <div class="craft-slots-row">
-        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
-        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
-        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
-      </div>
+      <div class="craft-slots-row" id="craftPopupCatalysts"></div>
 
       <div class="craft-success-rate" id="craftPopupSuccessRate"></div>
       <div class="reward-note" id="craftPopupFullNote" style="display:none; text-align:center;"></div>
@@ -785,11 +805,7 @@
       <div class="craft-slots-row" id="restorePopupSlots"></div>
 
       <div class="craft-section-label">촉매 추가</div>
-      <div class="craft-slots-row">
-        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
-        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
-        <button class="craft-slot" data-action="open-craft-catalyst">+</button>
-      </div>
+      <div class="craft-slots-row" id="restorePopupCatalysts"></div>
 
       <div class="craft-success-rate" id="restorePopupSuccessRate"></div>
 
@@ -840,11 +856,11 @@
     </div>
   </div>
 
-  <!-- 촉매 선택창(요청사항 4번) — 출력까지만 구현, 실제 촉매 등록/효과는 미구현 -->
+  <!-- 촉매 선택창 — 강화/제작/손상 복구 공용(catalyst.js). 목록은 열 때마다 컨텍스트에 맞게 채워짐 -->
   <div id="craftCatalystModal" class="modal-overlay" style="display:none;">
-    <div class="modal-box">
+    <div class="modal-box forge-select-modal">
       <div class="modal-title">촉매 선택</div>
-      <div class="inv-empty">촉매 시스템은 추후 업데이트를 통해 추가될 예정입니다.</div>
+      <div id="catalystPickList"></div>
       <div class="modal-actions">
         <button class="nav-btn" id="closeCraftCatalystBtn">닫기</button>
       </div>
@@ -926,7 +942,11 @@
         <div class="craft-anim-result-icons" id="craftAnimResultIcons" style="display:none;"></div>
       </div>
       <div class="craft-confirm-item-name" id="craftAnimName"></div>
+      <!-- 비장비 반복 제작 결과 화면 전용(craft_multi.js): 제작/성공/실패 횟수 + 획득 아이템 -->
+      <div class="craft-multi-stats" id="craftMultiStats" style="display:none;"></div>
 
+      <div class="craft-multi-gained-label" id="craftMultiGainedLabel" style="display:none;">획득 아이템</div>
+      <div class="craft-anim-result-icons craft-multi-grid" id="craftMultiGrid" style="display:none;"></div>
       <div class="craft-anim-stage-text" id="craftAnimStageText"></div>
       <div class="hp-bar-wrap craft-anim-bar-wrap" id="craftAnimBarWrap">
         <div class="hp-bar-fill craft-anim-bar-fill" id="craftAnimBarFill" style="width:0%;"></div>
@@ -1052,20 +1072,22 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=333"></script>
-<script src="js/formulas.js?v=333"></script>
-<script src="js/state.js?v=333"></script>
-<script src="js/effects.js?v=333"></script>
-<script src="js/render.js?v=333"></script>
-<script src="js/actions.js?v=333"></script>
-<script src="js/dungeon.js?v=333"></script>
-<script src="js/navigation.js?v=333"></script>
-<script src="js/inventory_box.js?v=333"></script>
-<script src="js/codex.js?v=333"></script>
-<script src="js/codex_monster.js?v=333"></script>
-<script src="js/craft_menu.js?v=333"></script>
-<script src="js/shop_menu.js?v=333"></script>
-<script src="js/forge_menu.js?v=333"></script>
-<script src="js/main.js?v=333"></script>
+<script src="js/data.js?v=355"></script>
+<script src="js/formulas.js?v=355"></script>
+<script src="js/catalyst.js?v=355"></script>
+<script src="js/state.js?v=355"></script>
+<script src="js/effects.js?v=355"></script>
+<script src="js/render.js?v=355"></script>
+<script src="js/actions.js?v=355"></script>
+<script src="js/dungeon.js?v=355"></script>
+<script src="js/navigation.js?v=355"></script>
+<script src="js/inventory_box.js?v=355"></script>
+<script src="js/codex.js?v=355"></script>
+<script src="js/codex_monster.js?v=355"></script>
+<script src="js/craft_menu.js?v=355"></script>
+<script src="js/craft_multi.js?v=355"></script>
+<script src="js/shop_menu.js?v=355"></script>
+<script src="js/forge_menu.js?v=355"></script>
+<script src="js/main.js?v=355"></script>
 </body>
 </html>

@@ -38,6 +38,7 @@ function showView(name){
     // 제작소를 벗어나면 제작 진행 팝업 관련 상태를 정리함(팝업이 열린 채로 화면을 벗어나는 경로는 없지만,
     // 혹시 모를 상태 잔류를 방지).
     craftPopup = null;
+    craftMultiAbort(); // 비장비 반복 제작 진행 중이었다면 정리(회차 처리는 한 번에 끝나므로 재료 유실·중복 지급 없음)
     if(craftAnim){
       restoreHeldCraftEquip(); // 이탈로 중단되는 경우 홀딩 장비를 잃지 않도록 되돌림
       clearInterval(craftAnim.tickInterval);
@@ -391,9 +392,32 @@ function openCraftPopup(category, itemId){
   craftPopup = {
     category, itemId,
     slots: item.materials.map(m => ({ name: m.name, qty: 0, picks: [] })), // picks: 장비 재료로 직접 선택해 등록한 실제 인벤토리 인스턴스 id 목록(qty는 그 개수)
+    qty: 1, // 제작 개수 — 비장비(소비/재료/마석) 아이템에서만 설정 UI가 표시되고 쓰임(장비 제작은 항상 1)
   };
   renderCraftPopup();
   el('craftPopupModal').style.display = 'flex';
+}
+// ---- 제작소: 비장비 제작 개수 설정(반복 제작 실행은 craft_multi.js) ----
+// 모든 입력은 1 ~ 최대 제작 가능 개수(craftMaxCount, 재료·골드 조건을 동시에 만족하는 최솟값)로 보정되며, 바뀔 때마다 팝업 전체(재료·비용·촉매·버튼)를 다시 그림.
+function craftQtyApply(n){
+  if(!craftPopup) return;
+  craftPopup.qty = craftClampQty(craftPopup, n);
+  el('craftQtyInput').value = String(craftPopup.qty); // 버튼으로 바꿀 때는(입력칸에 포커스가 남아 있어도) 입력칸을 새 값으로 맞춤
+  renderCraftPopup();
+}
+function craftQtyStep(delta){ if(craftPopup) craftQtyApply(craftPopupQty(craftPopup) + delta); }
+function craftQtyFillMax(){ if(craftPopup) craftQtyApply(craftMaxCount(craftPopup)); }
+function craftQtyReset(){ craftQtyApply(1); }
+// 직접 입력: 입력 중에는 숫자만 남기고 유효한 값이면 바로 반영(최대 초과 시 최대로 자동 보정해 입력칸에도 표시). 비었거나 1 미만이면 입력 중에는 두었다가 입력을 마칠 때(commit) 1로 보정.
+function craftQtyInputChanged(commit){
+  if(!craftPopup) return;
+  const input = el('craftQtyInput');
+  const digits = (input.value || '').replace(/[^0-9]/g, '');
+  const n = digits === '' ? NaN : parseInt(digits, 10);
+  if(!commit && !(n >= 1)){ if(input.value !== digits) input.value = digits; return; }
+  craftPopup.qty = craftClampQty(craftPopup, n);
+  if(commit || n > craftPopup.qty || input.value !== String(craftPopup.qty)) input.value = String(craftPopup.qty);
+  renderCraftPopup();
 }
 function closeCraftPopup(){
   el('craftPopupModal').style.display = 'none';
@@ -428,12 +452,16 @@ function pickCraftEquip(itemId){
   const resource = findCraftResource(craftSelectState.name);
   if(!material || !slot || !resource) return;
   if(!craftEligibleEquipInstances(resource).some(it => it.id === itemId)) return; // 기존 재료 등록 조건을 통과한 장비만
+  // 장비 제작은 재료 필요 개수가 상한(가득 차면 가장 먼저 등록한 것을 교체). 비장비 제작은 개수를 늘릴수록 더 많이 필요하므로 보유한 재료 장비 수까지 등록할 수 있음.
+  const multi = craftItemIsMulti(item);
+  const capacity = multi ? craftEligibleEquipInstances(resource).length : material.need;
+  const needNow = material.need * craftPopupQty(craftPopup, item);
   let picks = craftSlotValidPicks(slot, resource);
   if(picks.includes(itemId)) picks = picks.filter(id => id !== itemId);
-  else { if(picks.length >= material.need) picks.shift(); picks.push(itemId); }
+  else { if(picks.length >= capacity) picks.shift(); picks.push(itemId); }
   slot.picks = picks;
   slot.qty = picks.length;
-  if(picks.length >= material.need){ closeCraftEquipSelect(); return; }
+  if(picks.length >= (multi ? Math.min(needNow, capacity) : material.need)){ closeCraftEquipSelect(); return; }
   renderCraftSelectList();
   renderCraftPopup();
 }
@@ -443,6 +471,7 @@ function openCraftCatalystSelect(){
   el('craftCatalystModal').style.display = 'flex';
 }
 function closeCraftCatalystSelect(){
+  if(typeof closeCatalystPicker === 'function') closeCatalystPicker(); // 선택창 상태 정리(catalyst.js)
   el('craftCatalystModal').style.display = 'none';
 }
 
@@ -471,7 +500,9 @@ function proceedCraftConfirm(){
   }
   el('craftConfirmModal').style.display = 'none';
   el('craftPopupModal').style.display = 'none';
-  openCraftAnim();
+  // 비장비(소비/재료/마석)는 장비 제작 연출(openCraftAnim)과 분리된 반복 제작 연출/처리를 사용함(craft_multi.js). 장비 제작은 기존 그대로.
+  if(craftItemIsMulti(findCraftItem(craftPopup.category, craftPopup.itemId))) openCraftMulti();
+  else openCraftAnim();
 }
 
 // ---- 제작소: 제작 연출 UI ----
@@ -486,6 +517,10 @@ function openCraftAnim(){
   // 하고, 정작 차감하는 코드가 어디에도 없었음) — 재료가 소모되는 시점(연출 시작)과 동일하게 이 시점에
   // 골드를 차감하도록 추가.
   state.gold -= (item.craftCost || 0);
+  // 촉매(창조의 파편): 재료/골드가 소모되는 이 시점에 함께 소모하고, 적용된 성공 확률 증가량을 확정해 판정(finishCraftAnimProgress)에 그대로 씀.
+  const catalystPlanUsed = catalystCraftPlan(item);
+  const catalystBonus = catalystCraftBonusPct(item, catalystPlanUsed);
+  catalystConsume(catalystPlanUsed);
   // 버그 수정: 제작 플로우 전체에 saveState() 호출이 한 곳도 없어서, 골드/재료를 이미 차감한 뒤에도
   // 저장이 전혀 안 된 상태였음 — 연출 도중(7초 사이) 새로고침하면 방금 차감된 골드/재료가 저장 시점의
   // 값으로 되돌아가 버림(사실상 무료로 재시도 가능한 허점이기도 했음). 차감이 확정되는 이 시점에
@@ -516,7 +551,7 @@ function openCraftAnim(){
   craftAnim = {
     category: craftPopup.category, itemId: craftPopup.itemId,
     phase: 'animating', progress: 0, startTime: Date.now(),
-    resultSuccess: null, resultReturn: null, heldEquip,
+    resultSuccess: null, resultReturn: null, heldEquip, catalystBonus,
     tickInterval: null, orbInterval: null,
   };
   saveState(); // 골드/재료 차감 확정 직후 저장(위 주석 참고)
@@ -552,7 +587,7 @@ function finishCraftAnimProgress(){
   const item = findCraftItem(craftAnim.category, craftAnim.itemId);
   // 기존 판정 방식 그대로 — 다만 기준 확률은 천장 도달 여부를 반영한 craftEffectiveSuccessChance(천장 도달 시 100%, 아니면 기존 successChance).
   // 제작 팝업/제작 메뉴에 표시되는 확률도 같은 함수를 쓰므로 표시와 실제 판정이 항상 일치함.
-  craftAnim.resultSuccess = Math.random() * 100 < craftEffectiveSuccessChance(item);
+  craftAnim.resultSuccess = Math.random() * 100 < Math.min(100, craftEffectiveSuccessChance(item) + (craftAnim.catalystBonus || 0));
   // 실패라면 반환 결과도 이 시점에 함께 확정(요청사항 — 결과는 연출 완료 시점에 결정하고, 결과 확인
   // 단계에서는 이미 결정된 결과만 보여줌). 성공이면 반환 추첨 자체가 필요 없음(반환은 실패 전용).
   craftAnim.resultReturn = craftAnim.resultSuccess ? null : craftRollFailReturn(item);
@@ -719,10 +754,9 @@ function pendingStatPoints(key){
   if(!draftStats) return 0;
   return (draftStats[key] || 0) - (state.stats[key] || 0);
 }
-// 캐릭터 메뉴("캐릭터" 탭)와 던전 우측 카드는 draftStats 등 동일한 데이터를 공유하며(대장간 전용 캐릭터
-// 정보 팝업은 구조 통합으로 제거됨), 요구사항대로 "한쪽에서 바뀌면 다른 쪽도 즉시 반영"되도록 스탯이
-// 바뀌는 모든 지점에서 항상 둘 다 다시 그림(둘 중 숨겨진 화면을 다시 그리는 건 비용이 거의 없음 —
-// render()가 매번 상점/인벤토리를 다시 그리는 것과 동일한 방식).
+// 캐릭터 메뉴("캐릭터" 탭)와 던전 우측 카드는 draftStats 등 동일한 데이터를 공유하며, 요구사항대로
+// "한쪽에서 바뀌면 다른 쪽도 즉시 반영"되도록 스탯이 바뀌는 모든 지점에서 항상 둘 다 다시 그림(둘 중 숨겨진
+// 화면을 다시 그리는 건 비용이 거의 없음 — render()가 매번 상점/인벤토리를 다시 그리는 것과 동일한 방식).
 function refreshCharDisplays(){
   renderCharacterMenu();
   renderHuntSidePanel(); // 던전 우측 카드에 재사용 중인 캐릭터 정보 UI도 함께 갱신

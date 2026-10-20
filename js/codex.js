@@ -30,6 +30,7 @@ const CODEX_EQUIP_CATEGORIES = [
   { id: 'sub',               label: '보조' },
   { id: 'accessory:necklace', label: '목걸이' },
   { id: 'accessory:ring',    label: '반지' },
+  { id: 'artifact',          label: '아티팩트' }, // 아티팩트(ARTIFACTS) — 종류 구분 없이 한 탭. 착용 레벨 제한이 없어 등급 오름차순 → 이름 가나다 → 데이터 등록 순으로 정렬됨(codexCompare)
 ];
 
 // 장비 데이터 소스 → 세로 탭 id 결정 규칙. 새 장비 종류 테이블이 생기면 여기에 한 줄만 추가하면 됨.
@@ -38,6 +39,9 @@ const CODEX_EQUIP_SOURCES = [
   { src: 'armor',     table: () => ARMOR_TYPES,     categoryOf: def => 'armor:' + def.armorKind,         kindLabels: () => ARMOR_KINDS },
   { src: 'sub',       table: () => SUB_TYPES,       categoryOf: () => 'sub' },
   { src: 'accessory', table: () => ACCESSORY_TYPES, categoryOf: def => 'accessory:' + def.accessoryKind, kindLabels: () => ACCESSORY_KINDS },
+  // 아티팩트: 장비 테이블이 아니라 별도 데이터(ARTIFACTS)라 아이콘/툴팁/색상은 인벤토리 아티팩트 탭과 같은 함수로 만듦(display). 강화 단계·착용 레벨이 없음.
+  { src: 'artifact',  table: () => ARTIFACTS,        categoryOf: () => 'artifact',
+    display: (type, def) => ({ iconHtml: itemIconHtml(def, 'inv-icon-img'), tooltipHtml: buildArtifactTooltipHtml(type), color: artifactNameColor(type) }) },
 ];
 
 const CODEX_SEARCH_MAX_RESULTS = 60;
@@ -96,7 +100,7 @@ function codexBuildEntries(){
     Object.keys(table).forEach(type => {
       const def = table[type];
       if(!def) return;
-      const info = equipInstanceDisplayInfo({ level: 0 }, type);
+      const info = source.display ? source.display(type, def) : equipInstanceDisplayInfo({ level: 0 }, type);
       const grade = def.grade || 'normal';
       out.push({
         key: source.src + ':' + type, src: source.src, type, def,
@@ -339,7 +343,8 @@ function codexHideTip(){
 // 가로 탭 id별 항목 제공자(이번 단계는 장비 탭만). 인벤토리의 INV_BOX_ACTION_PROVIDERS와 같은 구조.
 const CODEX_ACTION_PROVIDERS = {
   equipment: (e) => [
-    { id: 'info', label: '정보', run: () => codexOpenInfo(e.key) },
+    // 정보(강화 단계별 세부 정보 + 내 장비와 비교)는 장비 전용이라 아티팩트에는 제공하지 않음(아티팩트용 세부 정보는 이후 단계)
+    ...(e.src === 'artifact' ? [] : [{ id: 'info', label: '정보', run: () => codexOpenInfo(e.key) }]),
     { id: 'favorite', label: codexIsFavorite(e.key) ? '즐겨찾기 해제' : '즐겨찾기',
       run: () => { codexToggleFavorite(e.key); codexRender(null, true); } }, // 즐겨찾기 탭에서는 해제 즉시 목록에서 사라짐(스크롤 위치 유지)
   ],

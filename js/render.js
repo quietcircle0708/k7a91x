@@ -13,11 +13,8 @@ function render(){
   renderForgeTabs(); // 대장간 강화/수리 탭(내구도 시스템 15번 요구사항) — 정적 토글이라 render() 매 사이클 갱신
   renderHuntCharPanel();
   renderQuickSlots();
-  // 플라스크 퀵슬롯(renderQuickSlots)과 동일한 이유로 여기서 항상 호출함 — 예전에는 캐릭터 메뉴의
-  // 스킬 탭을 열거나 스킬을 실제로 사용할 때만 renderSkillQuickSlots()가 불려서, 게임 시작 후 스킬
-  // 탭을 한 번도 안 연 채로 곧장 던전에 들어가면 huntSkillQuickSlotRow가 비어있는 채로 남는 버그가
-  // 있었음(캐릭터 메뉴를 한 번 열면 그 뒤로는 정상 출력됐던 것도 이 때문). render()에서 항상 채워주면
-  // 화면 전환과 무관하게 처음부터 정상 출력됨.
+  // 플라스크 퀵슬롯(renderQuickSlots)과 동일한 이유로 여기서 항상 호출함 — 스킬 탭을 열지 않고 곧장 던전에
+  // 들어가도 huntSkillQuickSlotRow가 처음부터 채워지도록 render()에서 항상 갱신함.
   renderSkillQuickSlots();
   el('goldText').textContent = state.gold.toLocaleString();
   el('goldLedger').textContent = state.gold.toLocaleString() + ' G';
@@ -111,10 +108,9 @@ function renderForgeSelectList(){
   }).join('')}</div>`;
 }
 
-// ---- 인벤토리 UI 형식 분기(인벤토리 개편 1단계) ----
-// 구버전(세로)은 지금까지 쓰던 인벤토리 렌더링 그대로(탭 + 무기/방어구/보조/장신구 목록)이며 코드 변경 없음.
-// 신버전(박스)은 아직 구현되지 않았으므로 INVENTORY_UI_RENDERERS에 등록돼 있지 않고, 이 경우 구버전 렌더러로
-// 안전하게 대체됨(기존 인벤토리/기능은 그대로). 이후 단계에서 신버전이 만들어지면 여기에 'box' 렌더러를 등록하면 됨.
+// ---- 인벤토리 UI 형식 분기 ----
+// 구버전(세로): 탭 + 무기/방어구/보조/장신구 목록 렌더링(renderInventoryLegacy).
+// 신버전(박스): inventory_box.js가 INVENTORY_UI_RENDERERS.box로 등록함. 등록되지 않은 값은 구버전 렌더러로 대체됨.
 function renderInventoryLegacy(){
   renderInvTabs();
   renderInventoryList();
@@ -443,6 +439,10 @@ function renderCraftPopup(){
   const item = findCraftItem(craftPopup.category, craftPopup.itemId);
   if(!item) return;
   const color = craftItemNameColor(item);
+  // 비장비 제작: 제작 개수를 매번 1 ~ 최대 제작 가능 개수로 보정(보유량이 줄어든 경우 포함). 장비 제작은 항상 1개 기준이라 아래 값이 모두 기존과 같음.
+  const multi = craftItemIsMulti(item);
+  if(multi) craftPopup.qty = craftClampQty(craftPopup, craftPopup.qty);
+  const qty = craftPopupQty(craftPopup, item);
 
   el('craftPopupIconBox').innerHTML = craftItemIconHtml(item, 'inv-icon-img');
   el('craftPopupIconBox').style.borderColor = color;
@@ -452,8 +452,9 @@ function renderCraftPopup(){
     `<span class="inv-name" style="color:${color};">${item.name}</span>` +
     `<span class="tooltip">${craftItemTooltipHtml(item)}</span>`;
 
-  // 재료 슬롯: 더 이상 플레이어가 재료를 직접 고르지 않고, 제작 아이템 데이터에 등록된 재료를
-  // 등급 높은 순으로 자동 배치함(요청사항 3-1). 장비 재료 슬롯 클릭 시 재료 장비 선택 팝업으로 감.
+  // 재료 슬롯: 제작 아이템 데이터에 등록된 재료를 등급 높은 순으로 자동 배치함(요청사항 3-1).
+  // 장비 재료 슬롯 클릭 시 재료 장비 선택 팝업으로 감.
+  renderCraftQtyBox(multi, qty);
   const sortedMaterials = craftMaterialsSortedByGradeDesc(item.materials);
   el('craftPopupSlots').innerHTML = sortedMaterials.map(material => {
     const slot = craftPopup.slots.find(s => s.name === material.name);
@@ -463,12 +464,13 @@ function renderCraftPopup(){
     // 일반 재료(장비 제외)는 직접 투입하지 않고 현재 보유 수량으로 자동 인식: "+" 대신 재료 아이콘(+툴팁)을 항상
     // 표시하고, 보유수량/필요수량을 기존 서식(craft-slot-qty-ok=노랑 / craft-slot-qty-short=빨강)으로 보여줌.
     // 클릭해도 아무 동작이 없도록 data-action 없는 일반 요소로 렌더링(레이아웃은 기존 .craft-slot 그대로).
-    if(craftResourceIsAutoMaterial(resource)) return craftAutoMaterialSlotHtml(resource, material.need);
+    if(craftResourceIsAutoMaterial(resource)) return craftAutoMaterialSlotHtml(resource, material.need * qty);
     // 장비 재료: 사용자가 직접 선택해 등록한 실제 장비 인스턴스를 슬롯에 표시함. 아직 등록 전이면 "+" 아이콘(누르면 장비 선택 팝업).
     // 등록된 장비가 여러 개(필요 개수 2개 이상)면 첫 번째 장비 아이콘을 보여주고 개수는 n/필요 개수로 표시함.
     const picks = craftSlotValidPicks(slot, resource);
     slot.picks = picks; slot.qty = picks.length; // 등록 후 조건이 바뀐 장비는 자동으로 등록 해제
-    const qtyCls = slot.qty < material.need ? 'craft-slot-qty-short' : 'craft-slot-qty-ok';
+    const needTotal = material.need * qty;
+    const qtyCls = slot.qty < needTotal ? 'craft-slot-qty-short' : 'craft-slot-qty-ok';
     const found = picks.length ? inventoryInstanceByKindAndId(resource.equipType, picks[0]) : null;
     let iconInner = `<span class="craft-slot-plus">+</span>`, iconBorder = '';
     if(found){
@@ -479,14 +481,15 @@ function renderCraftPopup(){
     return `
       <button class="craft-slot" data-action="open-craft-equip-select" data-name="${material.name}">
         <span class="inv-icon craft-slot-icon-box weapon-name-wrap" style="border-color:${iconBorder};">${iconInner}</span>
-        <span class="${qtyCls}">${slot.qty}/${material.need}</span>
+        <span class="${qtyCls}">${slot.qty}/${needTotal}</span>
         <span class="craft-slot-name" style="color:${matColor};">${resource.def.name}</span>
       </button>`;
   }).join('');
 
-  el('craftPopupSuccessRate').textContent = `성공 확률 ${craftEffectiveSuccessChance(item)}%`; // 천장 도달 시 100%(실제 판정과 같은 함수)
+  catalystRenderPopupRow('craft');
+  el('craftPopupSuccessRate').textContent = `성공 확률 ${fmtOddsNum(craftSuccessChanceWithCatalyst(item, qty))}%`; // 천장 도달 시 100% + 창조의 파편 증가량(상한 100%, 실제 판정과 같은 값)
   el('craftPopupCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
-  el('craftPopupCost').innerHTML = goldHtml((item.craftCost || 0).toLocaleString());
+  el('craftPopupCost').innerHTML = goldHtml(craftTotalCost(item, qty).toLocaleString()); // 총 제작 비용 = 1개 기준 비용 × 제작 개수
 
   el('craftPopupMakeBtn').disabled = !craftPopupCanCraft(craftPopup);
   // 제작 결과물을 담을 인벤토리 슬롯이 없어 제작이 막힌 경우 그 이유를 카테고리별로 안내함
@@ -495,6 +498,21 @@ function renderCraftPopup(){
   if(noteEl){ noteEl.textContent = blockedCategory ? inventoryFullMessage(blockedCategory) : ''; noteEl.style.display = blockedCategory ? 'block' : 'none'; }
 }
 
+// 비장비 제작 개수 설정 UI 표시/갱신 — 장비 제작이면 통째로 숨김. 입력칸에 포커스가 있는(직접 입력 중인) 동안은 입력 중인 글자를 덮어쓰지 않음.
+function renderCraftQtyBox(multi, qty){
+  const box = el('craftQtyBox');
+  if(!box) return;
+  box.style.display = multi ? 'block' : 'none';
+  if(!multi) return;
+  const input = el('craftQtyInput');
+  if(document.activeElement !== input) input.value = String(qty);
+  const max = craftMaxCount(craftPopup);
+  el('craftQtyDecBtn').disabled = qty <= 1;
+  el('craftQtyIncBtn').disabled = qty >= max;
+  el('craftQtyMaxBtn').disabled = max <= 1 || qty >= max;
+  el('craftQtyResetBtn').disabled = qty <= 1;
+  el('craftQtyBox').querySelectorAll('[data-craft-qty-add]').forEach(b => { b.disabled = qty >= max; });
+}
 // 제작 재료 장비 선택 목록 — 복구 장비 선택 목록(renderRestoreSelectList)과 같은 마크업/페이지네이션. 현재 고르는 재료로 실제 등록할 수 있는
 // 장비(craftEligibleEquipInstances: 잠금/손상/착용 중/내구도 온전하지 않음/종류 불일치 제외 — 기존 재료 등록 조건 그대로)만 나옴.
 // 이미 이 슬롯에 등록한 장비는 선택 상태(.active)로 표시됨.
@@ -550,7 +568,7 @@ function renderCraftConfirmModal(){
   el('craftConfirmFailWrap').style.display = failHtml ? 'block' : 'none';
   el('craftConfirmFailArea').innerHTML = failHtml;
 
-  el('craftConfirmCost').innerHTML = goldHtml((item.craftCost || 0).toLocaleString());
+  el('craftConfirmCost').innerHTML = goldHtml(craftTotalCost(item, craftPopupQty(craftPopup, item)).toLocaleString());
 }
 
 // ---- 제작소: 제작 연출 UI(요청사항 1~11번) ----
@@ -563,6 +581,10 @@ function renderCraftAnimModal(){
   const color = craftItemNameColor(item);
 
   el('craftAnimHeader').textContent = craftAnim.phase === 'animating' ? '' : '제작 결과';
+  // 비장비 반복 제작 전용 요소(craft_multi.js)는 장비 제작 화면에서 항상 숨김 + 큰 버튼 상태/문구를 장비 제작 기준으로 복원
+  ['craftMultiStats', 'craftMultiGainedLabel', 'craftMultiGrid'].forEach(id => { el(id).style.display = 'none'; });
+  el('craftAnimConfirmBtn').disabled = false;
+  el('craftAnimConfirmBtn').textContent = '확인';
 
   if(craftAnim.phase === 'revealed'){
     el('craftAnimIconBox').style.display = 'none';
@@ -616,6 +638,7 @@ function renderCraftAnimModal(){
 }
 function renderCraftAnimProgress(){
   if(!craftAnim) return;
+  el('craftAnimBarFill').style.transition = ''; // 비장비 반복 제작이 꺼 둔 전환 효과 복원(장비 제작 로딩바는 기존 그대로)
   el('craftAnimBarFill').style.width = craftAnim.progress + '%';
   el('craftAnimBarText').textContent = craftAnim.progress.toFixed(2) + '%';
   // 버그 수정: 이전엔 연출 시작 시 renderCraftAnimModal()에서 딱 한 번만 문구를 세팅해서, 이후
@@ -626,9 +649,11 @@ function renderCraftAnimProgress(){
 // 1초마다 빛 구체 하나를 생성(요청사항 3번) — CSS 애니메이션(craftOrbSpiral)이 바깥에서 중앙으로
 // 소용돌이치며 빨려들어가는 이동을 전부 처리하고, 애니메이션이 끝나는 순간(animationend)에만 이
 // 함수가 개입해 구체를 제거하고 아이템 아이콘에 0.2초 흔들림 클래스를 붙였다 뗌.
-function spawnCraftAnimOrb(){
+// options.shake === false 이면 빛 구체가 도착해도 아이콘을 흔들지 않음(비장비 반복 제작 — craft_multi.js). 생략 시 기존 그대로 흔들림(장비 제작).
+function spawnCraftAnimOrb(options){
   const field = el('craftAnimIconStage');
   if(!field) return;
+  const shake = !(options && options.shake === false);
   const orb = document.createElement('div');
   orb.className = 'craft-anim-orb';
   orb.style.setProperty('--angle', Math.floor(Math.random() * 360) + 'deg');
@@ -636,7 +661,8 @@ function spawnCraftAnimOrb(){
   orb.addEventListener('animationend', () => {
     orb.remove();
     const iconBox = el('craftAnimIconBox');
-    if(!iconBox) return;
+    if(!iconBox || !shake) return;
+    if(typeof craftMultiRun !== 'undefined' && craftMultiRun) return; // 비장비 반복 제작 중에는(이전 장비 제작의 잔여 구체가 도착해도) 흔들지 않음
     iconBox.classList.add('craft-anim-icon-shake');
     setTimeout(() => iconBox.classList.remove('craft-anim-icon-shake'), 200);
   });
@@ -1049,8 +1075,8 @@ function equippedItemInfoLinesHtml(){
 //         [투구]
 //   [무기]  [갑옷]   [보조]
 //       [장신구][장신구]
-// 아티팩트가 더 이상 별도 세로 칸(equip-artifact-col)이 아니라 최상단 가로 3칸으로 합쳐져서, 슬롯
-// 그리드 하나(equip-slots-grid)에 전부 포함됨(CSS 그리드 영역만 이 구조에 맞게 재정의 — style.css 참고).
+// 아티팩트는 최상단 가로 3칸으로 슬롯 그리드 하나(equip-slots-grid)에 함께 포함됨
+// (CSS 그리드 영역은 이 구조에 맞게 정의 — style.css 참고).
 // includeInfo=false면 "장착 아이템 정보" 목록(구분선 포함)을 생략하고 슬롯 그리드만 반환함 —
 // 던전 전투 화면(renderHunt)에서만 이 목록을 표시하지 않기 위한 옵션이며, 기존 호출부(캐릭터 정보창,
 // 캐릭터 메뉴)는 인자를 넘기지 않으므로 기본값(true)으로 기존과 완전히 동일하게 동작함.
@@ -1191,6 +1217,7 @@ function renderRestorePopup(){
   if(restorePopup.target && !found) restorePopup.target = null; // 선택해둔 장비가 사라졌거나 더 이상 손상이 아니면 선택 해제
   const iconBox = el('restorePopupIconBox');
   const nameWrap = el('restorePopupNameWrap');
+  catalystRenderPopupRow('restore');
   if(!found){
     iconBox.innerHTML = '<span class="craft-slot-plus">+</span>';
     iconBox.style.borderColor = '';
@@ -1216,7 +1243,7 @@ function renderRestorePopup(){
         const resource = findCraftResource(m.name);
         return resource ? craftAutoMaterialSlotHtml(resource, m.need) : '';
       }).join('');
-  el('restorePopupSuccessRate').textContent = `복구 확률 ${restoreChanceFor(type)}%`;
+  el('restorePopupSuccessRate').textContent = `복구 확률 ${fmtOddsNum(catalystRestoreChance(type, catalystRestorePlan(type)))}%`; // 소생석 적용 후의 실제 확률
   el('restorePopupCurrentGold').innerHTML = goldHtml(state.gold.toLocaleString());
   el('restorePopupCost').innerHTML = goldHtml(restoreCostFor(type).toLocaleString());
   el('restorePopupMakeBtn').disabled = !restoreCanProceed(restorePopup.target);
@@ -1391,9 +1418,8 @@ function buildCharFinalStatsHtml(){
     <div class="char-stat-row big"><span>지능</span>${charStatValueWithTip('int', {}, '지능', `${s.int}`)}</div>
   `;
 }
-// "적용 중인 아티팩트 효과" HTML 조립. 기존에는 무기가 장착돼 있을 때만 표시되던 블록이라 그 조건은 그대로
-// 유지하고(무기 미장착 시 동일한 안내 문구), 장착 아티팩트가 0개일 때만 기존에는 아무것도 출력되지 않았던 것을
-// 빈 페이지로 보이지 않도록 동일한 안내 문구 스타일로 보완함. [착용 장비] 소분류 탭이 이 함수를 그대로 씀.
+// "적용 중인 아티팩트 효과" HTML 조립. 무기가 장착돼 있을 때만 표시되며(무기 미장착 시 안내 문구),
+// 장착 아티팩트가 0개면 빈 페이지가 되지 않도록 같은 스타일의 안내 문구를 보여줌. [착용 장비] 소분류 탭이 이 함수를 그대로 씀.
 function buildArtifactEffectsHtml(){
   const equipped = getEquippedWeapon();
   if(!equipped){
@@ -1461,7 +1487,7 @@ function buildCharInfoBlockHtml(activeSubtab, dataAttr){
 // 그 외 탭이 추가되면 기본적으로 빈 화면만 출력함.
 // "info" 탭은 소분류([정보]/[착용 장비]/[세부 능력치], CHAR_INFO_SUBTABS)로 다시 나뉘며, 던전 우측
 // 패널(renderHuntSidePanel)의 "info" 탭과 완전히 동일한 공통 콘텐츠 빌더(buildCharInfoBlockHtml)를
-// 공유함(구조 통합 — 대장간 전용 캐릭터 정보 팝업은 더 이상 없음).
+// 공유함.
 function renderCharacterMenu(){
   const tabsRow = el('charTabsRow');
   const panelsWrap = el('charTabPanels');
@@ -1692,12 +1718,6 @@ function buildSkillIconBtnHtml(id){
 }
 
 // ---- 던전 입구 목록 ----
-function gradeSpan(grade){
-  const g = MONSTER_GRADES[grade];
-  return `<span style="color:${g.color}; font-weight:700;">${g.label}</span>`;
-}
-// (모험가의 유해·마석 드랍 안내는 이제 buildDungeonDropIcons에서 하드코딩 문구 또는 자동 생성 방식으로
-// 대체되어, 이 던전별 동적 문구 생성 함수들은 더 이상 쓰이지 않아 정리함)
 // 이 던전의 몬스터들이 실제로 등장 가능한 레벨(정상 등급은 레벨~레벨+levelRange 구간, 그 외 등급은 고정 레벨)을
 // 전부 모아서, 그 레벨들에서 나올 수 있는 마석 등급(stonePossibleGrades, 전역 공식 재사용)을 중복없이 반환.
 function dungeonStoneGrades(d){
@@ -1710,6 +1730,19 @@ function dungeonStoneGrades(d){
     levels.forEach(lv => stonePossibleGrades(lv).forEach(g => grades.add(g)));
   });
   return grades;
+}
+// 이 던전 몬스터들이 실제로 등장 가능한 레벨(dungeonStoneGrades와 같은 수집 방식)·몬스터 등급 기준으로 드랍될 수 있는 촉매 id를 모두 모아 중복 없이 반환.
+// 실제 드랍 공식(catalystPossibleItemIds)을 그대로 쓰는 표시용 계산이라 추첨/지급은 하지 않음. 확률 0%인 촉매는 나오지 않음.
+function dungeonCatalystItems(d){
+  const ids = new Set();
+  d.monsters.forEach(id => {
+    const m = MONSTERS[id];
+    const levels = m.grade === 'normal'
+      ? Array.from({ length: (d.levelRange || 0) + 1 }, (_, i) => m.level + i)
+      : [m.level];
+    levels.forEach(lv => catalystPossibleItemIds(lv, m.grade).forEach(x => ids.add(x)));
+  });
+  return ids;
 }
 // 이 던전의 몬스터들이 실제로 등장 가능한 레벨(dungeonStoneGrades와 동일한 레벨 수집 방식)에서 나올 수
 // 있는 플라스크 아이템 id(hpFlask{tier}/mpFlask{tier})를 전부 모아 중복없이 반환. 종류(체력/마나)는
@@ -1819,6 +1852,15 @@ function buildDungeonDropIcons(d){
     });
   });
 
+  // 6-1. 촉매 — 몬스터 등급별 드랍 확률과 레벨 구간별 선택표(전역 공식)에서 이 던전 몬스터가 실제로 낼 수 있는 촉매만 표시.
+  //      마석(7번)보다 앞에 오도록 분류 순서는 data.js DUNGEON_DROP_KINDS가 정함.
+  dungeonCatalystItems(d).forEach(itemId => {
+    const item = MISC_ITEMS[itemId];
+    if(!item) return;
+    icons.push({ kind: 'catalyst', sortInfo: { grade: item.grade, price: item.sellPrice || 0, name: item.name },
+      iconHtml: itemIconHtml(item), borderColor: miscNameColor(item.id), tooltip: buildMiscTooltipHtml(item.id) });
+  });
+
   // 7. 마석 — 이 던전 몬스터들의 레벨 구간에서 실제로 나올 수 있는 등급의 마석만 자동 선별,
   //    마석 툴팁 공식으로 표시.
   const seenStoneIds = new Set();
@@ -1854,7 +1896,7 @@ function buildDungeonDropIcons(d){
   // 한 페이지에 최대 11개 아이템 + 마지막 칸에 다음/이전 버튼 1개(총 12칸)로, 기존에 한 줄에 들어가던
   // 최대 개수(12개)를 그대로 유지해 카드 크기가 커지지 않도록 함.
   // 모바일 UI 개편 4단계: 화면 폭이 좁은 모바일 프리셋에서는 이 12/11 기준을 그대로 쓰면 아이콘 행이
-  // 카드 밖으로 넘치므로, 페이지당 표시 개수만 7개로 줄임(데스크톱 PAGE_SIZE.dungeonDrop=11은 그대로
+  // 카드 밖으로 넘치므로, 페이지당 표시 개수만 9개로 줄임(데스크톱 PAGE_SIZE.dungeonDrop=11은 그대로
   // 유지 — 전역 값을 바꾸지 않고 여기서 프리셋에 따라 다른 값을 고르기만 함). 페이지네이션 계산
   // 함수(pageCount/pageSlice/clampPage)와 페이지 버튼 로직은 데스크톱과 완전히 동일하게 재사용.
   const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
@@ -2058,12 +2100,10 @@ function renderHunt(){
 // 망자의 저주(사망 패널티)도 요청에 따라 이 UI 안에 같은 정렬 규칙(남은시간 내림차순)으로 함께 표시함 —
 // state.js의 DEATH_CURSE_DURATION_MS을 그대로 초 단위로 환산해서 보여줄 뿐 새 지속시간 계산은 없음.
 // 대장간 화면 뱃지(curseBadgeForge)는 이 UI와 무관하게 renderDeathCurseBadge가 그대로 담당함.
-// (요청 3번 버그수정) 100ms마다 wrap.innerHTML을 통째로 새로 그리면, 마우스가 올라가 있던 아이콘의
-// DOM 노드 자체가 매번 파괴·재생성되어 :hover 상태가 끊기고 그 사이 툴팁이 깜빡였음. 그래서 이제는
-// data-key(스킬id 또는 'curse')로 기존 노드를 찾아 재사용하고, 남은시간 텍스트만 갱신함 — 노드 자체는
-// 그 버프가 실제로 사라지거나 새로 생길 때만 추가/제거되므로, 마우스가 계속 같은 아이콘 위에 있으면
-// hover가 끊기지 않음. 순서가 바뀔 때만 insertBefore로 재배치(그때만 그 노드의 hover가 끊길 수 있는데,
-// 이는 실제로 순위가 바뀌었을 때뿐이라 정상적인 동작임).
+// 100ms마다 wrap.innerHTML을 통째로 새로 그리면 마우스가 올라가 있던 아이콘의 DOM 노드가 매번 재생성되어
+// :hover 상태가 끊기고 툴팁이 깜빡이므로, data-key(스킬id 또는 'curse')로 기존 노드를 찾아 재사용하고
+// 남은시간 텍스트만 갱신함 — 노드는 그 버프가 실제로 사라지거나 새로 생길 때만 추가/제거됨. 순서가 바뀔 때만
+// insertBefore로 재배치함(순위가 실제로 바뀐 경우뿐이라 그때 hover가 끊기는 것은 정상 동작).
 const HUNT_BUFF_UI_MAX = 15; // 한 줄 5개 × 최대 3줄(CSS .hunt-buff-ui의 고정폭/최대높이와 반드시 같이 맞춰야 함)
 function renderHuntBuffUi(){
   const wrap = el('huntBuffUi');

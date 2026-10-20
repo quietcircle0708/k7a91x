@@ -84,22 +84,34 @@ function startEnhance(){
   if(breakdown.total === undefined) return; // 아직 강화 데이터가 없는 무기(숏소드/대거 등)
   if(state.gold < breakdown.total) return;
 
+  // 촉매 효과가 반영된 이번 시도의 확률을 먼저 구한 뒤(보유량 확인 포함) 비용과 함께 촉매를 소모함 — 소모 후 보유량이 줄어도 이번 판정/표시는 이 확률 그대로.
+  const attemptOdds = effectivePrayerOdds(type, level);
+  const catalystUsed = catalystEnhancePlan(type, level);
+
   isEnhancing = true;
   state.gold -= breakdown.total;
+  catalystConsume(catalystUsed); // 재료(골드)가 소모되는 시점에 적용된 촉매도 함께 소모
+  forgeEnhOddsLock = attemptOdds ? attemptOdds.slice() : null;
   state.totalAttempts++;
   showMsg('', '');
-  render();
 
   // 결과는 여기서 딱 한 번 판정해 보관하고, 연출(시도 → 결과)이 끝난 뒤 resolveEnhance가 실제 결과만 반영함.
   // 연출 스킵이면 시도 연출만 생략(attemptMs=0)하고 결과 연출은 그대로 재생. 입력 잠금(isEnhancing)은 결과 처리까지 유지됨.
-  const outcome = weightedOutcome(effectivePrayerOdds(type, level));
-  const highRisk = (effectivePrayerOdds(type, level) || oddsFor(type, level))[2] > 0; // 파괴 확률이 있는 단계는 연출을 더 길게(기존 방식 그대로)
+  const outcome = weightedOutcome(attemptOdds);
+  // 선저장: 비용(골드·촉매) 차감과 판정 결과를 시도 시작 시점에 함께 저장함(state.pendingEnhance). 연출 도중 새로고침·종료해도
+  // 비용은 되돌아가지 않고, 다음에 불러올 때 resumePendingEnhance가 같은 결과를 그대로 반영함(파괴를 본 뒤 새로고침으로 되돌리기 방지).
+  state.pendingEnhance = { itemId: equipped.id, level, outcome };
+  saveState();
+  render();
+  const highRisk = (attemptOdds || oddsFor(type, level))[2] > 0; // 파괴 확률이 있는 단계는 연출을 더 길게(기존 방식 그대로)
   forgeEnhPlay(equipped.id, level, type, outcome, state.skipEffects ? 0 : (highRisk ? 1000 : 700));
 }
 
 // 이미 판정된 결과(opts.outcome)를 받아 실제 결과(레벨 변경/파괴/보상)를 반영함 — 강화 연출(forge_menu.js forgeEnhPlay)이
 // 끝난 뒤 호출됨. 결과 처리가 끝날 때까지(파괴는 안내 팝업이 뜰 때까지) isEnhancing 입력 잠금을 유지함.
 function resolveEnhance(itemId, level, opts){
+  forgeEnhOddsLock = null; // 이번 시도의 확률 고정 해제(catalyst.js)
+  state.pendingEnhance = null; // 선저장해 둔 시도 결과를 이제 반영하므로 해제(아래 모든 경로가 이어서 saveState를 호출함)
   // 대장간 화면에 지금 표시된 대상은 무기/방어구/장신구 인벤토리 중 하나이므로 전부 검색함(getEquipped()와 동일한 검색 범위).
   let item = state.inventory.find(i => i.id === itemId);
   if(!item) item = (state.armorInventory || []).find(i => i.id === itemId);
@@ -156,6 +168,15 @@ function resolveEnhance(itemId, level, opts){
       render();
     }, ENCHANT_DESTROY_POPUP_DELAY_MS);
   }
+}
+
+// 불러오기 직후 호출: 연출 도중 새로고침·종료로 반영되지 못한 강화 시도(state.pendingEnhance)가 있으면 선저장된 결과를 연출 없이 그대로 반영함.
+// 비용(골드·촉매)은 시도 시점에 이미 차감·저장되어 있으므로 여기서는 결과(레벨/파괴/보상)만 반영하며, 파괴였다면 파괴 안내 팝업도 띄움.
+function resumePendingEnhance(){
+  const p = state.pendingEnhance;
+  if(!p) return;
+  isEnhancing = true; // resolveEnhance가 결과 처리(파괴는 안내 팝업)까지 입력 잠금을 유지하다 해제함 — 정상 흐름과 동일
+  resolveEnhance(p.itemId, p.level, { outcome: p.outcome });
 }
 
 // 강화 파괴 처리: 파괴된 장비를 (+0으로 되돌리는 대신) 인벤토리에서 완전히 소멸시킨 뒤, 장비 등급에
@@ -292,8 +313,8 @@ function recheckEquipRequirements(){
 }
 // 강화 대상 선택(무기/방어구/장신구 공통) — "대장간 표시 대상"(forgeTargetId)만 바꿈. 착용 상태는 어떤 종류도
 // 건드리지 않음: 실제 착용은 별도의 착용 함수(무기 equipWeaponPiece, 방어구 equipArmorPiece, 장신구
-// equipAccessoryPiece)가 담당하고, 이 함수는 대장간에 올려놓는 일만 함(예전에는 무기만 강화 선택이 곧 착용이었으나
-// 이제 방어구/장신구와 같은 구조로 분리됨). 호출처: 구버전/신버전 인벤토리의 "강화 선택"(selectForgeTargetFromInventory),
+// equipAccessoryPiece)가 담당하고, 이 함수는 대장간에 올려놓는 일만 함. 호출처: 구버전/신버전 인벤토리의
+// "강화 선택"(selectForgeTargetFromInventory),
 // 대장간의 "강화 장비 선택" 팝업(selectForgeTarget) — 모두 같은 forgeTargetId를 사용함.
 function equipItem(id){
   if(isEnhancing) return;
@@ -440,9 +461,8 @@ function buyWeapon(typeId, btn, silent){
     state.gold -= price;
     const newItem = { id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) };
     state.inventory.push(newItem);
-    // (구조 변경 5번) 예전에는 장착 중인 무기가 없으면 방금 구매한 무기를 자동으로 강화 대상으로
-    // 지정했지만, 이제는 대장간 버튼/인벤토리에서 플레이어가 직접 "강화 선택"해야만 강화 화면에
-    // 표시되도록 자동 지정을 제거함. 구매 자체(인벤토리에 추가)는 그대로 동작함.
+    // 구매한 무기는 인벤토리에만 추가되며, 강화 화면에는 대장간 버튼/인벤토리에서 플레이어가
+    // 직접 "강화 선택"해야만 표시됨(자동 지정 없음).
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
   }
@@ -1119,7 +1139,11 @@ function executeRestore(target){
     const resource = findCraftResource(m.name);
     state[resource.def.stateKey] = (state[resource.def.stateKey] || 0) - m.need;
   });
-  const success = Math.random() * 100 < restoreChanceFor(type);
+  // 소생석: 복구 확률(소생석 적용 후)을 먼저 확정하고, 골드/재료와 함께 소모함(보유량 부족이면 효과만 적용하지 않음).
+  const catalystPlanUsed = catalystRestorePlan(type);
+  const chance = catalystRestoreChance(type, catalystPlanUsed);
+  catalystConsume(catalystPlanUsed);
+  const success = Math.random() * 100 < chance;
   if(success){
     item.damaged = false;
     item.currentDurability = freshCurrentDurability(type); // 정상 최대 내구도의 100%

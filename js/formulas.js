@@ -230,7 +230,6 @@ function weaponKindLabel(type){
   const hand = HAND_TYPE_LABELS[w.handType];
   return hand ? `${hand} / ${kind}` : kind;
 }
-function weaponGradeLabel(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.label : ''; }
 function weaponGradeColor(type){ const g = WEAPON_GRADES[wpn(type).grade]; return g ? g.color : '#ffffff'; }
 // ---- 아이템 등급별 아이콘 슬롯 배경색(공통) ----
 // PNG 이미지 자체는 절대 건드리지 않고, PNG가 담기는 "슬롯" 영역에만 등급별 배경색을 적용하기 위한
@@ -319,7 +318,7 @@ function playerCombatIconHtml(direction, motion){
 // 되므로 ARTIFACTS/CONSUMABLES/MISC_ITEMS 항목뿐 아니라 필요한 필드만 담은 객체를 넘겨도 동일하게 동작함.
 function itemIconHtml(itemDefLike, className){
   if(!itemDefLike || !itemDefLike.image) return itemDefLike ? itemDefLike.icon : '';
-  const cls = 'item-icon-img' + (className ? ' ' + className : '');
+  const cls = 'item-icon-img' + (className ? ' ' + className : '') + (itemDefLike.catalyst ? ' catalyst-icon' : ''); // 촉매 아이콘은 슬롯 크기에 비례해 표시(css .catalyst-icon + --catalyst-icon-ratio) — 다른 아이템에는 영향 없음
   const path = itemDefLike.equipType === 'artifact'
     ? ARTIFACT_IMAGE_DIR + itemDefLike.image + ARTIFACT_IMAGE_EXT
     : ITEM_IMAGE_DIR + itemDefLike.image + ITEM_IMAGE_EXT;
@@ -905,7 +904,7 @@ function buildMiscTooltipHtml(id){
   if(item.desc) html += `<div style="color:var(--forge-cream-dim); margin-bottom:2px;">${item.desc}</div>`;
 
   // 4. 아이템 분류
-  html += wtipRow('아이템 분류', ITEM_CLASS_LABELS[item.itemClass] || '');
+  html += wtipRow('아이템 분류', item.miscKind || ITEM_CLASS_LABELS[item.itemClass] || '');
 
   // 5. 판매 가격 — 장비 툴팁과 같은 최하단 판매 가격 블록(항목명 없이 금액+골드 아이콘, 점선 구분)
   html += tooltipSellPriceHtml(item.sellPrice, false);
@@ -1510,9 +1509,8 @@ function activeBuffListForUi(){
     .map(([id, b]) => ({ id, remainMs: b.until - now }))
     .sort((a, b) => b.remainMs - a.remainMs);
 }
-// 지금 습득할 수 있는지(레벨 조건 충족 + 포인트 충분 + 아직 미습득 + 습득 제한에 걸리지 않음). 에픽/유니크는
-// 해금 방식이 아직 구현되지 않아(비급/깨달음 소비 예정) 항상 불가로 처리 — SKILLS에 실제 항목이 등록되고
-// 해금 로직이 추가되면 이 부분만 손보면 됨.
+// 지금 습득할 수 있는지(레벨 조건 충족 + 포인트 충분 + 아직 미습득 + 습득 제한에 걸리지 않음). 기연은 비급 해금 여부로,
+// 공용/특화의 에픽·유니크는 해금 수단이 없어 항상 불가(skillGradeAllowsLearning 참고).
 // 스킬 업그레이드(요구사항 2·7번): upgradeFrom이 지정된 스킬은 기존 레벨 조건에 더해 그 upgradeFrom
 // 스킬을 실제로 보유(isSkillLearned) 중이어야만 습득 가능. upgradeFrom이 없는 스킬은 기존 방식 그대로
 // 동작(요구사항 7번, 조건 추가 없음). isSkillSupersededByUpgrade 체크는 이미 상위 스킬로 교체되어 화면에만
@@ -1690,7 +1688,7 @@ function playerDefenseIgnore(){
 // 패턴). 특정 아이템/스킬을 하드코딩하지 않고, 이미 있는 범용 함수(무기/방어구/보조/장신구 고유 옵션의
 // 고정형·성장형 statBonus, 패시브 스킬, 버프 스킬)를 'evasion'이라는 키로 그대로 재호출만 함 — 그래서
 // 앞으로 어떤 장비/아티팩트/패시브/버프든 자신의 데이터에 evasion 값을 등록하기만 하면 이 함수 수정 없이
-// 자동으로 합산됨(요구사항 8번). 지금은 실제로 evasion 값을 등록한 데이터가 하나도 없어 항상 0%.
+// 자동으로 합산됨(요구사항 8번). 현재 값이 나오는 곳은 패시브 스킬(경신술~무영보)·민첩 스탯·방어구/장신구 회피 옵션(은색 십자 목걸이, 전갈의 편린)이며, 아티팩트·버프 쪽에는 아직 값을 가진 데이터가 없음.
 function effectivePlayerEvasion(){
   const agi = ((state.stats && state.stats.agi) || 0) + artifactStatBonus('agi');
   const total = agi * 0.04 // 민첩 1당 회피 +0.04%(합연산, 스탯 효과 개편으로 신규 추가)
@@ -1709,8 +1707,8 @@ function rollEvasion(evasionPercent){
 }
 // ---- 재생력 ----
 // 회피와 완전히 동일한 패턴 — 이미 있는 범용 함수들을 'regen' 키로 그대로 재호출해 합산만 함(요구사항 10번:
-// 특정 아이템/스킬 하드코딩 금지). 지금은 실제 regen 값을 등록한 데이터가 하나도 없어 항상 0 — 다음 작업에서
-// 장비/아티팩트/패시브/버프 데이터에 evasion 값을 등록했던 것과 같은 방식으로 'regen' 값만 채우면 자동 반영됨.
+// 특정 아이템/스킬 하드코딩 금지). 현재 값이 나오는 곳은 목걸이 고유 옵션(성장형 regen)이며, 아티팩트·버프 쪽에는 아직
+// 값을 가진 데이터가 없음 — 해당 데이터에 'regen' 값만 채우면 이 함수 수정 없이 자동 반영됨.
 function effectivePlayerRegen(){
   const total = weaponUniqueOptionStatBonus('regen') + weaponUniqueOptionGrowthStat('regen')
     + armorUniqueOptionStatBonus('regen') + armorUniqueOptionGrowthStat('regen')
@@ -2389,6 +2387,46 @@ function rollStoneDrop(level){
   return { itemId: item.id, qty };
 }
 
+// ---- 촉매 전역 드랍(CATALYST_*, data.js) ----
+// 이 몬스터 등급의 촉매 드랍 판정 확률(%). 목록에 없는 등급은 0.
+function catalystDropChanceFor(monsterGrade){ return CATALYST_DROP_CHANCE[monsterGrade] || 0; }
+// 실제 처치 몬스터의 최종 레벨이 속하는 선택표 구간(없으면 null). 최소 레벨(21) 미만이면 항상 null — 추첨하지 않음.
+function catalystBracketFor(level){
+  if(!(level >= CATALYST_DROP_MIN_LEVEL)) return null;
+  return CATALYST_PICK_TABLE.find(r => level >= r.minLevel && (r.maxLevel == null || level <= r.maxLevel)) || null;
+}
+// 이 레벨 구간에서 추첨 대상인 촉매 [{ itemId, chance }] — 기타 아이템 종류가 '촉매'인 실제 아이템이고 선택 확률이 0 초과인 것만.
+function catalystCandidatesAt(level){
+  const b = catalystBracketFor(level);
+  if(!b) return [];
+  return Object.keys(b.items)
+    .filter(id => MISC_ITEMS[id] && MISC_ITEMS[id].miscKind === '촉매' && b.items[id] > 0)
+    .map(id => ({ itemId: id, chance: b.items[id] }));
+}
+// 이 레벨·몬스터 등급에서 실제로 드랍될 수 있는 촉매 id 목록(추첨 없음) — 던전 카드와 몬스터 도감의 표시용.
+function catalystPossibleItemIds(level, monsterGrade){
+  return catalystDropChanceFor(monsterGrade) > 0 ? catalystCandidatesAt(level).map(c => c.itemId) : [];
+}
+// 선택표 구간의 확률 합계가 100이 아닌 구간 목록(검증용 — 임의로 보정하지 않고 보고만 함). [{ minLevel, maxLevel, sum }]
+function catalystPickTableIssues(){
+  return CATALYST_PICK_TABLE.map(r => ({ minLevel: r.minLevel, maxLevel: r.maxLevel, sum: Object.values(r.items).reduce((s, v) => s + v, 0) }))
+    .filter(r => Math.abs(r.sum - 100) > 1e-6);
+}
+// 촉매 드랍 판정(전역 공식, 마석/플라스크 판정과 독립). 1) 몬스터 등급별 확률로 드랍 여부 판정(21레벨 미만은 판정 안 함) →
+// 2) 성공했을 때만 최종 레벨 구간의 선택표로 촉매 1종 추첨(0%는 제외, 확률을 임의로 보정하지 않음) → 3) CATALYST_DROP_QTY개 지급.
+// 실패하면 null을 반환.
+function rollCatalystDrop(level, monsterGrade){
+  if(!(level >= CATALYST_DROP_MIN_LEVEL)) return null;
+  const chance = catalystDropChanceFor(monsterGrade);
+  if(!(chance > 0) || Math.random() * 100 >= chance) return null;
+  const cands = catalystCandidatesAt(level);
+  const sum = cands.reduce((s, c) => s + c.chance, 0);
+  let r = Math.random() * 100;
+  for(const c of cands){ r -= c.chance; if(r < 0) return { itemId: c.itemId, qty: CATALYST_DROP_QTY }; }
+  // 부동소수 오차로 합계(100)에 못 미친 경우에만 마지막 후보로 마무리(표 자체를 보정하는 것이 아님 — 합계가 실제로 모자란 구간은 catalystPickTableIssues로 보고)
+  return cands.length && Math.abs(sum - 100) < 1e-6 ? { itemId: cands[cands.length - 1].itemId, qty: CATALYST_DROP_QTY } : null;
+}
+
 // 플라스크 단계(tier) 선택(전역 공식). FLASK_TIER_RULES(data.js)를 위에서부터 순서대로 검사해 몬스터
 // 레벨이 속하는 첫 구간의 tier를 반환함 — stoneBracketFor와 동일한 구간 조회 패턴을 재사용함.
 function pickFlaskTier(level){
@@ -2445,7 +2483,9 @@ function normalMonsterHP(level){
 }
 function monsterHPFor(monsterDef, level){
   const base = normalMonsterHP(level);
-  const gradeApplied = monsterDef.grade === 'epic' ? Math.round(base * 3) : base;
+  // 등급 체력 배율(MONSTER_GRADE_HP_MULT: 일반 1 / 에픽 3 / 유니크 4)을 먼저 적용한 뒤 몬스터별 hpMult를 한 번 적용
+  const gradeMult = MONSTER_GRADE_HP_MULT[monsterDef.grade] != null ? MONSTER_GRADE_HP_MULT[monsterDef.grade] : 1;
+  const gradeApplied = gradeMult === 1 ? base : Math.round(base * gradeMult);
   return Math.round(gradeApplied * (monsterDef.hpMult != null ? monsterDef.hpMult : 1));
 }
 // 몬스터 공격력: 플레이어가 레벨업마다 힘 1포인트를 투자한다고 가정했을 때의 예상 체력을 기준으로,
@@ -2458,8 +2498,16 @@ function monsterAtk(level){
 
 function monsterAtkFor(monsterDef, level){
   const base = monsterAtk(level);
-  const gradeApplied = monsterDef.grade === 'epic' ? Math.round(base * 1.3) : base;
+  // 등급 공격력 배율(MONSTER_GRADE_ATK_MULT: 일반 1.0 / 에픽 1.3 / 유니크 1.5)을 먼저 적용한 뒤 몬스터별 atkMult를 한 번 적용(공격 속도는 등급 배율 없음)
+  const gradeMult = MONSTER_GRADE_ATK_MULT[monsterDef.grade] != null ? MONSTER_GRADE_ATK_MULT[monsterDef.grade] : 1;
+  const gradeApplied = gradeMult === 1 ? base : Math.round(base * gradeMult);
   return Math.round(gradeApplied * (monsterDef.atkMult != null ? monsterDef.atkMult : 1));
+}
+// 몬스터 처치 경험치의 "기본값" — 레벨별 기본 경험치에 등급 경험치 배율(일반 1.0 / 에픽 1.1 / 유니크 1.2)을 적용. 이 뒤에 기존 보정(사망 저주 → 레벨 차이 보정)이 순서대로 이어짐.
+function monsterExpFor(monsterDef, level){
+  const base = monsterExp(level);
+  const gradeMult = MONSTER_GRADE_EXP_MULT[monsterDef.grade] != null ? MONSTER_GRADE_EXP_MULT[monsterDef.grade] : 1;
+  return gradeMult === 1 ? base : Math.round(base * gradeMult);
 }
 
 // ---- 레벨 차이 보정 ----
@@ -2972,10 +3020,10 @@ function resolveDrops(monsterDef, dungeon, level, options){
 
   const stoneDrop = rollStoneDrop(level); // { itemId, qty } 또는 null(전역 공식 — 실제 처치 몬스터의 최종 레벨 기준, 몬스터 등급·던전별 개별 설정 없음)
   const flaskDrop = rollFlaskDrop(level); // { itemId, qty } 또는 null(전역 공식, 마석 드랍과 완전히 독립적으로 판정)
+  const catalystDrop = rollCatalystDrop(level, grade); // { itemId, qty } 또는 null(전역 공식 — 몬스터 등급으로 드랍 여부, 최종 레벨로 종류 결정. 마석/플라스크와 독립)
 
   // drops 중 artifactId가 있는 항목은 각 항목마다 독립적으로 확률을 판정함(재료류 미스크 드랍과 동일한
-  // 원칙). 과거엔 몬스터마다 아티팩트 드랍 항목이 최대 1개뿐이라 첫 성공에서 멈춰도 차이가 없었지만,
-  // 이제 한 몬스터가 아티팩트 드랍을 여러 개 가질 수 있어 전부 독립 판정하도록 배열로 변경함.
+  // 원칙). 한 몬스터가 아티팩트 드랍을 여러 개 가질 수 있어 전부 독립 판정하도록 배열로 모음.
   const artifactDropIds = [];
   for(const drop of (monsterDef.drops || [])){
     if(drop.artifactId && canGrantArtifact(drop.artifactId) && Math.random() * 100 < drop.chance){
@@ -3039,7 +3087,7 @@ function resolveDrops(monsterDef, dungeon, level, options){
   // options.skipScroll로 판정 자체를 건너뜀(호출부인 killMonsterInstance가 hunt.scrollGrantedThisBattle로 전달).
   const scrollDrop = options.skipScroll ? null : rollScrollDrop(level);
 
-  return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, artifactDropIds, miscDrops, scrollDrop };
+  return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, catalystDrop, artifactDropIds, miscDrops, scrollDrop };
 }
 
 // ---- 던전 전투 종료 보상창의 "획득 아이템" 아이콘 그리드 표시용 데이터 ----
@@ -3149,7 +3197,6 @@ function hasBatchim(word){
   return code % 28 !== 0;
 }
 function josaIGa(word){ return hasBatchim(word) ? '이' : '가'; }
-function josaEulReul(word){ return hasBatchim(word) ? '을' : '를'; }
 function josaWaGwa(word){ return hasBatchim(word) ? '과' : '와'; }
 
 // ---- 던전 스테이지 시스템: 메시지 생성 ----
@@ -3170,46 +3217,47 @@ function pickEncounterMessage(monsterName){
   const josa = entry.josaType === 'wagwa' ? josaWaGwa(monsterName) : josaIGa(monsterName);
   return entry.text.replace('{name}', monsterName).replace('{josa}', josa);
 }
-// 스테이지 번호를 기준으로 몬스터 등급(일반/에픽)을 추첨(STAGE_GRADE_CHANCE, data.js 전역 설정).
+// 스테이지 번호를 기준으로 몬스터 등급 구분(일반 'normal' / 에픽 이상 'elite')을 추첨(STAGE_GRADE_CHANCE, data.js 전역 설정).
+// 'elite'가 나오면 실제 몬스터는 그 던전에 등록된 에픽 이상 몬스터 중에서 pickEpicMonsterId가 결정함.
 function pickStageGrade(stageNum){
-  const chance = STAGE_GRADE_CHANCE[stageNum] || { normal: 100, epic: 0 };
-  return Math.random() * 100 < chance.epic ? 'epic' : 'normal';
+  const chance = STAGE_GRADE_CHANCE[stageNum] || { normal: 100, elite: 0 };
+  return Math.random() * 100 < chance.elite ? 'elite' : 'normal';
 }
 // 전투 시작 시 등장할 몬스터 수(1~MONSTER_COUNT_MAX)를 스테이지 기준으로 추첨.
-// 5·10 스테이지도 이 확률표(MONSTER_COUNT_CHANCE)를 동일하게 그대로 사용함 — 예전에는 이 스테이지에서
-// 무조건 1마리만 반환하도록 별도 처리했지만, "에픽 몬스터 1마리 확정 출현 + 남은 슬롯은 기존 몬스터 수
-// 확률로 추가 추첨"으로 방식이 바뀌면서, 그 "확정 출현 1마리"는 여기가 아니라 pickStageMonsterGrades
-// 쪽에서 이미 보장하고 있어(STAGE_GRADE_CHANCE가 5·10에서 epic:100이라 첫 마리는 항상 에픽으로 뽑히고,
-// 이후 마리는 epicUsed 플래그로 강제 일반 처리됨) 이 함수는 그냥 매 스테이지 동일한 로직만 타면 됨.
+// 5·10 스테이지도 이 확률표(MONSTER_COUNT_CHANCE)를 동일하게 그대로 사용함. "에픽 몬스터 1마리 확정 출현 + 남은 슬롯은
+// 몬스터 수 확률로 추가 추첨" 구조에서 확정 출현 1마리는 이 함수가 아니라 pickStageMonsterGrades가 보장함
+// (STAGE_GRADE_CHANCE가 5·10에서 epic:100이라 첫 마리는 항상 에픽으로 뽑히고, 이후 마리는 epicUsed 플래그로
+// 강제 일반 처리됨) — 그래서 이 함수는 매 스테이지 동일한 로직만 타면 됨.
 function pickMonsterCount(stageNum){
   const pairs = Object.entries(MONSTER_COUNT_CHANCE).map(([count, chance]) => [Number(count), chance]);
   return pickWeighted(pairs);
 }
-// 몬스터 개체 수(pickMonsterCount 결과)만큼 등급(일반/에픽)을 순서대로 결정.
-// 에픽 등급은 한 전투 그룹에 최대 1마리만 허용되므로, 먼저 에픽이 결정되면 그 이후 등장분은
-// 등급 추첨 없이 전부 일반 등급으로 고정함(기존 pickStageGrade 확률 공식 자체는 그대로 사용).
+// 몬스터 개체 수(pickMonsterCount 결과)만큼 등급 구분(일반/에픽 이상)을 순서대로 결정.
+// 에픽 이상 몬스터는 한 전투 그룹에 최대 1마리만 허용되므로, 먼저 elite가 결정되면 그 이후 등장분은
+// 등급 추첨 없이 전부 일반으로 고정함(기존 pickStageGrade 확률 공식 자체는 그대로 사용).
 function pickStageMonsterGrades(stageNum, count){
   const grades = [];
-  let epicUsed = false;
+  let eliteUsed = false;
   for(let i = 0; i < count; i++){
-    if(epicUsed){
+    if(eliteUsed){
       grades.push('normal');
       continue;
     }
     const grade = pickStageGrade(stageNum);
-    if(grade === 'epic') epicUsed = true;
+    if(grade === 'elite') eliteUsed = true;
     grades.push(grade);
   }
   return grades;
 }
-// 에픽 몬스터 출현이 결정된 이후, 이 던전(dungeon)의 등록된 에픽 몬스터 중 이번 굴(stageNum)에
-// 실제로 어떤 몬스터가 등장할지 결정. 에픽 몬스터 출현 여부 자체(pickStageGrade)는 이 함수와 무관하며 전혀 변경되지 않음.
+// 에픽 이상(에픽·유니크) 몬스터 출현이 결정된 이후, 이 던전(dungeon)에 등록된 에픽 이상 몬스터 중 이번 굴(stageNum)에
+// 실제로 어떤 몬스터가 등장할지 결정(던전에 등록된 몬스터만 후보). 출현 여부 자체(pickStageGrade)는 이 함수와 무관하며 전혀 변경되지 않음.
+// 유니크 몬스터도 에픽과 같은 필드(epicSpawnStages / epicSpawnWeight)로 굴 제한·가중치를 지정함.
 // 우선순위: ①이 굴에서 등장 가능한 에픽 몬스터만 남김(monsterDef.epicSpawnStages에 stageNum이 없으면 제외,
 // epicSpawnStages 필드가 아예 없으면 모든 굴에서 등장 가능) → ②남은 후보가 전부 monsterDef.epicSpawnWeight를
 // 갖고 있으면 그 가중치로 추첨(pickWeighted 재사용) → ③하나라도 가중치가 없으면 남은 후보를 동일 확률로 추첨.
 // 에픽 몬스터가 1종만 등록된 던전은 후보가 1개뿐이라 추첨 없이 그 몬스터를 그대로 반환(기존 동작과 완전히 동일).
 function pickEpicMonsterId(dungeon, stageNum){
-  const allEpic = dungeon.monsters.filter(id => MONSTERS[id].grade === 'epic');
+  const allEpic = dungeon.monsters.filter(id => MONSTER_ELITE_GRADES.includes(MONSTERS[id].grade)); // 에픽 이상(에픽·유니크)
   if(allEpic.length <= 1) return allEpic[0];
   let candidates = allEpic.filter(id => {
     const stages = MONSTERS[id].epicSpawnStages;
@@ -3230,23 +3278,6 @@ function rollTreasureGold(minLevel){
   const base = monsterGoldBase(minLevel) * TREASURE_GOLD_MULT;
   const spread = base * TREASURE_GOLD_VARIANCE;
   return Math.round(base - spread + Math.random() * spread * 2);
-}
-
-// ---- 표시용 포맷 ----
-// "10 → 21(11↑)" 형식으로 증가폭을 함께 표시. 변동이 없으면 괄호를 생략.
-function formatStatDelta(now, next, decimals, suffix){
-  suffix = suffix || '';
-  const fmt = v => decimals != null ? v.toFixed(decimals) : String(v);
-  if(next === null) return fmt(now) + suffix;
-  const delta = next - now;
-  const eps = decimals != null ? Math.pow(10, -decimals) / 2 : 0;
-  let out = fmt(now) + suffix + ' → ' + fmt(next) + suffix;
-  if(delta > eps){
-    out += `<span class="stat-up">(${fmt(delta)}${suffix}↑)</span>`;
-  } else if(delta < -eps){
-    out += `<span class="stat-down">(${fmt(Math.abs(delta))}${suffix}↓)</span>`;
-  }
-  return out;
 }
 
 function tierOf(level){
@@ -3273,10 +3304,8 @@ function focusAdjustedOdds(baseOdds, focusActive){
   return [success, stay, destroy];
 }
 
-// 보호의 기도 보정(6단계 개편): 기존엔 강화 결과가 '파괴'로 나온 뒤에 사후적으로 '유지'로 가로채는
-// 방식이었으나, 이제는 강화를 시도하기 "전에" 확률표 자체에서 파괴 확률을 30% 낮추고(=70%로 감소),
-// 줄어든 만큼을 그대로 유지 확률에 더하는 방식으로 바뀜 — 이후에는 이 조정된 확률표를 기준으로
-// 기존과 동일한 성공/유지/파괴 처리 로직(weightedOutcome 등)을 그대로 사용함(결과를 가로채지 않음).
+// 보호의 기도 보정: 강화를 시도하기 "전에" 확률표 자체에서 파괴 확률을 30% 낮추고(=70%로 감소), 줄어든 만큼을
+// 유지 확률에 더함. 이후에는 이 조정된 확률표를 기준으로 성공/유지/파괴 처리 로직(weightedOutcome 등)을 그대로 사용함.
 function blessingAdjustedOdds(baseOdds, blessingActive){
   if(!baseOdds) return baseOdds;
   if(!blessingActive) return baseOdds.slice();
@@ -3292,15 +3321,18 @@ function blessingAdjustedOdds(baseOdds, blessingActive){
 // 사후 결과 가로채기가 아니라 확률표 자체를 바꾸는 방식이라, 화면 표시와 실제 판정이 완전히 같은
 // 값을 쓰게 됨(예전처럼 "표시용으로만 접어서 보여주는" 별도 처리가 필요 없어짐). null-safe.
 function effectivePrayerOdds(type, level){
+  if(forgeEnhOddsLock) return forgeEnhOddsLock.slice(); // 강화 진행 중에는 시도 시작 시점의 확률을 그대로 유지(촉매 소모로 표시가 바뀌지 않게, catalyst.js)
   const base = oddsFor(type, level);
   if(!base) return null;
   const afterBlessing = blessingAdjustedOdds(base, state.blessingActive);
-  return focusAdjustedOdds(afterBlessing, state.focusActive);
+  const afterFocus = focusAdjustedOdds(afterBlessing, state.focusActive);
+  // 촉매 모드: 기도는 적용되지 않으므로(모드 전환 시 해제됨) 위 결과는 기본 확률 그대로이고, 그 위에 촉매 효과(강화석 성공 확률/소생석 파괴 확률)를 반영함
+  if(state.forgeMode === 'catalyst') return catalystAdjustedOdds(afterFocus, catalystEnhancePlan(type, level), catalystEnhanceCtx(type, level));
+  return afterFocus;
 }
 
-// 화면에 "표시"할 확률 — 이제 실제 판정에 쓰이는 확률(effectivePrayerOdds)과 완전히 동일함(보호가
-// 더 이상 결과를 사후에 가로채지 않고 확률표 자체를 바꾸기 때문). 기존 호출부(render.js)를 그대로
-// 유지하기 위해 함수 자체는 남겨두되, 내부에서는 단순히 위임만 함.
+// 화면에 "표시"할 확률 — 실제 판정에 쓰이는 확률(effectivePrayerOdds)과 완전히 동일함(보호가 결과를
+// 가로채지 않고 확률표 자체를 바꾸기 때문). 기존 호출부(render.js)용으로 내부에서는 위임만 함.
 function displayEnhanceOdds(type, level){
   return effectivePrayerOdds(type, level);
 }
@@ -3349,7 +3381,7 @@ function fmtOddsNum(n){
 }
 
 // ---- 강화 결과 추첨 ----
-// 2단계 강화 확률 개편으로 하락 결과가 완전히 삭제되어, 이제 성공/유지/파괴 3가지 결과만 존재함.
+// 결과는 성공/유지/파괴 3가지뿐임(하락 없음).
 function weightedOutcome(odds){
   const r = Math.random()*100;
   if(r < odds[0]) return 'success';
@@ -3359,12 +3391,23 @@ function weightedOutcome(odds){
 
 // ---- 제작소: 제작 아이템/재료 공용 헬퍼 ----
 // iconType/iconRef로 등록된 기존 아이템 아이콘을 그대로 재사용해서 렌더링함(신규 제작 전용 이미지 없음).
-function craftItemIconHtml(item, className){
-  if(item.iconType === 'weapon' || item.iconType === 'accessory') return weaponIconHtml(item.iconRef, className); // weaponIconHtml은 무기/방어구/장신구 공용
-  return ''; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
+// 비장비 제작 아이템(소비/재료/마석)이 가리키는 기존 아이템 정의 — iconType 'consumable'은 CONSUMABLES, 그 외('misc'/'stone')는 MISC_ITEMS에서 iconRef로 조회.
+function craftItemDef(item){
+  if(!item || CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)) return null;
+  return (item.iconType === 'consumable' ? CONSUMABLES : MISC_ITEMS)[item.iconRef] || null;
 }
-// 제작 아이템 이름/아이콘 테두리 색상 — 기존 무기 등급 색상 공식(WEAPON_GRADES)을 그대로 재사용.
+function craftItemIconHtml(item, className){
+  if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)) return weaponIconHtml(item.iconRef, className); // weaponIconHtml은 무기/방어구/장신구/보조 공용
+  const def = craftItemDef(item);
+  return def ? itemIconHtml(def, className) : ''; // 소비/재료/마석은 기존 아이템 아이콘 그대로
+}
+// 제작 아이템 이름/아이콘 테두리 색상 — 장비는 기존 무기 등급 색상 공식(WEAPON_GRADES), 비장비는 해당 아이템의 기존 색상 규칙을 그대로 재사용.
 function craftItemNameColor(item){
+  const def = craftItemDef(item);
+  if(def){
+    if(item.iconType === 'consumable'){ const g = WEAPON_GRADES[item.grade || def.grade]; return g ? g.color : '#ffffff'; }
+    return def.itemClass === 'stone' ? stoneNameColor(def.id) : miscNameColor(def.id);
+  }
   const g = WEAPON_GRADES[item.grade];
   return g ? g.color : '#ffffff';
 }
@@ -3373,7 +3416,12 @@ function craftItemNameColor(item){
 function craftItemTooltipHtml(item){
   if(item.iconType === 'weapon') return buildWeaponTooltipHtml(item.iconRef, 0);
   if(item.iconType === 'accessory') return buildAccessoryTooltipHtml(item.iconRef, 0); // 장신구 툴팁 그대로 재사용(+0, 내구도 최대)
-  return ''; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
+  if(item.iconType === 'armor') return buildArmorTooltipHtml(item.iconRef, 0);
+  if(item.iconType === 'sub') return buildSubTooltipHtml(item.iconRef, 0);
+  if(item.iconType === 'consumable') return buildConsumableTooltipHtml(item.iconRef);
+  const def = craftItemDef(item);
+  if(def) return def.itemClass === 'stone' ? buildStoneTooltipHtml(def.id) : buildMiscTooltipHtml(def.id); // 재료/마석 툴팁 그대로 재사용
+  return '';
 }
 function findCraftItem(category, id){
   return (CRAFTABLE_ITEMS[category] || []).find(it => it.id === id);
@@ -3383,8 +3431,81 @@ function findCraftItem(category, id){
 // 실제 장비 데이터의 levelReq를 그대로 조회 — craftItemIconHtml/craftItemTooltipHtml과 동일한 분기
 // 구조라 iconType이 늘어나면 여기에도 같은 방식으로 분기만 추가하면 됨.
 function craftItemLevelReq(item){
-  if(item.iconType === 'weapon' || item.iconType === 'accessory') return wpn(item.iconRef).levelReq || 0;
-  return 0; // 다른 iconType이 추가되면 여기에 분기만 추가하면 됨
+  if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)) return wpn(item.iconRef).levelReq || 0;
+  return 0; // 비장비(소비/재료/마석)는 착용 제한 레벨이 없음
+}
+// 비장비 제작 아이템 정규화 — name/grade를 생략한 항목은 참조한 기존 아이템(CONSUMABLES/MISC_ITEMS)의 이름·등급으로 채우고, 성공 확률·비용·재료 기본값을 보정함.
+// 데이터(data.js)가 formulas.js보다 먼저 로드되므로 여기서 한 번 실행하면 이후 코드는 장비 제작 아이템과 똑같이 item.name/item.grade를 읽을 수 있음.
+function craftNormalizeNonEquipItems(){
+  Object.keys(CRAFTABLE_ITEMS).forEach(cat => {
+    CRAFTABLE_ITEMS[cat].forEach(item => {
+      const def = craftItemDef(item);
+      if(!def) return;
+      if(item.name == null) item.name = def.name;
+      if(item.grade == null) item.grade = def.grade || 'normal';
+      if(item.successChance == null) item.successChance = 100;
+      if(item.craftCost == null) item.craftCost = 0;
+      if(!Array.isArray(item.materials)) item.materials = [];
+    });
+  });
+}
+craftNormalizeNonEquipItems();
+
+// 장비 제작 아이템 제작 비용 자동 계산 — 제작 비용 = 기본 판매 가격 × max(기본 제작 성공 확률, 30)% 의 100 미만 버림.
+// 기본 판매 가격은 강화 단계·내구도가 반영되지 않은 데이터상의 기본값(restoreBaseSellPrice)을, 성공 확률은 데이터의 기본 successChance를 쓰므로
+// 제작 천장으로 실제 성공 확률이 일시적으로 100%가 돼도 비용은 변하지 않음. 장비 여부는 iconType(CRAFT_EQUIP_ICON_TYPES)으로만 판별하며,
+// 비장비 제작 아이템의 craftCost는 건드리지 않음. 결과를 item.craftCost에 한 번 채워 두므로 화면 표시·가능 여부·골드 차감이 모두 같은 값을 읽음.
+function craftEquipCostFor(item){
+  const price = restoreBaseSellPrice(item.iconRef);
+  const chance = Math.max(Number(item.successChance) || 0, 30);
+  return Math.floor((price * chance / 100) / 100) * 100;
+}
+function craftNormalizeEquipCosts(){
+  Object.keys(CRAFTABLE_ITEMS).forEach(cat => {
+    CRAFTABLE_ITEMS[cat].forEach(item => {
+      if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)) item.craftCost = craftEquipCostFor(item);
+    });
+  });
+}
+craftNormalizeEquipCosts();
+
+// ---- 제작소: 비장비(소비/재료/마석) 제작 개수 계산 (개수 설정·재료/골드 계산·제작 가능 여부. 반복 제작 실행은 craft_multi.js) ----
+// 장비 제작은 항상 1회 기준(이 함수들이 개수를 무시하고 1을 돌려줌). 데이터의 모든 재료·골드·촉매 수량은 "아이템 1개 제작 기준"이며 총량 = 1개 기준 × 제작 개수.
+function craftItemIsMulti(item){
+  return !!item && !CRAFT_EQUIP_ICON_TYPES.includes(item.iconType);
+}
+function craftPopupQty(popup, item){
+  const it = item || (popup ? findCraftItem(popup.category, popup.itemId) : null);
+  if(!craftItemIsMulti(it)) return 1;
+  const n = Math.floor(Number(popup && popup.qty));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, CRAFT_QTY_HARD_MAX) : 1;
+}
+function craftTotalCost(item, qty){ return (item.craftCost || 0) * qty; }
+// 현재 보유 재료·골드로 만들 수 있는 최대 개수 — 모든 재료와 골드 조건을 동시에 만족하는 개수 중 최솟값. 일반 재료는 보유 수량, 장비 재료는 슬롯에 등록해 둔 유효한 장비 개수 기준.
+function craftMaxCount(popup){
+  const item = popup ? findCraftItem(popup.category, popup.itemId) : null;
+  if(!item) return 0;
+  if(!craftItemIsMulti(item)) return 1;
+  let max = CRAFT_QTY_HARD_MAX;
+  item.materials.forEach(m => {
+    if(!(m.need > 0)) return;
+    const resource = findCraftResource(m.name);
+    let owned = 0;
+    if(resource){
+      if(craftResourceIsAutoMaterial(resource)) owned = craftResourceOwnedCount(resource);
+      else owned = craftSlotValidPicks((popup.slots || []).find(s => s.name === m.name), resource).length;
+    }
+    max = Math.min(max, Math.floor(owned / m.need));
+  });
+  const cost = item.craftCost || 0;
+  if(cost > 0) max = Math.min(max, Math.floor(state.gold / cost));
+  return Math.max(0, max);
+}
+// 팝업의 제작 개수를 1 ~ 최대 제작 가능 개수(최대가 0이어도 최소 1) 범위로 보정해 반환
+function craftClampQty(popup, qty){
+  const max = Math.max(1, craftMaxCount(popup));
+  const n = Math.floor(Number(qty));
+  return Math.min(max, Number.isFinite(n) && n >= 1 ? n : 1);
 }
 
 // ---- 제작소: 이름 기반 자원(재료/반환 아이템) 조회(요청사항 1·2번) ----
@@ -3578,7 +3699,7 @@ function craftAnimResultIconsHtml(item, success, resultReturn){
 function craftGrantResultItems(item){
   if(!craftAnim) return;
   if(craftAnim.resultSuccess){
-    if(item.iconType === 'weapon' || item.iconType === 'accessory'){
+    if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)){
       const wdef = wpn(item.iconRef);
       grantRelicEquipDrop({ type: item.iconRef, level: 0, equipType: wdef.equipType }); // equipType 'weapon'/'accessory'에 맞는 인벤토리로 지급
     }
@@ -3625,15 +3746,16 @@ function craftPopupCanCraft(popup){
   if(!popup) return false;
   const item = findCraftItem(popup.category, popup.itemId);
   if(!item) return false;
+  const qty = craftPopupQty(popup, item); // 장비 제작은 항상 1, 비장비는 설정한 제작 개수(재료·골드는 1개 기준 × 개수)
   const materialsOk = item.materials.every(m => {
     // 일반 재료: 슬롯 등록과 무관하게 "현재 보유 수량 >= 필요 수량"이면 충족(실제 소모는 openCraftAnim에서 기존 그대로)
     const resource = findCraftResource(m.name);
-    if(craftResourceIsAutoMaterial(resource)) return craftResourceOwnedCount(resource) >= m.need;
+    if(craftResourceIsAutoMaterial(resource)) return craftResourceOwnedCount(resource) >= m.need * qty;
     // 장비 재료: 사용자가 직접 선택해 등록한 실제 장비 인스턴스가 필요 개수만큼 있어야 함(지금도 재료 조건을 만족하는 것만 인정)
     const slot = popup.slots.find(s => s.name === m.name);
-    return !!slot && craftSlotValidPicks(slot, resource).length === m.need;
+    return !!slot && craftSlotValidPicks(slot, resource).length >= m.need * qty;
   });
-  const goldOk = state.gold >= (item.craftCost || 0);
+  const goldOk = state.gold >= craftTotalCost(item, qty);
   return materialsOk && goldOk && !craftResultInventoryBlock(item);
 }
 // ---- 제작소 새 메뉴용 보조 함수(craft_menu.js) — 기존 제작 판정/데이터를 그대로 재사용하고 새 조건은 만들지 않음 ----
@@ -3643,6 +3765,7 @@ const CRAFT_KIND_SOURCES = {
   weapon:    { table: () => WEAPON_TYPES,    kindOf: d => d.weaponKind,    labels: () => WEAPON_KINDS },
   armor:     { table: () => ARMOR_TYPES,     kindOf: d => d.armorKind,     labels: () => ARMOR_KINDS },
   sub:       { table: () => SUB_TYPES,       kindOf: d => d.subKind,       labels: () => SUB_KINDS },
+  shoes:     { table: () => ARMOR_TYPES,     kindOf: d => d.armorKind,     labels: () => ARMOR_KINDS },
   accessory: { table: () => ACCESSORY_TYPES, kindOf: d => d.accessoryKind, labels: () => ACCESSORY_KINDS },
 };
 function craftItemKind(category, item){
@@ -3672,6 +3795,7 @@ function craftItemCanCraft(category, item){
 // 누적 실패 횟수는 state.craftPity[아이템 id]에 아이템별로 따로 저장됨. 예) pityLimit 7: 1~7번째 제작에서 실패할 때마다 +1,
 // 7번 실패해 7/7이 되면 다음(8번째) 제작은 성공 확률 100% → 성공하면 0/7로 초기화.
 function craftPityLimit(item){
+  if(craftItemIsMulti(item)) return 0; // 비장비(소비/재료/마석) 제작에는 천장을 적용하지 않음
   const n = item && item.pityLimit;
   return Number.isInteger(n) && n > 0 ? n : 0;
 }
@@ -3703,7 +3827,7 @@ function craftPityRecordResult(item, success){
 // 결과물이 지급되지 못함). 제작 시작 때 소모되는 장비 재료는 인벤토리에서 빠지므로 그만큼의 슬롯은 비는 것으로 계산함.
 // 제작 아이템은 모두 장비(무기/방어구/보조/장신구)라 장비 카테고리로 판단함(iconType이 늘어나면 여기에 분기 추가).
 function craftResultInventoryBlock(item){
-  if(item.iconType !== 'weapon' && item.iconType !== 'accessory') return null;
+  if(craftItemIsMulti(item)) return craftMultiSpaceBlock(item); // 비장비 제작: 결과(제작 아이템/반환 아이템)를 안전하게 받을 수 있는지(craft_multi.js)
   const freed = item.materials.reduce((sum, m) => {
     const resource = findCraftResource(m.name);
     return sum + (resource && resource.kind === 'equip' ? m.need : 0);

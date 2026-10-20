@@ -218,13 +218,14 @@ function createMonsterInstance(dungeon, grade){
   };
 }
 // 주어진 등급에 해당하는 이 던전의 몬스터 종류 중 하나를 결정.
-// - 에픽 등급: 이 던전에 등록된 에픽 몬스터가 2종 이상이면 pickEpicMonsterId로 굴 제한/개별 확률을 적용해 결정,
+// - 에픽 이상(elite): 이 던전에 등록된 에픽·유니크 몬스터가 2종 이상이면 pickEpicMonsterId로 굴 제한/개별 확률을 적용해 결정,
 //   1종뿐이면 그 몬스터를 그대로 반환(추가 로직 없이 기존 동작과 동일).
 // - 일반 등급 및 그 외: 기존과 동일하게 균등 추첨.
 // 해당 등급 몬스터가 이 던전에 하나도 없으면(예: 다람쥐굴처럼 에픽 몬스터가 없는 던전) 등급 제한 없이 폴백.
 function pickSpawnMonsterOfGrade(dungeon, grade){
-  let candidates = dungeon.monsters.filter(id => MONSTERS[id].grade === grade);
-  if(grade === 'epic' && candidates.length > 0) return pickEpicMonsterId(dungeon, hunt.stage);
+  // grade: 'normal'(일반) 또는 'elite'(에픽 이상 — 이 던전에 등록된 에픽·유니크 몬스터)
+  let candidates = dungeon.monsters.filter(id => grade === 'elite' ? MONSTER_ELITE_GRADES.includes(MONSTERS[id].grade) : MONSTERS[id].grade === grade);
+  if(grade === 'elite' && candidates.length > 0) return pickEpicMonsterId(dungeon, hunt.stage);
   if(candidates.length === 0) candidates = dungeon.monsters; // 이 던전에 해당 등급 몬스터가 아예 없으면(예: 에픽 없는 던전) 등급 제한 없이 폴백
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
@@ -710,6 +711,16 @@ function killMonsterInstance(instanceId){
       dropVisualItems.push({ kind: 'item', itemId: result.stoneDrop.itemId });
     } else hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true;
   }
+  if(result.catalystDrop){
+    // 촉매는 기타 아이템(마석과 달리 itemClass 'misc')이라 기타 아이템 지급 로직(grantMiscStack)과 보상창의 기타 목록(miscDrops)을 그대로 씀.
+    const item = MISC_ITEMS[result.catalystDrop.itemId];
+    if(grantMiscStack(item, result.catalystDrop.qty)){
+      const r = hunt.pendingRewards.miscDrops;
+      if(!r[item.id]) r[item.id] = { icon: item.icon, name: item.name, qty: 0 };
+      r[item.id].qty += result.catalystDrop.qty;
+      dropVisualItems.push({ kind: 'item', itemId: item.id });
+    } else hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true;
+  }
   if(result.flaskDrop){
     // 플라스크는 마석(state[item.stateKey])과 달리 소비 아이템 전용 보유 수량 저장소(state.consumables)를
     // 사용함 — 상점 구매/사용(actions.js) 등 기존 플라스크 지급 로직과 완전히 동일한 방식으로 지급.
@@ -746,7 +757,7 @@ function killMonsterInstance(instanceId){
   // 실제 지급이 전부 끝난 뒤, 그 결과를 그대로 보여주기만 하는 연출 호출(연출 성패는 위 지급 로직과 완전히 무관함).
   playMonsterDropEffect(instanceId, dropVisualItems);
 
-  let expGained = monsterExp(level);
+  let expGained = monsterExpFor(monsterDef, level); // 레벨별 기본 경험치 × 등급 배율 → 아래 사망 저주 → 레벨 차이 보정 순서(기존 보정 순서 유지)
   if(curseActive) expGained = Math.round(expGained * DEATH_CURSE_MULTIPLIER);
   expGained = applyRewardLevelPenalty(expGained, state.playerLevel, level); // 최종 경험치가 정해진 뒤 마지막 단계(골드와 같은 보정, gainExp 호출 전의 플레이어 레벨 기준)
   const levelsGained = gainExp(expGained);
@@ -904,7 +915,7 @@ function openTreasureStage(){
   hunt.started = false;
   renderHunt();
 }
-// 보물 상자 클릭: 1초 흔들림 애니메이션 후 파괴되며 보상 지급(골드 확정 지급 + 모험가의 유해/마석은 기존 전역 드랍 공식 그대로 적용되어 드랍되지 않을 수도 있음)
+// 보물 상자 클릭: 1초 흔들림 애니메이션 후 파괴되며 보상 지급(골드 확정 지급 + 모험가의 유해/마석/촉매는 기존 전역 드랍 공식 그대로 적용되어 드랍되지 않을 수도 있음)
 function clickTreasureChest(){
   if(hunt.chestOpened || hunt.stage !== DUNGEON_TREASURE_STAGE) return;
   hunt.chestOpened = true;
@@ -940,7 +951,7 @@ function anyEquipInventoryFull(){
 }
 
 // 던전의 최소 레벨(가장 낮은 등장 몬스터 레벨) 기준으로 보상을 산정해 지급.
-// 골드는 확정 지급(×5, ±25%)이고, 모험가의 유해/마석은 각각의 전역 드랍 확률을 그대로 적용하므로 드랍되지 않을 수도 있음.
+// 골드는 확정 지급(×5, ±25%)이고, 모험가의 유해/마석/촉매는 각각의 전역 드랍 확률을 그대로 적용하므로 드랍되지 않을 수도 있음.
 function grantTreasureRewards(){
   const minLevel = dungeonLevelRange(hunt.dungeon).min;
   const gold = rollTreasureGold(minLevel);
@@ -963,7 +974,14 @@ function grantTreasureRewards(){
     const item = MISC_ITEMS[stoneDrop.itemId];
     if(!grantMiscStack(item, stoneDrop.qty)){ stoneDrop = null; fullCategories[miscItemCategory(item)] = true; }
   }
-  // 숨겨진 장소 전용 기타 아이템 추첨 — 위 골드/모험가의 유해/마석과 완전히 독립적인 별도 판정
+  // 촉매 드랍 — 모험가의 유해/마석과 같은 전역 공식(rollCatalystDrop)을 던전 최소 레벨 기준으로 1회 판정(TREASURE_CATALYST_GRADE 등급의 확률).
+  // 촉매는 기타 아이템이라 기타 아이템 지급 로직(grantMiscStack)을 그대로 쓰고, 가득 차면 몬스터 처치 때와 같이 해당 카테고리 안내만 남기고 무산됨.
+  let catalystDrop = rollCatalystDrop(minLevel, TREASURE_CATALYST_GRADE);
+  if(catalystDrop){
+    const item = MISC_ITEMS[catalystDrop.itemId];
+    if(!grantMiscStack(item, catalystDrop.qty)){ catalystDrop = null; fullCategories[miscItemCategory(item)] = true; }
+  }
+  // 숨겨진 장소 전용 기타 아이템 추첨 — 위 골드/모험가의 유해/마석/촉매와 완전히 독립적인 별도 판정
   // (rollTreasureMiscDrop 자체가 기존 전역 드랍 공식과 무관한 로직이라 서로 영향을 주지 않음).
   let miscDrop = rollTreasureMiscDrop(minLevel);
   if(miscDrop){
@@ -973,7 +991,7 @@ function grantTreasureRewards(){
 
   render();
   saveState();
-  return { gold, weaponDrop, stoneDrop, miscDrop, scrollDrop, fullCategories };
+  return { gold, weaponDrop, stoneDrop, catalystDrop, miscDrop, scrollDrop, fullCategories };
 }
 function openTreasureResultModal(result){
   // 11스테이지 보상(gold/weaponDrop/stoneDrop/miscDrop/scrollDrop)을 던전 누적 보상(hunt.pendingRewards)에 합산한 뒤,
@@ -987,6 +1005,11 @@ function openTreasureResultModal(result){
     const m = MISC_ITEMS[result.miscDrop.itemId];
     if(!r.miscDrops[result.miscDrop.itemId]) r.miscDrops[result.miscDrop.itemId] = { icon: m.icon, name: m.name, qty: 0 };
     r.miscDrops[result.miscDrop.itemId].qty += result.miscDrop.qty;
+  }
+  if(result.catalystDrop){ // 촉매는 기타 아이템 목록(miscDrops)에 합산(몬스터 처치 시 촉매와 같은 표시 방식)
+    const c = MISC_ITEMS[result.catalystDrop.itemId];
+    if(!r.miscDrops[c.id]) r.miscDrops[c.id] = { icon: c.icon, name: c.name, qty: 0 };
+    r.miscDrops[c.id].qty += result.catalystDrop.qty;
   }
   if(result.scrollDrop) r.scrollDrops[result.scrollDrop.itemId] = (r.scrollDrops[result.scrollDrop.itemId] || 0) + 1;
   Object.keys(result.fullCategories || {}).forEach(c => { r.fullCategories[c] = true; });
