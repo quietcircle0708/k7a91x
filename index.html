@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=355">
+<link rel="stylesheet" href="css/style.css?v=370">
 </head>
 <body>
 <div class="wrap">
@@ -43,7 +43,6 @@
   <div id="forgeView">
     <div id="townToast" class="town-toast"></div>
     <div class="forge-card" id="forgeCard">
-      <button class="stat-peek-btn blacksmith-peek-btn" id="openBlacksmithBtn" title="강화 장비 선택"><img src="assets/ui/blacksmith.png" class="blacksmith-icon-img" alt="대장간" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'blacksmith-icon-fallback',textContent:'🔨'}))"></button>
       <div id="curseBadgeForge" class="curse-badge" style="display:none;">
         <span class="curse-badge-icon">💀</span>
         <span class="curse-badge-time" id="curseBadgeForgeTime">0:00</span>
@@ -605,6 +604,11 @@
     </div>
   </div>
 
+  <!-- 상자 사용 모달(box_menu.js): 구성품 안내 → (랜덤형) 추첨 연출 / (선택형) 선택 → 지급 결과를 이 한 창 안에서 단계만 바꿔 보여줌. 내용은 전부 JS가 채움. -->
+  <div id="boxUseModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box box-modal"></div>
+  </div>
+
   <div id="skillResetConfirmModal" class="modal-overlay" style="display:none;">
     <div class="modal-box">
       <div class="modal-title">스킬 초기화</div>
@@ -1072,22 +1076,23 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=355"></script>
-<script src="js/formulas.js?v=355"></script>
-<script src="js/catalyst.js?v=355"></script>
-<script src="js/state.js?v=355"></script>
-<script src="js/effects.js?v=355"></script>
-<script src="js/render.js?v=355"></script>
-<script src="js/actions.js?v=355"></script>
-<script src="js/dungeon.js?v=355"></script>
-<script src="js/navigation.js?v=355"></script>
-<script src="js/inventory_box.js?v=355"></script>
-<script src="js/codex.js?v=355"></script>
-<script src="js/codex_monster.js?v=355"></script>
-<script src="js/craft_menu.js?v=355"></script>
-<script src="js/craft_multi.js?v=355"></script>
-<script src="js/shop_menu.js?v=355"></script>
-<script src="js/forge_menu.js?v=355"></script>
-<script src="js/main.js?v=355"></script>
+<script src="js/data.js?v=370"></script>
+<script src="js/formulas.js?v=370"></script>
+<script src="js/catalyst.js?v=370"></script>
+<script src="js/state.js?v=370"></script>
+<script src="js/effects.js?v=370"></script>
+<script src="js/render.js?v=370"></script>
+<script src="js/actions.js?v=370"></script>
+<script src="js/dungeon.js?v=370"></script>
+<script src="js/navigation.js?v=370"></script>
+<script src="js/inventory_box.js?v=370"></script>
+<script src="js/codex.js?v=370"></script>
+<script src="js/codex_monster.js?v=370"></script>
+<script src="js/craft_menu.js?v=370"></script>
+<script src="js/craft_multi.js?v=370"></script>
+<script src="js/shop_menu.js?v=370"></script>
+<script src="js/box_menu.js?v=370"></script>
+<script src="js/forge_menu.js?v=370"></script>
+<script src="js/main.js?v=370"></script>
 </body>
 </html>

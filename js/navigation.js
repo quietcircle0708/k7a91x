@@ -84,6 +84,7 @@ function showView(name){
   [['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character'],['backFromCollectionBtn','collection']]
     .forEach(([id, view]) => { el(id).style.display = name === view ? '' : 'none'; });
   currentView = name;
+  if(name !== 'dungeonlist') dungeonDropScroll = {}; // 던전 입구를 벗어나면 카드별 "획득 가능 아이템" 가로 스크롤 위치 초기화
   if(name === 'dungeonlist') renderDungeonList();
   if(name === 'collection') codexOpen(); // 도감: 진입할 때마다 현재 장비 데이터로 목록을 새로 구성
   if(name === 'hunt') renderHunt();
@@ -678,11 +679,9 @@ const PAGE_RENDER_FN = {
 };
 // delta는 -1(이전) 또는 +1(다음). 실제 유효 범위 보정(clampPage)은 각 렌더 함수 내부에서 그 시점의
 // 아이템 개수 기준으로 다시 계산하므로, 여기서는 페이지 번호만 옮기고 다시 그리기만 하면 됨.
-// dungeonDrop:<던전id> 형태의 동적 타겟(던전 카드별 "획득 가능 아이템 안내" 페이지)은 던전마다 키가
-// 달라 PAGE_RENDER_FN에 미리 등록해둘 수 없으므로, prefix로 감지해 renderDungeonList로 보냄.
 function goPage(target, delta){
   pageState[target] = (pageState[target] || 1) + delta;
-  const renderFn = PAGE_RENDER_FN[target] || (target.startsWith('dungeonDrop:') ? renderDungeonList : null);
+  const renderFn = PAGE_RENDER_FN[target];
   if(renderFn) renderFn();
 }
 

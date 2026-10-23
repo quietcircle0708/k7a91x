@@ -777,13 +777,13 @@ function renderConsumableList(){
 
   let html = flasks.map(({ item, count }) => `
     <div class="inv-card">
-      <div class="inv-icon" style="border-color: var(--forge-line);">${itemIconHtml(item)}</div>
+      <div class="inv-icon" style="border-color: ${consumableBorderColor(item)};">${itemIconHtml(item)}</div>
       <div class="inv-info">
         <div class="inv-name">${consumableNameHtml(item)} ×${count}</div>
         <div class="inv-sub">${item.desc}</div>
       </div>
       <div class="inv-actions">
-        <button class="inv-btn" data-action="${isScrollItem(item) ? 'use-scroll' : 'use-flask'}" data-id="${item.id}">사용하기</button>
+        <button class="inv-btn" data-action="${isBoxItem(item) ? 'use-box' : (isScrollItem(item) ? 'use-scroll' : 'use-flask')}" data-id="${item.id}">${isBoxItem(item) ? '사용' : '사용하기'}</button>
       </div>
     </div>`).join('');
 
@@ -874,9 +874,9 @@ function renderQuickSlots(){
     const onCooldown = cooldownLeft > 0;
     return `
       <div class="quickslot-wrap">
-        <button class="quickslot-btn filled" data-action="use" data-item="${itemId}" ${(count <= 0 || onCooldown) ? 'disabled' : ''} title="${item.name}">
-          <span class="quickslot-icon" style="${onCooldown ? 'visibility:hidden;' : ''}">${itemIconHtml(item)}</span>
-          <span class="quickslot-count" style="${onCooldown ? 'visibility:hidden;' : ''}">${count}</span>
+        <button class="quickslot-btn filled flask-slot" data-action="use" data-item="${itemId}" ${(count <= 0 || onCooldown) ? 'disabled' : ''} title="${item.name}"${consumableGradeInfo(item) ? ` style="border-color:${consumableBorderColor(item)};"` : ''}>
+          <span class="quickslot-icon" style="${onCooldown ? 'visibility:hidden;' : ''}">${itemIconHtml(item, 'inv-icon-img')}</span>
+          <span class="quickslot-count reward-item-qty" style="${onCooldown ? 'visibility:hidden;' : ''}">${count}</span>
           <span class="quickslot-cooldown" style="display:${onCooldown ? 'flex' : 'none'};">${cooldownLeft.toFixed(1)}</span>
         </button>
         <button class="quickslot-clear" data-action="clear" data-slot="${idx}" title="슬롯 비우기">×</button>
@@ -1796,6 +1796,19 @@ function buildDungeonDropIcons(d){
       tooltip: `<div style="text-align:center;">몬스터 처치 시 획득 가능한 비급<br><br>${nameLines}</div>` });
   }
 
+  // 3-2. 상자 — 몬스터 드랍 테이블의 boxId 항목. 상자 아이콘만 표시(구성품은 표시하지 않음), 등급 색 테두리 + 소비 아이템 툴팁 공식 재사용.
+  //       표시 순서는 data.js DUNGEON_DROP_KINDS의 'box'(비급 바로 다음)가 정함.
+  const seenBoxIds = new Set();
+  d.monsters.forEach(id => {
+    (MONSTERS[id].drops || []).forEach(drop => {
+      const item = drop.boxId && CONSUMABLES[drop.boxId];
+      if(!item || seenBoxIds.has(drop.boxId)) return;
+      seenBoxIds.add(drop.boxId);
+      icons.push({ kind: 'box', sortInfo: { grade: item.grade, price: item.sellPrice || 0, name: item.name },
+        iconHtml: itemIconHtml(item), borderColor: consumableBorderColor(item), tooltip: buildConsumableTooltipHtml(item.id) });
+    });
+  });
+
   // 4. 장비 아이템 — 몬스터 드랍 테이블에 직접 등록된 장비(weaponId, 모험가의 유해와는 별개의 확정 드랍)가
   //    있다면 해당 장비 종류(무기/방어구/장신구)에 맞는 아이콘/툴팁 공식을 사용해 표시. weaponIconHtml·
   //    weaponGradeColor는 wpn()으로 세 종류를 통합 조회해 이미 범용이지만, 툴팁은 종류별 함수가 따로
@@ -1843,7 +1856,7 @@ function buildDungeonDropIcons(d){
   const seenMiscIds = new Set();
   d.monsters.forEach(id => {
     (MONSTERS[id].drops || []).forEach(drop => {
-      if(drop.artifactId || drop.weaponId) return;
+      if(drop.artifactId || drop.weaponId || drop.boxId) return;
       const item = miscItemByName(drop.name);
       if(!item || item.itemClass !== 'misc' || seenMiscIds.has(item.id)) return;
       seenMiscIds.add(item.id);
@@ -1878,11 +1891,11 @@ function buildDungeonDropIcons(d){
     const item = CONSUMABLES[itemId];
     if(!item) return;
     icons.push({ kind: 'consumable', sortInfo: { grade: item.grade, price: item.sellPrice || 0, name: item.name },
-      iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltip: buildConsumableTooltipHtml(itemId) });
+      iconHtml: itemIconHtml(item), borderColor: consumableBorderColor(item), tooltip: buildConsumableTooltipHtml(itemId) });
   });
 
   // 분류 순서(골드 → 경험치 → 유해 → 비급 → 장비 → 기타 → 마석 → 소비 → 그 외)와 분류별 정렬은 data.js DUNGEON_DROP_KINDS 설정을 따름.
-  // 표시할 아이템 계산(위의 각 단계)은 그대로이고 여기서 순서만 정함. 페이지 나누기는 정렬된 목록 기준.
+  // 표시할 아이템 계산(위의 각 단계)은 그대로이고 여기서 순서만 정함.
   const sortedIcons = sortDungeonDropIcons(icons);
 
   const iconHtmls = sortedIcons.map(it => `
@@ -1892,28 +1905,9 @@ function buildDungeonDropIcons(d){
     </span>
   `);
 
-  // 12개 이하는 기존 그대로(더보기 버튼 없이 전부 출력). 13개 이상인 던전만 페이지 전환 UI 적용 —
-  // 한 페이지에 최대 11개 아이템 + 마지막 칸에 다음/이전 버튼 1개(총 12칸)로, 기존에 한 줄에 들어가던
-  // 최대 개수(12개)를 그대로 유지해 카드 크기가 커지지 않도록 함.
-  // 모바일 UI 개편 4단계: 화면 폭이 좁은 모바일 프리셋에서는 이 12/11 기준을 그대로 쓰면 아이콘 행이
-  // 카드 밖으로 넘치므로, 페이지당 표시 개수만 9개로 줄임(데스크톱 PAGE_SIZE.dungeonDrop=11은 그대로
-  // 유지 — 전역 값을 바꾸지 않고 여기서 프리셋에 따라 다른 값을 고르기만 함). 페이지네이션 계산
-  // 함수(pageCount/pageSlice/clampPage)와 페이지 버튼 로직은 데스크톱과 완전히 동일하게 재사용.
-  const isMobile = !!(state.settings && state.settings.screenPreset === 'mobile');
-  const pageSize = isMobile ? 9 : PAGE_SIZE.dungeonDrop;
-  const showAllThreshold = isMobile ? 9 : 12; // 모바일: 9개까지 전부 표시 / 데스크톱: 기존 12개 그대로
-  if(iconHtmls.length <= showAllThreshold) return iconHtmls.join('');
-
-  const target = 'dungeonDrop:' + d.id;
-  const totalPageCount = pageCount(iconHtmls.length, pageSize);
-  pageState[target] = clampPage(pageState[target] || 1, totalPageCount);
-  const page = pageState[target];
-  const pageIcons = pageSlice(iconHtmls, page, pageSize);
-
-  const hasNext = page < totalPageCount;
-  const pageBtn = `<button class="drop-icon-page-btn" data-action="${hasNext ? 'page-next' : 'page-prev'}" data-page-target="${target}">${hasNext ? '다음' : '이전'}</button>`;
-
-  return pageIcons.join('') + pageBtn;
+  // 페이지 나누기(다음/이전 버튼)는 없앰 — 전체 아이콘을 그대로 반환하고, 보이는 개수/가로 스크롤은 renderDungeonList가 감싸는
+  // .drop-icon-scroll/.drop-icon-row(style.css)가 담당함.
+  return iconHtmls.join('');
 }
 
 function renderDungeonList(){
@@ -1944,11 +1938,27 @@ function renderDungeonList(){
         던전 몬스터: <b>${monsterNames}</b><br>
         등장 몬스터 레벨: <b>Lv.${range.min}~${range.max}</b>
       </div>
-      <div class="drop-icon-row">${buildDungeonDropIcons(d)}</div>
+      <div class="drop-icon-scroll"><div class="drop-icon-row" data-dungeon-id="${d.id}">${buildDungeonDropIcons(d)}</div></div>
       <button class="dungeon-enter-btn" data-id="${d.id}" ${equipped ? '' : 'disabled'}>입장하기</button>
     </div>
   `;
   }).join('');
+  // 던전별 가로 스크롤 위치 복원(던전 목록 페이지를 넘겨 카드를 다시 그려도 유지 — 화면을 벗어나면 showView가 비움) + 가장자리 표시 갱신
+  wrap.querySelectorAll('.drop-icon-row').forEach(row => {
+    row.scrollLeft = dungeonDropScroll[row.dataset.dungeonId] || 0;
+    dungeonDropScrollSync(row);
+  });
+}
+
+// 던전 카드 "획득 가능 아이템" 줄의 스크롤 상태 표시: 넘치는 줄만 드래그 커서(is-scrollable), 아직 보이지 않는 쪽 끝에만 흐림(can-left/can-right).
+function dungeonDropScrollSync(row){
+  const box = row.parentElement;
+  const max = row.scrollWidth - row.clientWidth;
+  row.classList.toggle('is-scrollable', max > 1);
+  if(box){
+    box.classList.toggle('can-left', row.scrollLeft > 1);
+    box.classList.toggle('can-right', max > 1 && row.scrollLeft < max - 1);
+  }
 }
 
 // ---- 던전 상단 UI 접기/펼치기 ----

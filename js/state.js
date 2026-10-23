@@ -54,7 +54,7 @@ let state = {
   manaShards: 0,       // 마석 조각 보유 개수
   manaCrystals: 0,     // 마석 결정 보유 개수
   manaStones: 0,       // 마석 보유 개수
-  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, // 기타(재료) 아이템 보유 개수
+  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
@@ -150,10 +150,10 @@ let pageState = {
   patchNote: 1,
   // 던전 전투 종료 보상창 "획득 아이템" 그리드 — 보상창을 새로 열 때마다 항상 1페이지부터 시작.
   killRewardItems: 1,
-  // dungeonDrop 페이지는 던전마다 따로 관리해야 해서 고정 키 하나가 아니라, 던전 카드를 그릴 때
-  // `dungeonDrop:<던전id>` 형태의 동적 키를 이 오브젝트에 필요할 때마다 추가해서 씀(goPage의 범용
-  // "pageState[target] = ..." 로직을 그대로 재사용하기 위함, render.js buildDungeonDropIcons 참고).
 };
+// 던전 카드 "획득 가능 아이템" 줄의 가로 스크롤 위치(던전 id → scrollLeft). 저장하지 않는 화면 상태이며,
+// 던전 입구 화면을 벗어나면(showView) 비워서 다음에 들어오면 항상 맨 앞부터 시작함.
+let dungeonDropScroll = {};
 
 const el = id => document.getElementById(id);
 // 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기든 방어구든 상관없이 state.forgeTargetId가
@@ -667,7 +667,7 @@ function resetGame(){
     forgeMode: 'prayer', forgeStone: { id: null, on: false, forId: null }, forgeRevive: 0,
     craftCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }], restoreCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }],
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
-    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0,
+    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0,
     skipEffects:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },

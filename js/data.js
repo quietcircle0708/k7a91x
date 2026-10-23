@@ -1088,6 +1088,83 @@ const WEAPON_TYPES = {
       statBonus: { str: 5, agi: 5 },
     },
   },
+
+  // ---- 도깨비 계열 무기 4종(신규) ----
+  // 획득처는 이후 신규 던전 추가 때 함께 등록됨(지금은 획득 경로 없음). 고유 옵션은 전부 성장치 없는 "고정형"(+0부터 활성, 강화해도 불변) —
+  // opt.text + opt.statBonus 스키마. 방어도 무시(statBonus.defenseIgnore)는 playerDefenseIgnore가 자동 합산함.
+  // 도깨비방망이·녹귀령봉은 첫 한손 둔기(weaponKind:'blunt', handType:'one_hand') — 강화 성장치는 한손 검 프로필을 참조, 착용 요구 스탯도 임시로 한손 검 공식을 따름.
+  goblinclub: {
+    id: 'goblinclub', name: '도깨비방망이', desc: '도깨비가 각종 요술을 부릴 때<br>사용한다는 방망이',
+    equipType: 'weapon',
+    durability: 50000,
+    weaponKind: 'blunt', // 둔기
+    handType: 'one_hand', // 한손 둔기
+    grade: 'epic', // 에픽
+    attackPower: 278, attackSpeed: 0.75, critRate: 5,
+    purchasable: false, levelReq: 50,
+    image: 'epic_goblin_bat',
+    atk: [278], speed: [0.75], crit: [5], sell: [0],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '방어도 무시 +6<br>힘 +5',
+      statBonus: { defenseIgnore: 6, str: 5 },
+    },
+  },
+  pommelsword: {
+    id: 'pommelsword', name: '환두대도', desc: '칼자루 끝을 고리 형태로 만든 대도',
+    equipType: 'weapon',
+    durability: 50000,
+    weaponKind: 'sword', // 검
+    handType: 'two_hand', // 양손 검
+    grade: 'rare', // 레어
+    attackPower: 1043, attackSpeed: 0.6, critRate: 10,
+    purchasable: false, levelReq: 70,
+    image: 'rare_pommel_sword',
+    atk: [1043], speed: [0.6], crit: [10], sell: [0],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '최대 체력 +200',
+      statBonus: { maxHp: 200 },
+    },
+  },
+  thorndagger: {
+    id: 'thorndagger', name: '가시철단도', desc: '눈에 보이지 않는 세밀한 가시가<br>돋혀 있는 철단도',
+    equipType: 'weapon',
+    durability: 30000,
+    weaponKind: 'dagger', // 단검
+    handType: 'one_hand',
+    grade: 'rare', // 레어
+    attackPower: 417, attackSpeed: 1.2, critRate: 10,
+    purchasable: false, levelReq: 70,
+    image: 'rare_thorn_sword',
+    atk: [417], speed: [1.2], crit: [10], sell: [0],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '민첩 +3',
+      statBonus: { agi: 3 },
+    },
+  },
+  goblinkingclub: {
+    id: 'goblinkingclub', name: '녹귀령봉', desc: '도깨비들의 왕이 사용했던 무기',
+    equipType: 'weapon',
+    durability: 100000,
+    weaponKind: 'blunt', // 둔기
+    handType: 'one_hand', // 한손 둔기
+    grade: 'epic', // 에픽
+    attackPower: 1110, attackSpeed: 0.75, critRate: 5,
+    purchasable: false, levelReq: 75,
+    image: 'epic_goblin_bat_2',
+    atk: [1110], speed: [0.75], crit: [5], sell: [0],
+    cost: [], odds: [],
+    uniqueOption: {
+      activateLevel: 0,
+      text: '방어도 무시 +6<br>힘 +12',
+      statBonus: { defenseIgnore: 6, str: 12 },
+    },
+  },
 };
 
 
@@ -1506,6 +1583,24 @@ const ARMOR_TYPES = {
       growthStat: 'agi',
       activateLevel: 0,
       chanceByLevel: { 0: 6, 1: 6, 2: 6, 3: 6, 4: 6, 5: 7, 6: 7, 7: 8, 8: 8, 9: 10 },
+      chanceSuffix: '',
+      textTemplate: '민첩 +{chance}',
+    },
+  },
+  // 도깨비장화: 회피 옵션을 가진 첫 신발(신발 방어도는 강화되지 않고, 회피는 방어구 회피 강화 공식 ARMOR_EVASION_STEP_DELTA를 따름). 획득처는 신규 던전 추가 때 등록.
+  goblinboots: {
+    id: 'goblinboots', name: '도깨비장화', desc: '신출귀몰한 도깨비의 발놀림이 깃든 장화',
+    equipType: 'armor',
+    durability: 50000,
+    armorKind: 'shoes', // 신발
+    grade: 'epic', // 에픽
+    defense: -4, hp: 200, mana: 300, evasion: 2, // 신발은 방어도가 강화되지 않음(모든 단계 동일)
+    purchasable: false, levelReq: 56,
+    image: 'epic_goblin_shoes',
+    uniqueOption: {
+      growthStat: 'agi',
+      activateLevel: 0,
+      chanceByLevel: { 0: 8, 1: 8, 2: 8, 3: 8, 4: 8, 5: 9, 6: 10, 7: 11, 8: 13, 9: 15 },
       chanceSuffix: '',
       textTemplate: '민첩 +{chance}',
     },
@@ -2514,6 +2609,16 @@ const ARTIFACTS = {
     effectText: '지능 +10<br>마나 +500',
     buyPrice: null,
   },
+  // 몬스터 처치 골드 +20%: 계산 순서는 기본 골드 → 랜덤 범위 → 이 아티팩트(artifactGoldBonusPercent, formulas.js) → 죽음의 저주 → 최종 레벨 패널티(dungeon.js 처치 보상).
+  goblinfairy: {
+    id: 'goblinfairy', name: '뿔 달린 정령인형', icon: '🧸', image: 'unique_goblin_fairy',
+    desc: '불길한 행운이 깃든 인형<br>알 수 없는 행운을 가져온다',
+    equipType: 'artifact',
+    grade: 'unique',
+    effect: '몬스터 처치 시 획득 골드가 20% 증가한다',
+    effectText: '몬스터 처치 시 획득 골드 +20%',
+    buyPrice: null,
+  },
 };
 
 // 소비 아이템(플라스크 등) 도감
@@ -2530,15 +2635,42 @@ const FLASK_INSTANT_COOLDOWN_MS = 1500; // 즉시 회복 플라스크
 // 별개로, 툴팁의 "효과" 항목에는 이 필드만 사용함.
 // effect.type: 'healHp'/'healMp'(지속 회복, percent+durationMs 기준 — 기존 방식) |
 //   'healHpInstant'/'healMpInstant'(즉시 회복, amount 고정값을 사용 즉시 전부 회복 — 신규).
+// 소비 아이템 등급(grade: WEAPON_GRADES 키 — 'normal'/'rare'/'epic'/'unique'): 플라스크 등 일반 소비 아이템은 grade만 적으면 툴팁 이름·등급 줄(buildConsumableTooltipHtml),
+// 아이콘 배경(itemIconHtml → gradeIconBgClass), 아이콘 테두리(formulas.js consumableBorderColor) 가 모든 화면에서 자동 적용됨. grade를 생략하면 예전처럼 등급 표시 없이 동작.
+// 비급은 할당 스킬 등급을 getter로 쓰므로(아래 initConsumableClassRules) 여기서 지정하지 않고, 흔적은 CONSUMABLES가 아님.
+// ---- 상자(소비 아이템 class '상자') 공통 설정 — 규칙/연출 값은 이 상수들만 바꾸면 됨 ----
+const BOX_CLASS_LABEL = '상자';
+const BOX_DEFAULT_IMAGE = { normal: 'random_chest', rare: 'random_chest', epic: 'random_chest2', unique: 'random_chest3' }; // 등급별 기본 상자 이미지(assets/MiscItems) — 랜덤형·선택형 공통
+const BOX_SELL_PRICE = 100; // 상자 판매 가격(G) 고정 — 개별 상자 데이터의 sellPrice도 이 값을 씀
+const BOX_TYPES = { random: { label: '랜덤형' }, select: { label: '선택형' } }; // 데이터의 boxType 값 → 사용 절차 구분(툴팁에는 표시하지 않음)
+const BOX_ROLL_WAIT_MS = 500;        // [사용] 클릭 후 연출 시작 전 대기(이 동안 취소·사용 비활성)
+const BOX_ROLL_SPIN_MS = 2500;       // 구성품 아이콘이 번갈아 바뀌는 시간(마지막에 서서히 느려지며 당첨 아이콘에 멈춤)
+const BOX_ROLL_FAST_MS = 1500;       // 위 시간 중 일정한 빠른 속도로 바뀌는 구간(나머지는 점점 느려짐)
+const BOX_ROLL_FAST_INTERVAL_MS = 70;  // 빠른 구간의 아이콘 교체 간격
+const BOX_ROLL_SLOW_START_INTERVAL_MS = 90; // 느려지는 구간 첫 교체 간격(이후 매번 BOX_ROLL_SLOW_GROWTH배)
+const BOX_ROLL_SLOW_GROWTH = 1.3;
+const BOX_ROLL_RESULT_DELAY_MS = 500; // 당첨 아이콘이 멈춘 뒤 아이템 이름·당첨 텍스트가 나오기까지
+// 화면 문구(수정하기 쉽도록 한 곳에 모음). {name}은 등급 색·볼드 처리된 아이템 이름, {josa}는 이름의 받침에 따라 을/를로 자동 결정됨.
+const BOX_TEXTS = {
+  randomListTitle: '획득 가능 아이템',
+  selectListTitle: '선택 가능 아이템',
+  grantTitle: '지급 아이템',
+  selectGuide: '선택 아이템이 인벤토리로 지급됩니다.',
+  resultTemplate: '{name}{josa} 획득하였습니다!',
+  cancel: '취소', use: '사용', ok: '확인',
+  full: '인벤토리가 가득 차 사용할 수 없습니다.', // 구성품 중 넣을 공간이 없는 것이 있을 때(랜덤형: 하나라도 / 선택형: 고른 아이템)
+  fullTag: '인벤토리 가득참',
+};
+
 const CONSUMABLES = {
   hpFlask6: {
-    id: 'hpFlask6', name: '하급 체력 엘릭서', class: '플라스크', icon: '🧪', image: 'hpflask6',
+    id: 'hpFlask6', name: '하급 체력 엘릭서', class: '플라스크', grade: 'rare', icon: '🧪', image: 'hpflask6',
     desc: '2초에 걸쳐 최대 체력의 25%를 회복한다', effectText: '체력 25% 회복',
     buyPrice: 1800, sellPrice: 900,
     effect: { type: 'healHp', percent: 25, durationMs: 2000 },
   },
   mpFlask6: {
-    id: 'mpFlask6', name: '하급 마나 엘릭서', class: '플라스크', icon: '💧', image: 'mpflask6',
+    id: 'mpFlask6', name: '하급 마나 엘릭서', class: '플라스크', grade: 'rare', icon: '💧', image: 'mpflask6',
     // 원본 요청에는 이 항목의 desc도 "최대 체력의 25%"로 적혀있었으나(하급 체력 엘릭서 desc와 동일 문구),
     // 마나 엘릭서이고 effect도 healMp이므로 "마나"로 바로잡아 반영함(응답 참고, 확인 필요).
     desc: '2초에 걸쳐 최대 마나의 25%를 회복한다', effectText: '마나 25% 회복',
@@ -2546,49 +2678,49 @@ const CONSUMABLES = {
     effect: { type: 'healMp', percent: 25, durationMs: 2000 },
   },
   hpFlask1: {
-    id: 'hpFlask1', name: '하급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask1',
+    id: 'hpFlask1', name: '하급 체력 포션', class: '플라스크', grade: 'normal', icon: '🧪', image: 'hpflask1',
     desc: '사용 즉시 체력 100을 회복한다', effectText: '체력 100 회복',
     buyPrice: 100, sellPrice: 50,
     effect: { type: 'healHpInstant', amount: 100 },
   },
   mpFlask1: {
-    id: 'mpFlask1', name: '하급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask1',
+    id: 'mpFlask1', name: '하급 마나 포션', class: '플라스크', grade: 'normal', icon: '💧', image: 'mpflask1',
     desc: '사용 즉시 마나 100을 회복한다', effectText: '마나 100 회복',
     buyPrice: 100, sellPrice: 50,
     effect: { type: 'healMpInstant', amount: 100 },
   },
   hpFlask2: {
-    id: 'hpFlask2', name: '중급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask2',
+    id: 'hpFlask2', name: '중급 체력 포션', class: '플라스크', grade: 'normal', icon: '🧪', image: 'hpflask2',
     desc: '사용 즉시 체력 300을 회복한다', effectText: '체력 300 회복',
     buyPrice: 200, sellPrice: 100,
     effect: { type: 'healHpInstant', amount: 300 },
   },
   mpFlask2: {
-    id: 'mpFlask2', name: '중급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask2',
+    id: 'mpFlask2', name: '중급 마나 포션', class: '플라스크', grade: 'normal', icon: '💧', image: 'mpflask2',
     desc: '사용 즉시 마나 300을 회복한다', effectText: '마나 300 회복',
     buyPrice: 200, sellPrice: 100,
     effect: { type: 'healMpInstant', amount: 300 },
   },
   hpFlask3: {
-    id: 'hpFlask3', name: '상급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask3',
+    id: 'hpFlask3', name: '상급 체력 포션', class: '플라스크', grade: 'normal', icon: '🧪', image: 'hpflask3',
     desc: '사용 즉시 체력 800을 회복한다', effectText: '체력 800 회복',
     buyPrice: 400, sellPrice: 200,
     effect: { type: 'healHpInstant', amount: 800 },
   },
   mpFlask3: {
-    id: 'mpFlask3', name: '상급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask3',
+    id: 'mpFlask3', name: '상급 마나 포션', class: '플라스크', grade: 'normal', icon: '💧', image: 'mpflask3',
     desc: '사용 즉시 마나 800을 회복한다', effectText: '마나 800 회복',
     buyPrice: 400, sellPrice: 200,
     effect: { type: 'healMpInstant', amount: 800 },
   },
   hpFlask4: {
-    id: 'hpFlask4', name: '최상급 체력 포션', class: '플라스크', icon: '🧪', image: 'hpflask4',
+    id: 'hpFlask4', name: '최상급 체력 포션', class: '플라스크', grade: 'normal', icon: '🧪', image: 'hpflask4',
     desc: '사용 즉시 체력 1200을 회복한다', effectText: '체력 1200 회복',
     buyPrice: 900, sellPrice: 450,
     effect: { type: 'healHpInstant', amount: 1200 },
   },
   mpFlask4: {
-    id: 'mpFlask4', name: '최상급 마나 포션', class: '플라스크', icon: '💧', image: 'mpflask4',
+    id: 'mpFlask4', name: '최상급 마나 포션', class: '플라스크', grade: 'normal', icon: '💧', image: 'mpflask4',
     // 원본 요청 표의 효과 값이 "체력 1200 회복"으로 적혀있었으나(마나 포션인데 체력으로 표기),
     // 마나 포션이므로 "마나"로 바로잡아 반영함(응답 참고, 확인 필요).
     desc: '사용 즉시 마나 1200을 회복한다', effectText: '마나 1200 회복',
@@ -2604,7 +2736,67 @@ const CONSUMABLES = {
   scroll_flowing_sword: { id: 'scroll_flowing_sword', name: '비천사검 - 비류검', class: '비급', icon: '📜', skillId: 'flowing_sword' },
   scroll_cascade_sword: { id: 'scroll_cascade_sword', name: '비천사검 - 비월검', class: '비급', icon: '📜', skillId: 'cascade_sword' },
   scroll_soaring_sword: { id: 'scroll_soaring_sword', name: '비천사검 - 비천검', class: '비급', icon: '📜', skillId: 'soaring_sword' },
+  // ---- 상자(class: '상자') ----
+  // 사용하면 구성품(contents) 중 1개를 지급하는 소비 아이템. boxType으로 방식을 구분함(BOX_TYPES): 'random'(확률 추첨) / 'select'(선택 지급).
+  // contents: [{ kind, id, weight?, qty? }] — kind는 'weapon'/'armor'/'sub'/'accessory'(장비, 강화 +0으로 지급) / 'consumable'(CONSUMABLES id) / 'misc'(MISC_ITEMS id, 마석 포함).
+  //   weight를 생략하면 모든 구성품이 같은 확률(랜덤형만 의미 있음), qty를 생략하면 1개(소비·마석/기타만). 아티팩트는 상자 구성품으로 쓰지 않음.
+  // 판매 가격은 BOX_SELL_PRICE(100G) 고정, 툴팁에는 effectText 대신 desc가 출력됨. 구매 가격(buyPrice)은 상점에서 팔 상자에만 적음(없으면 구매 불가, 판매만 가능).
+  // image를 무기 이미지로 쓰려면 imageDir에 폴더를 함께 적음(itemIconHtml, formulas.js) — 생략하면 기본 ITEM_IMAGE_DIR.
+  // image를 생략하면 등급별 기본 상자 이미지(BOX_DEFAULT_IMAGE)가 CONSUMABLES 정의 직후에 자동으로 채워짐 — 특수한 이미지를 쓰려면 image를 직접 적음.
+  // 획득처는 몬스터 drops에 { name, chance, boxId } 항목으로 등록함(예: 불연·원각). 도깨비 상자 2종은 획득처 미정(데이터만 등록).
+  goblinWeaponBox: {
+    id: 'goblinWeaponBox', name: '도깨비 무기 상자', class: BOX_CLASS_LABEL, boxType: 'random', grade: 'rare',
+    icon: '📦',
+    desc: '사용 시 도깨비 무기를<br>무작위로 획득 할 수 있다.',
+    sellPrice: BOX_SELL_PRICE,
+    contents: [
+      { kind: 'weapon', id: 'goblinclub',  weight: 10 }, // 도깨비방망이
+      { kind: 'weapon', id: 'thorndagger', weight: 45 }, // 가시철단도
+      { kind: 'weapon', id: 'pommelsword', weight: 45 }, // 환두대도(요청서의 "환두대검")
+    ],
+  },
+  goblinWeaponSelectBox: {
+    id: 'goblinWeaponSelectBox', name: '도깨비 무기 선택 상자', class: BOX_CLASS_LABEL, boxType: 'select', grade: 'epic',
+    icon: '📦',
+    desc: '사용 시 도깨비 무기를<br>선택하여 획득 할 수 있다.',
+    sellPrice: BOX_SELL_PRICE,
+    contents: [
+      { kind: 'weapon', id: 'goblinclub' },  // 도깨비방망이
+      { kind: 'weapon', id: 'thorndagger' }, // 가시철단도
+      { kind: 'weapon', id: 'pommelsword' }, // 환두대도(요청서의 "환두대검")
+    ],
+  },
+  ghostWeaponBox: {
+    id: 'ghostWeaponBox', name: '유령 무기 상자', class: BOX_CLASS_LABEL, boxType: 'random', grade: 'rare',
+    icon: '📦',
+    desc: '사용 시 유령 무기를<br>무작위로 획득 할 수 있다.',
+    sellPrice: BOX_SELL_PRICE,
+    contents: [
+      { kind: 'weapon', id: 'moonsword_black',      weight: 3.3 }, // 월도'흑
+      { kind: 'weapon', id: 'heavydagger_black',    weight: 3.4 }, // 흑철비도
+      { kind: 'weapon', id: 'heavysword_black',     weight: 3.3 }, // 흑철중검
+      { kind: 'weapon', id: 'moonsword',            weight: 30 },  // 월도
+      { kind: 'weapon', id: 'heavydagger',          weight: 30 },  // 현철단검(요청서의 "현철비도")
+      { kind: 'weapon', id: 'heavysword',           weight: 30 },  // 현철중검
+    ],
+  },
+  ghostWeaponSelectBox: {
+    id: 'ghostWeaponSelectBox', name: '유령 무기 선택 상자', class: BOX_CLASS_LABEL, boxType: 'select', grade: 'epic',
+    icon: '📦',
+    desc: '사용 시 유령 무기를<br>선택하여 획득 할 수 있다.',
+    sellPrice: BOX_SELL_PRICE,
+    contents: [
+      { kind: 'weapon', id: 'moonsword_black' },   // 월도'흑
+      { kind: 'weapon', id: 'heavydagger_black' }, // 흑철비도
+      { kind: 'weapon', id: 'heavysword_black' },  // 흑철중검
+      { kind: 'weapon', id: 'moonsword' },         // 월도
+      { kind: 'weapon', id: 'heavydagger' },       // 현철단검(요청서의 "현철비도")
+      { kind: 'weapon', id: 'heavysword' },        // 현철중검
+    ],
+  },
 };
+// 상자 기본 이미지: 이미지가 지정되지 않은 상자에 등급별 기본 이미지(BOX_DEFAULT_IMAGE)를 할당함(새 상자는 데이터에 image를 적지 않아도 자동 적용).
+Object.values(CONSUMABLES).forEach(it => { if(it.class === BOX_CLASS_LABEL && !it.image) it.image = BOX_DEFAULT_IMAGE[it.grade] || BOX_DEFAULT_IMAGE.normal; });
 
 // ---- 소비 아이템 "종류(class)" 기준 자동 규칙 ----
 const SCROLL_CLASS = '비급';
@@ -2833,6 +3025,17 @@ const MISC_ITEMS = {
     desc: '태초의 힘이 응축된 신비로운 파편.<br>새로운 형태를 탄생시키는 힘이 담겨있다.',
     sellPrice: 100000, stateKey: 'creationShards',
     catalyst: { kind: 'creationShard', craftSuccessBonusPct: 15, craftMaxPerAttempt: 1 },
+  },
+  // 신규 던전용 기타 아이템 — 획득처는 던전 추가 때 함께 등록(지금은 획득 경로 없음).
+  goblinHorn: {
+    id: 'goblinHorn', name: '도깨비뿔', icon: '🦴', image: 'common_goblin_horn', itemClass: 'misc', grade: 'normal',
+    desc: '도깨비의 기운이 깃들어 매우 단단한 뿔',
+    sellPrice: 300, stateKey: 'goblinHorns',
+  },
+  greenOrbShard: {
+    id: 'greenOrbShard', name: '녹색 구슬 조각', icon: '🟢', image: 'rare_green_shed', itemClass: 'misc', grade: 'rare',
+    desc: '희미한 마력이 깃든 녹색 구슬 파편',
+    sellPrice: 350, stateKey: 'greenOrbShards',
   },
 };
 
@@ -3163,6 +3366,23 @@ CRAFTABLE_ITEMS.weapon.push(
       { name: '흑철비도', chance: 100 },
     ],
   },
+  // 도깨비방망이(신규 한손 둔기) — 천장 없음(pityLimit 생략). 실패 시 반짝이는 돌 1개를 반환(chance 100).
+  // 제작 비용은 장비 제작 비용 자동 계산 공식(기본 판매 가격 × max(성공 확률, 30)% — formulas.js craftNormalizeEquipCosts)이 채움.
+  {
+    id: 'craft_goblinclub', name: '도깨비방망이', grade: 'epic',
+    iconType: 'weapon', iconRef: 'goblinclub',
+    successChance: 35,
+    materials: [
+      { name: '반짝이는 돌', need: 3 },
+      { name: '녹색 구슬 조각', need: 1 },
+      { name: '도깨비뿔', need: 10 },
+      { name: '흑철', need: 15 },
+      { name: '쇠조각', need: 15 },
+    ],
+    failReturns: [
+      { name: '반짝이는 돌', need: 1, chance: 100 },
+    ],
+  },
 );
 
 // 장신구 제작 아이템 — 장신구 소분류 탭의 첫 제작 아이템. iconType이 'accessory'면 iconRef는 ACCESSORY_TYPES 키를
@@ -3372,7 +3592,7 @@ const INV_SORT_KIND_ORDER = [
   { group: 'armor', kinds: ['armor:helmet', 'armor:armor', 'armor:shoes'] },                                // 투구 → 갑옷 → 신발
   { group: 'accessory', kinds: ['accessory:necklace', 'accessory:ring', 'accessory:bracelet'] },            // 목걸이 → 반지 → (팔찌 예정)
   { group: 'sub', kinds: ['sub:shield', 'sub:sub_weapon'] },                                                // 방패 → 보조 무기
-  { group: 'consumable', kinds: ['consumable:플라스크', 'consumable:' + SCROLL_CLASS, 'consumable:trace'] }, // 플라스크 → 비급 → 흔적
+  { group: 'consumable', kinds: ['consumable:플라스크', 'consumable:' + SCROLL_CLASS, 'consumable:' + BOX_CLASS_LABEL, 'consumable:trace'] }, // 플라스크 → 비급 → 상자 → 흔적
 ];
 // 신버전 \"착용 장비 우선 정렬\" 시 착용 장비끼리의 순서(착용 슬롯 키 — EQUIPMENT_SLOTS의 key와 같은 값).
 const INV_SORT_WORN_SLOT_ORDER = ['weapon', 'helmet', 'armor', 'sub', 'necklace', 'accessory1', 'accessory2', 'shoes'];
@@ -3412,6 +3632,7 @@ const DUNGEON_DROP_KINDS = [
   { id: 'exp' },                                                 // 경험치
   { id: 'relic' },                                               // 모험가의 유해
   { id: 'scroll' },                                              // 비급
+  { id: 'box',       sort: ['grade', 'price', 'name'] },         // 상자(소비 아이템이지만 비급 바로 다음)
   { id: 'artifact', sort: ['grade', 'name'] },                   // 아티팩트(등급 높은 순 → 이름 가나다순)
   { id: 'equipment', sort: ['grade', 'levelReq', 'name'] },      // 장비(무기/방어구/보조/장신구를 구분하지 않음)
   { id: 'misc',      sort: ['grade', 'price', 'name'] },         // 기타
@@ -3432,7 +3653,6 @@ const PAGE_SIZE = {
   restoreSelect: 6,     // 수리 탭 "손상 복구" 장비 선택 팝업
   craftSelect: 6,       // 제작소 "재료 장비 선택" 팝업
   dungeonList: 3,        // 던전 입구
-  dungeonDrop: 11,       // 던전 카드 "획득 가능 아이템 안내" 아이콘 목록(13개 이상인 던전만 적용)
   killRewardItems: 15,   // 던전 전투 종료 보상창 "획득 아이템" 그리드(5열×3행)
 };
 // 캐릭터 정보창 페이지 수. 이 화면은 아이템 목록을 잘라서 보여주는 게 아니라 "1페이지(장비창+캐릭터 정보) /
@@ -4600,6 +4820,7 @@ const MONSTERS = {
     epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 30 },
+      { name: '유령 무기 상자', chance: 0.5, boxId: 'ghostWeaponBox' }, // 상자 드랍(boxId — 소비 아이템 지급)
       { name: '현철', chance: 10 },
       { name: '흑철', chance: 15 },
       { name: '현철중검', chance: 10, weaponId: 'heavysword' },
@@ -4748,9 +4969,48 @@ const MONSTERS = {
     epicSpawnWeight: 55, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 30 },
+      { name: '유령 무기 선택 상자', chance: 0.5, boxId: 'ghostWeaponSelectBox' }, // 상자 드랍(boxId — 소비 아이템 지급)
       { name: '원한이 담긴 유서', chance: 5 },
       { name: '불길한 검은색 방패', chance: 3, weaponId: 'cursedblackshield' },
       { name: '그림자 비수', chance: 3, weaponId: 'shadowdagger' },
+    ],
+  },
+  // ---- 물망동 몬스터 4종(도깨비 계열) ----
+  // 흑해골굴과 동일한 구조 — 사명비(70)/녹명비(30)를 epicSpawnWeight로 가중치 추첨하고, 녹명비만 epicSpawnStages:[10]이라 10굴에서만 후보에 들어감.
+  // 10굴이 아닌 굴에서는 녹명비가 후보에서 빠져 항상 사명비만 등장함(pickEpicMonsterId, formulas.js).
+  goblinfire: {
+    id: 'goblinfire', name: '도깨비불', icon: '🔥', grade: 'normal', level: 80, image: 'common_goblin_1',
+    defense: -25, hpMult: 1.0, atkMult: 0.75, speedMult: 2.0,
+    drops: [
+      { name: '호박', chance: 15 },
+      { name: '녹색 구슬 조각', chance: 1 },
+    ],
+  },
+  goblin: {
+    id: 'goblin', name: '도깨비', icon: '👹', grade: 'normal', level: 81, image: 'common_goblin_2',
+    defense: -30, hpMult: 1.2, atkMult: 1.1, speedMult: 1.0,
+    drops: [
+      { name: '호박', chance: 20 },
+      { name: '도깨비뿔', chance: 5 },
+    ],
+  },
+  epicgoblin: {
+    id: 'epicgoblin', name: '사명비', icon: '👹', grade: 'epic', level: 86, image: 'epic_goblin_1',
+    defense: -30, hpMult: 1.1, atkMult: 1.1, speedMult: 1.0,
+    epicSpawnWeight: 70, // 물망동 전용 — 녹명비와 합쳐 100%(10굴 기준. 그 외 스테이지는 녹명비가 후보에서 빠져 항상 사명비)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '도깨비뿔', chance: 10 },
+    ],
+  },
+  epicgoblin2: {
+    id: 'epicgoblin2', name: '녹명비', icon: '👹', grade: 'epic', level: 87, image: 'epic_goblin_2',
+    defense: -30, hpMult: 1.1, atkMult: 1.1, speedMult: 1.0,
+    epicSpawnWeight: 30, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
+    drops: [
+      { name: '진호박', chance: 30 },
+      { name: '녹색 구슬 조각', chance: 5 },
+      { name: '도깨비방망이', chance: 1, weaponId: 'goblinclub' },
     ],
   },
 };
@@ -4912,6 +5172,15 @@ const DUNGEONS = [
     icon: '',
     desc: '해골이 잠든 저주받은 지하 동굴의 깊은 곳',
     monsters: ['blackskeleton', 'blackskeleton2', 'epicblackskeleton', 'epicblackskeleton2'],
+    levelRange: 5,
+    region: '일반',
+  },
+  {
+    id: 'mulmang_den',
+    name: '물망동',
+    icon: '',
+    desc: '오래전부터 요괴들이 모여들었다는 동굴의 초입',
+    monsters: ['goblinfire', 'goblin', 'epicgoblin', 'epicgoblin2'],
     levelRange: 5,
     region: '일반',
   },

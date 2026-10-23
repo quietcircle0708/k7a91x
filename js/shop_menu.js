@@ -27,7 +27,9 @@ function shopMenuLeafIds(top){ return top.subTabs ? top.subTabs.map(s => s.id) :
 // 소비 아이템 아이콘 상자 색: 플라스크는 기존 상점과 같은 붉은 상자(#2a1414/#c13c3c), 비급 등은 등급 색
 function shopMenuConsumableLook(item){
   if(isScrollItem(item)){ const g = scrollGradeInfo(item); return { border: g ? g.color : 'var(--forge-line)', bg: '#242424', name: null }; }
-  return { border: '#c13c3c', bg: '#2a1414', name: 'var(--forge-cream)' };
+  const g = consumableGradeInfo(item); // 등급이 있는 일반 소비(플라스크 등): 등급 색 테두리 + 다른 아이템과 같은 기본 배경(아이콘 배경은 itemIconHtml이 등급별로 적용)
+  if(g) return { border: g.color, bg: '#242424', name: 'var(--forge-cream)' };
+  return { border: '#c13c3c', bg: '#2a1414', name: 'var(--forge-cream)' }; // 등급이 없는 소비 아이템: 기존 붉은색
 }
 // 소비 아이템 이름 표시 조각: 비급은 앞에 굵은 보라색 "[비급]" + 등급 색 이름(consumableNameHtml과 동일한 표시), 그 외는 기본 이름.
 // 검색어 강조는 이름 본문(name)에만 적용하고 접두어/접미어(pre/suf)에는 적용하지 않음.

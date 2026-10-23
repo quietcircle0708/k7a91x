@@ -47,7 +47,7 @@ function skipHuntPrep(){
 function newDungeonRewards(){
   return {
     gold: 0, expGained: 0, levelsGained: 0, newPlayerLevel: state.playerLevel,
-    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, flaskDrops: {}, artifactDrops: [], miscDrops: {}, scrollDrops: {}, killedMonsters: [],
+    weaponDrops: [], weaponIdDrops: [], stoneDrops: {}, flaskDrops: {}, artifactDrops: [], miscDrops: {}, scrollDrops: {}, boxDrops: {}, killedMonsters: [],
     fullCategories: {}, // 인벤토리 카테고리가 가득 차 지급하지 못한 드랍이 있었던 카테고리(보상창 안내용, 예: { stone: true })
   };
 }
@@ -676,6 +676,9 @@ function killMonsterInstance(instanceId){
   // 각 지급 블록에서 실제 지급이 확정된 시점에만 push되므로, 인벤토리가 가득 차 드랍이 무산된 경우 등은
   // 자동으로 연출 대상에서도 제외됨).
   const dropVisualItems = [];
+  // 아티팩트 골드 증가(예: 뿔 달린 정령인형 +20%): 기본 골드·랜덤 범위 계산이 끝난 값에 먼저 적용하고(소수점 반올림), 이후 죽음의 저주 → 최종 레벨 패널티 순으로 이어짐.
+  const goldBonusPct = artifactGoldBonusPercent();
+  if(goldBonusPct > 0) result.gold = Math.round(result.gold * (1 + goldBonusPct / 100));
   const curseActive = isDeathCurseActive();
   if(curseActive) result.gold = Math.round(result.gold * DEATH_CURSE_MULTIPLIER);
   // 최종 골드가 정해진 뒤 마지막 단계: 이 몬스터 개체의 레벨과 플레이어 레벨 차이에 따른 획득량 보정(죽음의 저주 적용 이후, 소수점 버림)
@@ -753,6 +756,16 @@ function killMonsterInstance(instanceId){
       hunt.scrollGrantedThisBattle = true; // 이번 전투에서는 더 이상 비급을 지급하지 않음(요구사항 9번)
       dropVisualItems.push({ kind: 'consumable', itemId: result.scrollDrop.itemId });
     } else hunt.pendingRewards.fullCategories.consumable = true;
+  }
+  if(result.boxDropIds && result.boxDropIds.length){
+    // 상자: 비급·플라스크와 같은 소비 인벤토리(state.consumables)에 지급(보상창에는 pendingRewards.boxDrops로 표시). 가득 차서 못 받으면 소비 "인벤토리 가득참" 안내만 표시.
+    if(!hunt.pendingRewards.boxDrops) hunt.pendingRewards.boxDrops = {}; // 이전 버전에서 저장된 진행 중 보상 호환
+    for(const boxId of result.boxDropIds){
+      if(grantConsumableStack(boxId, 1)){
+        hunt.pendingRewards.boxDrops[boxId] = (hunt.pendingRewards.boxDrops[boxId] || 0) + 1;
+        dropVisualItems.push({ kind: 'consumable', itemId: boxId });
+      } else hunt.pendingRewards.fullCategories.consumable = true;
+    }
   }
   // 실제 지급이 전부 끝난 뒤, 그 결과를 그대로 보여주기만 하는 연출 호출(연출 성패는 위 지급 로직과 완전히 무관함).
   playMonsterDropEffect(instanceId, dropVisualItems);

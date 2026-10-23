@@ -270,7 +270,6 @@ el('monsterRow').addEventListener('click', (e)=>{
 });
 el('leaveConfirmStopBtn').addEventListener('click', confirmLeaveBattle);
 el('leaveConfirmContinueBtn').addEventListener('click', cancelLeaveBattle);
-el('openBlacksmithBtn').addEventListener('click', openForgeSelect);
 el('closeForgeSelectBtn').addEventListener('click', closeForgeSelect);
 el('forgeSelectList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action="select-forge-target"]');
@@ -481,14 +480,6 @@ el('dungeonListPager').addEventListener('click', (e)=>{
   else if(btn.dataset.action === 'page-next') goPage(btn.dataset.pageTarget, 1);
 });
 el('dungeonList').addEventListener('click', (e)=>{
-  // 던전 카드 내부의 "획득 가능 아이템 안내" 페이지 전환 버튼(다음/이전) — 입장하기 버튼과 같은
-  // 컨테이너 안에 있어서 같은 리스너에서 data-action으로 구분해 처리함.
-  const pageBtn = e.target.closest('button[data-action]');
-  if(pageBtn){
-    if(pageBtn.dataset.action === 'page-prev') goPage(pageBtn.dataset.pageTarget, -1);
-    else if(pageBtn.dataset.action === 'page-next') goPage(pageBtn.dataset.pageTarget, 1);
-    return;
-  }
   const btn = e.target.closest('button[data-id]');
   if(!btn || btn.disabled) return;
   enterDungeon(btn.dataset.id);
@@ -566,6 +557,7 @@ el('consumableList').addEventListener('click', (e)=>{
   if(!btn) return;
   if(btn.dataset.action === 'use-flask') useFlask(btn.dataset.id);
   else if(btn.dataset.action === 'use-scroll') openScrollUseModal(btn.dataset.id);
+  else if(btn.dataset.action === 'use-box') openBoxModal(btn.dataset.id);
   else if(btn.dataset.action === 'use-trace') useTraceItem(Number(btn.dataset.id));
 });
 el('quickSlotRow').addEventListener('click', (e)=>{
@@ -867,3 +859,45 @@ window.addEventListener('resize', ()=>{ if(typeof alignHuntHeader === 'function'
 
 loadState();
 initPatchNoteSystem();
+
+
+// ---- 던전 카드 "획득 가능 아이템" 줄 가로 스크롤 ----
+// 터치는 브라우저 기본 가로 스크롤을 그대로 쓰고, 마우스는 줄 위를 누른 채 끌면 그 방향으로 움직임(스크롤바는 숨김, style.css).
+// 스크롤 위치는 던전별로 dungeonDropScroll에 기억(화면을 벗어나면 showView가 비움).
+(function initDungeonDropScroll(){
+  const DRAG_START_PX = 4; // 이 이상 움직여야 드래그로 인정(그 미만은 일반 클릭/호버)
+  let drag = null;
+  el('dungeonList').addEventListener('pointerdown', (e)=>{
+    if(e.pointerType !== 'mouse' || e.button !== 0) return;
+    const row = e.target.closest('.drop-icon-row');
+    if(!row || row.scrollWidth <= row.clientWidth + 1) return;
+    drag = { row, pointerId: e.pointerId, startX: e.clientX, startLeft: row.scrollLeft, moved: false };
+  });
+  window.addEventListener('pointermove', (e)=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    const dx = e.clientX - drag.startX;
+    if(!drag.moved){
+      if(Math.abs(dx) < DRAG_START_PX) return;
+      drag.moved = true;
+      drag.row.classList.add('is-dragging');
+      try{ drag.row.setPointerCapture(e.pointerId); }catch(_){}
+    }
+    drag.row.scrollLeft = drag.startLeft - dx;
+  });
+  const endDrag = (e)=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    drag.row.classList.remove('is-dragging');
+    try{ drag.row.releasePointerCapture(e.pointerId); }catch(_){}
+    drag = null;
+  };
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  // scroll 이벤트는 버블링하지 않아 캡처로 받음: 위치 기억 + 가장자리 흐림 갱신
+  document.addEventListener('scroll', (e)=>{
+    const row = e.target;
+    if(!row || !row.classList || !row.classList.contains('drop-icon-row')) return;
+    dungeonDropScroll[row.dataset.dungeonId] = row.scrollLeft;
+    dungeonDropScrollSync(row);
+  }, true);
+  window.addEventListener('resize', ()=>{ document.querySelectorAll('.drop-icon-row').forEach(dungeonDropScrollSync); });
+})();

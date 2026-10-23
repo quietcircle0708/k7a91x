@@ -236,7 +236,7 @@ function weaponGradeColor(type){ const g = WEAPON_GRADES[wpn(type).grade]; retur
 // 공용 클래스 계산 함수. 새로운 색상 값을 만들지 않고 기존 등급 텍스트 색상 시스템(WEAPON_GRADES.color)이
 // 쓰는 것과 동일한 등급 키만 그대로 재사용함 — 실제 배경 색상값 자체는 css/style.css의
 // .icon-grade-bg.grade-* 규칙에서 관리(텍스트 색상 로직인 weaponNameColor 등과는 완전히 별개 시스템).
-// grade가 없거나(플라스크 등 등급 없는 소비 아이템) WEAPON_GRADES에 없는 값이면 빈 문자열을 반환해
+// grade가 없거나(등급이 지정되지 않은 소비 아이템 등) WEAPON_GRADES에 없는 값이면 빈 문자열을 반환해
 // 슬롯의 기존 기본 배경을 그대로 둠(강제로 등급을 만들어 씌우지 않음).
 function gradeIconBgClass(grade){
   return (grade && WEAPON_GRADES[grade]) ? ('icon-grade-bg grade-' + grade) : '';
@@ -321,7 +321,7 @@ function itemIconHtml(itemDefLike, className){
   const cls = 'item-icon-img' + (className ? ' ' + className : '') + (itemDefLike.catalyst ? ' catalyst-icon' : ''); // 촉매 아이콘은 슬롯 크기에 비례해 표시(css .catalyst-icon + --catalyst-icon-ratio) — 다른 아이템에는 영향 없음
   const path = itemDefLike.equipType === 'artifact'
     ? ARTIFACT_IMAGE_DIR + itemDefLike.image + ARTIFACT_IMAGE_EXT
-    : ITEM_IMAGE_DIR + itemDefLike.image + ITEM_IMAGE_EXT;
+    : (itemDefLike.imageDir || ITEM_IMAGE_DIR) + itemDefLike.image + ITEM_IMAGE_EXT; // imageDir(선택): 다른 폴더의 PNG를 쓰는 아이템(예: 무기 이미지를 아이콘으로 쓰는 상자) 전용
   const img = `<img src="${path}" class="${cls}" alt="" draggable="false" data-fallback-emoji="${itemDefLike.icon}" onerror="itemImgError(this)">`;
   const bgCls = gradeIconBgClass(itemDefLike.grade);
   return bgCls ? `<span class="${bgCls}">${img}</span>` : img;
@@ -579,8 +579,15 @@ function buildArmorTooltipHtml(type, level, damaged, currentDurability){
 // 장비 전용 필드는 소비 아이템에 없으므로 표시하지 않음).
 // ---- 비급(소비 아이템 종류) 표시 헬퍼 ----
 function isScrollItem(item){ return !!item && item.class === SCROLL_CLASS; }
+// 상자(class '상자') 판정 — 사용 절차(랜덤/선택)는 데이터의 boxType으로 구분하며 박스 로직은 box_menu.js에 있음.
+function isBoxItem(item){ return !!item && item.class === BOX_CLASS_LABEL; }
 function scrollSkill(item){ return isScrollItem(item) ? (SKILLS[item.skillId] || null) : null; }
 function scrollGradeInfo(item){ return WEAPON_GRADES[item.grade] || null; } // 비급 등급 = 할당 스킬 등급(getter)
+// 소비 아이템 공용 등급 헬퍼 — 비급(getter 등급)·플라스크 등 일반 소비(data.js의 grade)를 구분 없이 처리함. 등급이 없으면 null.
+// 등급 색상/명칭은 WEAPON_GRADES를 그대로 재사용(새 색상 정의 없음).
+function consumableGradeInfo(item){ return (item && item.grade && WEAPON_GRADES[item.grade]) || null; }
+// 소비 아이템 아이콘 테두리 색: 등급이 있으면 등급 색상, 없으면 fallback(기본 'var(--forge-line)').
+function consumableBorderColor(item, fallback){ const g = consumableGradeInfo(item); return g ? g.color : (fallback || 'var(--forge-line)'); }
 // 존재하는 모든 비급 아이템(CONSUMABLES 중 class==='비급'). 새 비급을 CONSUMABLES에 추가하기만 하면
 // 드랍/던전 판정에 자동으로 포함됨(하드코딩 없음).
 function allScrollItems(){ return Object.values(CONSUMABLES).filter(isScrollItem); }
@@ -618,8 +625,27 @@ function buildConsumableTooltipHtml(id){
     h += `</div>`;
     return h;
   }
+  if(isBoxItem(item)){
+    // 상자 툴팁: 이름 / 등급 / 종류 / 설명(데이터 desc — 효과 문구 대신) / 판매 가격 순. 상자 종류(boxType)와 구매 가격은 표시하지 않음.
+    const g = consumableGradeInfo(item);
+    let h = `<div style="text-align:center;">`;
+    h += `<div style="color:${g ? g.color : 'var(--forge-cream)'}; font-weight:700; margin-bottom:2px;">${item.name}</div>`;
+    if(g) h += `<div style="color:${g.color}; font-weight:700; margin-bottom:4px;">${g.label}</div>`;
+    h += wtipRow('', item.class);
+    if(item.desc) h += wtipRow('', item.desc);
+    h += consumableTooltipSellPriceHtml(id);
+    h += `</div>`;
+    return h;
+  }
   let html = `<div style="text-align:center;">`;
-  html += `<div style="color:var(--forge-cream); font-weight:700; margin-bottom:4px;">${item.name}</div>`;
+  // 등급이 있는 일반 소비 아이템(플라스크 등): 이름에 등급 색상, 이름 아래 줄에 등급 명칭(마석·기타 툴팁과 같은 서식). 등급이 없으면 기존 그대로.
+  const grade = consumableGradeInfo(item);
+  if(grade){
+    html += `<div style="color:${grade.color}; font-weight:700; margin-bottom:2px;">${item.name}</div>`;
+    html += `<div style="color:${grade.color}; font-weight:700; margin-bottom:4px;">${grade.label}</div>`;
+  } else {
+    html += `<div style="color:var(--forge-cream); font-weight:700; margin-bottom:4px;">${item.name}</div>`;
+  }
   if(item.class) html += wtipRow('', item.class);
   // 소비 아이템 툴팁의 "효과" 문구도 무기/방어구/아티팩트와 동일하게 용어사전 용어를 클릭 가능하게 처리
   if(item.effectText) html += wtipRow('효과', resolveGlossaryTermsHtml(item.effectText));
@@ -1138,10 +1164,10 @@ function requiredKills(level){
   // requiredExp를 아예 호출하지 않도록 가드하고 있어 level 인자로 99가 들어오는 경우는 없음.
   let exponent;
   if(level <= 49) exponent = 1.05;
-  else if(level <= 79) exponent = 1.08;
-  else if(level <= 89) exponent = 1.2;
-  else if(level <= 94) exponent = 1.3;
-  else exponent = 1.4; // Lv95~98
+  else if(level <= 79) exponent = 1.1;
+  else if(level <= 89) exponent = 1.3;
+  else if(level <= 94) exponent = 1.4;
+  else exponent = 1.5; // Lv95~98
   return Math.round(10 + Math.pow(level - 1, exponent));
 }
 function requiredExp(level){
@@ -1753,6 +1779,13 @@ function naturalMpRegenAmount(maxMp, regen){
   const raw = maxMp * rate + (regen > 0 ? regen * rate : 0);
   return Math.round(raw);
 }
+// 장착한 아티팩트의 몬스터 처치 골드 증가율(%). 뿔 달린 정령인형 +20%. 장착 중인 아티팩트 효과를 합산하며, 적용 순서는 dungeon.js 참고
+// (기본 골드 → 랜덤 범위 → 이 보너스 → 죽음의 저주 → 최종 레벨 패널티).
+function artifactGoldBonusPercent(){
+  let pct = 0;
+  if(isArtifactEquipped('goblinfairy')) pct += 20;
+  return pct;
+}
 // 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
 // 초록색 "(+N)"으로 표시하는 데도 사용됨(render.js renderStatAllocRow 참고).
 // 착용 무기의 고유 옵션 statBonus(예: 반월대도의 힘+5)도 여기서 함께 합산됨 — 이름은 그대로 두지만
@@ -2224,7 +2257,7 @@ function shopBuyItemDisplay(action, typeId){
     const item = CONSUMABLES[typeId];
     // 실제 아이템 아이콘(PNG 등록시 자동 대체)과 기존 아이템 툴팁 서식(buildConsumableTooltipHtml)을
     // 그대로 재사용함 — 사용 효과(desc)만 단독으로 보여주던 기존 방식은 여기서 교체됨.
-    return { iconHtml: itemIconHtml(item, 'shop-icon-img'), tooltipHtml: buildConsumableTooltipHtml(typeId), borderColor: '#c13c3c' };
+    return { iconHtml: itemIconHtml(item, 'shop-icon-img'), tooltipHtml: buildConsumableTooltipHtml(typeId), borderColor: consumableBorderColor(item, '#c13c3c') }; // 등급이 있으면 등급 색상, 없으면 기존 붉은색
   }
   if(action === 'sell-misc'){
     // 상점 마석/기타 목록과 같은 아이콘·툴팁·등급 테두리색을 그대로 재사용
@@ -2797,7 +2830,7 @@ function invSortInfoArtifact(id){
 }
 function invSortInfoConsumable(item){
   return {
-    kindKey: 'consumable:' + (item.class || ''), gradeRank: isScrollItem(item) ? (WEAPON_GRADE_RANK[item.grade] ?? -1) : -1,
+    kindKey: 'consumable:' + (item.class || ''), gradeRank: (isScrollItem(item) || isBoxItem(item)) ? (WEAPON_GRADE_RANK[item.grade] ?? -1) : -1,
     price: item.sellPrice || 0, level: 0,
   };
 }
@@ -3074,9 +3107,14 @@ function resolveDrops(monsterDef, dungeon, level, options){
   // drops 중 artifactId/weaponId가 없는 항목(도토리/쥐고기 등 재료류)은 MISC_ITEMS에 등록된 재료
   // 아이템으로 취급하여, 각 항목마다 독립적으로 확률을 판정함(하나의 몬스터가 여러 개를 동시에
   // 드랍할 수도, 하나도 드랍 안 할 수도 있음).
+  // 상자(drops의 boxId — 소비 아이템 class '상자') 드랍: 항목마다 독립적으로 확률을 판정함(한 몬스터가 여러 상자를 가질 수도 있음).
+  const boxDropIds = [];
+  for(const drop of (monsterDef.drops || [])){
+    if(drop.boxId && CONSUMABLES[drop.boxId] && Math.random() * 100 < drop.chance) boxDropIds.push(drop.boxId);
+  }
   const miscDrops = [];
   for(const drop of (monsterDef.drops || [])){
-    if(drop.artifactId || drop.weaponId) continue; // 아티팩트/확정 무기 드랍은 위에서 이미 별도 처리됨
+    if(drop.artifactId || drop.weaponId || drop.boxId) continue; // 아티팩트/확정 무기/상자 드랍은 위에서 이미 별도 처리됨
     if(Math.random() * 100 < drop.chance){
       const item = miscItemByName(drop.name);
       if(item) miscDrops.push({ itemId: item.id, name: item.name, icon: item.icon, qty: 1 });
@@ -3087,7 +3125,7 @@ function resolveDrops(monsterDef, dungeon, level, options){
   // options.skipScroll로 판정 자체를 건너뜀(호출부인 killMonsterInstance가 hunt.scrollGrantedThisBattle로 전달).
   const scrollDrop = options.skipScroll ? null : rollScrollDrop(level);
 
-  return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, catalystDrop, artifactDropIds, miscDrops, scrollDrop };
+  return { gold, weaponDrop, weaponIdDrops, stoneDrop, flaskDrop, catalystDrop, artifactDropIds, miscDrops, scrollDrop, boxDropIds };
 }
 
 // ---- 던전 전투 종료 보상창의 "획득 아이템" 아이콘 그리드 표시용 데이터 ----
@@ -3133,27 +3171,40 @@ function buildRewardDisplayItems(rewards){
     const item = CONSUMABLES[itemId];
     if(!item) return;
     slots.push({
-      category: 'consumable',
+      category: 'consumable', subOrder: 2, // 소비 안에서의 순서: 비급(0) → 상자(1) → 플라스크(2) — 던전 카드(비급 다음)와 같은 방향
       gradeRank: -1, // 소비 아이템은 등급 필드가 없음 — 정렬 대상 아님(안정 정렬로 기존 순서 유지)
       iconHtml: itemIconHtml(item, 'reward-icon-img'),
       tooltipHtml: buildConsumableTooltipHtml(itemId),
-      borderColor: 'var(--forge-line)',
+      borderColor: consumableBorderColor(item), // 등급이 있으면 등급 색상(정렬 순위는 그대로 -1)
       qty: rewards.flaskDrops[itemId],
     });
   });
   // 비급(요구사항 13번) — 플라스크와 같은 소비 아이템 카테고리지만, 비급은 할당 스킬의 등급을 가지므로
-  // 등급 순위/등급 색상 테두리를 적용함(플라스크는 등급이 없어 -1/고정 회색을 그대로 씀).
+  // 등급 순위/등급 색상 테두리를 적용함(플라스크는 등급 색 테두리만 적용하고 정렬 순위는 -1 그대로).
   Object.keys(rewards.scrollDrops || {}).forEach(itemId => {
     const item = CONSUMABLES[itemId];
     if(!item) return;
     const g = scrollGradeInfo(item);
     slots.push({
-      category: 'consumable',
+      category: 'consumable', subOrder: 0,
       gradeRank: WEAPON_GRADE_RANK[item.grade] ?? -1,
       iconHtml: itemIconHtml(item, 'reward-icon-img'),
       tooltipHtml: buildConsumableTooltipHtml(itemId),
       borderColor: g ? g.color : 'var(--forge-line)',
       qty: rewards.scrollDrops[itemId],
+    });
+  });
+  // 상자 — 소비 아이템이며 비급 바로 다음(subOrder 1). 같은 상자 안에서는 등급 높은 순. 아이콘은 등급별 기본 상자 이미지, 테두리는 등급 색.
+  Object.keys(rewards.boxDrops || {}).forEach(itemId => {
+    const item = CONSUMABLES[itemId];
+    if(!item) return;
+    slots.push({
+      category: 'consumable', subOrder: 1,
+      gradeRank: WEAPON_GRADE_RANK[item.grade] ?? -1,
+      iconHtml: itemIconHtml(item, 'reward-icon-img'),
+      tooltipHtml: buildConsumableTooltipHtml(itemId),
+      borderColor: consumableBorderColor(item),
+      qty: rewards.boxDrops[itemId],
     });
   });
   Object.keys(rewards.miscDrops).forEach(itemId => {
@@ -3184,7 +3235,7 @@ function buildRewardDisplayItems(rewards){
   const catRank = c => { const i = REWARD_ITEM_CATEGORY_ORDER.indexOf(c); return i === -1 ? REWARD_ITEM_CATEGORY_ORDER.length : i; };
   return slots
     .map((s, i) => ({ s, i })) // Array.sort는 안정 정렬이지만, 비교 함수를 명시적으로 완전히 결정적으로
-    .sort((a, b) => (catRank(a.s.category) - catRank(b.s.category)) || (b.s.gradeRank - a.s.gradeRank) || (a.i - b.i))
+    .sort((a, b) => (catRank(a.s.category) - catRank(b.s.category)) || ((a.s.subOrder || 0) - (b.s.subOrder || 0)) || (b.s.gradeRank - a.s.gradeRank) || (a.i - b.i))
     .map(x => x.s);
 }
 

@@ -123,8 +123,7 @@ function invBoxConsumableEntries(){
   Object.values(CONSUMABLES).forEach(item => {
     const count = (state.consumables && state.consumables[item.id]) || 0;
     if(count <= 0) return;
-    const scroll = isScrollItem(item);
-    const g = scroll ? scrollGradeInfo(item) : null;
+    const g = consumableGradeInfo(item); // 비급·플라스크 공통(등급이 있으면 등급 색 테두리)
     out.push({
       key: 'consumable:' + item.id, src: 'consumable', id: item.id, item, type: item.id, name: item.name,
       ...invSortInfoConsumable(item),
@@ -254,7 +253,9 @@ const INV_BOX_ACTION_PROVIDERS = {
     ];
   },
   consumable: (e) => [
-    { id: 'use', label: '사용하기', run: () => isScrollItem(e.item) ? openScrollUseModal(e.id) : useFlask(e.id) },
+    isBoxItem(e.item)
+      ? { id: 'use', label: '사용', run: () => openBoxModal(e.id) } // 상자: 구성품 안내 UI(box_menu.js)
+      : { id: 'use', label: '사용하기', run: () => isScrollItem(e.item) ? openScrollUseModal(e.id) : useFlask(e.id) },
   ],
   trace: (e) => [
     { id: 'use', label: '사용하기', run: () => useTraceItem(e.id) },

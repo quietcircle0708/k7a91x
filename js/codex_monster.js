@@ -20,7 +20,7 @@ const CODEX_MONSTER_SEARCH_MAX_RESULTS = 60;
 const CODEX_MONSTER_DROP_USE_SPAWN_RANGE = true;
 
 // 드랍 아이템 표시 순서(그룹). 같은 그룹 안에서는 등급 내림차순 → 이름 가나다순.
-const CODEX_MONSTER_DROP_GROUPS = ['relic', 'scroll', 'table', 'catalyst', 'stone', 'flask', 'gold'];
+const CODEX_MONSTER_DROP_GROUPS = ['relic', 'scroll', 'box', 'table', 'catalyst', 'stone', 'flask', 'gold'];
 
 // ---- 화면 상태(저장하지 않음, 즐겨찾기만 state.codexFavorites에 저장) ----
 // cat: 세로 탭 id / grades: 등급 id → 체크 여부(기본 전부 체크) / query: 검색어 / infoKey: 정보 화면에 열린 몬스터 key
@@ -104,6 +104,12 @@ function codexMonsterBuildDrops(e){
       add({ group: 'table', id: 'equip:' + drop.weaponId, name: def.name, searchName: def.name, gradeRank: codexGradeRankOf(def.grade),
         iconHtml: weaponIconHtml(drop.weaponId, 'codex-drop-img'), borderColor: weaponGradeColor(drop.weaponId),
         tooltipHtml: codexEquipTooltipAtZero(drop.weaponId) });
+    } else if(drop.boxId){
+      // 상자(소비 아이템 class '상자') — 드랍 테이블에 boxId 항목이 있으면 자동으로 표시(상자 아이콘만, 구성품은 툴팁에 나오지 않음). 던전 카드와 같이 비급 바로 다음 그룹.
+      const def = CONSUMABLES[drop.boxId];
+      if(!def) return;
+      add({ group: 'box', id: 'box:' + drop.boxId, name: def.name, searchName: def.name, gradeRank: codexGradeRankOf(def.grade),
+        iconHtml: itemIconHtml(def), borderColor: consumableBorderColor(def), tooltipHtml: buildConsumableTooltipHtml(drop.boxId) });
     } else if(drop.artifactId){
       const def = ARTIFACTS[drop.artifactId];
       if(!def) return;
@@ -141,7 +147,7 @@ function codexMonsterBuildDrops(e){
       const item = CONSUMABLES[prefix + tier];
       if(!item) return;
       add({ group: 'flask', id: item.id, name: item.name, searchName: item.name, gradeRank: codexGradeRankOf(item.grade),
-        iconHtml: itemIconHtml(item), borderColor: 'var(--forge-line)', tooltipHtml: buildConsumableTooltipHtml(item.id) });
+        iconHtml: itemIconHtml(item), borderColor: consumableBorderColor(item), tooltipHtml: buildConsumableTooltipHtml(item.id) });
     });
   });
 
