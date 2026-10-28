@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=370">
+<link rel="stylesheet" href="css/style.css?v=385">
 </head>
 <body>
 <div class="wrap">
@@ -133,7 +133,7 @@
           <div class="shop-mode-tabs" id="shopModeTabs"></div>
           <div class="inv-box-gold shop-gold" id="shopGold"></div>
         </div>
-        <div class="shop-cat-tabs" id="shopCatTabs"></div>
+        <div class="shop-cat-tabs drag-tabs" id="shopCatTabs"></div>
       </div>
       <!-- 패널: 세부 분류 → 필터·검색 → 빠른 구매/판매는 고정, 아이템 목록(#shopListScroll)만 세로 스크롤 -->
       <div class="inv-box-panel shop-panel">
@@ -301,7 +301,7 @@
     <!-- 제작소 메뉴 — 내용은 craft_menu.js가 채움. 탭/세로 탭/검색/정렬/툴팁 스타일은 도감·신버전 인벤토리(.inv-box-*, .codex-*)를 재사용 -->
     <div class="craft-new-wrap" id="craftNewWrap">
       <div class="shop-title">제작소</div>
-      <div class="craft-cat-tabs" id="craftCatTabs"></div>
+      <div class="craft-cat-tabs drag-tabs" id="craftCatTabs"></div>
       <div class="inv-box-panel craft-panel">
         <div class="craft-body">
           <div class="codex-vtabs craft-vtabs" id="craftVTabs"></div>
@@ -1076,23 +1076,23 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=370"></script>
-<script src="js/formulas.js?v=370"></script>
-<script src="js/catalyst.js?v=370"></script>
-<script src="js/state.js?v=370"></script>
-<script src="js/effects.js?v=370"></script>
-<script src="js/render.js?v=370"></script>
-<script src="js/actions.js?v=370"></script>
-<script src="js/dungeon.js?v=370"></script>
-<script src="js/navigation.js?v=370"></script>
-<script src="js/inventory_box.js?v=370"></script>
-<script src="js/codex.js?v=370"></script>
-<script src="js/codex_monster.js?v=370"></script>
-<script src="js/craft_menu.js?v=370"></script>
-<script src="js/craft_multi.js?v=370"></script>
-<script src="js/shop_menu.js?v=370"></script>
-<script src="js/box_menu.js?v=370"></script>
-<script src="js/forge_menu.js?v=370"></script>
-<script src="js/main.js?v=370"></script>
+<script src="js/data.js?v=385"></script>
+<script src="js/formulas.js?v=385"></script>
+<script src="js/catalyst.js?v=385"></script>
+<script src="js/state.js?v=385"></script>
+<script src="js/effects.js?v=385"></script>
+<script src="js/render.js?v=385"></script>
+<script src="js/actions.js?v=385"></script>
+<script src="js/dungeon.js?v=385"></script>
+<script src="js/navigation.js?v=385"></script>
+<script src="js/inventory_box.js?v=385"></script>
+<script src="js/codex.js?v=385"></script>
+<script src="js/codex_monster.js?v=385"></script>
+<script src="js/craft_menu.js?v=385"></script>
+<script src="js/craft_multi.js?v=385"></script>
+<script src="js/shop_menu.js?v=385"></script>
+<script src="js/box_menu.js?v=385"></script>
+<script src="js/forge_menu.js?v=385"></script>
+<script src="js/main.js?v=385"></script>
 </body>
 </html>

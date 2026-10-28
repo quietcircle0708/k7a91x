@@ -56,17 +56,16 @@ function codexEquipTooltipAtZero(id){ // 던전 입구 카드의 장비 드랍 �
     : buildWeaponTooltipHtml(id, 0);
 }
 // 모험가의 유해가 이 레벨에서 실제로 나올 수 있는지(resolveWeaponRelicDrop과 같은 조건: 장비 타입·등급 확률이 0보다 크고,
-// min(몬스터 레벨+10, RELIC_LEVEL_CAP) 이하 장비가 그 등급에 하나라도 있음). 조건 판정만 하고 추첨은 하지 않음.
+// relicMaxDropLevel(등급, 몬스터 레벨) 이하 장비가 그 등급에 하나라도 있음). 조건 판정만 하고 추첨은 하지 않음.
 function codexRelicPossibleAt(level){
   if(!(RELIC_DROP_CHANCE > 0)) return false;
-  const maxDropLevel = Math.min(level + 10, RELIC_LEVEL_CAP);
   return Object.entries(RELIC_EQUIP_TYPE_CHANCE).some(([equipType, typeChance]) => {
     if(!(typeChance > 0)) return false;
     const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === equipType);
     if(!pool || !pool.typesTable) return false;
     const gradeChances = RELIC_GRADE_CHANCE[equipType] || {};
     return Object.entries(gradeChances).some(([grade, chance]) =>
-      chance > 0 && Object.values(pool.typesTable).some(w => w.grade === grade && w.levelReq <= maxDropLevel));
+      chance > 0 && Object.values(pool.typesTable).some(w => w.grade === grade && w.levelReq <= relicMaxDropLevel(grade, level)));
   });
 }
 function codexGradeRankOf(grade){ return (grade && WEAPON_GRADE_RANK[grade] != null) ? WEAPON_GRADE_RANK[grade] : -1; } // 등급 없는 아이템은 가장 낮게

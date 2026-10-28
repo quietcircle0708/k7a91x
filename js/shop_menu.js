@@ -166,7 +166,8 @@ function shopMenuRender(){
   shopMenuSet('shopModeTabs', SHOP_MODES.map(x => `<button class="shop-mode-tab ${x.id === m ? 'active' : ''}" data-mode="${x.id}">${shopMenuEsc(x.label)}</button>`).join(''));
   shopMenuSet('shopGold', `소유 골드 <span class="inv-box-gold-val"><b>${state.gold.toLocaleString()}</b>${uiIconHtml('gold', 'ui-icon-inline')}</span>`);
   // 분류 탭(장비/소비/마석/기타) — 표시 가능한 아이템이 있는 분류만 / 세부 분류(장비) — 같은 규칙
-  shopMenuSet('shopCatTabs', tops.map(t => `<button class="inv-box-tab shop-cat-tab ${top && t.id === top.id ? 'active' : ''}" data-cat="${t.id}">${shopMenuEsc(t.label)}</button>`).join(''));
+  const catFirst = shopMenuUI.cache['shopCatTabs'] === undefined; // 상점에 들어온 직후의 첫 구성이면 스크롤 이동을 즉시, 분류 전환이면 부드럽게
+  if(shopMenuSet('shopCatTabs', tops.map(t => `<button class="inv-box-tab shop-cat-tab ${top && t.id === top.id ? 'active' : ''}" data-cat="${t.id}">${shopMenuEsc(t.label)}</button>`).join(''))) tabBarAfterRender(el('shopCatTabs'), !catFirst); // 내용이 바뀐 경우에만 활성 탭이 보이도록 이동
   const subWrap = el('shopSubTabs');
   subWrap.style.display = top && top.subTabs && subs.length ? 'flex' : 'none';
   shopMenuSet('shopSubTabs', subs.map(s => `<button class="shop-sub-tab ${s.id === leaf ? 'active' : ''}" data-leaf="${s.id}">${shopMenuEsc(s.label)}</button>`).join(''));

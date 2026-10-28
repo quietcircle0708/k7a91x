@@ -23,7 +23,7 @@ let state = {
   nextItemId: 1,
   armorInventory: [],                          // 보유 방어구 목록({id,type,level}, 무기 인벤토리와 동일한 형태)
   equippedArmor: { helmet: null, armor: null, shoes: null }, // 착용 중인 방어구(종류당 1개 — 투구/갑옷/신발) — 강화 대상(forgeTargetId)과는 별개 개념
-  subInventory: [],                             // 보유 보조(방패/보조 무기) 목록({id,type,level} — level은 강화가 없어 항상 0)
+  subInventory: [],                             // 보유 보조(방패/보조 무기) 목록({id,type,level} — level은 강화 단계(0~9))
   equippedSubId: null,                          // 착용 중인 보조 아이템 id(동시에 1개만, 양손 무기 장착 중이면 착용 불가)
   accessoryInventory: [],                       // 보유 장신구 목록({id,type,level})
   equippedNecklaceId: null,                     // 착용 중인 목걸이 id(목걸이 전용 슬롯 1개 — 장신구1/2 슬롯과 별개, 목걸이는 여기에만 착용)
@@ -54,7 +54,7 @@ let state = {
   manaShards: 0,       // 마석 조각 보유 개수
   manaCrystals: 0,     // 마석 결정 보유 개수
   manaStones: 0,       // 마석 보유 개수
-  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0, // 기타(재료) 아이템 보유 개수
+  acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0, redOrbShards: 0, goblinKingMedals: 0, oldCoins: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
@@ -136,7 +136,6 @@ let pageState = {
   restoreSelect: 1,
   craftSelect: 1,
   dungeonList: 1,
-  skillPage: 1,
   // [캐릭터 정보] 탭 안에서 자체 페이지를 갖는 소분류("착용 장비"의 1p 장비창/2p 아티팩트 효과, "세부
   // 능력치"의 1p 전투 능력치/2p 최종 스탯)용 페이지 상태 — 캐릭터 메뉴/던전 우측 패널이 각자 "지금 보고
   // 있는 페이지"를 독립적으로 관리함(실제 수치는 공용 state를 그대로 읽으므로 항상 서로 일치함).
@@ -156,12 +155,13 @@ let pageState = {
 let dungeonDropScroll = {};
 
 const el = id => document.getElementById(id);
-// 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기든 방어구든 상관없이 state.forgeTargetId가
+// 대장간 화면(swordStage)에 지금 표시된 "강화 대상" — 무기/방어구/장신구/보조 어느 것이든 state.forgeTargetId가
 // 가리키는 아이템을 반환함(사용자 요청: 강화 화면에서 강화 가능한 모든 장비를 선택해서 쓸 수 있어야 함).
 function getEquipped(){
   return state.inventory.find(i => i.id === state.forgeTargetId)
     || (state.armorInventory || []).find(i => i.id === state.forgeTargetId)
     || (state.accessoryInventory || []).find(i => i.id === state.forgeTargetId)
+    || (state.subInventory || []).find(i => i.id === state.forgeTargetId) // 보조(방패/보조 무기)도 강화 대상
     || null;
 }
 // 공격력 등 "실제 전투에 쓰이는 착용 무기"가 필요한 곳 전용(스킬 데미지 계산, 던전 입장 조건, 전투 자동
@@ -341,14 +341,30 @@ function gainExp(amount){
 // 보유 아티팩트 수는 제한이 없고(인벤토리에 계속 쌓임), 동시에 장착 가능한 개수만 ARTIFACT_SLOT_MAX로 제한됨.
 function ownsArtifact(id){ return state.artifacts.includes(id); }
 function isArtifactEquipped(id){ return state.equippedArtifacts.includes(id); }
+// 아티팩트의 "같은 효과 그룹" 목록(data.js ARTIFACT_EXCLUSIVE_EFFECTS). 해당 효과 필드를 가진 그룹만 반환.
+function artifactExclusiveGroups(id){
+  const a = ARTIFACTS[id];
+  if(!a) return [];
+  return ARTIFACT_EXCLUSIVE_EFFECTS.filter(g => a[g.field] != null);
+}
+// 이 아티팩트를 장착하려 할 때 막는 다른 장착 중 아티팩트 id(같은 효과 그룹을 공유) — 없으면 null.
+function artifactEquipBlocker(id){
+  const groups = artifactExclusiveGroups(id);
+  if(groups.length === 0) return null;
+  return state.equippedArtifacts.find(otherId => otherId !== id && artifactExclusiveGroups(otherId).some(g => groups.some(mine => mine.id === g.id))) || null;
+}
+// 장착 불가 사유 문구(버튼 툴팁용) — 슬롯이 가득 찬 경우보다 이쪽을 먼저 안내함. 막는 아티팩트가 없으면 ''.
+function artifactEquipBlockReason(id){
+  const blocker = artifactEquipBlocker(id);
+  return blocker ? `같은 효과를 가진 아티팩트(${ARTIFACTS[blocker].name})를 먼저 해제해주세요.` : '';
+}
 function canGrantArtifact(id){ return !ownsArtifact(id) && !inventoryCategoryFull('artifact'); } // 이미 보유 중이거나 아티팩트 인벤토리(64슬롯)가 가득 차면 지급 불가
 function grantArtifactSafe(id){
   if(!canGrantArtifact(id)) return false;
   state.artifacts.push(id);
   // 빈 장착 슬롯이 있을 때만 자동 장착. 슬롯이 가득 차 있으면 장착하지 않고 보유 목록에만 추가하며,
   // 이미 장착 중인 다른 아티팩트를 교체하지 않음.
-  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX) state.equippedArtifacts.push(id);
-  return true;
+  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX && !artifactEquipBlocker(id)) state.equippedArtifacts.push(id); // 같은 효과 그룹의 아티팩트가 이미 장착 중이면 자동 장착하지 않음
 }
 
 // ---- 상태 이상(디버프) 적용 ----
@@ -483,6 +499,8 @@ function applyLoadedRaw(raw){
   // 실패 등 연쇄 증상). 더 이상 존재하지 않는 id는 보유·장착 목록 양쪽에서 조용히 제거해 정리함.
   state.artifacts = state.artifacts.filter(id => ARTIFACTS[id]);
   state.equippedArtifacts = state.equippedArtifacts.filter(id => ARTIFACTS[id]);
+  // 같은 효과 그룹 아티팩트가 둘 이상 장착된 비정상 세이브는 먼저 장착된 것만 남기고 정리(정상 플레이에서는 발생하지 않음).
+  state.equippedArtifacts = state.equippedArtifacts.filter((id, i, arr) => !arr.slice(0, i).some(prev => artifactExclusiveGroups(prev).some(g => artifactExclusiveGroups(id).some(m => m.id === g.id))));
   // 구버전 인벤토리(type 필드 없음) 마이그레이션: 전부 롱소드였음
   if(Array.isArray(state.inventory)){
     state.inventory.forEach(it => { if(!it.type) it.type = 'longsword'; });
@@ -519,12 +537,41 @@ function applyLoadedRaw(raw){
   // 이미 진행 중이던 세이브의 미사용 포인트가 새 공식 기준으로 자동 보정됨(기존엔 필드가 아예 없을
   // 때만 소급 지급해서, 공식이 바뀐 경우는 반영이 안 되는 문제가 있었음). 기연(awakeningPoints)은
   // 이번 수정 범위가 아니라 기존 방식(필드 없을 때만 소급 지급) 그대로 유지함.
+  // 요구 레벨 미달 공용/특화 스킬 해제(전체 해제): 세이브에 습득돼 있어도 현재 레벨이 스킬의 levelReq에 못 미치면
+  // 목록에서 제거함. 아래 포인트 재계산이 "총량 - 습득 스킬 체인 비용"이라 해제된 체인 비용은 자동으로 환급됨
+  // (하위 스킬도 함께 미습득 상태가 되며, 일괄 습득으로 다시 배울 수 있음). 매 로드마다 검사하므로 이후 스킬의
+  // 요구 레벨이 상향돼도 같은 규칙이 적용됨. 해제된 id는 아래 퀵슬롯 정리에 사용.
+  const prunedSkillIds = [];
+  if(Array.isArray(state.learnedSkills)){
+    state.learnedSkills = state.learnedSkills.filter(id => {
+      const sk = SKILLS[id];
+      if(sk && sk.levelReq && (state.playerLevel || 1) < sk.levelReq){ prunedSkillIds.push(id); return false; }
+      return true;
+    });
+  }
   const spentSkillPoints = (state.learnedSkills || []).reduce((sum, id) => sum + chainSkillCost(id), 0);
   state.skillPoints = totalSkillPointsForLevel(state.playerLevel) - spentSkillPoints;
+  // 육연격 추가(zip380)로 칠연격 체인 비용이 1 늘어난 기존 세이브 보정: 그 때문에 미사용 포인트가 음수가 되면 칠연격만 해제함.
+  if(state.skillPoints < 0 && Array.isArray(state.learnedSkills) && state.learnedSkills.includes('seven_strike')){
+    state.learnedSkills = state.learnedSkills.filter(id => id !== 'seven_strike');
+    prunedSkillIds.push('seven_strike');
+    state.skillPoints = totalSkillPointsForLevel(state.playerLevel) - state.learnedSkills.reduce((sum, id) => sum + chainSkillCost(id), 0);
+  }
   if(loaded.awakeningPoints === undefined) state.awakeningPoints = totalAwakeningPointsForLevel(state.playerLevel);
   if(!Array.isArray(state.learnedSkills)) state.learnedSkills = [];
   if(!Array.isArray(state.learnedAwakeningSkills)) state.learnedAwakeningSkills = [];
   if(!Array.isArray(state.unlockedAwakeningSkills)) state.unlockedAwakeningSkills = [];
+  // 요구 레벨 미달 기연 스킬 해제: 깨달음 포인트는 로드 시 재계산되지 않으므로 해제한 체인 비용을 직접 환급함
+  // (필드가 없던 구버전 세이브는 위에서 총량으로 새로 지급되므로 환급하지 않음). 비급 해금 기록은 그대로 유지됨.
+  state.learnedAwakeningSkills = state.learnedAwakeningSkills.filter(id => {
+    const sk = SKILLS[id];
+    if(sk && sk.levelReq && (state.playerLevel || 1) < sk.levelReq){
+      if(loaded.awakeningPoints !== undefined) state.awakeningPoints = (state.awakeningPoints || 0) + chainSkillCost(id);
+      prunedSkillIds.push(id);
+      return false;
+    }
+    return true;
+  });
   // 도감 즐겨찾기: 이전 세이브에는 없는 필드 → 빈 목록. 문자열 키만 남기고 중복 제거
   state.codexFavorites = Array.isArray(state.codexFavorites) ? [...new Set(state.codexFavorites.filter(k => typeof k === 'string'))] : [];
   // 제작 천장 누적: 이전 세이브에는 없는 필드 → 빈 객체. 0 이상 정수 값만 남김(저장/불러오기 후에도 누적 유지)
@@ -557,6 +604,7 @@ function applyLoadedRaw(raw){
     const prevSkillSlots = Array.isArray(state.skillQuickSlots) ? state.skillQuickSlots : [];
     state.skillQuickSlots = Array.from({ length: SKILL_QUICK_SLOT_COUNT }, (_, i) => prevSkillSlots[i] || null);
   }
+  if(prunedSkillIds.length) state.skillQuickSlots = state.skillQuickSlots.map(id => prunedSkillIds.includes(id) ? null : id); // 해제된 스킬이 등록된 퀵슬롯은 비움
   if(!state.consumables) state.consumables = { hpFlask6: 0, mpFlask6: 0 };
   // 구버전(플라스크 리네임 이전) 마이그레이션: 기존 hpFlask/mpFlask로 저장된 보유 수량을
   // 동일한 지속 회복 플라스크인 hpFlask6/mpFlask6로 그대로 이전(수량 손실 없이 합산).
@@ -667,7 +715,7 @@ function resetGame(){
     forgeMode: 'prayer', forgeStone: { id: null, on: false, forId: null }, forgeRevive: 0,
     craftCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }], restoreCatalysts: [{ id: null, qty: 0 }, { id: null, qty: 0 }, { id: null, qty: 0 }],
     artifacts: [], equippedArtifacts: [], manaFragments: 0, manaShards: 0, manaCrystals: 0, manaStones: 0,
-    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0,
+    acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0, redOrbShards: 0, goblinKingMedals: 0, oldCoins: 0,
     skipEffects:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },

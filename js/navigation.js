@@ -93,6 +93,7 @@ function showView(name){
   if(name === 'shop') shopMenuOpen(); // 상점 새 메뉴(shop_menu.js): 진입할 때마다 목록을 현재 데이터로 새로 구성
   if(name !== 'shop' && typeof shopMenuSearchReset === 'function') shopMenuSearchReset(); // 상점을 나가면 구매/판매 검색어 초기화(인벤토리 검색과 동일)
   if(name !== 'craft' && typeof craftMenuSearchReset === 'function') craftMenuSearchReset(); // 제작소를 나가면 검색어/결과 초기화(인벤토리 검색과 동일)
+  skillSearchReset(); // 화면을 이동하면(캐릭터 메뉴/던전 우측 카드를 나가면) 스킬 검색어/결과 초기화(인벤토리 검색과 동일)
   if(name === 'character'){
     // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
     // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
@@ -103,10 +104,9 @@ function showView(name){
     activeCharInfoSubtab = CHAR_INFO_SUBTABS.length > 0 ? CHAR_INFO_SUBTABS[0].id : null; // 캐릭터 메뉴 진입할 때마다 항상 첫 소분류탭부터
     pageState.charInfoEquip = 1;
     pageState.charInfoStats = 1;
-    // 스킬 탭 상태도 캐릭터 정보 탭과 동일하게 진입할 때마다 첫 하위탭·1페이지로 초기화
+    // 스킬 탭 상태도 캐릭터 정보 탭과 동일하게 진입할 때마다 첫 하위탭으로 초기화
     activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
     activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null; // 요구사항 3번: 진입할 때마다 항상 "공격" 탭부터
-    pageState.skillPage = 1;
     renderCharacterMenu();
   }
   render();
@@ -536,6 +536,8 @@ function openCraftAnim(){
     if(!resource) return;
     if(resource.kind === 'misc'){
       state[resource.def.stateKey] = Math.max(0, (state[resource.def.stateKey] || 0) - m.need);
+    } else if(resource.kind === 'artifact'){
+      state.artifacts = state.artifacts.filter(id => id !== resource.itemId); // 아티팩트 재료 — 보유 목록에서 소모(착용 중이면 애초에 재료 불가). 실패 반환은 craftGrantResultItems
     } else {
       // 자동으로 같은 종류의 장비를 찾지 않고, 사용자가 슬롯에 직접 등록한 실제 인스턴스(id)만 소모함(같은 종류의 다른 장비는 건드리지 않음).
       const pool = EQUIP_INVENTORY_POOLS.find(p => p.kind === resource.equipType);
@@ -670,9 +672,6 @@ const PAGE_RENDER_FN = {
   charInfoStats: renderCharacterMenu,
   huntInfoEquip: renderHuntSidePanel,
   huntInfoStats: renderHuntSidePanel,
-  // skillPage(공용/특화/기연 스킬 목록의 레벨 구간 페이지)는 캐릭터 메뉴 스킬 탭과 던전 우측 카드 스킬
-  // 탭 2페이지가 공용 state로 함께 쓰므로, 페이지를 넘기면 둘 다 갱신함(둘 중 실제 존재하는 쪽만 반영됨).
-  skillPage: () => { renderCharacterMenu(); renderHuntSidePanel(); },
   huntCharSkill: renderHuntSidePanel,
   patchNote: renderPatchNote,
   killRewardItems: renderKillRewardItemSection,
@@ -702,7 +701,7 @@ function openQuickSlotPicker(idx){
   } else {
     list.innerHTML = ownedItems.map(item => `
       <button class="quickslot-pick-item" data-item="${item.id}">
-        <span style="font-size:20px;">${itemIconHtml(item)}</span>
+        <div class="inv-icon" style="border-color: ${consumableBorderColor(item)};">${itemIconHtml(item)}</div>
         <span>${item.name} <span style="color:var(--forge-cream-dim);">×${state.consumables[item.id]}</span></span>
       </button>
     `).join('');
@@ -868,15 +867,40 @@ function switchSkillCategory(catId){
   renderCharacterMenu();
   renderHuntSidePanel(); // 던전 우측 카드 스킬 탭도 같은 activeSkillCategory를 공유해서 씀
 }
-// 스킬 탭 세로 탭(공격/버프/패시브) 전환 — 요구사항 3번: 공용/특화/기연 하위 탭을 바꾸거나 페이지를
-// 넘겨도 이 값은 별도로 건드리지 않으므로(위 switchSkillCategory와 goPage 어디에도 activeSkillKind를
-// 건드리는 코드가 없음) 선택 상태가 그대로 유지되고, 캐릭터 메뉴에 새로 진입할 때만(navigation.js
-// showView) 항상 '공격'으로 초기화됨.
+// 스킬 탭 세로 탭(공격/버프/패시브) 전환 — 요구사항 3번: 공용/특화/기연 하위 탭을 바꿔도 이 값은 별도로
+// 건드리지 않으므로(위 switchSkillCategory가 activeSkillKind를 건드리지 않음) 선택 상태가 그대로 유지되고,
+// 캐릭터 메뉴에 새로 진입할 때만(navigation.js showView) 항상 '공격'으로 초기화됨(검색 결과 선택 시에는 그 스킬의 탭으로 이동).
 let activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null;
 function switchSkillKind(kindId){
   activeSkillKind = kindId;
   renderCharacterMenu();
   renderHuntSidePanel();
+}
+// 스킬 검색 상태(캐릭터 메뉴 스킬 탭 / 던전 우측 카드 스킬 탭이 함께 씀 — 검색창 UI는 render.js buildSkillSearchHtml).
+// 검색어는 탭을 옮겨도 유지되고, 검색창을 다시 선택하면(main.js initSkillTree) 또는 화면을 이동하면(showView → skillSearchReset) 초기화됨.
+// focusId: 검색 결과로 이동 중인 스킬(트리 기본 스크롤 위치 계산을 건너뛰기 위한 일시 값) / restoring: 다시 그린 뒤 검색창 포커스를 복원하는 중.
+const skillSearchUI = { query: '', resultsOpen: false, focusId: null, restoring: false };
+// 검색 결과 선택: 그 스킬의 분류·세로 탭으로 이동하고 트리에서 가운데로 옮겨 잠깐 강조함.
+function skillSearchGoTo(id){
+  const s = SKILLS[id];
+  if(!s) return;
+  const kindId = skillVerticalTabOf(s);
+  const sameTab = activeSkillCategory === s.category && activeSkillKind === kindId;
+  activeSkillCategory = s.category;
+  activeSkillKind = kindId;
+  skillSearchUI.resultsOpen = false;
+  skillSearchUI.focusId = id;
+  renderCharacterMenu();
+  renderHuntSidePanel(); // 던전 우측 카드 스킬 탭도 같은 상태를 공유해서 씀(둘 중 실제로 화면에 있는 쪽만 이동·강조됨)
+  skillTreeFocus(id, sameTab);
+  skillSearchUI.focusId = null;
+}
+function skillSearchReset(){
+  skillSearchUI.query = '';
+  skillSearchUI.resultsOpen = false;
+  skillSearchUI.focusId = null;
+  document.querySelectorAll('.skill-search-input').forEach(i => { i.value = ''; });
+  document.querySelectorAll('.skill-search-results').forEach(b => { b.style.display = 'none'; b.innerHTML = ''; });
 }
 // 스킬 습득: 포인트를 소비하고 해당 분류의 습득 목록(learnedSkills/learnedAwakeningSkills)에 추가함.
 // 에픽/유니크는 아직 해금 방식이 구현되지 않아(비급/깨달음 소비 예정) canLearnSkill이 항상 false를 반환하므로
@@ -1038,11 +1062,12 @@ function confirmTraceRestore(){
   if(idx !== -1) state.traceInventory.splice(idx, 1);
 
   // 복구되는 장비는 파괴 당시 강화 단계가 아닌 +0으로 지급됨(요구사항 8) — 능력치/등급/아이템 레벨 등은
-  // 원래 장비 데이터(forType의 WEAPON_TYPES/ARMOR_TYPES/ACCESSORY_TYPES 항목)를 그대로 사용함.
+  // 원래 장비 데이터(forType의 WEAPON_TYPES/ARMOR_TYPES/ACCESSORY_TYPES/SUB_TYPES 항목)를 그대로 사용함.
   const w = wpn(trace.forType);
   const newItem = { id: state.nextItemId++, level: 0, type: trace.forType, currentDurability: freshCurrentDurability(trace.forType) };
   if(w.equipType === 'armor') state.armorInventory.push(newItem);
   else if(w.equipType === 'accessory') state.accessoryInventory.push(newItem);
+  else if(w.equipType === 'sub') state.subInventory.push(newItem); // 보조 아이템도 강화 파괴 시 흔적을 남기므로 복구 시 보조 인벤토리로 지급
   else state.inventory.push(newItem);
 
   openTraceRestoreResult(trace.forType, w.name);

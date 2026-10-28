@@ -349,6 +349,9 @@ function handleCharPanelClick(e){
   const skillKindBtn = e.target.closest('button[data-skill-kind]');
   if(skillKindBtn){ switchSkillKind(skillKindBtn.dataset.skillKind); return; }
 
+  const skillResultBtn = e.target.closest('button[data-skill-result]');
+  if(skillResultBtn){ skillSearchGoTo(skillResultBtn.dataset.skillResult); return; }
+
   const learnBtn = e.target.closest('button[data-learn-skill]');
   if(learnBtn){
     const id = learnBtn.dataset.learnSkill;
@@ -540,9 +543,9 @@ el('subInventoryList').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn || btn.disabled) return;
   const id = Number(btn.dataset.id);
-  // 보조 아이템은 "강화 선택" 버튼 자체가 없음(문서 2번 규칙) — wear-sub/unwear-sub/sell-sub만 처리.
   if(btn.dataset.action === 'wear-sub') equipSubPiece(id);
   else if(btn.dataset.action === 'unwear-sub') unequipSubPiece(id);
+  else if(btn.dataset.action === 'equip') selectForgeTargetFromInventory(id); // 강화 선택 → 강화 대상 지정 후 대장간으로 이동(방어구/장신구와 동일)
   else if(btn.dataset.action === 'sell-sub') sellSubItem(id);
 });
 el('artifactList').addEventListener('click', (e)=>{
@@ -861,15 +864,17 @@ loadState();
 initPatchNoteSystem();
 
 
-// ---- 던전 카드 "획득 가능 아이템" 줄 가로 스크롤 ----
+// ---- 가로 스크롤 줄 마우스 드래그 스크롤(공용) ----
 // 터치는 브라우저 기본 가로 스크롤을 그대로 쓰고, 마우스는 줄 위를 누른 채 끌면 그 방향으로 움직임(스크롤바는 숨김, style.css).
-// 스크롤 위치는 던전별로 dungeonDropScroll에 기억(화면을 벗어나면 showView가 비움).
-(function initDungeonDropScroll(){
+// host 안에서 rowSelector에 해당하는 줄(host 자신 포함)이 대상이며, 던전 카드 "획득 가능 아이템" 줄과 제작소/상점 분류 탭 줄이 함께 씀.
+// opts.suppressClick: 줄 안에 클릭 가능한 버튼(분류 탭)이 있으면 드래그를 끝낼 때 따라오는 클릭 1회를 무시해서 탭이 바뀌지 않게 함.
+function enableDragScroll(host, rowSelector, opts){
   const DRAG_START_PX = 4; // 이 이상 움직여야 드래그로 인정(그 미만은 일반 클릭/호버)
+  const suppressClick = !!(opts && opts.suppressClick);
   let drag = null;
-  el('dungeonList').addEventListener('pointerdown', (e)=>{
+  host.addEventListener('pointerdown', (e)=>{
     if(e.pointerType !== 'mouse' || e.button !== 0) return;
-    const row = e.target.closest('.drop-icon-row');
+    const row = e.target.closest(rowSelector);
     if(!row || row.scrollWidth <= row.clientWidth + 1) return;
     drag = { row, pointerId: e.pointerId, startX: e.clientX, startLeft: row.scrollLeft, moved: false };
   });
@@ -886,12 +891,41 @@ initPatchNoteSystem();
   });
   const endDrag = (e)=>{
     if(!drag || e.pointerId !== drag.pointerId) return;
-    drag.row.classList.remove('is-dragging');
-    try{ drag.row.releasePointerCapture(e.pointerId); }catch(_){}
+    const { row, moved } = drag;
+    row.classList.remove('is-dragging');
+    try{ row.releasePointerCapture(e.pointerId); }catch(_){}
     drag = null;
+    if(moved && suppressClick){
+      const stop = (ev)=>{ ev.stopImmediatePropagation(); ev.preventDefault(); };
+      row.addEventListener('click', stop, { capture: true, once: true });
+      setTimeout(()=>row.removeEventListener('click', stop, true), 60); // 클릭이 오지 않는 경우(포인터 취소 등)를 대비해 정리
+    }
   };
   window.addEventListener('pointerup', endDrag);
   window.addEventListener('pointercancel', endDrag);
+}
+
+// ---- 가로 스크롤 줄 위 마우스 휠 → 가로 이동(공용) ----
+// host 안의 rowSelector 줄(host 자신 포함) 위에서 세로 휠을 가로 스크롤로 바꿔 줌. 줄이 넘치지 않거나 이미 그 방향 끝이면
+// 기본 동작(페이지 스크롤)에 넘기고, 가로 휠·트랙패드 가로 제스처·확대(ctrl) 제스처도 기본 동작 그대로 둠.
+function enableWheelHScroll(host, rowSelector){
+  host.addEventListener('wheel', (e)=>{
+    const row = e.target.closest(rowSelector);
+    if(!row) return;
+    const max = row.scrollWidth - row.clientWidth;
+    if(max <= 1 || e.ctrlKey) return;
+    if(Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? row.clientWidth : 1);
+    if((dy < 0 && row.scrollLeft <= 0) || (dy > 0 && row.scrollLeft >= max - 1)) return;
+    e.preventDefault();
+    row.scrollLeft += dy;
+  }, { passive: false });
+}
+
+// ---- 던전 카드 "획득 가능 아이템" 줄 가로 스크롤 ----
+// 스크롤 위치는 던전별로 dungeonDropScroll에 기억(화면을 벗어나면 showView가 비움).
+(function initDungeonDropScroll(){
+  enableDragScroll(el('dungeonList'), '.drop-icon-row');
   // scroll 이벤트는 버블링하지 않아 캡처로 받음: 위치 기억 + 가장자리 흐림 갱신
   document.addEventListener('scroll', (e)=>{
     const row = e.target;
@@ -900,4 +934,56 @@ initPatchNoteSystem();
     dungeonDropScrollSync(row);
   }, true);
   window.addEventListener('resize', ()=>{ document.querySelectorAll('.drop-icon-row').forEach(dungeonDropScrollSync); });
+})();
+
+// ---- 분류 탭 줄(제작소 #craftCatTabs / 상점 #shopCatTabs, class drag-tabs) 가로 스크롤 ----
+// 던전 카드 줄과 같은 마우스 드래그 + 탭 줄 위 마우스 휠(세로 휠 → 가로 이동) + 가장자리 흐림 표시. 터치는 기본 스와이프.
+// 활성 탭을 화면 안으로 옮기는 처리는 탭을 그릴 때(craft_menu.js/shop_menu.js → tabBarAfterRender, render.js)에 함.
+(function initDragTabs(){
+  const bars = ['craftCatTabs', 'shopCatTabs'].map(id => el(id)).filter(Boolean);
+  bars.forEach(bar => {
+    enableDragScroll(bar, '.drag-tabs', { suppressClick: true });
+    enableWheelHScroll(bar, '.drag-tabs');
+    // 줄 크기가 바뀌거나 화면에 나타날 때(제작소/상점으로 들어올 때 display가 켜짐) 흐림 갱신 + 보류됐던 활성 탭 이동 수행
+    new ResizeObserver(()=>{
+      tabBarSync(bar);
+      if(bar._pendingEnsure && bar.clientWidth > 0) tabBarEnsureActive(bar, false);
+    }).observe(bar);
+  });
+  document.addEventListener('scroll', (e)=>{
+    const bar = e.target;
+    if(bar && bar.classList && bar.classList.contains('drag-tabs')) tabBarSync(bar);
+  }, true);
+})();
+
+// ---- 스킬 트리(캐릭터 메뉴 스킬 탭 #charTabPanels / 던전 우측 카드 스킬 탭 #huntCharTabPanels) ----
+// LV1~99 전체를 한 구역에 늘어놓은 .skill-tree-wrap을 마우스 드래그 + 휠로 가로 스크롤(터치는 기본 스와이프).
+// 스킬 아이콘 위에서 드래그를 시작해도 되고, 드래그를 끝낼 때 따라오는 클릭은 무시돼 스킬 습득 창이 뜨지 않음(suppressClick).
+// 검색창(.skill-search-input): 입력하면 결과 드롭다운만 갱신, 다시 선택하면 입력/결과 초기화(인벤토리 검색과 동일), 바깥을 누르면 드롭다운만 닫음(검색어 유지).
+(function initSkillTree(){
+  ['charTabPanels', 'huntCharTabPanels'].map(id => el(id)).filter(Boolean).forEach(host => {
+    enableDragScroll(host, '.skill-tree-wrap', { suppressClick: true });
+    enableWheelHScroll(host, '.skill-tree-wrap');
+  });
+  document.addEventListener('input', (e)=>{
+    const inp = e.target.closest && e.target.closest('.skill-search-input');
+    if(!inp) return;
+    skillSearchUI.query = inp.value;
+    skillSearchUI.resultsOpen = true;
+    skillSearchRefreshResults(inp.closest('.skill-search'));
+  });
+  document.addEventListener('focusin', (e)=>{
+    const inp = e.target.closest && e.target.closest('.skill-search-input');
+    if(!inp || skillSearchUI.restoring) return; // 다시 그린 뒤 포커스 복원(restoring)은 초기화 대상이 아님
+    if(!inp.value && !skillSearchUI.query) return;
+    inp.value = '';
+    skillSearchUI.query = '';
+    skillSearchUI.resultsOpen = false;
+    skillSearchRefreshResults(inp.closest('.skill-search'));
+  });
+  document.addEventListener('click', (e)=>{
+    if(!skillSearchUI.resultsOpen || e.target.closest('.skill-search')) return;
+    skillSearchUI.resultsOpen = false;
+    document.querySelectorAll('.skill-search-results').forEach(b => { b.style.display = 'none'; });
+  });
 })();

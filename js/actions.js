@@ -112,15 +112,17 @@ function startEnhance(){
 function resolveEnhance(itemId, level, opts){
   forgeEnhOddsLock = null; // 이번 시도의 확률 고정 해제(catalyst.js)
   state.pendingEnhance = null; // 선저장해 둔 시도 결과를 이제 반영하므로 해제(아래 모든 경로가 이어서 saveState를 호출함)
-  // 대장간 화면에 지금 표시된 대상은 무기/방어구/장신구 인벤토리 중 하나이므로 전부 검색함(getEquipped()와 동일한 검색 범위).
+  // 대장간 화면에 지금 표시된 대상은 무기/방어구/장신구/보조 인벤토리 중 하나이므로 전부 검색함(getEquipped()와 동일한 검색 범위).
   let item = state.inventory.find(i => i.id === itemId);
   if(!item) item = (state.armorInventory || []).find(i => i.id === itemId);
   if(!item) item = (state.accessoryInventory || []).find(i => i.id === itemId);
+  if(!item) item = (state.subInventory || []).find(i => i.id === itemId);
   if(!item){ isEnhancing = false; render(); saveState(); return; }
   const type = item.type || 'longsword';
   const equipTypeNow = wpn(type).equipType;
   const isArmorItem = equipTypeNow === 'armor';
   const isAccessoryItem = equipTypeNow === 'accessory';
+  const isSubItem = equipTypeNow === 'sub';
 
   const odds = effectivePrayerOdds(type, level); // 보호(파괴 확률 감소)+집중(성공 확률 증가) 전부 반영된 최종 확률
   let outcome = (opts && opts.outcome) || weightedOutcome(odds);
@@ -140,6 +142,7 @@ function resolveEnhance(itemId, level, opts){
       state.legendCount++;
       showMsg(isArmorItem ? '✨ 전설의 방어구 완성! 판매하여 다음 방어구를 준비하세요'
         : isAccessoryItem ? '✨ 전설의 장신구 완성! 판매하여 다음 장신구를 준비하세요'
+        : isSubItem ? '✨ 전설의 보조 아이템 완성! 판매하여 다음 보조 아이템을 준비하세요'
         : '✨ 전설의 검 완성! 판매하여 다음 검을 만드세요', 'legend');
     } else {
       showMsg('강화 성공! +' + item.level, 'success');
@@ -150,7 +153,7 @@ function resolveEnhance(itemId, level, opts){
     state.totalDestroys++;
     // 파괴 안내 팝업용 정보 — 장비가 제거되기 전에 이름/등급색/강화 단계를 확보함
     destroyNotice = { type, level, name: weaponName(type) + levelSuffix(level), color: weaponNameColor(type, level) };
-    const rewardMsg = processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem);
+    const rewardMsg = processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem, isSubItem);
     destroyNotice.reward = lastDestroyReward;
     destroyNotice.failMsg = (!lastDestroyReward && rewardMsg) ? rewardMsg : '';
     showMsg('💥 아이템이 파괴되었습니다...' + (rewardMsg ? ' ' + rewardMsg : ''), 'destroy');
@@ -189,13 +192,13 @@ function resumePendingEnhance(){
 // 정상적으로 0개 획득 문구를 반환함, 별도로 숨기지 않음).
 // 마지막 파괴 보상 중 "실제로 지급된" 보상(파괴 안내 팝업 표시용): {kind:'trace', type} | {kind:'misc', key, qty} | null(없음/지급 실패)
 let lastDestroyReward = null;
-function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem){
+function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem, isSubItem){
   lastDestroyReward = null;
   const w = wpn(type);
   const displayName = w.name;
 
   // 1. 파괴된 장비를 소속 인벤토리에서 완전히 제거 + 착용/대장간 강화대상 참조 정리
-  //    (sellItem/sellArmorItem/sellAccessoryItem의 정리 패턴과 동일)
+  //    (sellItem/sellArmorItem/sellAccessoryItem/sellSubItem의 정리 패턴과 동일)
   if(isArmorItem){
     const idx = (state.armorInventory || []).findIndex(i => i.id === itemId);
     if(idx !== -1) state.armorInventory.splice(idx, 1);
@@ -208,6 +211,10 @@ function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem)
       if(slotIdx !== -1) state.equippedAccessories[slotIdx] = null;
     }
     if(state.equippedNecklaceId === itemId) state.equippedNecklaceId = null;
+  } else if(isSubItem){
+    const idx = (state.subInventory || []).findIndex(i => i.id === itemId);
+    if(idx !== -1) state.subInventory.splice(idx, 1);
+    if(state.equippedSubId === itemId) state.equippedSubId = null;
   } else {
     const idx = state.inventory.findIndex(i => i.id === itemId);
     if(idx !== -1) state.inventory.splice(idx, 1);
@@ -311,7 +318,7 @@ function recheckEquipRequirements(){
   }
   clampPlayerVitals();
 }
-// 강화 대상 선택(무기/방어구/장신구 공통) — "대장간 표시 대상"(forgeTargetId)만 바꿈. 착용 상태는 어떤 종류도
+// 강화 대상 선택(무기/방어구/장신구/보조 공통) — "대장간 표시 대상"(forgeTargetId)만 바꿈. 착용 상태는 어떤 종류도
 // 건드리지 않음: 실제 착용은 별도의 착용 함수(무기 equipWeaponPiece, 방어구 equipArmorPiece, 장신구
 // equipAccessoryPiece)가 담당하고, 이 함수는 대장간에 올려놓는 일만 함. 호출처: 구버전/신버전 인벤토리의
 // "강화 선택"(selectForgeTargetFromInventory),
@@ -341,6 +348,16 @@ function equipItem(id){
   const accessoryItem = (state.accessoryInventory || []).find(i => i.id === id);
   if(accessoryItem){
     if(!meetsWeaponEquipRequirements(accessoryItem.type, state.playerLevel, effectiveStats())) return;
+    state.forgeTargetId = id;
+    showMsg('', '');
+    render();
+    saveState();
+    return;
+  }
+  const subItem = (state.subInventory || []).find(i => i.id === id);
+  if(subItem){
+    // 보조 아이템도 강화 대상으로 선택 가능(착용 요구 조건만 확인 — 착용 상태/양손 무기 배타 조건과 무관).
+    if(!meetsWeaponEquipRequirements(subItem.type, state.playerLevel, effectiveStats())) return;
     state.forgeTargetId = id;
     showMsg('', '');
     render();
@@ -422,7 +439,7 @@ function buyArtifact(id, btn, silent){
   state.gold -= a.buyPrice;
   state.artifacts.push(id);
   // 빈 장착 슬롯이 있을 때만 자동 장착(기존 장착 중인 아티팩트를 교체하지 않음).
-  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX){
+  if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX && !artifactEquipBlocker(id)){ // 같은 효과 그룹의 아티팩트가 이미 장착 중이면 자동 장착하지 않음
     state.equippedArtifacts.push(id);
     recheckEquipRequirements(); // 자동 장착도 착용상태 변경이므로 동일하게 재검사(스탯이 느는 방향이라 실제로 해제될 일은 없음)
   }
@@ -434,6 +451,7 @@ function buyArtifact(id, btn, silent){
 function equipArtifact(id){
   if(!ownsArtifact(id) || isArtifactEquipped(id)) return;
   if(state.equippedArtifacts.length >= ARTIFACT_SLOT_MAX) return;
+  if(artifactEquipBlocker(id)) return; // 같은 효과를 가진 아티팩트가 장착 중이면 먼저 해제해야 장착 가능
   state.equippedArtifacts.push(id);
   recheckEquipRequirements(); // 아티팩트 스탯 보너스가 늘어 요구 스탯 재계산이 필요할 수 있음(다른 장비에는 항상 유리한 방향)
   render(); saveState();
@@ -480,7 +498,7 @@ function buyWeapon(typeId, btn, silent){
     return true;
   }
   // 상점 "장비 > 보조" 탭도 동일한 data-action="buy-weapon"을 공유해서 호출함
-  // — 방어구/장신구와 같은 방식이나, 보조는 강화가 없어 level은 항상 0 그대로 유지됨.
+  // — 방어구/장신구와 같은 방식(+0으로 지급, 이후 강화로 level이 오름).
   const sub = SUB_TYPES[typeId];
   if(sub){
     if(!sub.purchasable) return false;
@@ -937,7 +955,7 @@ function applyDelayedSkillHits(target, s, perHit, critChance){
   // onHitStatus를 부여함 — 이 클로저 변수로 이미 부여했는지 추적함(스킬 시전 1회당 새로 생성되므로
   // onceOnHitStatus가 없는 기존 스킬은 매 타격 부여 로직이 그대로 유지되어 전혀 영향받지 않음).
   let onceStatusApplied = false;
-  const applyOneHit = () => {
+  const applyOneHit = (hitIndex) => {
     const t = hunt.monsters.find(m => m.instanceId === instanceId);
     if(!t || t.hp <= 0) return;
     const isCrit = Math.random() * 100 < critChance; // 타수마다 독립적으로 치명타 판정
@@ -950,18 +968,21 @@ function applyDelayedSkillHits(target, s, perHit, critChance){
     dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(t)));
     t.hp -= dmg;
     monsterHitEffect(t.instanceId, dmg, isCrit);
-    if(t.hp > 0 && s.onHitStatus && !(s.onceOnHitStatus && onceStatusApplied)){
+    // onHitStatusOnLastHit:true인 스킬(예: 파쇄격)은 마지막 타격에서만(대상 생존 시) 부여해, 그 스킬 자신의 피해는 해당 상태이상을 받지 않음.
+    // 이 옵션이 없는 스킬은 기존 규칙(매 타격 / onceOnHitStatus는 최초 생존 타격 1회)을 그대로 따름.
+    const statusAllowed = s.onHitStatusOnLastHit ? (hitIndex === hits - 1) : !(s.onceOnHitStatus && onceStatusApplied);
+    if(t.hp > 0 && s.onHitStatus && statusAllowed){
       applyStatusEffectToMonster(t, s.onHitStatus.key, s.onHitStatus.durationMs);
       onceStatusApplied = true;
     }
     if(t.hp <= 0) killMonsterInstance(t.instanceId);
     else updateMonsterSlot(t);
   };
-  applyOneHit();
+  applyOneHit(0);
   for(let i = 1; i < hits; i++){
     setTimeout(() => {
       if(currentView !== 'hunt' || !hunt.started || hunt.monsters.length === 0) return;
-      applyOneHit();
+      applyOneHit(i);
     }, Math.round(s.hitDelayMs * i * 1000));
   }
 }

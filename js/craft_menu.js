@@ -95,7 +95,9 @@ function craftMenuSet(id, html, key){ // 내용이 같으면 다시 그리지 �
 }
 function craftMenuRenderTabs(){
   const cats = craftMenuCategories();
-  craftMenuSet('craftCatTabs', cats.map(c => `<button class="inv-box-tab craft-cat-tab ${c.id === craftMenuUI.cat ? 'active' : ''}" data-cat="${c.id}">${craftMenuEsc(c.label)}</button>`).join(''));
+  const first = craftMenuUI.cache['craftCatTabs'] === undefined; // 제작소에 들어온 직후의 첫 구성이면 스크롤 이동을 즉시, 분류 전환이면 부드럽게
+  const changed = craftMenuSet('craftCatTabs', cats.map(c => `<button class="inv-box-tab craft-cat-tab ${c.id === craftMenuUI.cat ? 'active' : ''}" data-cat="${c.id}">${craftMenuEsc(c.label)}</button>`).join(''));
+  if(changed) tabBarAfterRender(el('craftCatTabs'), !first); // 내용이 바뀐 경우(진입/분류 전환)에만 활성 탭이 보이도록 이동 — 사용자가 직접 끈 위치를 매 갱신마다 되돌리지 않음
 }
 function craftMenuRenderVTabs(){
   craftMenuSet('craftVTabs', craftMenuVTabs().map((c, i) => {

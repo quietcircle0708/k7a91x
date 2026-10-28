@@ -533,6 +533,8 @@ function armorKindLabel(type){ return ARMOR_KINDS[wpn(type).armorKind] || ''; }
 function defenseFor(type, level){ const w = wpn(type); return w.defArr ? w.defArr[level] : null; }
 function armorHpFor(type, level){ const w = wpn(type); return w.hpArr ? w.hpArr[level] : null; }
 function armorManaFor(type, level){ const w = wpn(type); return w.manaArr ? w.manaArr[level] : null; }
+// 보조 아이템(보조 무기)의 기본 옵션 공격력 — 강화 단계별 배열(atkArr)에서 조회. 옵션이 없으면 null. 무기의 atkFor(type, level)와는 별개(무기 전용 atk 배열을 건드리지 않음).
+function armorAtkFor(type, level){ const w = wpn(type); return w.atkArr ? w.atkArr[level] : null; }
 // 방어구/장신구의 회피(%) — 강화 단계별 배열(evasionArr)에서 조회. 데이터 값이 공란이면 null(옵션 없음).
 function evasionFor(type, level){ const w = wpn(type); return w.evasionArr ? w.evasionArr[level] : null; }
 // 방어구 툴팁: 무기 툴팁(buildWeaponTooltipHtml)과 동일한 레이아웃/서식(이름·등급 색상 효과, wtipRow
@@ -753,7 +755,8 @@ function playerTotalDefense(){
     + artifactDefenseBonus(); // 사각 방패 등 방어도를 갖는 아티팩트 합산
   return applyPercentBonus(flat, 'defense');
 }
-// 착용 중인 방어구+장신구 전체의 체력/마나/치명타 보너스 합산. key: 'hp' | 'mana' | 'crit'
+// 착용 중인 방어구+보조+장신구 전체의 체력/마나/치명타/회피/공격력 보너스 합산. key: 'hp' | 'mana' | 'crit' | 'evasion' | 'atk'
+// ('atk'는 보조 아이템의 기본 옵션 공격력 — 강화 단계별 성장, 내구도 0이면 비활성)
 function armorStatBonus(key){
   return wornEquipmentItems().reduce((sum, item) => {
     if(isEquipDurabilityZero(item)) return sum; // 내구도 0 — 이 장비의 능력치 비활성화(요구사항 7번)
@@ -762,6 +765,7 @@ function armorStatBonus(key){
     else if(key === 'mana') val = armorManaFor(item.type, item.level);
     else if(key === 'crit') val = wpn(item.type).crit ? critChanceFor(item.type, item.level) : null;
     else if(key === 'evasion') val = evasionFor(item.type, item.level); // 방어구/장신구 기본 회피 옵션(고유 옵션의 evasion과 별개)
+    else if(key === 'atk') val = armorAtkFor(item.type, item.level); // 보조 아이템(보조 무기) 기본 공격력 옵션
     return sum + (val || 0);
   }, 0);
 }
@@ -810,8 +814,8 @@ function buildAccessoryTooltipHtml(type, level, damaged, currentDurability){
 // ---- 보조(방패/보조 무기) 이름/종류 · 툴팁 ----
 function subKindLabel(type){ return SUB_KINDS[wpn(type).subKind] || ''; }
 // 보조 툴팁: 장신구 툴팁(buildAccessoryTooltipHtml)과 서식은 동일("장비 전역 설정" 공용)하되, 치명타
-// 확률 항목은 보조 아이템 스키마에 없으므로 표시하지 않음. 출력 순서(문서 4번 규칙): 이름/등급/장비
-// 설명/보조 종류/방어도/체력/마나/(고유 옵션)/착용 제한.
+// 확률 항목은 보조 아이템 스키마에 없으므로 표시하지 않음. 출력 순서: 이름/등급/장비
+// 설명/보조 종류/내구도/방어도/공격력/체력/마나/(고유 옵션)/착용 제한/판매 가격.
 function buildSubTooltipHtml(type, level, damaged, currentDurability){
   const a = wpn(type);
   const grade = WEAPON_GRADES[a.grade];
@@ -830,6 +834,8 @@ function buildSubTooltipHtml(type, level, damaged, currentDurability){
 
   const def = defenseFor(type, lvl);
   if(def != null) html += wtipRow('방어도', signedStatText(def)); // 양수면 +6처럼 + 기호 표시
+  const atk = armorAtkFor(type, lvl);
+  if(atk != null) html += wtipRow('공격력', atk); // 보조 무기 기본 옵션 — 방어도 바로 아래, 체력/마나 위(강화 단계별로 성장)
   const hp = armorHpFor(type, lvl);
   if(hp != null) html += wtipRow('체력', hp);
   const mana = armorManaFor(type, lvl);
@@ -854,6 +860,11 @@ function artifactNameColor(id){ return artifactGradeColor(id); }
 // 표시 항목은 이름 / 장비 설명 / 장비 타입(값만, 라벨 없음) / 효과 설명(값만, 라벨 없음) / 상점 구매 가격으로 구성함.
 // 등급 행은 이름 바로 아래 줄에 표시함(장비 툴팁과 같은 위치·서식). 새로 추가되는 아티팩트도
 // ARTIFACTS 데이터만 등록하면 이 함수를 그대로 거치므로 동일한 규칙이 자동 적용됨.
+// 같은 효과 그룹(ARTIFACT_EXCLUSIVE_EFFECTS) 안내 문구 HTML — 효과 설명 아래에 한 줄 띄우고 기울임으로 표시. 해당 그룹이 없으면 ''.
+// 아티팩트 툴팁과 캐릭터 정보창의 "적용 중인 아티팩트 효과"가 같은 함수를 써서 항상 같은 문구가 나옴.
+function artifactExclusiveNoteHtml(id){
+  return artifactExclusiveGroups(id).map(g => `<div style="margin-top:1.2em; font-style:italic; color:var(--forge-cream-dim); word-break:keep-all;">${g.note}</div>`).join('');
+}
 function buildArtifactTooltipHtml(id){
   const a = ARTIFACTS[id];
   if(!a) return '';
@@ -874,6 +885,9 @@ function buildArtifactTooltipHtml(id){
 
   // 4. 효과 설명 (라벨 없이 값만 출력) — 상태이상 용어({term:id}단어{/term})가 있으면 클릭 가능하게 처리
   if(a.effectText) html += wtipRow('', resolveGlossaryTermsHtml(a.effectText));
+
+  // 4-2. 같은 효과 그룹(ARTIFACT_EXCLUSIVE_EFFECTS) 안내 — 효과 설명 아래에 한 줄 띄우고 기울임으로 표시. 그룹 필드를 가진 아티팩트에 자동 적용.
+  html += artifactExclusiveNoteHtml(id);
 
   // 5. 상점 구매 가격 (공란이면 표시하지 않음)
   if(a.buyPrice != null) html += wtipRow('상점 구매 가격', a.buyPrice.toLocaleString() + ' G');
@@ -1237,34 +1251,16 @@ function skillMilestoneLevels(categoryId){
   levels.push(PLAYER_MAX_LEVEL); // 99는 항상 예외적으로 마지막에 단독 포함
   return levels;
 }
-// 스킬 탭의 한 페이지(SKILL_PAGES[pageIdx-1])에 표시할 레벨 목록(해당 분류의 마일스톤 레벨 중 그 구간에
-// 속하는 것만). 페이지가 늘어나거나 마일스톤 공식이 바뀌어도 이 함수는 그대로 동작함.
-function levelsForSkillPage(categoryId, pageIdx){
-  const range = SKILL_PAGES[pageIdx - 1];
-  if(!range) return [];
-  return skillMilestoneLevels(categoryId).filter(lv => lv >= range.min && lv <= range.max);
-}
 // ---- 스킬 트리 UI 좌표 계산 ----
-// 스킬 목록 UI를 레벨별 세로 나열에서 "레벨을 가로축으로 + 선행/후속 스킬을 연결선으로 표시하는 트리"
-// 형태로 바꾸기 위한 좌표 계산 전용 함수(실제 습득/사용/전투 로직에는 전혀 관여하지 않음, render.js
-// buildSkillTreeHtml이 이 결과를 그대로 그림으로 옮겨 그림).
-// - columns: 이 페이지에 표시할 레벨 라벨 목록(levelsForSkillPage 그대로 재사용 — 페이지네이션 무수정).
-// - items: columns 첫~끝 레벨 사이에 levelReq가 있는 이 분류의 스킬들. col은 실수 열 위치로, 데이터의
-//   실제 levelReq를 두 라벨 사이에서 선형보간해 구함(예: LV14는 LV10·LV15 라벨 사이 0.8 지점) — 5단위가
-//   아닌 레벨이 등록돼도 하드코딩 없이 자동으로 그 사이 위치에 놓이도록 하기 위함.
-//   row는 정수 세로줄. computeSkillTreeRows가 "카테고리 전체(페이지 구분 없이)" 기준으로 한 번만 계산한
-//   값을 그대로 가져다 쓰므로, 같은 체인이 페이지가 바뀌어도 항상 같은 행을 유지함(요구사항 2번) — 페이지가
-//   바뀔 때마다 그 페이지에 보이는 스킬만으로 행을 새로 매기지 않음. 페이지에 이 체인의 이전 스킬들이
-//   하나도 없어 낮은 행 번호가 이 페이지엔 등장하지 않으면, 그만큼 위쪽이 빈 행으로 남는 것도 의도된 동작.
-// - 페이지 레벨 구간이 서로 겹치므로(요구사항 1번: 1~30/30~60/60~90/90~99), 경계 레벨(30·60·90) 스킬은
-//   filter 조건(levelReq가 minLv~maxLv 사이)에 의해 자연스럽게 인접한 두 페이지 모두에 포함됨 — 복제가
-//   아니라 완전히 같은 SKILLS[id] 데이터를 그대로 두 번 그리는 것뿐이라 습득/초기화/툴팁이 항상 연동됨
-//   (요구사항 3번).
-// - connections: ①이 페이지 안의 스킬이 갖는 upgradeFrom(선행 스킬) 방향, ②이 페이지 안의 스킬을
-//   upgradeFrom으로 삼는 다른 스킬(후속 스킬) 방향을 모두 확인해서 만듦. 상대 스킬이 이 페이지 범위 밖(다른
-//   페이지)에 있어도 connections에는 넣되, colOf가 범위 밖 레벨을 항상 0(왼쪽 끝) 또는 columns.length-1
-//   (오른쪽 끝)로 clamp하기 때문에 선이 그 페이지의 라벨 영역을 넘어가지 않는 "이어지는 중" 형태의 부분
-//   연결선으로 자연스럽게 그려짐(요구사항 4번, 별도의 stub 좌표 계산 불필요).
+// 스킬 목록 UI를 "레벨을 가로축으로 + 선행/후속 스킬을 연결선으로 표시하는 트리" 형태로 그리기 위한 좌표 계산
+// 전용 함수(실제 습득/사용/전투 로직에는 전혀 관여하지 않음, render.js buildSkillTreeHtml이 이 결과를 그대로
+// 그림으로 옮겨 그림). 페이지 구분 없이 LV1~99 전체를 한 줄로 늘어놓고 가로 스크롤로 살펴보는 구조임.
+// - columns: 레벨 라벨 목록(skillMilestoneLevels 그대로).
+// - items: 이 분류의 스킬들. col은 실수 열 위치로, 데이터의 실제 levelReq를 두 라벨 사이에서 선형보간해 구함
+//   (예: LV14는 LV10·LV15 라벨 사이 0.8 지점) — 5단위가 아닌 레벨이 등록돼도 하드코딩 없이 자동으로 그 사이
+//   위치에 놓이도록 하기 위함. row는 정수 세로줄로, computeSkillTreeRows가 한 번만 계산한 값을 그대로
+//   가져다 쓰므로 같은 체인은 항상 같은 행을 유지함.
+// - connections: 각 스킬의 upgradeFrom(선행 스킬) → 그 스킬로 이어지는 가로 연결선.
 // - kindId(신규, 세로 탭 요구사항): 지정하면 skillVerticalTabOf(SKILLS[id])가 이 값과 일치하는 스킬만
 //   골라서 columns/items/connections/rowOf 전부를 그 부분집합 기준으로 다시 계산함(행 번호도 kindId별로
 //   따로 촘촘하게 매겨짐 — 예: '버프' 탭엔 버프 스킬끼리만 있으므로 그 안에서 0,1,2...로 새로 매김. 세
@@ -1287,15 +1283,11 @@ function computeSkillTreeRows(categoryId, kindId){
   });
   return rowOf;
 }
-function buildSkillTreeLayout(categoryId, pageIdx, kindId){
-  const columns = levelsForSkillPage(categoryId, pageIdx);
-  if(!columns.length) return { columns: [], items: [], connections: [], maxRow: 0 };
-
-  const minLv = columns[0], maxLv = columns[columns.length - 1];
-  const rowOf = computeSkillTreeRows(categoryId, kindId); // 페이지 무관, (분류+세로탭) 기준 고정 행(요구사항 2번)
+function buildSkillTreeLayout(categoryId, kindId){
+  const columns = skillMilestoneLevels(categoryId);
+  const rowOf = computeSkillTreeRows(categoryId, kindId); // (분류+세로탭) 기준 고정 행
   const ids = Object.keys(SKILLS)
-    .filter(id => SKILLS[id].category === categoryId && (!kindId || skillVerticalTabOf(SKILLS[id]) === kindId)
-      && SKILLS[id].levelReq >= minLv && SKILLS[id].levelReq <= maxLv)
+    .filter(id => SKILLS[id].category === categoryId && (!kindId || skillVerticalTabOf(SKILLS[id]) === kindId))
     .sort((a, b) => SKILLS[a].levelReq - SKILLS[b].levelReq);
 
   function colOf(level){
@@ -1308,31 +1300,16 @@ function buildSkillTreeLayout(categoryId, pageIdx, kindId){
 
   const items = ids.map(id => ({ id, col: colOf(SKILLS[id].levelReq), row: rowOf[id] }));
 
-  const onThisPage = new Set(ids);
+  // 선행 스킬 방향(스킬 → upgradeFrom). 지금 데이터는 upgradeFrom 체인이 전부 같은 세로 탭 안에서만
+  // 이어지므로(예: 버프↔버프, 공격↔공격) kindId로 걸러도 연결선이 끊기지 않음 — 다른 탭으로 넘어가는
+  // 체인이 생기면 그 경우엔 rowOf[s.upgradeFrom]가 이 kindId 집합에 없어 undefined가 되므로 아래 조건에서 자동으로 걸러짐.
   const connections = [];
-  // ①선행 스킬 방향(이 페이지 스킬 → upgradeFrom). 상대가 다른 페이지에 있으면 colOf가 clamp해 부분선이 됨.
-  // (참고) 지금 데이터는 upgradeFrom 체인이 전부 같은 세로 탭 안에서만 이어지므로(예: 버프↔버프,
-  // 공격↔공격) kindId로 걸러도 연결선이 끊기지 않음 — 다른 탭으로 넘어가는 체인이 생기면 그 경우엔
-  // rowOf[s.upgradeFrom]가 이 kindId 집합에 없어 undefined가 되므로 아래 조건에서 자동으로 걸러짐.
   ids.forEach(id => {
     const s = SKILLS[id];
     if(s.upgradeFrom && rowOf[s.upgradeFrom] !== undefined){
       connections.push({
         fromId: s.upgradeFrom, toId: id, row: rowOf[id],
         fromCol: colOf(SKILLS[s.upgradeFrom].levelReq), toCol: colOf(s.levelReq),
-      });
-    }
-  });
-  // ②후속 스킬 방향(이 페이지 스킬 → 이 스킬을 upgradeFrom으로 삼는 다른 스킬). 그 후속 스킬이 이 페이지에도
-  // 있으면 위 ①에서 그 스킬 자신의 시점으로 이미 연결선이 추가되므로, 여기서는 "후속 스킬이 이 페이지에는
-  // 없는 경우"만 추가해 중복을 피함.
-  Object.keys(SKILLS).forEach(childId => {
-    const child = SKILLS[childId];
-    if(child.category === categoryId && (!kindId || skillVerticalTabOf(child) === kindId)
-      && child.upgradeFrom && onThisPage.has(child.upgradeFrom) && !onThisPage.has(childId)){
-      connections.push({
-        fromId: child.upgradeFrom, toId: childId, row: rowOf[childId],
-        fromCol: colOf(SKILLS[child.upgradeFrom].levelReq), toCol: colOf(child.levelReq),
       });
     }
   });
@@ -1779,11 +1756,13 @@ function naturalMpRegenAmount(maxMp, regen){
   const raw = maxMp * rate + (regen > 0 ? regen * rate : 0);
   return Math.round(raw);
 }
-// 장착한 아티팩트의 몬스터 처치 골드 증가율(%). 뿔 달린 정령인형 +20%. 장착 중인 아티팩트 효과를 합산하며, 적용 순서는 dungeon.js 참고
+// 장착한 아티팩트의 몬스터 처치 골드 증가율(%). 뿔 달린 정령인형 +20%·조악한 정령인형 +10%. 장착 중인 아티팩트 효과를 합산하며, 적용 순서는 dungeon.js 참고
 // (기본 골드 → 랜덤 범위 → 이 보너스 → 죽음의 저주 → 최종 레벨 패널티).
 function artifactGoldBonusPercent(){
+  // 장착 중인 아티팩트의 killGoldBonusPct(data.js)를 합산 — 같은 효과 아티팩트는 동시 착용이 불가능해(ARTIFACT_EXCLUSIVE_EFFECTS)
+  // 실제로는 하나만 더해지지만, 합산 방식이라 새 아티팩트는 필드만 넣으면 별도 코드 없이 적용됨.
   let pct = 0;
-  if(isArtifactEquipped('goblinfairy')) pct += 20;
+  state.equippedArtifacts.forEach(id => { const a = ARTIFACTS[id]; if(a && a.killGoldBonusPct) pct += a.killGoldBonusPct; });
   return pct;
 }
 // 아티팩트로 증가하는 원시 스탯(힘/민첩/지능) 보너스. 캐릭터 정보창에서 기본값과 구분해
@@ -1924,10 +1903,11 @@ function effectiveAtk(type, level, damaged, durabilityZero){
   // 힘/민첩/버프 보너스는 손상과 마찬가지로 영향받지 않음.
   const baseAtk = atkFor(type, level);
   const itemAtk = durabilityZero ? 0 : (damaged ? Math.round(baseAtk * 0.8) : baseAtk);
-  // 착용 중인 방어구/보조/장신구 고유 옵션의 고정 공격력 보너스(statBonus.atkFlat, 예: 그림자 비수 +50)도 버프의
-  // atkFlat과 같은 방식(아이템 공격력 + 스탯 보너스 뒤에 그대로 더함)으로 합산 — 착용 중일 때만 적용됨.
+  // 착용 중인 보조 아이템의 기본 옵션 공격력(armorStatBonus('atk'), 예: 그림자 비수 50 — 강화 단계별 성장)과 방어구/보조/장신구
+  // 고유 옵션의 고정 공격력 보너스(statBonus.atkFlat)를 버프의 atkFlat과 같은 방식(아이템 공격력 + 스탯 보너스 뒤에 그대로 더함)으로
+  // 합산 — 착용 중일 때만 적용됨.
   // learnedPassiveSkillBonus('atkFlat'): 습득한 패시브 스킬(단련/강력/철력/패력 등)의 고정 공격력 보너스.
-  const flat = itemAtk + str * 4 + agi * 1 + activeBuffBonus('atkFlat') + armorUniqueOptionStatBonus('atkFlat') + learnedPassiveSkillBonus('atkFlat');
+  const flat = itemAtk + str * 4 + agi * 1 + activeBuffBonus('atkFlat') + armorStatBonus('atk') + armorUniqueOptionStatBonus('atkFlat') + learnedPassiveSkillBonus('atkFlat');
   return applyPercentBonus(flat, 'atk');
 }
 // 아티팩트 치명타 확률 보너스가 반영된 실질 치명타 확률. 무기 자체 수치(critChanceFor)는 툴팁/강화화면
@@ -1996,6 +1976,7 @@ function combatStatBreakdown(key, ctx){
     push('스탯', '민첩', agi * 1);
     push('장비', '장비 스탯 보너스(힘)', artifactStatBonus('str') * 4);
     push('장비', '장비 스탯 보너스(민첩)', artifactStatBonus('agi') * 1);
+    push('장비', '보조 아이템 공격력', armorStatBonus('atk'));
     push('장비', '장비 고유 옵션', armorUniqueOptionStatBonus('atkFlat'));
     push('스킬/패시브', '전투 버프', activeBuffBonus('atkFlat'));
     push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus('atkFlat'));
@@ -2940,15 +2921,19 @@ function nearestLevelCandidates(list, targetLevel){
   eligible.forEach(w => { const diff = targetLevel - w.levelReq; if(diff < minDiff) minDiff = diff; });
   return eligible.filter(w => (targetLevel - w.levelReq) === minDiff);
 }
+// 모험가의 유해 후보 최대 착용 레벨 — 등급별 상한(RELIC_GRADE_LEVEL_CAP)과 처치한 몬스터 레벨 중 더 작은 값.
+// 이 값보다 착용 제한이 높은 장비는 후보에서 제외됨(몬스터 레벨보다 높은 장비는 드랍되지 않음).
+function relicMaxDropLevel(grade, monsterLevel){
+  const cap = RELIC_GRADE_LEVEL_CAP[grade] != null ? RELIC_GRADE_LEVEL_CAP[grade] : RELIC_GRADE_LEVEL_CAP_DEFAULT;
+  return Math.min(monsterLevel, cap);
+}
 // 모험가의 유해(장비) 드랍 판정.
 // 1) RELIC_DROP_CHANCE 확률로 드랍 판정 → 2) RELIC_EQUIP_TYPE_CHANCE로 장비 타입(무기/방어구/장신구)
 //    선택 → 3) 선택된 타입의 RELIC_GRADE_CHANCE로 등급 선택(이후 절대 바뀌지 않음 — "선택풀 장비의 등급이
-//    변하는 일은 없어야 한다") → 4) 그 등급 중 아이템 레벨이 maxDropLevel 이하인 후보만 필터.
-//    maxDropLevel = min(몬스터 레벨 + 10, RELIC_LEVEL_CAP) — 몬스터보다 최대 10레벨 높은 장비까지는
-//    허용하되, 전체 상한은 RELIC_LEVEL_CAP(51레벨 이상 장비 착용 불가 기준)을 넘지 않음(레벨10 몬스터→
-//    장비 20 이하, 레벨30→40 이하, 레벨40→50 이하, 레벨80→50 이하로 캡됨). 이 등급의 캡 이하 장비가
-//    하나도 없으면(현재 데이터에서는 발생하지 않음) 등급을 바꾸지 않고 그대로 드랍 무산(null) — 등급이
-//    바뀌느니 안 주는 쪽을 선택함.
+//    변하는 일은 없어야 한다") → 4) 그 등급 중 착용 제한이 maxDropLevel 이하인 후보만 필터.
+//    maxDropLevel = min(몬스터 레벨, 등급별 상한 RELIC_GRADE_LEVEL_CAP) — 몬스터 레벨보다 착용 제한이 높은
+//    장비는 드랍되지 않으며, 등급별 상한(일반·레어 50, 에픽 44)도 넘지 않음. 이 등급의 후보가 하나도
+//    없으면 등급을 바꾸지 않고 그대로 드랍 무산(null) — 등급이 바뀌느니 안 주는 쪽을 선택함.
 //    → 5) 후보의 "등록된 레벨" 종류를 내림차순으로 최고 레벨 가중치 100, 한 단계 낮아질 때마다
 //    ×RELIC_LEVEL_WEIGHT_DECAY로 레벨 추첨(드랍되는 장비의 레벨이 몬스터보다 낮아도 상관없음)
 //    → 6) 그 레벨(+처음 추첨된 그 등급 그대로)에 해당하는 장비 중 하나를 무작위로 선택 → 7) 강화 단계
@@ -2965,11 +2950,10 @@ function resolveWeaponRelicDrop(monsterLevel){
 
   const grade = pickWeighted(Object.entries(RELIC_GRADE_CHANCE[equipType]));
 
-  // 처음 뽑힌 grade 그대로 유지 — 몬스터 레벨+10과 전체 상한(RELIC_LEVEL_CAP) 중 더 작은 값(maxDropLevel)
-  // 이하인 그 등급 후보만 모음.
-  const maxDropLevel = Math.min(monsterLevel + 10, RELIC_LEVEL_CAP);
+  // 처음 뽑힌 grade 그대로 유지 — 등급별 상한과 몬스터 레벨 중 더 작은 값(maxDropLevel) 이하인 그 등급 후보만 모음.
+  const maxDropLevel = relicMaxDropLevel(grade, monsterLevel);
   const candidates = Object.values(typesTable).filter(w => w.grade === grade && w.levelReq <= maxDropLevel);
-  if(candidates.length === 0) return null; // 이 등급에 maxDropLevel 이하 장비가 하나도 없는 극단적인 경우 — 등급을 바꾸지 않고 드랍 무산
+  if(candidates.length === 0) return null; // 이 등급에 maxDropLevel 이하 장비가 하나도 없는 경우(저레벨 몬스터·에픽 방어구/장신구 등) — 등급을 바꾸지 않고 드랍 무산
 
   const levels = [...new Set(candidates.map(w => w.levelReq))].sort((a, b) => b - a); // 높은 레벨부터
   let weight = 100;
@@ -3448,12 +3432,14 @@ function craftItemDef(item){
   return (item.iconType === 'consumable' ? CONSUMABLES : MISC_ITEMS)[item.iconRef] || null;
 }
 function craftItemIconHtml(item, className){
+  if(item.iconType === 'artifact') return itemIconHtml(ARTIFACTS[item.iconRef], className); // 아티팩트 제작 아이템은 아티팩트 아이콘 그대로
   if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)) return weaponIconHtml(item.iconRef, className); // weaponIconHtml은 무기/방어구/장신구/보조 공용
   const def = craftItemDef(item);
   return def ? itemIconHtml(def, className) : ''; // 소비/재료/마석은 기존 아이템 아이콘 그대로
 }
 // 제작 아이템 이름/아이콘 테두리 색상 — 장비는 기존 무기 등급 색상 공식(WEAPON_GRADES), 비장비는 해당 아이템의 기존 색상 규칙을 그대로 재사용.
 function craftItemNameColor(item){
+  if(item.iconType === 'artifact') return artifactNameColor(item.iconRef);
   const def = craftItemDef(item);
   if(def){
     if(item.iconType === 'consumable'){ const g = WEAPON_GRADES[item.grade || def.grade]; return g ? g.color : '#ffffff'; }
@@ -3465,6 +3451,7 @@ function craftItemNameColor(item){
 // 제작 아이템의 툴팁 — iconType에 맞는 기존 툴팁 빌더를 그대로 재사용(신규 제작 전용 툴팁 없음).
 // iconType이 'weapon'이면 강화 단계 0으로 간주해 무기 툴팁을 그대로 출력함(기존 아이템 표시 규칙 재사용).
 function craftItemTooltipHtml(item){
+  if(item.iconType === 'artifact') return buildArtifactTooltipHtml(item.iconRef);
   if(item.iconType === 'weapon') return buildWeaponTooltipHtml(item.iconRef, 0);
   if(item.iconType === 'accessory') return buildAccessoryTooltipHtml(item.iconRef, 0); // 장신구 툴팁 그대로 재사용(+0, 내구도 최대)
   if(item.iconType === 'armor') return buildArmorTooltipHtml(item.iconRef, 0);
@@ -3482,6 +3469,7 @@ function findCraftItem(category, id){
 // 실제 장비 데이터의 levelReq를 그대로 조회 — craftItemIconHtml/craftItemTooltipHtml과 동일한 분기
 // 구조라 iconType이 늘어나면 여기에도 같은 방식으로 분기만 추가하면 됨.
 function craftItemLevelReq(item){
+  if(item.iconType === 'artifact') return 0; // 아티팩트는 착용 제한 레벨이 없음
   if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)) return wpn(item.iconRef).levelReq || 0;
   return 0; // 비장비(소비/재료/마석)는 착용 제한 레벨이 없음
 }
@@ -3514,7 +3502,7 @@ function craftEquipCostFor(item){
 function craftNormalizeEquipCosts(){
   Object.keys(CRAFTABLE_ITEMS).forEach(cat => {
     CRAFTABLE_ITEMS[cat].forEach(item => {
-      if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)) item.craftCost = craftEquipCostFor(item);
+      if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType) && item.iconType !== 'artifact') item.craftCost = craftEquipCostFor(item); // 아티팩트는 판매 가격이 없어 데이터의 craftCost를 그대로 씀
     });
   });
 }
@@ -3577,6 +3565,8 @@ function findCraftResource(name){
   }
   const misc = Object.values(MISC_ITEMS).find(d => d.name === name);
   if(misc) return { kind: 'misc', itemId: misc.id, def: misc };
+  const artifact = Object.values(ARTIFACTS).find(d => d.name === name); // 아티팩트 재료/반환(1종 1개 보유 — 수량 대신 보유 여부로 판정)
+  if(artifact) return { kind: 'artifact', itemId: artifact.id, def: artifact };
   return null;
 }
 function craftResourceIconHtml(resource, className){
@@ -3586,6 +3576,7 @@ function craftResourceIconHtml(resource, className){
 function craftResourceColor(resource){
   if(!resource) return '#ffffff';
   if(resource.kind === 'equip') return weaponNameColor(resource.typeId, 0);
+  if(resource.kind === 'artifact') return artifactNameColor(resource.itemId);
   return resource.def.itemClass === 'stone' ? stoneNameColor(resource.itemId) : miscNameColor(resource.itemId);
 }
 function craftResourceTooltipHtml(resource){
@@ -3596,6 +3587,7 @@ function craftResourceTooltipHtml(resource){
     if(resource.equipType === 'accessory') return buildAccessoryTooltipHtml(resource.typeId, 0);
     if(resource.equipType === 'sub') return buildSubTooltipHtml(resource.typeId, 0);
   }
+  if(resource.kind === 'artifact') return buildArtifactTooltipHtml(resource.itemId);
   return resource.def.itemClass === 'stone' ? buildStoneTooltipHtml(resource.itemId) : buildMiscTooltipHtml(resource.itemId);
 }
 // 특정 장비 인벤토리 항목(id)이 현재 착용 중인지 — 착용 중인 아이템은 재료로 선택할 수 없음(요청사항 8번).
@@ -3628,6 +3620,7 @@ function isEquipDurabilityFull(item){
 function craftResourceOwnedCount(resource){
   if(!resource) return 0;
   if(resource.kind === 'equip') return craftEligibleEquipInstances(resource).length;
+  if(resource.kind === 'artifact') return (ownsArtifact(resource.itemId) && !isArtifactEquipped(resource.itemId)) ? 1 : 0; // 착용 중인 아티팩트는 재료로 쓸 수 없음(장비 재료와 같은 규칙) — 해제 후 사용
   return state[resource.def.stateKey] || 0;
 }
 
@@ -3750,7 +3743,9 @@ function craftAnimResultIconsHtml(item, success, resultReturn){
 function craftGrantResultItems(item){
   if(!craftAnim) return;
   if(craftAnim.resultSuccess){
-    if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)){
+    if(item.iconType === 'artifact'){
+      grantArtifactSafe(item.iconRef); // 아티팩트 제작 성공 — 일반 아티팩트 지급(자동 장착 규칙 포함). 제작 시작 전에 보유·가득 참 여부를 막아 두므로 정상 흐름에선 항상 성공
+    } else if(CRAFT_EQUIP_ICON_TYPES.includes(item.iconType)){
       const wdef = wpn(item.iconRef);
       grantRelicEquipDrop({ type: item.iconRef, level: 0, equipType: wdef.equipType }); // equipType 'weapon'/'accessory'에 맞는 인벤토리로 지급
     }
@@ -3761,6 +3756,12 @@ function craftGrantResultItems(item){
   if(!picked){ craftAnim.heldEquip = []; return; }
   const resource = findCraftResource(picked.name);
   if(!resource){ craftAnim.heldEquip = []; return; }
+  if(resource.kind === 'artifact'){
+    // 반환 아이템이 아티팩트(재료로 쓴 것) — 자동 장착 없이 보유 목록으로만 되돌림(이미 보유 중이면 중복 지급 안 함)
+    if(!ownsArtifact(resource.itemId) && !inventoryCategoryFull('artifact')) state.artifacts.push(resource.itemId);
+    craftAnim.heldEquip = [];
+    return;
+  }
   if(resource.kind === 'misc'){
     grantMiscStack(resource.def, picked.need || 1); // 반환 개수(need 생략 시 1개) — 카테고리별 슬롯 용량 규칙 적용(재료로 소모돼 슬롯이 비었으므로 보통 다시 들어감)
     craftAnim.heldEquip = [];
@@ -3877,8 +3878,19 @@ function craftPityRecordResult(item, success){
 // 제작 성공 시 지급될 제작 아이템을 담을 인벤토리 슬롯이 부족하면 해당 카테고리를 반환(막지 않으면 제작 재료/골드만 소모되고
 // 결과물이 지급되지 못함). 제작 시작 때 소모되는 장비 재료는 인벤토리에서 빠지므로 그만큼의 슬롯은 비는 것으로 계산함.
 // 제작 아이템은 모두 장비(무기/방어구/보조/장신구)라 장비 카테고리로 판단함(iconType이 늘어나면 여기에 분기 추가).
+// craftResultInventoryBlock이 돌려준 값을 화면 문구로 — 카테고리면 "○○ 인벤토리가 가득 찼습니다.", 아티팩트 중복 보유면 별도 안내.
+function craftResultBlockMessage(block){
+  if(!block) return '';
+  if(block === 'artifactOwned') return '이미 보유 중인 아티팩트는 제작할 수 없습니다.';
+  return inventoryFullMessage(block);
+}
 function craftResultInventoryBlock(item){
   if(craftItemIsMulti(item)) return craftMultiSpaceBlock(item); // 비장비 제작: 결과(제작 아이템/반환 아이템)를 안전하게 받을 수 있는지(craft_multi.js)
+  if(item.iconType === 'artifact'){
+    if(ownsArtifact(item.iconRef)) return 'artifactOwned'; // 이미 보유 중인 아티팩트는 제작할 수 없음(1종 1개 보유)
+    const freedArt = item.materials.reduce((sum, m) => { const r = findCraftResource(m.name); return sum + (r && r.kind === 'artifact' ? m.need : 0); }, 0);
+    return (inventorySlotsUsed('artifact') - freedArt >= inventorySlotMax('artifact')) ? 'artifact' : null;
+  }
   const freed = item.materials.reduce((sum, m) => {
     const resource = findCraftResource(m.name);
     return sum + (resource && resource.kind === 'equip' ? m.need : 0);

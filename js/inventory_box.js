@@ -215,6 +215,7 @@ const INV_BOX_ACTION_PROVIDERS = {
   sub: (e) => {
     const reqOk = meetsWeaponEquipRequirements(e.type, state.playerLevel, effectiveStats());
     const canWear = !e.equipped && reqOk && canEquipSubItem();
+    const isForgeTarget = e.id === state.forgeTargetId;
     let reason = '';
     if(!e.equipped && !reqOk) reason = invBoxReqReason(e.type);
     else if(!e.equipped && reqOk && !canEquipSubItem()) reason = '양손 무기를 장착 중에는 보조 아이템을 장착할 수 없습니다.';
@@ -222,8 +223,11 @@ const INV_BOX_ACTION_PROVIDERS = {
       { id: 'wear', label: e.equipped ? '착용 해제' : '착용', active: e.equipped, quickEquip: true,
         disabled: !e.equipped && !canWear, reason,
         run: () => e.equipped ? unequipSubPiece(e.id) : equipSubPiece(e.id) },
+      { id: 'forge', label: isForgeTarget ? '강화 대상' : '강화 선택', active: isForgeTarget, // 보조도 강화 가능 — 착용 조건과 무관하게 착용 요구 조건만 확인(방어구/장신구와 동일)
+        disabled: isForgeTarget || !reqOk || e.locked, reason: e.locked ? INV_LOCKED_REASON : ((!isForgeTarget && !reqOk) ? invBoxReqReason(e.type) : ''),
+        run: () => selectForgeTargetFromInventory(e.id) },
       { id: 'compare', label: '아이템 비교', run: () => invCompareStart(e) }, // 잠긴 장비도 비교 가능(잠금과 무관)
-      { id: 'sell', label: `판매 (${e.price.toLocaleString()}G)`, variant: 'sell', disabled: !!e.locked, reason: e.locked ? INV_LOCKED_REASON : '', run: () => sellSubItem(e.id) }, // 보조는 강화 선택 버튼 없음
+      { id: 'sell', label: `판매 (${e.price.toLocaleString()}G)`, variant: 'sell', disabled: !!e.locked, reason: e.locked ? INV_LOCKED_REASON : '', run: () => sellSubItem(e.id) },
     ];
   },
   accessory: (e) => {
@@ -246,9 +250,10 @@ const INV_BOX_ACTION_PROVIDERS = {
   },
   artifact: (e) => {
     const slotFull = state.equippedArtifacts.length >= ARTIFACT_SLOT_MAX;
+    const blockReason = e.equipped ? '' : artifactEquipBlockReason(e.id); // 같은 효과 아티팩트가 장착 중이면 해제 후 장착 가능
     return [
       { id: 'wear', label: e.equipped ? '해제' : '장착', active: e.equipped, quickEquip: true,
-        disabled: !e.equipped && slotFull, reason: (!e.equipped && slotFull) ? '장착 슬롯이 모두 사용 중입니다. 다른 아티팩트를 먼저 해제해주세요.' : '',
+        disabled: !e.equipped && (slotFull || !!blockReason), reason: blockReason || ((!e.equipped && slotFull) ? '장착 슬롯이 모두 사용 중입니다. 다른 아티팩트를 먼저 해제해주세요.' : ''),
         run: () => e.equipped ? unequipArtifact(e.id) : equipArtifact(e.id) },
     ];
   },

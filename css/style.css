@@ -836,7 +836,8 @@
   /* ---- 스킬 트리 UI ---- 레벨을 가로축으로, 선행/후속 스킬을 연결선으로 표시(js/formulas.js
      buildSkillTreeLayout이 계산한 열=레벨/행=체인 세로줄 좌표를 그대로 px로 옮김). 아이콘 자체는
      .skill-icon-btn(아래)을 그대로 재사용해서 등급색/툴팁/잠금 표시는 기존과 완전히 동일함. */
-  .skill-tree-wrap{ overflow-x:auto; padding-bottom:4px; }
+  .skill-tree-wrap{ overflow-x:auto; padding-bottom:4px; overscroll-behavior-x:contain; }
+  .skill-tree-wrap.is-dragging, .skill-tree-wrap.is-dragging .skill-icon-btn{ cursor:grabbing; user-select:none; } /* 마우스 드래그 스크롤 중(main.js enableDragScroll) */
   /* 트리 전체 폭(treeWidth, JS에서 인라인 width로 지정)이 패널 폭보다 좁을 때 왼쪽에 몰리지 않고
      가운데로 오도록 함(레벨 라벨 줄 우측에 여백만 남던 문제 수정) — 라벨/노드 좌표 자체는 그대로,
      이 두 요소를 감싼 블록만 좌우 여백을 균등하게 나눠 가운데 정렬. */
@@ -864,6 +865,9 @@
   .skill-icon-btn.cant-learn .skill-icon{ opacity:.6; }
   .skill-icon-btn .tooltip{ width:200px; left:50%; transform:translateX(-50%); bottom:120%; text-align:center; }
   .skill-icon-btn:hover .tooltip{ visibility:visible; opacity:1; }
+  /* 스킬 검색 결과로 이동했을 때 그 스킬을 잠깐 강조(노란 링이 퍼지며 사라짐 — 검색어 강조색 .codex-hl과 같은 색). render.js skillTreeFocus가 클래스를 붙였다 뗌. */
+  @keyframes skillFoundPulse{ 0%{ box-shadow:0 0 0 0 rgba(255,225,77,.95); } 70%{ box-shadow:0 0 0 10px rgba(255,225,77,0); } 100%{ box-shadow:0 0 0 0 rgba(255,225,77,0); } }
+  .skill-icon-btn.skill-found{ animation: skillFoundPulse .6s ease-out 3; }
 
   .quickslot-picker-list{ display:flex; flex-direction:column; gap:8px; margin:14px 0; }
   .quickslot-pick-item{
@@ -901,6 +905,10 @@
     image-rendering: pixelated;
     padding:22px 20px; max-width:340px; width:100%; text-align:center;
   }
+  /* .modal-box의 image-rendering:pixelated는 프레임(border-image)을 또렷하게 그리기 위한 것인데, 상속되어 팝업 안의 모든 이미지에도 적용됨 →
+     512px 아이템/무기 PNG를 28~40px로 줄일 때 최근접 방식이라 픽셀이 듬성듬성 뽑혀 깨져 보였음(보상창 획득 아이템 등). 팝업 안 이미지는 기본(부드러운 축소)으로
+     되돌림. :where()라 우선순위가 0이어서, 아이콘이 따로 지정한 pixelated(.kill-header-icon·.fe-cat .item-icon-img 등)는 그대로 유지됨. */
+  :where(.modal-box) *{ image-rendering:auto; }
   .modal-title{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:16px; margin-bottom:8px; color: var(--forge-gold); }
   .modal-body{ font-size:13px; color: var(--forge-cream-dim); line-height:1.6; margin-bottom:18px; }
   .modal-actions{ display:flex; gap:10px; justify-content:center; }
@@ -914,8 +922,8 @@
 
   /* 캐릭터 메뉴 "캐릭터 정보" 탭 — 화면 폭이 좁아 페이지 이동 버튼만 우측 정렬로 표시 */
   .char-menu-info-head{ display:flex; justify-content:flex-end; margin-bottom:10px; }
-  /* 스킬 탭 전용 헤더 — 페이지 이동 버튼(pagerHtml)은 그대로 우측에 두고, 왼쪽에 스킬 초기화(⟲) 버튼을
-     별도로 배치함(요구사항: "페이지 이동 버튼 줄의 왼쪽" + "기존 페이지 UI와 충돌 없음"). */
+  /* 스킬 탭 전용 헤더 — 스킬 검색창(.codex-search, margin-left:auto로 우측)을 두고, 왼쪽에 스킬 초기화(⟲) 버튼을
+     별도로 배치함. */
   .skill-menu-info-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .skill-reset-btn{ font-size:15px; line-height:1; padding:6px 10px; }
 
@@ -1201,6 +1209,9 @@
   .buy-qty-quick-btns{ margin-bottom:10px; } /* 소비 아이템 구매창의 빠른 수량 버튼 — 아래 골드 표시와 간격만 확보(스타일은 .repair-quick-btns 재사용) */
   .repair-confirm-cost{ color: var(--forge-gold); font-weight:700; } /* 노란색(요구사항 19번) — 기존 비용 강조색 재사용 */
   #repairAllList .inv-card:last-child{ margin-bottom:0; }
+  /* 모두 수리 팝업의 수리 품목 목록 — 화면 높이에 맞춰 최대 높이를 제한하고(상·하 고정 영역과 여백을 뺀 값, 최소 150px / 최대 약 5개 분량 340px),
+     그보다 많아지면 목록 안에서만 세로 스크롤됨. 툴팁은 position:fixed로 보정되므로 스크롤 영역에 잘리지 않음. */
+  #repairAllList{ max-height: clamp(150px, calc(100vh - 380px), 340px); max-height: clamp(150px, calc(100dvh - 380px), 340px); overflow-y:auto; overflow-x:hidden; }
 
 
   /* ---- 마을(대장간) 상단 팝업 메시지 ---- */
@@ -1683,9 +1694,21 @@
 /* 가로 분류 탭: 한 줄, 넘치면 가로 스크롤. (스크롤 컨테이너가 활성 탭의 아래 1px 겹침을 자르지 않도록 같은 크기만큼 안쪽 여백+음수 마진) */
 .craft-cat-tabs{
   display:flex; gap:4px; margin-top:10px; margin-bottom:-1px; padding-bottom:1px; align-items:flex-end;
-  position:relative; z-index:1; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin;
+  position:relative; z-index:1; overflow-x:auto; overflow-y:hidden;
 }
 .craft-cat-tabs .inv-box-tab{ flex:0 0 auto; min-width:76px; padding-left:14px; padding-right:14px; white-space:nowrap; }
+/* 드래그로 가로 스크롤하는 분류 탭 줄(제작소·상점 공용, main.js initDragTabs) — 던전 카드 "획득 가능 아이템" 줄과 같은 방식: 스크롤바는 숨기고
+   (scrollbar-width를 지정하면 공용 ::-webkit-scrollbar 테마가 무시돼 하얀 기본 스크롤바가 나오므로 thin 대신 none), 아직 보이지 않는 쪽 끝만 흐려짐.
+   흐림은 배경색과 무관하게 동작하도록 mask-image로 처리(탭 줄에는 툴팁이 없어 마스크로 잘려도 문제 없음). can-left/can-right는 tabBarSync(render.js)가 토글. */
+.drag-tabs{ scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-x:contain; user-select:none; }
+.drag-tabs::-webkit-scrollbar{ display:none; }
+.drag-tabs.is-dragging, .drag-tabs.is-dragging .inv-box-tab{ cursor:grabbing; }
+.drag-tabs.can-left{ -webkit-mask-image:linear-gradient(to right, transparent 0, #000 22px); mask-image:linear-gradient(to right, transparent 0, #000 22px); }
+.drag-tabs.can-right{ -webkit-mask-image:linear-gradient(to left, transparent 0, #000 22px); mask-image:linear-gradient(to left, transparent 0, #000 22px); }
+.drag-tabs.can-left.can-right{
+  -webkit-mask-image:linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+  mask-image:linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+}
 
 .craft-panel{ padding-bottom:12px; }
 .craft-body{ display:flex; align-items:stretch; }
@@ -1716,7 +1739,7 @@ body.mobile-preset .craft-row{ gap:8px; padding:7px 8px; }
 body.mobile-preset .craft-vtabs{ width:clamp(60px, 20vw, 96px); }                       /* 최소 60px(가장 긴 탭 '즐겨찾기'가 읽히는 폭) ~ 최대 96px(기존) */
 body.mobile-preset .craft-vtabs .codex-vtab{ width:100%; font-size:clamp(10px, 2.9vw, 12px); white-space:nowrap; }
 body.mobile-preset .craft-main{ padding-left:8px; }
-body.mobile-preset .craft-listscroll{ scrollbar-gutter:auto; scrollbar-width:thin; }   /* 스크롤바 자리를 미리 비워 두지 않음(목록 폭 확보) */
+body.mobile-preset .craft-listscroll{ scrollbar-gutter:auto; }   /* 스크롤바 자리를 미리 비워 두지 않음(목록 폭 확보) */
 body.mobile-preset .craft-row{ gap:6px; padding:6px; }
 body.mobile-preset .craft-row-name{ font-size:clamp(11.5px, 3.2vw, 13px); overflow-wrap:anywhere; } /* 이름은 필요하면 줄바꿈하되 잘리거나 상태 문구와 겹치지 않음 */
 body.mobile-preset .craft-row-status{ font-size:clamp(9px, 2.6vw, 10.5px); white-space:nowrap; line-height:1.2; text-align:right; } /* 상태 문구는 한 줄 */
@@ -1748,7 +1771,7 @@ body.mobile-preset .craft-row-status{ font-size:clamp(9px, 2.6vw, 10.5px); white
 .craft-mat-box{ --craft-mat-pad:6px; --craft-mat-vpad:5px; --craft-mat-title-h:26px; min-width:0; box-sizing:border-box; background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
 .craft-mat-title{ height:var(--craft-mat-title-h); box-sizing:border-box; display:flex; align-items:center; padding:0 var(--craft-mat-pad); border-bottom:1px solid var(--forge-line); font-size:12px; font-weight:700; color: var(--forge-cream-dim); text-align:left; }
 /* 필요 재료: 한 줄 4개, 2줄 높이로 고정하고 8개를 넘으면 이 영역만 세로 스크롤(하단 영역 전체 높이는 변하지 않음) */
-.craft-mat-scroll{ max-height:var(--craft-mat-h); overflow-y:auto; overflow-x:hidden; scrollbar-width:thin; padding:var(--craft-mat-vpad) var(--craft-mat-pad); box-sizing:border-box; flex:none; } /* 높이는 재료 줄 수(1~2줄)만큼, 3줄 이상이면 최대 높이에서 내부 스크롤(아래 빈 영역 없음) */
+.craft-mat-scroll{ max-height:var(--craft-mat-h); overflow-y:auto; overflow-x:hidden; padding:var(--craft-mat-vpad) var(--craft-mat-pad); box-sizing:border-box; flex:none; } /* 높이는 재료 줄 수(1~2줄)만큼, 3줄 이상이면 최대 높이에서 내부 스크롤(아래 빈 영역 없음) */
 .craft-mat-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px 0; justify-items:start; align-content:start; }
 .craft-mat-grid.few{ width:calc(var(--craft-mat-n) * 25%); margin:0 auto; grid-template-columns:repeat(var(--craft-mat-n), minmax(0, 1fr)); justify-items:center; } /* 재료 1~3개: 한 줄, 4열 폭 기준 간격 그대로 가운데 정렬 */
 .craft-mat-cell{ display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; cursor:default; width:42px; max-width:100%; }
@@ -1806,7 +1829,7 @@ body.shop-ui-new #shopView .shop-new-wrap{ display:block; }
 /* 분류 탭: 왼쪽부터, 한 줄, 넘치면 가로 스크롤(활성 탭이 아래 패널과 이어지도록 craft-cat-tabs와 같은 방식) */
 .shop-cat-tabs{
   display:flex; gap:4px; margin-top:10px; margin-bottom:-1px; padding-bottom:1px; align-items:flex-end;
-  position:relative; z-index:1; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin;
+  position:relative; z-index:1; overflow-x:auto; overflow-y:hidden;
 }
 .shop-cat-tabs .inv-box-tab{ flex:0 0 auto; min-width:76px; padding-left:14px; padding-right:14px; white-space:nowrap; }
 .shop-panel{ padding-bottom:12px; }
@@ -1871,7 +1894,7 @@ body.mobile-preset .shop-mode-tab{ padding:6px 16px; font-size:13px; }
 body.mobile-preset .shop-gold{ font-size:12px; }
 body.mobile-preset .shop-search{ flex:1 1 110px; min-width:100px; }
 body.mobile-preset .shop-panel{ padding:8px 8px 10px; }
-body.mobile-preset .shop-listscroll{ scrollbar-gutter:auto; scrollbar-width:thin; }
+body.mobile-preset .shop-listscroll{ scrollbar-gutter:auto; }
 body.mobile-preset .shop-row{ gap:5px; }
 body.mobile-preset #shopView{ --shop-icon-size: 50px; }
 body.mobile-preset .shop-row-icon .shop-icon-img, body.mobile-preset .shop-row-icon .inv-icon-img{ width:34px; height:34px; }
@@ -2023,6 +2046,9 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
 
 /* 촉매 슬롯: 아이콘 + 오른쪽 아래 '보유/필요' 수량. 보유가 모자라면 회색조 */
 .fe-cat .item-icon-img{ object-fit:contain; image-rendering:pixelated; }
+/* 촉매 슬롯(.fe-slot: 반지름 9px, 테두리 2px)의 안쪽 가장자리 곡률은 9-2=7px인데, 등급 배경(.icon-grade-bg)은 border-radius:inherit로 슬롯의 9px을 그대로 물려받아
+   네 모서리가 더 둥글게 깎이며 틈이 생겼음 → 배경 반지름을 안쪽 곡률(7px)에 맞춰 모서리까지 빈 공간 없이 채움. 촉매 슬롯(.fe-cat)에만 적용. */
+.fe-cat .icon-grade-bg{ border-radius:7px; }
 .fe-cat-qty{ font-size:10px; }
 .forge-select-item.cat-none .item-icon-img{ filter:grayscale(1) opacity(.55); }
 

@@ -256,12 +256,9 @@ function renderArmorInventoryList(){
   }).join('');
 }
 // 보조 인벤토리 목록. 방어구 인벤토리 카드(renderArmorInventoryList)와 동일한 구조를 재사용하되:
-// - "강화 선택" 버튼이 아예 없음(보조 아이템은 강화 대상으로 선택할 수 없음 — 문서 2번 규칙, EQUIP_
-//   INVENTORY_POOLS의 sub 항목에 cost가 없어 forgeSelectableItems에서도 자동으로 걸러짐과는 별개로,
-//   애초에 이 카드에 그 버튼 자체를 그리지 않음).
-// - "착용" 가능 여부는 레벨 조건(reqOk)뿐 아니라 양손 무기 상호 배타 조건(canEquipSubItem, 문서 3번)도
+// - "착용" 가능 여부는 레벨 조건(reqOk)뿐 아니라 양손 무기 상호 배타 조건(canEquipSubItem)도
 //   함께 검사함 — 이미 보조 아이템을 착용 중인 경우는 항상 "착용 해제" 버튼이 뜨므로 그 경우는 이
-//   조건과 무관(해제는 항상 가능).
+//   조건과 무관(해제는 항상 가능). "강화 선택"은 착용 조건과 무관하게 착용 요구 조건(reqOk)만 확인함.
 function renderSubInventoryList(){
   renderInvSortControl('sub');
   const wrap = el('subInventoryList');
@@ -297,18 +294,22 @@ function renderSubInventoryList(){
     const wearBtnFinal = wearTooltipText
       ? `<span class="equip-req-wrap">${wearBtnHtml}<span class="tooltip">${wearTooltipText}</span></span>`
       : wearBtnHtml;
+    // "강화 선택" — 방어구/장신구 카드와 동일(equipItem 재사용, 대장간 강화 대상으로 올림). 착용 상태/양손 무기 배타 조건과 무관.
+    const isForgeTarget = item.id === state.forgeTargetId;
+    const forgeBtnHtml = `<button class="inv-btn equip ${isForgeTarget ? 'active' : ''}" data-action="equip" data-id="${item.id}" ${(isForgeTarget || !reqOk || item.locked) ? 'disabled' : ''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>${isForgeTarget ? '강화 대상' : '강화 선택'}</button>`;
     return `
       <div class="inv-card ${isWorn ? 'equipped' : ''} ${item.locked ? 'locked' : ''}" data-lock-src="sub" data-lock-id="${item.id}">
         <div class="inv-icon" style="border-color:${itemColor};">${weaponIconHtml(type, 'inv-icon-img', item.level)}${invLockBadgeHtml(item.locked)}</div>
         <div class="inv-info">
           <span class="weapon-name-wrap">
-            <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
+            <span class="inv-name" style="color:${itemColor};">${def.name}${item.damaged ? '(손상)' : ''}${item.level > 0 ? ` <span class="inv-level" style="color:${itemColor};">+${item.level}</span>` : ''}</span> ${isWorn ? '<span class="inv-badge">착용 중</span>' : ''}
             <span class="tooltip">${buildSubTooltipHtml(type, item.level, item.damaged, item.currentDurability)}</span>
           </span>
           <div class="inv-sub">${SUB_KINDS[def.subKind] || ''}</div>
         </div>
         <div class="inv-actions">
           ${wearBtnFinal}
+          ${forgeBtnHtml}
           <button class="inv-btn sell" data-action="sell-sub" data-id="${item.id}" ${item.locked ? 'disabled' : ''} ${item.locked ? `title="${INV_LOCKED_REASON}"` : ''}>판매 (${sellVal.toLocaleString()}G)</button>
         </div>
       </div>`;
@@ -495,7 +496,7 @@ function renderCraftPopup(){
   // 제작 결과물을 담을 인벤토리 슬롯이 없어 제작이 막힌 경우 그 이유를 카테고리별로 안내함
   const blockedCategory = craftResultInventoryBlock(item);
   const noteEl = el('craftPopupFullNote');
-  if(noteEl){ noteEl.textContent = blockedCategory ? inventoryFullMessage(blockedCategory) : ''; noteEl.style.display = blockedCategory ? 'block' : 'none'; }
+  if(noteEl){ noteEl.textContent = blockedCategory ? craftResultBlockMessage(blockedCategory) : ''; noteEl.style.display = blockedCategory ? 'block' : 'none'; }
 }
 
 // 비장비 제작 개수 설정 UI 표시/갱신 — 장비 제작이면 통째로 숨김. 입력칸에 포커스가 있는(직접 입력 중인) 동안은 입력 중인 글자를 덮어쓰지 않음.
@@ -681,11 +682,12 @@ function renderArtifactList(){
     const nameColor = artifactNameColor(id);
     const equipped = isArtifactEquipped(id);
     const slotFull = state.equippedArtifacts.length >= ARTIFACT_SLOT_MAX;
+    const blockReason = equipped ? '' : artifactEquipBlockReason(id); // 같은 효과 아티팩트가 장착 중이면 해제 후 장착 가능
     const equipBtnHtml = equipped
       ? `<button class="inv-btn equip active" data-action="unequip-artifact" data-artifact-id="${id}">해제</button>`
-      : `<button class="inv-btn equip" data-action="equip-artifact" data-artifact-id="${id}" ${slotFull ? 'disabled' : ''}>장착</button>`;
-    const equipBtnFinal = (!equipped && slotFull)
-      ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">장착 슬롯이 모두 사용 중입니다. 다른 아티팩트를 먼저 해제해주세요.</span></span>`
+      : `<button class="inv-btn equip" data-action="equip-artifact" data-artifact-id="${id}" ${(slotFull || blockReason) ? 'disabled' : ''}>장착</button>`;
+    const equipBtnFinal = (!equipped && (slotFull || blockReason))
+      ? `<span class="equip-req-wrap">${equipBtnHtml}<span class="tooltip">${blockReason || '장착 슬롯이 모두 사용 중입니다. 다른 아티팩트를 먼저 해제해주세요.'}</span></span>`
       : equipBtnHtml;
     return `
       <div class="inv-card ${equipped?'equipped':''}">
@@ -1431,7 +1433,7 @@ function buildArtifactEffectsHtml(){
   let html = `<div class="char-stat-sub-title">적용 중인 아티팩트 효과</div>`;
   html += state.equippedArtifacts.map(id => {
     const a = ARTIFACTS[id];
-    return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${itemIconHtml(a)} ${a.name}</b><br>${resolveGlossaryTermsHtml(a.effectText)}</div>`;
+    return `<div class="char-stat-artifact"><b style="color:${artifactNameColor(id)};">${itemIconHtml(a)} ${a.name}</b><br>${resolveGlossaryTermsHtml(a.effectText)}${artifactExclusiveNoteHtml(id)}</div>`;
   }).join('');
   return html;
 }
@@ -1501,7 +1503,7 @@ function renderCharacterMenu(){
   if(!tab){ panelsWrap.innerHTML = ''; return; }
 
   if(tab.id === 'skill'){
-    panelsWrap.innerHTML = buildSkillTabHtml();
+    setSkillPanelHtml(panelsWrap, buildSkillTabHtml());
     renderSkillQuickSlots();
     renderQuickSlots(); // 스킬 탭에 새로 생긴 skillTabFlaskRow도 함께 채움
     return;
@@ -1535,26 +1537,24 @@ function buildSkillQuickSlotSectionHtml(quickSlotRowId, flaskRowId){
     </div>
   `;
 }
-// 스킬 분류 탭(공용/특화/기연)+페이지 이동+스킬 목록만 따로 뺀 것 — 요구사항: 던전 우측 카드 스킬 탭
-// 2페이지("공용/특화/기연 ~ 스킬 목록").
+// 스킬 분류 탭(공용/특화/기연)+스킬 검색+스킬 목록(LV1~99 한 구역 가로 스크롤)만 따로 뺀 것 — 요구사항: 던전 우측 카드
+// 스킬 탭 2페이지("공용/특화/기연 ~ 스킬 목록").
 function buildSkillListSectionHtml(){
   const catTabsHtml = SKILL_CATEGORIES.map(c =>
     `<button class="inv-tab-btn${c.id === activeSkillCategory ? ' active' : ''}" data-skill-cat="${c.id}">${c.label}</button>`
   ).join('');
-  const page = clampPage(pageState.skillPage, SKILL_PAGES.length);
-  pageState.skillPage = page;
   return `
     <div class="inv-tabs">${catTabsHtml}</div>
     <div class="skill-menu-info-head">
       <button class="nav-btn skill-reset-btn" data-action="reset-skills" title="스킬 초기화">⟲</button>
-      ${pagerHtml('skillPage', page, SKILL_PAGES.length)}
+      ${buildSkillSearchHtml()}
     </div>
     ${buildSkillCategoryBodyHtml(activeSkillCategory)}
   `;
 }
 // ---- 스킬 탭 ----
 // 상단: 스킬 퀵슬롯(5칸) + 기존 플라스크 퀵슬롯 + 초기화 버튼 → 하위 탭(공용/특화/기연, SKILL_CATEGORIES
-// 기반) → 페이지 이동 → 하위 탭별 본문(buildSkillCategoryBodyHtml). 하위 탭 버튼도 인벤토리와 동일한
+// 기반) → 스킬 검색 → 하위 탭별 본문(buildSkillCategoryBodyHtml). 하위 탭 버튼도 인벤토리와 동일한
 // inv-tabs 클래스를 그대로 사용함(요구사항: "탭 UI는 현재 인벤토리에서 사용하는 탭 구조를 그대로 사용").
 // 위 두 섹션 빌더를 그대로 이어붙인 것과 완전히 동일한 결과(기존 호출부는 전혀 수정하지 않아도 됨).
 function buildSkillTabHtml(){
@@ -1633,7 +1633,7 @@ function updateSkillQuickSlotCooldowns(){
   });
 }
 // 하위 탭(공용/특화/기연) 한 개의 본문: 미사용 포인트 표시 + 세로 탭(공격/버프/패시브, 요구사항 1번) +
-// 레벨별 스킬 목록(현재 페이지 구간, 선택된 세로 탭 기준).
+// 레벨별 스킬 목록(LV1~99 전체 한 구역, 선택된 세로 탭 기준).
 function buildSkillCategoryBodyHtml(categoryId){
   const isAwakening = categoryId === 'awakening';
   const pointsLabel = isAwakening ? '미사용 깨달음' : '미사용 스킬 포인트';
@@ -1655,10 +1655,7 @@ function buildSkillCategoryBodyHtml(categoryId){
 // 완전히 기존 그대로이고(요구사항 4번), 여기서 바뀌는 건 그 아이콘을 배치하는 좌표뿐임.
 const SKILL_TREE_COL_W = 56, SKILL_TREE_ROW_H = 62, SKILL_TREE_ICON = 34, SKILL_TREE_NODE_W = 52;
 function buildSkillTreeHtml(categoryId, kindId){
-  const layout = buildSkillTreeLayout(categoryId, pageState.skillPage, kindId);
-  if(!layout.columns.length){
-    return `<div class="char-stat-empty">표시할 레벨이 없습니다.</div>`;
-  }
+  const layout = buildSkillTreeLayout(categoryId, kindId);
   const center = SKILL_TREE_ICON / 2;
   // 노드(아이콘+이름표)가 아이콘보다 넓어서(이름표가 더 넓을 수 있음) 맨 왼쪽 노드가 컨테이너 밖으로
   // 잘리지 않도록, 전체 좌표를 이 여백만큼 오른쪽으로 밀어줌(레벨 라벨/연결선/노드 전부 동일하게 적용해야
@@ -1680,13 +1677,113 @@ function buildSkillTreeHtml(categoryId, kindId){
   const treeWidth = padX * 2 + (layout.columns.length - 1) * SKILL_TREE_COL_W + SKILL_TREE_ICON;
   const treeHeight = (layout.maxRow + 1) * SKILL_TREE_ROW_H;
   return `
-    <div class="skill-tree-wrap">
+    <div class="skill-tree-wrap" data-key="${categoryId}:${kindId}">
       <div class="skill-tree-levels" style="width:${treeWidth}px;">${labelsHtml}</div>
       <div class="skill-tree-body" style="width:${treeWidth}px; height:${treeHeight}px;">
         ${linesHtml}${nodesHtml}
       </div>
     </div>
   `;
+}
+// ---- 스킬 검색(공용/특화/기연 전체 대상) ----
+// 검색창·결과 드롭다운은 도감/인벤토리 검색 UI(.codex-search/.codex-results/.codex-result/.codex-hl, codexHighlightHtml)를
+// 그대로 재사용함. 입력/포커스/결과 선택 처리는 main.js(initSkillTree)와 navigation.js(skillSearchGoTo/skillSearchReset)에 있음.
+function skillSearchNorm(){ return (skillSearchUI.query || '').trim().toLowerCase(); }
+function skillSearchResultsHtml(){
+  const q = skillSearchNorm();
+  const ids = [];
+  SKILL_CATEGORIES.forEach(c => {
+    Object.keys(SKILLS)
+      .filter(id => SKILLS[id].category === c.id && SKILLS[id].name.toLowerCase().includes(q))
+      .sort((a, b) => SKILLS[a].levelReq - SKILLS[b].levelReq)
+      .forEach(id => ids.push(id));
+  });
+  if(ids.length === 0) return '<div class="codex-result-empty">검색 결과가 없습니다.</div>';
+  return ids.slice(0, CODEX_SEARCH_MAX_RESULTS).map(id => {
+    const s = SKILLS[id];
+    const grade = WEAPON_GRADES[s.grade];
+    const cat = SKILL_CATEGORIES.find(c => c.id === s.category);
+    const kind = SKILL_KIND_TABS.find(k => k.id === skillVerticalTabOf(s));
+    return `<button class="codex-result" data-skill-result="${id}"><span style="color:${grade ? grade.color : '#fff'};">${codexHighlightHtml(s.name, skillSearchUI.query)}</span>`
+      + `<span class="codex-result-cat">${codexEsc(cat ? cat.label : '')}${kind ? ' · ' + codexEsc(kind.label) : ''}</span></button>`;
+  }).join('');
+}
+function buildSkillSearchHtml(){
+  const open = skillSearchUI.resultsOpen && skillSearchNorm();
+  return `
+    <div class="codex-search skill-search">
+      <input type="text" class="skill-search-input" placeholder="클릭하여 검색..." value="${codexEsc(skillSearchUI.query)}" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <img src="assets/ui/icon_item_comparison.png" class="codex-search-icon" alt="" draggable="false">
+      <div class="codex-results skill-search-results" style="display:${open ? 'block' : 'none'};">${open ? skillSearchResultsHtml() : ''}</div>
+    </div>`;
+}
+// 입력 중에는 결과 드롭다운만 갱신함(전체를 다시 그리지 않아 입력 포커스가 유지됨).
+function skillSearchRefreshResults(root){
+  const box = root && root.querySelector('.skill-search-results');
+  if(!box) return;
+  if(!skillSearchNorm() || !skillSearchUI.resultsOpen){ box.style.display = 'none'; return; }
+  box.innerHTML = skillSearchResultsHtml();
+  box.style.display = 'block';
+}
+// ---- 스킬 트리 가로 스크롤 위치 ----
+// 트리의 한 지점(노드 중심 x, 트리 좌표)이 보이는 영역의 가운데 오도록 스크롤함(양 끝에서는 가능한 만큼만).
+// 영역이 아직 화면에 없어 너비가 0이면 다음 프레임에 다시 시도함.
+function skillTreeScrollToX(wrap, x, smooth){
+  const apply = () => {
+    const w = wrap.clientWidth;
+    const max = wrap.scrollWidth - w;
+    wrap.scrollTo({ left: Math.max(0, Math.min(max, x - w / 2)), behavior: smooth ? 'smooth' : 'auto' });
+  };
+  if(wrap.clientWidth > 0) apply(); else requestAnimationFrame(apply);
+}
+// 분류·세로 탭에 처음 들어왔을 때의 기본 위치: 습득한 스킬 중 가장 오른쪽(=습득 레벨이 가장 높은) 스킬 위치. 습득한 스킬이 없으면 맨 왼쪽(0).
+function skillTreeDefaultX(wrap){
+  let x = 0;
+  wrap.querySelectorAll('.skill-tree-node').forEach(node => {
+    if(node.querySelector('.skill-icon-btn.locked')) return; // 미습득 스킬 제외
+    x = Math.max(x, parseFloat(node.style.left) + parseFloat(node.style.width) / 2);
+  });
+  return x;
+}
+// 검색 결과 선택 시: 화면에 보이는 스킬 트리에서 그 스킬을 가운데로 옮기고 잠깐 강조함(같은 탭 안이면 부드럽게, 탭이 바뀐 경우는 즉시).
+function skillTreeFocus(id, smooth){
+  document.querySelectorAll('.skill-tree-wrap').forEach(wrap => {
+    if(wrap.clientWidth === 0) return; // 화면에 없는(숨겨진) 쪽은 건너뜀
+    const btn = wrap.querySelector(`button[data-learn-skill="${id}"]`);
+    const node = btn && btn.closest('.skill-tree-node');
+    if(!node) return;
+    skillTreeScrollToX(wrap, parseFloat(node.style.left) + parseFloat(node.style.width) / 2, smooth);
+    btn.classList.remove('skill-found');
+    void btn.offsetWidth; // 같은 스킬을 연달아 찾아도 강조 애니메이션이 처음부터 다시 재생되도록 리플로우
+    btn.classList.add('skill-found');
+    setTimeout(() => btn.classList.remove('skill-found'), 1800);
+  });
+}
+// 스킬 패널(캐릭터 메뉴 스킬 탭 / 던전 우측 카드 스킬 탭) HTML 반영 — 매번 전체를 다시 그리므로 다음을 유지/복원함:
+// ① 스킬 트리 가로 스크롤 위치: 같은 분류·세로 탭을 다시 그릴 때는 그대로 유지하고, 다른 탭으로 들어오면(전환·메뉴 진입) 기본 위치(skillTreeDefaultX).
+//    검색 결과로 이동하는 중(skillSearchUI.focusId)에는 기본 위치 계산을 건너뛰고 skillTreeFocus가 이동함.
+// ② 검색창에 포커스가 있었다면 포커스/커서 위치(입력 중 다시 그려져도 끊기지 않게).
+function setSkillPanelHtml(panelsWrap, html){
+  const prevWrap = panelsWrap.querySelector('.skill-tree-wrap');
+  const prev = prevWrap ? { key: prevWrap.dataset.key, left: prevWrap.scrollLeft } : null;
+  const ae = document.activeElement;
+  const hadFocus = !!(ae && ae.classList && ae.classList.contains('skill-search-input') && panelsWrap.contains(ae));
+  const selStart = hadFocus ? ae.selectionStart : 0, selEnd = hadFocus ? ae.selectionEnd : 0;
+  panelsWrap.innerHTML = html;
+  const wrap = panelsWrap.querySelector('.skill-tree-wrap');
+  if(wrap){
+    if(prev && prev.key === wrap.dataset.key) wrap.scrollLeft = prev.left;
+    else if(!skillSearchUI.focusId) skillTreeScrollToX(wrap, skillTreeDefaultX(wrap), false);
+  }
+  if(hadFocus){
+    const inp = panelsWrap.querySelector('.skill-search-input');
+    if(inp){
+      skillSearchUI.restoring = true; // 포커스 복원이 "검색창을 다시 선택하면 초기화" 동작을 일으키지 않도록
+      inp.focus();
+      try{ inp.setSelectionRange(selStart, selEnd); }catch(_){}
+      skillSearchUI.restoring = false;
+    }
+  }
 }
 // 스킬 한 칸: 습득 전이면 흑백(50% 밝기), 습득했으면 원본 그대로. 클릭하면 학습을 시도함(learnSkill).
 // 습득 불가(등급 미구현/레벨 미달/포인트 부족/공용·특화 습득 제한 충돌)면 버튼 자체를 비활성화함(요구사항 4번:
@@ -1961,6 +2058,36 @@ function dungeonDropScrollSync(row){
   }
 }
 
+// 드래그 스크롤 분류 탭 줄(.drag-tabs: 제작소 #craftCatTabs, 상점 #shopCatTabs)의 가장자리 흐림 상태 — 아직 보이지 않는 쪽 끝에만 can-left/can-right를 붙임.
+function tabBarSync(bar){
+  if(!bar) return;
+  const max = bar.scrollWidth - bar.clientWidth;
+  bar.classList.toggle('can-left', max > 1 && bar.scrollLeft > 1);
+  bar.classList.toggle('can-right', max > 1 && bar.scrollLeft < max - 1);
+}
+// 활성 탭이 화면 밖(또는 흐림 영역)에 있을 때만, 보이는 데 필요한 만큼만 탭 줄을 가로로 이동함(이미 보이면 그대로).
+// bar의 scrollLeft만 계산해서 움직이므로 세로 스크롤/부모 영역은 영향받지 않음. 줄이 아직 화면에 없으면(너비 0) 보류했다가 보이는 순간 main.js의 ResizeObserver가 다시 호출함.
+const TAB_BAR_EDGE_PX = 28; // 가장자리 흐림 폭(22px) + 여유
+function tabBarEnsureActive(bar, smooth){
+  if(!bar) return;
+  const tab = bar.querySelector('.inv-box-tab.active');
+  if(!tab) return;
+  if(bar.clientWidth === 0){ bar._pendingEnsure = true; return; }
+  bar._pendingEnsure = false;
+  const b = bar.getBoundingClientRect(), t = tab.getBoundingClientRect();
+  let delta = 0;
+  if(t.left < b.left + TAB_BAR_EDGE_PX) delta = t.left - (b.left + TAB_BAR_EDGE_PX);
+  else if(t.right > b.right - TAB_BAR_EDGE_PX) delta = t.right - (b.right - TAB_BAR_EDGE_PX);
+  const max = bar.scrollWidth - bar.clientWidth;
+  const target = Math.max(0, Math.min(max, bar.scrollLeft + delta));
+  if(Math.abs(target - bar.scrollLeft) >= 1) bar.scrollTo({ left: target, behavior: smooth ? 'smooth' : 'auto' });
+}
+// 탭 줄 내용을 새로 그린 직후 호출: 흐림 상태 갱신 + 활성 탭 보이게 이동(첫 구성은 즉시, 이후 분류 전환은 부드럽게).
+function tabBarAfterRender(bar, smooth){
+  tabBarSync(bar);
+  tabBarEnsureActive(bar, smooth);
+}
+
 // ---- 던전 상단 UI 접기/펼치기 ----
 // hunt.topUiExpanded 값만 바꾸고 DOM 반영은 이 함수가 전담 — 토글 버튼 클릭과 던전 재입장(enterDungeon,
 // 기본값으로 초기화) 양쪽에서 공통으로 호출됨.
@@ -2038,12 +2165,12 @@ function renderHuntSidePanel(){
     const pageBodyHtml = page === 2
       ? buildSkillListSectionHtml()
       : buildSkillQuickSlotSectionHtml('huntPanelSkillQuickSlotRow', 'huntPanelSkillFlaskRow');
-    panelsWrap.innerHTML = `
+    setSkillPanelHtml(panelsWrap, `
       <div class="inv-tab-panel">
         <div class="char-menu-info-head">${pagerHtml('huntCharSkill', page, HUNT_CHAR_SKILL_PAGE_COUNT)}</div>
         <div>${pageBodyHtml}</div>
       </div>
-    `;
+    `);
     renderSkillQuickSlots(); // 1페이지일 때만 실제 존재하는 huntPanelSkillQuickSlotRow를 채움(없으면 조용히 무시됨)
     renderQuickSlots();
     return;

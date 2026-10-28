@@ -54,9 +54,9 @@ const CODEX_FAVORITES_LABEL = '즐겨찾기';
 const CODEX_FAVORITE_IMG = 'assets/ui/icon_favorite.png';
 
 // ---- 아이템 세부 정보 ----
-// 강화 단계 선택이 가능한 장비 종류(인벤토리 액션에서 '강화 선택'이 있는 종류와 동일: 무기/방어구/장신구, 보조는 강화 불가).
+// 강화 단계 선택이 가능한 장비 종류(인벤토리 액션에서 '강화 선택'이 있는 종류와 동일: 무기/방어구/보조/장신구).
 // 선택 가능 범위는 0 ~ MAX_LEVEL(실제 강화 최대 단계, data.js).
-const CODEX_ENHANCEABLE_SRCS = ['weapon', 'armor', 'accessory'];
+const CODEX_ENHANCEABLE_SRCS = ['weapon', 'armor', 'sub', 'accessory'];
 
 // ---- 화면 상태(저장하지 않음) ----
 // grades: 등급 id → 체크 여부(WEAPON_GRADES 기준으로 자동 구성, 기본은 전부 체크).

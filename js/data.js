@@ -478,10 +478,10 @@ const WEAPON_TYPES = {
     weaponKind: 'sword', // 검
     handType: 'one_hand',
     grade: 'epic', // 에픽
-    attackPower: 870, attackSpeed: 0.8, critRate: 9,
+    attackPower: 770, attackSpeed: 0.8, critRate: 9,
     purchasable: false, levelReq: 70,
     image: 'epic_firesword',
-    atk: [870], speed: [0.8], crit: [9], sell: [49900],
+    atk: [770], speed: [0.8], crit: [9], sell: [49900],
     cost: [], odds: [],
     // 고유 옵션: poison_on_hit(독 송곳니)와 동일한 "적중 시 확률 발동형" 스키마 — activateLevel:0이라
     // +0부터 바로 활성화되고, chanceByLevel에 0~9 전 구간 값을 직접 등록함(poisonfang처럼 activateLevel
@@ -493,7 +493,7 @@ const WEAPON_TYPES = {
     uniqueOption: {
       effectId: 'burn_on_hit',
       activateLevel: 0,
-      chanceByLevel: { 0: 5, 1: 5, 2: 5, 3: 5, 4: 5, 5: 7, 6: 7, 7: 9, 8: 10, 9: 15 },
+      chanceByLevel: { 0: 3, 1: 3, 2: 3, 3: 3, 4: 3, 5: 4, 6: 4, 7: 5, 8: 7, 9: 10 },
       textTemplate: "공격 적중 시 {chance}% 확률로 {term:burn}화상{/term} 부여",
     },
   },
@@ -1338,7 +1338,7 @@ const ARMOR_TYPES = {
     durability: 10000,
     armorKind: 'armor', // 갑옷
     grade: 'unique', // 유니크
-    defense: -23, hp: 1000, mana: 200,
+    defense: -20, hp: 1000, mana: 200,
     purchasable: false, levelReq: 50,
     image: 'unique_spider_armor',
     // 고유 옵션: "피격 시 확률로 중독 부여" 계열 — effectId(poison_on_taking_damage)로
@@ -1382,7 +1382,7 @@ const ARMOR_TYPES = {
     durability: 35000,
     armorKind: 'armor', // 갑옷
     grade: 'epic', // 에픽
-    defense: -18, hp: 500,
+    defense: -24, hp: 500,
     purchasable: false, levelReq: 68,
     image: 'epic_black_ghost_armor',
     // 고유 옵션: 강화 단계별로 자라는 방어도 무시(성장형) — growthStat:'defenseIgnore'로 등록해
@@ -1449,7 +1449,7 @@ const ARMOR_TYPES = {
     durability: 35000,
     armorKind: 'helmet', // 투구
     grade: 'epic', // 에픽
-    defense: -4, hp: 400,
+    defense: -8, hp: 400,
     purchasable: false, levelReq: 66,
     image: 'epic_black_ghost_helmet',
     // 고유 옵션: 고정형(statBonus.str=5, 강화해도 불변)과 성장형(growthStat:'defenseIgnore')을 한 옵션에
@@ -2051,25 +2051,63 @@ Object.values(ACCESSORY_TYPES).forEach(a => {
 });
 
 // ============================================================
-// SUB_TYPES(보조 장비: 방패/보조 무기) — 방어구 데이터 스키마를 그대로 재사용하되, 강화 자체가 없는
-// 장비 타입이라 무기/방어구/장신구와 달리 cost/odds(강화 비용/확률)를 아예 채우지 않음. 이 cost 필드가
-// 없다는 사실 하나만으로 forgeSelectableItems(formulas.js)가 자동으로 강화 대상에서 제외해줌(무기/방어구/
-// 장신구가 "강화 데이터가 아직 없는 종류"를 거르는 것과 완전히 같은 기존 메커니즘 재사용 — 별도의
-// 예외 처리를 새로 만들지 않음).
+// SUB_TYPES(보조 장비: 방패/보조 무기) — 방어구 데이터 스키마를 그대로 재사용하며, 방어구/장신구와 같이 강화가 가능함.
+// 강화 비용/확률/판매가는 무기·방어구·장신구와 같은 등급별 공식(computeGradeCost / resolveGradeOdds /
+// computeWeaponSellPrices)을 그대로 연결하고(이 파일 아래 "ACCESSORY_TYPES 연결" 바로 다음 SUB_TYPES 블록), cost 배열이 채워지면
+// forgeSelectableItems(formulas.js)가 보조 아이템도 강화 대상으로 자동 포함함(별도 예외 처리 없음).
 // ---- 항목 설명 ----
 // subKind: 보조 종류('shield'|'sub_weapon', SUB_KINDS 참고 — 툴팁 구분 표시 전용이며 능력치 공식과는
-// 무관함) / defense,hp,mana: 방어구와 동일한 의미(공란=옵션 없음) / uniqueOption: 방어구와 동일한 구조
-// 그대로 재사용(weaponUniqueOptionTooltipHtml 등 기존 범용 함수가 그대로 인식함).
-// defArr/hpArr/manaArr/sell: 강화 단계가 없으므로(항상 +0) 방어구처럼 단계별로 자라는 배열이 아니라,
-// "장신구의 방어도"(강화 대상에서 제외되는 옵션)와 동일한 방식으로 10칸 전부 같은 값을 채운 flat
-// 배열을 씀 — defenseFor/armorHpFor/armorManaFor/sellValueFor 등 기존 접근자 함수가 항상 [level]로
-// 인덱싱하므로, 아이템 인스턴스의 level이 항상 0이더라도(강화 불가) 이 함수들을 그대로 재사용하기 위함.
-// 아직 실제 아이템 데이터는 등록하지 않음(이번 작업 범위는 스키마/시스템 구현까지).
+// 무관함) / defense,hp,mana,attack: 기본(+0) 옵션 값(공란=옵션 없음 — 없는 옵션은 강화해도 새로 생기지 않음) /
+// uniqueOption: 방어구와 동일한 구조 그대로 재사용(보조 아이템의 고유 옵션은 모두 "고정형" — 강화 단계로 성장하지 않음).
+// defArr/hpArr/manaArr/atkArr: 강화 단계별(0~9) 옵션 값 배열 — 아래 보조 아이템 성장 공식(computeSubDefenseArray /
+// computeSubVitalArray / computeSubAttackArray)이 기본 값에서 자동 계산함(아이템마다 하드코딩하지 않음).
+// defenseFor/armorHpFor/armorManaFor/armorAtkFor/sellValueFor 등 접근자 함수는 항상 [level]로 인덱싱함.
 // ============================================================
 const SUB_KINDS = { shield: '방패', sub_weapon: '보조 무기' }; // 새 보조 종류가 추가되면 항목만 추가하면 툴팁 등에 자동 반영됨(ARMOR_KINDS/ACCESSORY_KINDS와 동일한 확장 방식)
 const SUB_IMAGE_DIR = 'assets/sub/';
 const SUB_IMAGE_EXT = '.png';
 const SUB_DEFAULT_IMAGE = { shield: 'shieldbase', sub_weapon: 'subweaponbase' }; // image 필드가 비어있을 때 보조 종류별 기본 이미지(방어구/장신구와 동일한 방식). 실제 PNG 파일은 아직 없지만 onerror 폴백(weaponIconHtml)이 있어 안전하게 동작함.
+
+// ---- 보조 아이템 강화 단계별 옵션 성장 공식 ----
+// 무기(ENHANCE_ATK_LEVEL_MULT)·방어구(ARMOR_DEFENSE_STEP_DELTA / ARMOR_VITAL_STEP_MULT) 공식과는 이름도 값도 완전히 분리된 보조 아이템 전용
+// 상수임 — 이 표를 바꿔도 무기/방어구/장신구 수치는 영향받지 않고, 반대로도 마찬가지. 보조 아이템이 "실제로 가진 옵션"만 성장시키며
+// (공란 옵션을 0에서 새로 만들지 않음), 고유 옵션(uniqueOption)은 모두 고정형이라 강화로 변하지 않음. index = 강화 단계(1~9, [0]은 사용 안 함).
+//
+// ① 방어도 — 증가분 누적(재귀): +N 방어도 = +(N-1) 방어도 + SUB_DEFENSE_STEP_DELTA[N]. 방어도가 양수(그림자 비수 +6 → +9에서 +1,
+//    트레이드오프 완화)든 음수(방패 -3 → -8, 받는 피해 감소)든 같은 증가분을 그대로 더함(누적 -5).
+const SUB_DEFENSE_STEP_DELTA = [null, 0, 0, -1, 0, -1, 0, -1, -1, -1];
+function computeSubDefenseArray(base){
+  if(base == null) return null;
+  const arr = [base];
+  for(let lv = 1; lv <= 9; lv++) arr.push(arr[lv - 1] + (SUB_DEFENSE_STEP_DELTA[lv] || 0));
+  return arr;
+}
+// ② 체력/마나 — 증가율 누적: 각 단계마다 "기본값의 N%"를 이전 단계 값에 더함. 즉 +N = 기본값 × (1 + (1~N단계 증가율 합계)).
+//    예) 기본 200 → +3 220, +5 240, +7 260, +8 280, +9 310(×1.55). 0인 단계는 그 단계에서 증가 없음(값 유지). 항상 +0 기본값 기준이며
+//    계산 중에는 반올림하지 않고 각 단계의 최종 값만 반올림함(증가율은 정수 %로 합산해 부동소수 오차를 없앰).
+//    기본값이 0 이하인 체력/마나(체력 페널티 아이템 — 불길한 검은색 방패 hp -1500 등)는 성장시키지 않고 모든 단계에서 그대로 둠(페널티를 키우지 않음).
+const SUB_VITAL_STEP_DELTA = [null, 0, 0, 0.10, 0, 0.10, 0, 0.10, 0.10, 0.15];
+function computeSubVitalArray(base){
+  if(base == null) return null;
+  if(base <= 0) return new Array(10).fill(base);
+  const arr = [base];
+  let cumPct = 0; // 누적 증가율(정수 %)
+  for(let lv = 1; lv <= 9; lv++){
+    cumPct += Math.round((SUB_VITAL_STEP_DELTA[lv] || 0) * 100);
+    arr.push(Math.round(base * (100 + cumPct) / 100));
+  }
+  return arr;
+}
+// ③ 공격력 — 직접 계산(재귀 아님): +N 공격력 = 기본 + 기본 × N × SUB_ATK_LEVEL_MULT[N]. 항상 +0 기본값 기준, 최종 결과만 반올림.
+//    예) 그림자 비수 50 → +9 455(×9.1). 기본값이 0 이하이면 성장하지 않음.
+const SUB_ATK_LEVEL_MULT = [null, 0.5, 0.5, 0.5, 0.5, 0.55, 0.6, 0.65, 0.75, 0.9];
+function computeSubAttackArray(base){
+  if(base == null) return null;
+  if(base <= 0) return new Array(10).fill(base);
+  const arr = [base];
+  for(let lv = 1; lv <= 9; lv++) arr.push(Math.round(base + (base * lv * Math.round((SUB_ATK_LEVEL_MULT[lv] || 0) * 100)) / 100));
+  return arr;
+}
 
 const SUB_TYPES = {
   woodshield: {
@@ -2149,9 +2187,9 @@ const SUB_TYPES = {
     },
   },
   // 보조 무기 2종(그림자 비수/세컨드 어템프트): 방어도가 "양수"인 것이 트레이드오프(방어도 수치가 높을수록 받는
-  // 피해가 커짐 — defenseDamageMultiplier). 고유 옵션의 공격력 +N / 치명타 확률 +N%는 statBonus의
-  // atkFlat / critRate 키로 등록하며, 착용 중일 때만 적용됨(armorUniqueOptionStatBonus — effectiveAtk /
-  // effectiveCritChance가 이번에 이 키를 읽도록 확장됨, formulas.js).
+  // 피해가 커짐 — defenseDamageMultiplier). 공격력은 기본 옵션(attack)이라 강화 단계로 성장하며(armorStatBonus('atk') →
+  // effectiveAtk에 합산, formulas.js), 그림자 비수의 치명타 확률 +4%는 고정형 고유 옵션(statBonus.critRate —
+  // armorUniqueOptionStatBonus / effectiveCritChance)이라 성장하지 않음. 모두 착용 중일 때만 적용됨.
   // 내구도: 그림자 비수 30000 / 세컨드 어템프트 20000(사용자 확정값).
   shadowdagger: {
     id: 'shadowdagger', name: '그림자 비수', desc: '어둠 속에서 빈틈을 노리는 날카로운 무기',
@@ -2159,13 +2197,13 @@ const SUB_TYPES = {
     durability: 30000,
     subKind: 'sub_weapon', // 보조 무기
     grade: 'epic', // 에픽
-    defense: 6,
+    defense: 6, attack: 50, // 공격력은 기본 옵션(강화로 성장 — SUB_ATK_LEVEL_MULT). 고유 옵션은 고정형 치명타 확률만 남김.
     purchasable: false, levelReq: 50,
     image: 'epic_shadow_dagger_a_',
     uniqueOption: {
-      text: '공격력 +50, 치명타 확률 +4%',
+      text: '치명타 확률 +4%',
       activateLevel: 0,
-      statBonus: { atkFlat: 50, critRate: 4 },
+      statBonus: { critRate: 4 },
     },
   },
   secondattempt: {
@@ -2174,20 +2212,17 @@ const SUB_TYPES = {
     durability: 20000,
     subKind: 'sub_weapon', // 보조 무기
     grade: 'rare', // 레어
-    defense: 4,
+    defense: 4, attack: 20, // 공격력은 기본 옵션(강화로 성장). 이 아이템은 고유 옵션이 없음.
     purchasable: false, levelReq: 30,
     image: 'rare_second_attempt_a_',
-    uniqueOption: {
-      text: '공격력 +20',
-      activateLevel: 0,
-      statBonus: { atkFlat: 20 },
-    },
   },
 };
 Object.values(SUB_TYPES).forEach(s => {
-  if(s.defense != null) s.defArr = new Array(10).fill(s.defense);
-  if(s.hp != null) s.hpArr = new Array(10).fill(s.hp);
-  if(s.mana != null) s.manaArr = new Array(10).fill(s.mana);
+  // 강화 단계별 옵션 배열(보조 아이템 성장 공식) — 실제로 가진 옵션만 만들고, 없는 옵션은 배열 자체를 만들지 않음.
+  if(s.defense != null) s.defArr = computeSubDefenseArray(s.defense);
+  if(s.hp != null) s.hpArr = computeSubVitalArray(s.hp);
+  if(s.mana != null) s.manaArr = computeSubVitalArray(s.mana);
+  if(s.attack != null) s.atkArr = computeSubAttackArray(s.attack);
   // sell(판매가 배열)은 여기서 채우지 않음 — 이 시점엔 아직 s.sellPrice가 계산되기 전(항상 undefined)
   // 이라 0으로 고정돼버리는 버그가 있었음. 실제 대입은 sellPrice가 확정된 뒤(등급별 판매가 공식 적용
   // 직후)로 옮김 — 아래 "장비 기본 판매 가격 일괄 설정" 블록 바로 다음 참고.
@@ -2220,11 +2255,9 @@ const EQUIP_INVENTORY_POOLS = [
     typesTable: ACCESSORY_TYPES,
     meetsReq: type => meetsWeaponEquipRequirements(type, state.playerLevel, effectiveStats()),
   },
-  // "보조"도 다른 세 종류와 동일하게 이 풀에 등록함(공용 인벤토리 슬롯 카운트에 정상적으로 포함되고,
-  // 모험가의 유해 등 확정 장비 드랍이 grantRelicEquipDrop에서 올바른 인벤토리로 들어가려면 이 풀이
-  // 필요함). 그런데도 강화 대상에서는 절대 뜨지 않음 — forgeSelectableItems(바로 아래)가 typeDef.cost
-  // 배열이 없는 아이템을 자동으로 걸러내는데, SUB_TYPES 항목은 애초에 cost/odds를 채우지 않으므로
-  // (위 SUB_TYPES 블록 참고) 이 풀에 있어도 강화 선택 목록에는 절대 나타나지 않음.
+  // "보조"도 다른 세 종류와 동일하게 이 풀에 등록함(공용 인벤토리 슬롯 카운트, 모험가의 유해 등 확정 장비 드랍이
+  // grantRelicEquipDrop에서 올바른 인벤토리로 들어가는 데 필요). 보조 아이템도 강화할 수 있으므로 cost 배열이 채워지면
+  // (아래 "SUB_TYPES 연결") forgeSelectableItems가 강화 선택 목록에 포함함.
   {
     kind: 'sub',
     items: () => state.subInventory || [],
@@ -2244,7 +2277,7 @@ const EQUIP_INVENTORY_POOLS = [
 // 1. 강화 단계별 공격력 배율 (index = 강화단계, [0]은 사용 안 함)
 // 신규 공식: 무기 +N 공격력 = 기본 공격력 + (기본 공격력 × 강화 단계 × 이 배율). 재귀식이 아니라
 // 항상 +0 기본 공격력만을 기준으로 직접 계산하며, 무기 종류/등급 보정은 이 공식에서 완전히 제외됨.
-const ENHANCE_ATK_LEVEL_MULT = [null, 1.5, 1.5, 1.5, 1.5, 1.55, 1.5, 1.6, 1.6, 1.65];
+const ENHANCE_ATK_LEVEL_MULT = [null, 1.4, 1.4, 1.4, 1.4, 1.45, 1.5, 1.55, 1.6, 1.7];
 
 // 2~3. 무기 종류별 강화 구간(+1~+9)당 공격속도/치명타 증가량은 이제 WEAPON_PROFILES(weaponKind+
 // handType 조합, 이 파일 상단)에 atkSpeedStep/critStep으로 통합 등록됨 — 기존 WEAPON_KIND_ATKSPEED_STEP/
@@ -2379,11 +2412,9 @@ function resolveGradeOdds(grade){
       : equipBaseSellPrice(item.levelReq || 1, item.grade);
   });
 });
-// 보조 장비(SUB_TYPES)는 강화 자체가 없어(항상 +0) computeWeaponSellPrices(강화 단계별 성장 공식)를
-// 거치지 않으므로, sellPrice가 방금 확정된 이 시점에 10칸 전부 같은 값으로 채운 flat 배열을 별도로
-// 만들어줌 — 판매가 계산·공통 처리 구조 자체는 무기/방어구/장신구와 동일(등급×착용레벨 공식 재사용),
-// 다만 강화로 성장하는 값이 없다는 보조 장비만의 특성 때문에 배열 채우는 방식만 다름(버그 수정: 이
-// 전엔 sellPrice가 아직 계산되기 전인 SUB_TYPES 선언 직후에 이 배열을 채워서 항상 0이 저장됐었음).
+// 보조 장비(SUB_TYPES)의 판매가 배열(sell)은 여기서 임시로 10칸 전부 +0 판매가(flat)로 채워 둠 — 실제 강화 단계별 판매가는
+// 아래 "SUB_TYPES 연결"에서 강화 비용/확률이 채워진 뒤 computeWeaponSellPrices로 덮어씀(등급 데이터가 없어 계산이 안 되는
+// 예외적인 경우에만 이 flat 배열이 그대로 쓰임).
 Object.values(SUB_TYPES).forEach(s => {
   s.sell = new Array(10).fill(s.sellPrice || 0);
 });
@@ -2507,6 +2538,21 @@ Object.values(ACCESSORY_TYPES).forEach(a => {
   if(sell) a.sell = sell;
 });
 
+// ============================================================
+// SUB_TYPES(보조: 방패/보조 무기)에 "장비 전역 설정" 연결 — 무기/방어구/장신구와 완전히 동일한 등급 기반 강화 확률/비용/판매가 공식을
+// 그대로 재사용함(보조 전용 보정값 없음). 이 연결로 cost/odds 배열이 생기면 forgeSelectableItems가 보조 아이템을 강화 대상에 포함함.
+// ============================================================
+Object.values(SUB_TYPES).forEach(s => {
+  const gradeOdds = resolveGradeOdds(s.grade);
+  const gradeCost = computeGradeCost(s.sellPrice, s.grade);
+  if(gradeOdds) s.odds = gradeOdds;
+  if(gradeCost) s.cost = gradeCost;
+});
+Object.values(SUB_TYPES).forEach(s => {
+  const sell = computeWeaponSellPrices(s);
+  if(sell) s.sell = sell;
+});
+
 // ---- 캐릭터 레벨 시스템 ----
 const PLAYER_MAX_LEVEL = 99;
 // Lv99(만렙) 경험치 누적 시스템 활성화 스위치. false(기본값)면 기존 방식(Lv99 도달/유지 시 경험치를
@@ -2616,10 +2662,30 @@ const ARTIFACTS = {
     equipType: 'artifact',
     grade: 'unique',
     effect: '몬스터 처치 시 획득 골드가 20% 증가한다',
-    effectText: '몬스터 처치 시 획득 골드 +20%',
+    effectText: '몬스터 처치 획득 골드 +20%',
+    killGoldBonusPct: 20, // 몬스터 처치 골드 증가율(%) — artifactGoldBonusPercent가 이 값을 읽음. 이 필드가 있으면 "몬스터 처치 골드" 효과 그룹(ARTIFACT_EXCLUSIVE_EFFECTS)에 자동 포함됨
+    buyPrice: null,
+  },
+  // 몬스터 처치 골드 +10%: 뿔 달린 정령인형과 같은 방식(killGoldBonusPct)이며 같은 효과 그룹이라 동시 착용 불가.
+  goblinlowdoll: {
+    id: 'goblinlowdoll', name: '조악한 정령인형', icon: '🧸', image: 'epic_goblin_lowdoll',
+    desc: '손재주 없는 도깨비가 만든 인형',
+    equipType: 'artifact',
+    grade: 'epic',
+    effect: '몬스터 처치 시 획득 골드가 10% 증가한다',
+    effectText: '몬스터 처치 획득 골드 +10%',
+    killGoldBonusPct: 10,
     buyPrice: null,
   },
 };
+
+// 아티팩트 "같은 효과 그룹" — 같은 그룹에 속한 아티팩트는 동시에 하나만 착용할 수 있음(착용 해제 후에 다른 것을 장착).
+// field: 아티팩트 데이터에 이 필드가 있으면(null/undefined 아님) 그 그룹에 속함 — 새 아티팩트는 필드만 넣으면 착용 제한과
+// 툴팁 안내 문구(note)가 자동 적용됨(아이템별 코드 수정 불필요). note: 효과 설명 아래에 한 줄 띄우고 기울임으로 표시되는 문구.
+// 새 종류의 "중복 착용 불가" 효과가 생기면 이 목록에 항목을 추가하면 됨.
+const ARTIFACT_EXCLUSIVE_EFFECTS = [
+  { id: 'killGold', field: 'killGoldBonusPct', note: '*같은 효과를 가진 아티팩트와 동시 착용 불가' },
+];
 
 // 소비 아이템(플라스크 등) 도감
 const QUICK_SLOT_COUNT = 2;
@@ -3037,6 +3103,22 @@ const MISC_ITEMS = {
     desc: '희미한 마력이 깃든 녹색 구슬 파편',
     sellPrice: 350, stateKey: 'greenOrbShards',
   },
+  // 신규 던전용 기타 아이템 — 획득처는 던전 추가 때 함께 등록(지금은 획득 경로 없음).
+  redOrbShard: {
+    id: 'redOrbShard', name: '적색 구슬 조각', icon: '🔴', image: 'rare_red_shed', itemClass: 'misc', grade: 'rare',
+    desc: '강한 사념이 깃든 적색 구슬 파편',
+    sellPrice: 450, stateKey: 'redOrbShards',
+  },
+  goblinKingMedal: {
+    id: 'goblinKingMedal', name: '도깨비 왕의 증표', icon: '🏅', image: 'epic_goblin_medal', itemClass: 'misc', grade: 'epic',
+    desc: '백륜동의 지배자를 상징하는 증표',
+    sellPrice: 1000, stateKey: 'goblinKingMedals',
+  },
+  oldCoin: {
+    id: 'oldCoin', name: '오래된 엽전', icon: '🪙', image: 'common_old_coin', itemClass: 'misc', grade: 'normal',
+    desc: '지금은 사용하지 않는 낡은 엽전',
+    sellPrice: 300, stateKey: 'oldCoins',
+  },
 };
 
 // 장비 요구 레벨별 강화석 추가 소모량(요청글 4번). [최소 레벨, 추가 소모량] — 해당 레벨 이상 중 가장 큰 구간을 적용.
@@ -3101,7 +3183,7 @@ const DESTROY_SHINYSTONE_ENHANCE_QTY = [
 // 상점/인벤토리의 EQUIP_SUB_TABS와 동일한 방식(배열에 항목만 추가하면 자동으로 탭이 늘어남)으로 관리.
 // 사용자 요청 4종(무기/방어구/보조/장신구)만 우선 등록 — 이번 작업은 UI 골격만 구현하는 범위라 실제
 // 제작 가능 아이템 데이터(CRAFTABLE_ITEMS)는 전부 빈 배열임.
-// 가로 탭의 표시 순서는 이 배열의 순서로 고정됨(무기 → 방어구 → 보조 → 신발 → 장신구 → 소비 → 재료 → 마석). 제작 아이템이 하나도 없는 분류는
+// 가로 탭의 표시 순서는 이 배열의 순서로 고정됨(무기 → 방어구 → 보조 → 신발 → 장신구 → 아티팩트 → 소비 → 재료 → 마석). 제작 아이템이 하나도 없는 분류는
 // 탭이 숨겨지지만 이 순서 안의 자리는 예약되어 있어, 나중에 해당 분류(CRAFTABLE_ITEMS[id])에 제작 데이터를 넣으면 UI 수정 없이 제 위치에 탭이 생김.
 // 기타 아이템 중 제작 가능한 아이템은 'misc'(탭 이름 '재료'), 마석은 'stone'에 등록함.
 const CRAFT_SUB_TABS = [
@@ -3110,13 +3192,14 @@ const CRAFT_SUB_TABS = [
   { id: 'sub', label: '보조' },
   { id: 'shoes', label: '신발' },
   { id: 'accessory', label: '장신구' },
+  { id: 'artifact', label: '아티팩트' },
   { id: 'consumable', label: '소비' },
   { id: 'misc', label: '재료' },
   { id: 'stone', label: '마석' },
 ];
 // 장비 제작 아이템의 iconType 목록(제작 1회 = 1개, 천장·재료 장비 등록 등 기존 장비 제작 흐름을 그대로 사용). 이 목록에 없는 iconType
 // ('consumable' 소비 / 'misc' 기타·재료 / 'stone' 마석 — iconRef는 CONSUMABLES·MISC_ITEMS의 아이템 id)은 비장비 제작 아이템으로, 제작 개수를 설정함.
-const CRAFT_EQUIP_ICON_TYPES = ['weapon', 'armor', 'sub', 'accessory'];
+const CRAFT_EQUIP_ICON_TYPES = ['weapon', 'armor', 'sub', 'accessory', 'artifact']; // 'artifact': iconRef = ARTIFACTS 키(1종 1개 보유, 제작 비용은 craftCost 직접 지정 — 판매 가격이 없어 자동 계산 대상 아님)
 // 비장비 제작 개수 상한(재료·골드 조건이 없어 무한정 계산될 때를 막는 안전 상한) / 제작 개수 UI의 [+N] 빠른 추가 버튼 값
 const CRAFT_QTY_HARD_MAX = 9999;
 const CRAFT_QTY_QUICK_ADDS = [5, 10, 100];
@@ -3135,6 +3218,7 @@ const CRAFTABLE_ITEMS = {
   sub: [],
   shoes: [],      // 신발 — 방어구 데이터(iconType 'armor')를 그대로 가리킴
   accessory: [],
+  artifact: [],   // 아티팩트 — iconType 'artifact', iconRef = ARTIFACTS 키(craftCost 직접 지정)
   consumable: [], // 소비 — iconType 'consumable', iconRef = CONSUMABLES 키
   misc: [],       // 재료(기타 아이템) — iconType 'misc', iconRef = MISC_ITEMS 키
   stone: [],      // 마석 — iconType 'stone', iconRef = MISC_ITEMS 키(마석)
@@ -3366,21 +3450,107 @@ CRAFTABLE_ITEMS.weapon.push(
       { name: '흑철비도', chance: 100 },
     ],
   },
-  // 도깨비방망이(신규 한손 둔기) — 천장 없음(pityLimit 생략). 실패 시 반짝이는 돌 1개를 반환(chance 100).
-  // 제작 비용은 장비 제작 비용 자동 계산 공식(기본 판매 가격 × max(성공 확률, 30)% — formulas.js craftNormalizeEquipCosts)이 채움.
+  // 도깨비 계열 장비 제작 — 제작 비용은 장비 제작 비용 자동 계산 공식(기본 판매 가격 × max(성공 확률, 30)% — formulas.js craftNormalizeEquipCosts)이 채움.
+  // failReturns: 실패 시 반환(chance 100 = 항상 반환). 도깨비방망이는 이전(zip357)에는 성공 35%·천장 없음이었으나 이번 요청으로 아래 값으로 교체됨.
+  {
+    id: 'craft_pommelsword', name: '환두대도', grade: 'rare',
+    iconType: 'weapon', iconRef: 'pommelsword',
+    successChance: 40, pityLimit: 3,
+    materials: [
+      { name: '반짝이는 돌', need: 1 },
+      { name: '녹색 구슬 조각', need: 1 },
+      { name: '도깨비뿔', need: 5 },
+      { name: '쇠조각', need: 5 },
+    ],
+    failReturns: [
+      { name: '녹색 구슬 조각', need: 1, chance: 100 },
+    ],
+  },
+  {
+    id: 'craft_thorndagger', name: '가시철단도', grade: 'rare',
+    iconType: 'weapon', iconRef: 'thorndagger',
+    successChance: 40, pityLimit: 3,
+    materials: [
+      { name: '반짝이는 돌', need: 1 },
+      { name: '녹색 구슬 조각', need: 1 },
+      { name: '도깨비뿔', need: 5 },
+      { name: '쇠조각', need: 5 },
+    ],
+    failReturns: [
+      { name: '녹색 구슬 조각', need: 1, chance: 100 },
+    ],
+  },
   {
     id: 'craft_goblinclub', name: '도깨비방망이', grade: 'epic',
     iconType: 'weapon', iconRef: 'goblinclub',
-    successChance: 35,
+    successChance: 40, pityLimit: 3,
     materials: [
-      { name: '반짝이는 돌', need: 3 },
-      { name: '녹색 구슬 조각', need: 1 },
-      { name: '도깨비뿔', need: 10 },
-      { name: '흑철', need: 15 },
-      { name: '쇠조각', need: 15 },
+      { name: '반짝이는 돌', need: 2 },
+      { name: '녹색 구슬 조각', need: 5 },
+      { name: '도깨비뿔', need: 7 },
+      { name: '쇠조각', need: 7 },
     ],
     failReturns: [
       { name: '반짝이는 돌', need: 1, chance: 100 },
+    ],
+  },
+  {
+    id: 'craft_goblinkingclub', name: '녹귀령봉', grade: 'epic',
+    iconType: 'weapon', iconRef: 'goblinkingclub',
+    successChance: 40, pityLimit: 4,
+    materials: [
+      { name: '도깨비방망이', need: 1 },
+      { name: '반짝이는 돌', need: 2 },
+      { name: '도깨비 왕의 증표', need: 2 },
+      { name: '적색 구슬 조각', need: 5 },
+      { name: '녹색 구슬 조각', need: 10 },
+      { name: '도깨비뿔', need: 8 },
+      { name: '쇠조각', need: 10 },
+    ],
+    failReturns: [
+      { name: '도깨비 왕의 증표', need: 1, chance: 100 },
+    ],
+  },
+);
+
+// 신발 제작 아이템 — 신발 소분류 탭(CRAFTABLE_ITEMS.shoes)은 방어구 데이터(iconType 'armor', iconRef = ARMOR_TYPES 키)를 그대로 가리킴.
+// 도깨비장화: 재료로 쓴 장비(금 장식 장화)는 failReturns에 등록하지 않았으므로 실패 시 반환 없이 소실됨(반환 후보에 그 장비가 있을 때만
+// 손상 상태로 돌아오는 기존 방식 — craftGrantResultItems). failReturns를 생략했으므로 제작 확인창의 "제작 실패" 영역도 표시되지 않음.
+CRAFTABLE_ITEMS.shoes.push(
+  {
+    id: 'craft_goblinboots', name: '도깨비장화', grade: 'epic',
+    iconType: 'armor', iconRef: 'goblinboots',
+    successChance: 40, pityLimit: 3,
+    materials: [
+      { name: '금 장식 장화', need: 1 },
+      { name: '반짝이는 돌', need: 1 },
+      { name: '적색 구슬 조각', need: 3 },
+      { name: '녹색 구슬 조각', need: 3 },
+      { name: '오래된 엽전', need: 5 },
+      { name: '흑철', need: 3 },
+      { name: '쇠조각', need: 5 },
+    ],
+  },
+);
+
+// 아티팩트 제작 아이템 — iconType 'artifact'(iconRef = ARTIFACTS 키). 아티팩트는 판매 가격이 없어 제작 비용(craftCost)을 직접 지정함(자동 계산 제외).
+// 재료로 쓰는 아티팩트(이름으로 지정)는 보유 중이면서 착용 중이 아닌 것만 인정되고, 제작 연출이 시작될 때 소모됨. 실패 시 failReturns로 되돌려 받을 수 있음.
+// 이미 보유 중인 아티팩트는 제작할 수 없음(1종 1개 보유 규칙).
+CRAFTABLE_ITEMS.artifact.push(
+  {
+    id: 'craft_goblinfairy', name: '뿔 달린 정령인형', grade: 'unique',
+    iconType: 'artifact', iconRef: 'goblinfairy',
+    successChance: 15, pityLimit: 6, craftCost: 75000,
+    materials: [
+      { name: '조악한 정령인형', need: 1 },
+      { name: '오래된 엽전', need: 5 },
+      { name: '도깨비 왕의 증표', need: 1 },
+      { name: '도깨비뿔', need: 5 },
+      { name: '적색 구슬 조각', need: 1 },
+      { name: '녹색 구슬 조각', need: 2 },
+    ],
+    failReturns: [
+      { name: '조악한 정령인형', chance: 100 },
     ],
   },
 );
@@ -3475,7 +3645,7 @@ const CRAFT_ANIM_STAGE_TEXT = [
 const EQUIP_SUB_TABS = [
   { id: 'weapon', label: '무기' },
   { id: 'armor', label: '방어구' },
-  { id: 'sub', label: '보조' }, // 보조 아이템 데이터/기능은 아직 미구현 — 탭 UI만 우선 추가(강화 불가 아이템으로 기획됨, EQUIP_INVENTORY_POOLS 주석 참고)
+  { id: 'sub', label: '보조' }, // 보조(방패/보조 무기) — 방어구/장신구와 같이 강화 가능(SUB_TYPES 연결 참고)
   { id: 'accessory', label: '장신구' },
   { id: 'artifact', label: '아티팩트' },
 ];
@@ -3971,7 +4141,7 @@ const SKILLS = {
     upgradeFrom: 'jin_cleave', // 스킬 업그레이드: 진'참격 보유해야 습득 가능, 습득시 진'참격→극진참격으로 교체
   },
   five_strike: {
-    name: '오연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 다섯 번 공격.',
+    name: '오연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 {hits}번 공격.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 50,
     cooldown: 5, resourceType: 'mp', resourceAmount: 250, castTime: 0,
     damagePercent: 100, hits: 5, icon: 'lv50atk', // 요청대로 사연격과 동일한 lv50atk 아이콘 재사용
@@ -3980,15 +4150,39 @@ const SKILLS = {
     hitDelayMs: 0.12,
     upgradeFrom: 'quad_strike', // 스킬 업그레이드: 사연격 보유해야 습득 가능, 습득시 사연격→오연격으로 교체
   },
-  seven_strike: {
-    name: '칠연격', desc: '맹렬하게 움직여<br>{dp}% 데미지로 일곱 번 베어낸다.',
+  six_strike: {
+    name: '육연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 {hits}번 공격.',
     grade: 'rare', category: 'common', target: 'single', levelReq: 60,
-    cooldown: 5, resourceType: 'mp', resourceAmount: 300, castTime: 0,
+    cooldown: 4.9, resourceType: 'mp', resourceAmount: 350, castTime: 0,
+    damagePercent: 100, hits: 6, icon: 'lv60atk', // 요청대로 칠연격과 동일한 lv60atk 아이콘 재사용
+    hitDelayMs: 0.1, // 1타 즉시, 이후 타수는 0.1초마다 순차 적용(applyDelayedSkillHits)
+    upgradeFrom: 'five_strike', // 스킬 업그레이드: 오연격 보유해야 습득 가능, 습득시 오연격→육연격으로 교체
+  },
+  seven_strike: {
+    name: '칠연격', desc: '맹렬하게 움직여 <br>{dp}%의 데미지로 {hits}번 공격.',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 70,
+    cooldown: 5, resourceType: 'mp', resourceAmount: 350, castTime: 0,
     damagePercent: 100, hits: 7, icon: 'lv60atk',
     // 이연격~오연격과 동일한 방식 — 1타 즉시, 이후 타수는 hitDelayMs(칠연격 0.1초)마다 순차 적용(applyDelayedSkillHits가
     // hits 값에 따라 자동 반복하므로 7타도 별도 처리 없이 순차 적용됨).
     hitDelayMs: 0.1,
-    upgradeFrom: 'five_strike', // 스킬 업그레이드: 오연격 보유해야 습득 가능, 습득시 오연격→칠연격으로 교체
+    upgradeFrom: 'six_strike', // 스킬 업그레이드: 육연격 보유해야 습득 가능, 습득시 육연격→칠연격으로 교체
+  },
+  chain_strike: {
+    name: '연환격', desc: '아름답게 움직여 <br>{dp}%의 데미지로 {hits}번 공격.',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 80,
+    cooldown: 4.9, resourceType: 'mp', resourceAmount: 400, castTime: 0,
+    damagePercent: 140, hits: 6, icon: 'lv80atk_single',
+    hitDelayMs: 0.1,
+    upgradeFrom: 'seven_strike', // 스킬 업그레이드: 칠연격 보유해야 습득 가능, 습득시 칠연격→연환격으로 교체
+  },
+  thunder_strike: {
+    name: '폭뢰격', desc: '번개처럼 파고들어<br>{dp}%의 데미지로 {hits}번 공격.',
+    grade: 'rare', category: 'common', target: 'single', levelReq: 90,
+    cooldown: 4.8, resourceType: 'mp', resourceAmount: 450, castTime: 0,
+    damagePercent: 140, hits: 7, icon: 'lv90atk',
+    hitDelayMs: 0.1,
+    upgradeFrom: 'chain_strike', // 스킬 업그레이드: 연환격 보유해야 습득 가능, 습득시 연환격→폭뢰격으로 교체
   },
   sky_vigor: {
     // 대지의 기운(earth_vigor)/바다의 기운(sea_vigor)과 완전히 동일한 스킴(target:'buff'+healFlat)의 회복 스킬.
@@ -4051,10 +4245,9 @@ const SKILLS = {
     damagePercent: 280, hits: 2, icon: 'lv74atk', // 업로드 파일명은 lv75atk.svg였으나 요청 표의 icon 필드값·레벨제한(74)과
     // 일치시키기 위해 lv74atk.svg로 저장함(기존 lvNN접두 아이콘 명명 규칙과도 일치) — 파일명 오탈자로 보여 이 자리에 알려드림.
     hitDelayMs: 0.3, // 1타 즉시, 2타는 0.3초 뒤(이연격 등과 동일한 hitDelayMs 방식)
-    onHitStatus: { key: 'shredding', durationMs: 4000 }, // 적중(=피해를 입혀 대상이 생존)한 "최초의" 타격에만 파쇄 부여 —
-    // onceOnHitStatus:true(actions.js applyDelayedSkillHits)로 2타 모두 적중해도 파쇄가 두 번 적용되지 않도록 함
-    // (수정 전에는 타격마다 부여되어 stackDurationAdditive로 남은시간이 가산됐었음).
-    onceOnHitStatus: true,
+    onHitStatus: { key: 'shredding', durationMs: 4000 }, // 마지막 타격(2타)이 적중하고 대상이 생존했을 때만 파쇄 부여 —
+    // onHitStatusOnLastHit:true(actions.js applyDelayedSkillHits)로 이 스킬 자신의 피해는 파쇄 효과를 받지 않음.
+    onHitStatusOnLastHit: true,
     upgradeFrom: 'crushing_sword2', // 스킬 업그레이드: 압쇄검 보유해야 습득 가능(zip165 등록 당시 중압검으로 잘못
     // 전달됐던 것을 사용자가 정정 — 원래 의도한 체인은 내려베기→중압검→압쇄검→파쇄격 단일 직선 체인),
     // 습득시 압쇄검→파쇄격으로 교체
@@ -4136,20 +4329,6 @@ const SKILL_KIND_TABS = [
   { id: 'attack', label: '공격' },
   { id: 'buff', label: '버프' },
   { id: 'passive', label: '패시브' },
-];
-// 스킬 탭 페이지 구성(레벨 구간). "8. 페이지" 요구사항 표를 그대로 데이터화한 것으로, 페이지네이션은
-// 기존 공용 시스템(pageState/pagerHtml/goPage/clampPage)을 그대로 재사용함(개수 기반 분할이 아니라
-// 레벨 구간 기준 분할이라는 점은 다른 공용 페이지네이션과 동일한 방식).
-// 스킬 탭 페이지 구간(요구사항: 1p 1~25 / 2p 30~55 / 3p 60~85 / 4p 90~99, 5p 삭제 — 페이지 경계가 전부
-// skillMilestoneLevels 값과 일치하므로 levelsForSkillPage의 min/max 필터링이 그대로 정확히 맞물림).
-const SKILL_PAGES = [
-  // 요청사항: 페이지 구간을 서로 겹치게(1~30/30~60/60~90/90~99) 바꿔서, 경계 레벨(30·60·90)
-  // 스킬은 인접한 두 페이지 모두에 "같은 스킬 id"로 자연히 함께 표시됨(중복 데이터 없이 동일 스킬
-  // 공유 — buildSkillTreeLayout의 필터 조건 자체가 그대로 처리하므로 별도 로직 불필요).
-  { min: 1, max: 30 },
-  { min: 30, max: 60 },
-  { min: 60, max: 90 },
-  { min: 90, max: 99 },
 ];
 // 스킬 퀵슬롯 칸 수(왼쪽 5칸). 오른쪽에는 기존 플라스크 퀵슬롯(QUICK_SLOT_COUNT)을 그대로 이어붙여 사용함.
 const SKILL_QUICK_SLOT_COUNT = 10; // 2줄 × 5칸(요구사항: 기존 1줄 5칸 유지 + 아래에 5칸 추가)
@@ -4324,10 +4503,12 @@ const RELIC_GRADE_CHANCE = {
   armor: { normal: 65, rare: 27, epic: 8 },
   accessory: { normal: 75, rare: 20, epic: 5 },
 };
-// 드랍 가능한 장비의 최대 레벨 "상한"(아이템 착용 제한 레벨 기준) — 몬스터 레벨과 무관하게 이 값을 절대
-// 넘지 않음. 실제 후보 레벨은 min(몬스터 레벨+10, 이 값)까지 허용됨(formulas.js resolveWeaponRelicDrop
-// 참고). 장비 타입 공통.
-const RELIC_LEVEL_CAP = 50;
+// 등급별 드랍 가능 장비의 최대 레벨 "상한"(아이템 착용 제한 레벨 기준). 실제 후보는 이 상한과 처치한 몬스터 레벨
+// 둘 다 만족하는 장비(착용 제한 ≤ min(등급 상한, 몬스터 레벨))만 허용됨 — 몬스터보다 착용 제한이 높은 장비는
+// 후보에서 제외(formulas.js relicMaxDropLevel / resolveWeaponRelicDrop 참고). 장비 타입 공통.
+// 범위를 바꾸고 싶으면 이 값만 수정하면 됨(표에 없는 등급은 RELIC_GRADE_LEVEL_CAP_DEFAULT 사용).
+const RELIC_GRADE_LEVEL_CAP = { normal: 50, rare: 50, epic: 44 };
+const RELIC_GRADE_LEVEL_CAP_DEFAULT = 50;
 const RELIC_LEVEL_WEIGHT_DECAY = 0.8; // 등록된 아이템 레벨이 한 단계 낮아질 때마다 가중치 ×이 값(최고 레벨 가중치는 100)
 // 드랍된 장비의 강화 단계(+N) 확률. "무기"에만 사용함(기존 값 그대로 유지) — 방어구/장신구는 등급과
 // 무관하게 항상 +0으로 고정 지급되므로 이 표를 참조하지 않음(resolveWeaponRelicDrop이 장비 타입에 따라
@@ -4358,7 +4539,7 @@ const STONE_DROP_TABLE = [
 
 // 촉매 드랍 — 전역 설정값(마석/플라스크와 독립적으로 판정, 한쪽 결과가 다른 쪽에 영향을 주지 않음). 촉매 시스템 요청글 2~4번.
 // 1) 몬스터 등급별 드랍 판정 확률(%) — 목록에 없는 등급은 0%. 유니크 몬스터는 아직 없지만 추후 추가에 대비해 등록함.
-const CATALYST_DROP_CHANCE = { normal: 1, epic: 1.5, unique: 3 };
+const CATALYST_DROP_CHANCE = { normal: 2, epic: 2.5, unique: 5 };
 // 촉매 드랍 추첨을 하는 최소 몬스터 레벨 — 이 값 미만(1~20레벨)은 추첨 자체를 하지 않음.
 const CATALYST_DROP_MIN_LEVEL = 21;
 // 드랍 성공 시 지급 수량(몬스터 레벨/등급과 무관하게 항상 동일). 아래 선택표는 '무슨 촉매인가'만 정함.
@@ -4509,7 +4690,7 @@ const MONSTERS = {
   },
   red_bear: {
     id: 'red_bear', name: '평웅', icon: '🐻', grade: 'normal', level: 15, image: 'bear',
-    defense: 0, hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '곰 가죽', chance: 25 },
       { name: '웅담', chance: 10 },
@@ -4539,7 +4720,7 @@ const MONSTERS = {
   },
   forest_boar: {
     id: 'forest_boar', name: '숲돼지', icon: '🐗', grade: 'normal', level: 20, image: 'monter_forest_boar',
-    defense: 0, hpMult: 1.1, atkMult: 1.0, speedMult: 1.0,
+    defense: 0, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [ { name: '숲돼지고기', chance: 15 } ],
   },
   mountain_boar: {
@@ -4939,7 +5120,7 @@ const MONSTERS = {
   // (pickEpicMonsterId, formulas.js).
   blackskeleton: {
     id: 'blackskeleton', name: '흑해골', icon: '💀', grade: 'normal', level: 75, image: 'monster_black_skeleton',
-    defense: -25, hpMult: 1.2, atkMult: 1.0, speedMult: 1.0,
+    defense: -25, hpMult: 1.0, atkMult: 1.0, speedMult: 1.0,
     drops: [
       { name: '호박', chance: 15 },
       { name: '원한이 담긴 유서', chance: 1 },
@@ -4947,7 +5128,7 @@ const MONSTERS = {
   },
   blackskeleton2: {
     id: 'blackskeleton2', name: '자해골', icon: '💀', grade: 'normal', level: 76, image: 'monster_black_skeleton2',
-    defense: -30, hpMult: 1.2, atkMult: 2.0, speedMult: 0.5,
+    defense: -30, hpMult: 1.1, atkMult: 2.0, speedMult: 0.5,
     drops: [
       { name: '호박', chance: 20 },
       { name: '쇠조각', chance: 2 },
@@ -4956,7 +5137,7 @@ const MONSTERS = {
   },
   epicblackskeleton: {
     id: 'epicblackskeleton', name: '주해골', icon: '💀', grade: 'epic', level: 81, image: 'epic_black_skeleton',
-    defense: -30, hpMult: 1.1, atkMult: 1.1, speedMult: 1.0,
+    defense: -30, hpMult: 1.0, atkMult: 1.1, speedMult: 1.0,
     epicSpawnWeight: 45, // 흑해골굴 전용 — 원각과 합쳐 100%(10굴 기준. 그 외 스테이지는 원각이 후보에서 빠져 항상 주해골)
     drops: [
       { name: '진호박', chance: 20 },
@@ -4965,7 +5146,7 @@ const MONSTERS = {
   },
   epicblackskeleton2: {
     id: 'epicblackskeleton2', name: '원각', icon: '💀', grade: 'epic', level: 82, image: 'epic_black_skeleton2',
-    defense: -30, hpMult: 1.1, atkMult: 0.6, speedMult: 2.0,
+    defense: -30, hpMult: 1.0, atkMult: 0.6, speedMult: 2.0,
     epicSpawnWeight: 55, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 30 },
@@ -4980,7 +5161,7 @@ const MONSTERS = {
   // 10굴이 아닌 굴에서는 녹명비가 후보에서 빠져 항상 사명비만 등장함(pickEpicMonsterId, formulas.js).
   goblinfire: {
     id: 'goblinfire', name: '도깨비불', icon: '🔥', grade: 'normal', level: 80, image: 'common_goblin_1',
-    defense: -25, hpMult: 1.0, atkMult: 0.75, speedMult: 2.0,
+    defense: -25, hpMult: 0.9, atkMult: 0.75, speedMult: 2.0,
     drops: [
       { name: '호박', chance: 15 },
       { name: '녹색 구슬 조각', chance: 1 },
@@ -4996,7 +5177,7 @@ const MONSTERS = {
   },
   epicgoblin: {
     id: 'epicgoblin', name: '사명비', icon: '👹', grade: 'epic', level: 86, image: 'epic_goblin_1',
-    defense: -30, hpMult: 1.1, atkMult: 1.1, speedMult: 1.0,
+    defense: -30, hpMult: 1.0, atkMult: 1.1, speedMult: 1.0,
     epicSpawnWeight: 70, // 물망동 전용 — 녹명비와 합쳐 100%(10굴 기준. 그 외 스테이지는 녹명비가 후보에서 빠져 항상 사명비)
     drops: [
       { name: '진호박', chance: 20 },
@@ -5005,12 +5186,61 @@ const MONSTERS = {
   },
   epicgoblin2: {
     id: 'epicgoblin2', name: '녹명비', icon: '👹', grade: 'epic', level: 87, image: 'epic_goblin_2',
-    defense: -30, hpMult: 1.1, atkMult: 1.1, speedMult: 1.0,
+    defense: -30, hpMult: 1.0, atkMult: 1.1, speedMult: 1.0,
     epicSpawnWeight: 30, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
       { name: '진호박', chance: 30 },
       { name: '녹색 구슬 조각', chance: 5 },
       { name: '도깨비방망이', chance: 1, weaponId: 'goblinclub' },
+      { name: '도깨비 무기 상자', chance: 3, boxId: 'goblinWeaponBox' }, // 상자 드랍(기존 드랍 테이블에 추가 — 다른 항목과 독립 판정)
+    ],
+  },
+  // 백륜동 몬스터 — 드랍 판정은 항목마다 독립 시행.
+  goblin3: {
+    id: 'goblin3', name: '청명비', icon: '👹', grade: 'normal', level: 86, image: 'common_goblin_3',
+    defense: -30, hpMult: 1.0, atkMult: 1.1, speedMult: 1.0,
+    drops: [
+      { name: '호박', chance: 15 },
+      { name: '도깨비뿔', chance: 6.5 },
+      { name: '오래된 엽전', chance: 3 },
+    ],
+  },
+  goblin4: {
+    id: 'goblin4', name: '사령불', icon: '🔥', grade: 'normal', level: 86, image: 'common_goblin_4',
+    defense: -25, hpMult: 1.0, atkMult: 0.75, speedMult: 2.0,
+    drops: [
+      { name: '호박', chance: 20 },
+      { name: '오래된 엽전', chance: 5 },
+    ],
+  },
+  epicgoblin3: {
+    id: 'epicgoblin3', name: '적명비', icon: '👹', grade: 'epic', level: 89, image: 'epic_goblin_3',
+    defense: -30, hpMult: 1.0, atkMult: 1.1, speedMult: 1.0,
+    epicSpawnWeight: 93, // 백륜동 전용 — 도깨비왕과 합쳐 100%(10굴 기준. 그 외 스테이지는 도깨비왕이 후보에서 빠져 항상 적명비)
+    drops: [
+      { name: '진호박', chance: 20 },
+      { name: '적색 구슬 조각', chance: 5 },
+      { name: '도깨비 무기 상자', chance: 2.5, boxId: 'goblinWeaponBox' },
+      { name: '반짝이는 돌', chance: 2 },
+      { name: '오래된 엽전', chance: 10 },
+    ],
+  },
+  goblinking: {
+    id: 'goblinking', name: '도깨비왕', icon: '👑', grade: 'unique', level: 90, image: 'unique_goblin_king',
+    defense: -50, hpMult: 1.0, atkMult: 1.1, speedMult: 1.2,
+    epicSpawnWeight: 7, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js) — 첫 유니크 몬스터 데이터
+    drops: [
+      { name: '진호박', chance: 70 },
+      { name: '도깨비 왕의 증표', chance: 10 },
+      { name: '도깨비 무기 선택 상자', chance: 3, boxId: 'goblinWeaponSelectBox' },
+      { name: '적색 구슬 조각', chance: 20 },
+      { name: '오래된 엽전', chance: 30 },
+      { name: '도깨비뿔', chance: 50 },
+      { name: '소생석', chance: 1 },
+      { name: '쇠조각', chance: 50 },
+      { name: '조악한 정령인형', chance: 3, artifactId: 'goblinlowdoll' }, // 이미 보유 중이면 드랍되지 않음(아티팩트 공통 규칙)
+      { name: '반짝이는 돌', chance: 10 },
+      { name: '도깨비방망이', chance: 5, weaponId: 'goblinclub' },
     ],
   },
 };
@@ -5182,6 +5412,15 @@ const DUNGEONS = [
     desc: '오래전부터 요괴들이 모여들었다는 동굴의 초입',
     monsters: ['goblinfire', 'goblin', 'epicgoblin', 'epicgoblin2'],
     levelRange: 5,
+    region: '일반',
+  },
+  {
+    id: 'baengnyun_den',
+    name: '백륜동',
+    icon: '',
+    desc: '도깨비왕이 지배하는 동굴',
+    monsters: ['goblin3', 'goblin4', 'epicgoblin3', 'goblinking'],
+    levelRange: 3,
     region: '일반',
   },
 ];
