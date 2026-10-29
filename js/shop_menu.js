@@ -11,8 +11,8 @@
 
 // 화면 상태(저장하지 않음. 빠른 구매/판매 체크만 state.settings.shopQuickTrade에 저장)
 // mode: 'buy'|'sell' / cat·leaf: 모드별로 따로 기억하는 분류(최상위 탭 id)·세부 분류 id / leafByTop: 모드·분류별로 마지막에 보던 세부 분류 /
-// query: 모드별 검색어(구매·판매 검색은 서로 섞이지 않음) / filterOpen: 필터 드롭다운 / cache: 영역별 마지막 HTML / tipByKey·rowByKey: 마지막으로 그린 목록 정보
-let shopMenuUI = { mode: 'buy', cat: {}, leaf: {}, leafByTop: {}, query: {}, filterOpen: false, resetScroll: false, cache: {}, tipByKey: {}, rowByKey: {} };
+// query: 모드별 검색어(구매·판매 검색은 서로 섞이지 않음) / resultsOpen·searchByKey: 검색 결과 드롭다운(전 분류 대상) 열림 여부·결과 정보 / filterOpen: 필터 드롭다운 / cache: 영역별 마지막 HTML / tipByKey·rowByKey: 마지막으로 그린 목록 정보
+let shopMenuUI = { mode: 'buy', cat: {}, leaf: {}, leafByTop: {}, query: {}, resultsOpen: false, searchByKey: {}, filterOpen: false, resetScroll: false, cache: {}, tipByKey: {}, rowByKey: {} };
 SHOP_MODES.forEach(m => { shopMenuUI.cat[m.id] = null; shopMenuUI.leaf[m.id] = null; shopMenuUI.leafByTop[m.id] = {}; shopMenuUI.query[m.id] = ''; });
 
 function shopMenuEsc(s){ return codexEsc(s); }
@@ -181,14 +181,15 @@ function shopMenuRender(){
   el('shopQuickLabel').textContent = shopMenuModeDef().quickLabel;
   el('shopQuickTrade').checked = !!(state.settings && state.settings.shopQuickTrade);
 
-  // 목록: 검색어가 있으면 이 모드의 모든 분류에서 이름이 맞는 아이템(탭 선택과 무관), 없으면 선택한 세부 분류의 아이템
+  // 목록: 선택한 세부 분류의 아이템 — 검색어가 있으면 그 안에서 이름이 맞는 것만(다른 탭의 아이템은 끌어오지 않음). 다른 탭의 검색 결과는 검색창 드롭다운으로 찾아 이동함.
   const q = shopMenuQueryNorm();
-  const list = q ? rows.filter(r => r.name.toLowerCase().includes(q)) : rows.filter(r => r.leaf === leaf);
+  const list = rows.filter(r => r.leaf === leaf && (!q || r.name.toLowerCase().includes(q)));
   const sorted = sortShopEntries(list, shopUI.filter, shopUI.dir);
   shopMenuUI.tipByKey = {}; shopMenuUI.rowByKey = {};
   const html = sorted.length
     ? sorted.map(shopMenuRowHtml).join('')
     : `<div class="inv-empty">${q ? '검색 결과가 없습니다.' : (m === 'sell' ? '판매할 수 있는 아이템이 없습니다.' : '구매할 수 있는 아이템이 없습니다.')}</div>`;
+  shopMenuRenderResults(rows, q);
   const scroller = el('shopListScroll');
   const prev = scroller.scrollTop;
   const changed = shopMenuSet('shopList', html);
@@ -211,13 +212,65 @@ function shopMenuRefresh(){
 }
 
 // ---- 검색(구매/판매 탭별로 독립) ----
+// 검색창 드롭다운(도감/제작소 검색 UI 재사용): 이 모드의 모든 분류에서 이름이 맞는 아이템을 이름 강조 + 오른쪽 분류("장비 · 무기" 등)로 보여주고,
+// 결과를 고르면 그 분류·세부 분류 탭으로 이동함. 같은 분류의 같은 이름(판매 탭의 같은 장비 여러 개)은 한 줄로 묶어 ×개수로 표시함.
+function shopMenuRenderResults(rows, q){
+  const box = el('shopResults');
+  if(!box) return;
+  if(!q || !shopMenuUI.resultsOpen){ box.style.display = 'none'; return; }
+  const groups = [], byGroup = {};
+  rows.forEach(r => {
+    if(!r.name.toLowerCase().includes(q)) return;
+    const g = `${r.cat}|${r.leaf}|${r.name}`;
+    if(byGroup[g]){ byGroup[g].keys.push(r.key); return; }
+    byGroup[g] = { key: r.key, cat: r.cat, leaf: r.leaf, keys: [r.key], row: r };
+    groups.push(byGroup[g]);
+  });
+  const shown = groups.slice(0, CODEX_SEARCH_MAX_RESULTS);
+  shopMenuUI.searchByKey = {};
+  shown.forEach(e => { shopMenuUI.searchByKey[e.key] = e; });
+  const query = shopMenuUI.query[shopMenuUI.mode] || '';
+  const html = shown.length ? shown.map(e => {
+    const top = SHOP_TABS.find(t => t.id === e.cat);
+    const sub = top && top.subTabs ? top.subTabs.find(s => s.id === e.leaf) : null;
+    const label = (top ? top.label : '') + (sub ? ' · ' + sub.label : '');
+    const count = e.keys.length > 1 ? ` <span class="shop-row-count">×${e.keys.length}</span>` : '';
+    const color = e.row.color ? ` style="color:${e.row.color};"` : '';
+    return `<button class="codex-result" data-shop-result="${shopMenuEsc(e.key)}"><span${color}>${e.row.namePre}${codexHighlightHtml(e.row.name, query)}${count}</span><span class="codex-result-cat">${shopMenuEsc(label)}</span></button>`;
+  }).join('') : '<div class="codex-result-empty">검색 결과가 없습니다.</div>';
+  shopMenuSet('shopResults', html);
+  box.style.display = 'block';
+}
+// 검색 결과 선택: 그 아이템이 있는 분류·세부 분류 탭으로 이동(검색어는 유지되어 그 탭의 일치 항목만 보임)하고, 선택한 아이템을 목록 맨 위로 올려 잠깐 강조함.
+function shopMenuGoTo(key){
+  const e = shopMenuUI.searchByKey[key];
+  if(!e) return;
+  const m = shopMenuUI.mode;
+  shopMenuUI.cat[m] = e.cat;
+  shopMenuUI.leafByTop[m][e.cat] = e.leaf; // 세부 분류가 없는 분류는 leaf가 분류 id와 같아 그대로 맞음
+  shopMenuUI.resultsOpen = false;
+  shopMenuUI.filterOpen = false;
+  shopMenuUI.resetScroll = true;
+  codexHideTip();
+  shopMenuRender();
+  const rowEls = [...el('shopList').querySelectorAll('.shop-row')].filter(r => e.keys.includes(r.dataset.key));
+  if(!rowEls.length) return;
+  const scroller = el('shopListScroll');
+  scroller.scrollTop += rowEls[0].getBoundingClientRect().top - scroller.getBoundingClientRect().top - 4;
+  rowEls.forEach(r => r.classList.add('search-found'));
+  setTimeout(() => rowEls.forEach(r => r.classList.remove('search-found')), 1800);
+}
 function shopMenuSyncSearchInput(){
   const input = document.getElementById('shopSearchInput');
   if(input) input.value = shopMenuUI.query[shopMenuUI.mode] || '';
 }
 function shopMenuSearchReset(){ // 상점 메뉴를 나가면 두 모드의 검색어를 모두 초기화(인벤토리 검색과 동일)
   SHOP_MODES.forEach(m => { shopMenuUI.query[m.id] = ''; });
+  shopMenuUI.resultsOpen = false;
   shopMenuSyncSearchInput();
+  const box = document.getElementById('shopResults');
+  if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+  shopMenuUI.cache['shopResults'] = undefined;
 }
 
 // ---- 조작 ----
@@ -225,6 +278,7 @@ function shopMenuSwitchMode(mode){
   if(shopMenuUI.mode === mode) return;
   shopMenuUI.mode = mode;
   shopMenuUI.filterOpen = false;
+  shopMenuUI.resultsOpen = false;
   shopMenuUI.resetScroll = true;
   codexHideTip();
   shopMenuSyncSearchInput(); // 입력창은 그 모드의 검색어로(구매/판매 검색 상태가 섞이지 않음)
@@ -315,10 +369,11 @@ function shopMenuShowTip(key){
     saveState();
   });
 
-  // 검색: 입력하는 즉시 현재 모드의 목록이 검색 결과로 바뀜. 검색창을 다시 선택하면 초기화(인벤토리 검색과 동일).
+  // 검색: 입력하는 즉시 현재 탭의 목록이 검색 결과로 바뀌고(다른 탭 항목은 드롭다운에서 선택해 이동), 검색창을 다시 선택하면 초기화(인벤토리 검색과 동일).
   const input = el('shopSearchInput');
   input.addEventListener('input', () => {
     shopMenuUI.query[shopMenuUI.mode] = input.value;
+    shopMenuUI.resultsOpen = true;
     shopMenuUI.resetScroll = true;
     shopMenuRender();
   });
@@ -326,8 +381,15 @@ function shopMenuShowTip(key){
     if(!input.value && !shopMenuUI.query[shopMenuUI.mode]) return;
     input.value = '';
     shopMenuUI.query[shopMenuUI.mode] = '';
+    shopMenuUI.resultsOpen = false;
     shopMenuUI.resetScroll = true;
     shopMenuRender();
+  });
+  el('shopResults').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-shop-result]'); if(b) shopMenuGoTo(b.dataset.shopResult); });
+  document.addEventListener('click', (ev) => { // 검색창 바깥을 누르면 결과 드롭다운만 닫음(검색어/필터는 유지)
+    if(!shopMenuUI.resultsOpen || ev.target.closest('#shopSearch')) return;
+    shopMenuUI.resultsOpen = false;
+    el('shopResults').style.display = 'none';
   });
 
   // 목록: 이름/가격 영역 클릭 = 기존 구매/판매 수량 입력 UI(데스크톱·모바일 공통). 아이콘 클릭은 아무 동작 없음(모바일에서는 툴팁만, 아래).

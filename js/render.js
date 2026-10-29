@@ -7,6 +7,7 @@
 
 
 function render(){
+  notifyRequestSync(); // 알림 점(notify.js) — 상태가 바뀔 때마다 점을 갱신(최소 간격마다 한 번만 계산)
   if(typeof craftMenuRefresh === 'function') craftMenuRefresh(); // 새 제작 메뉴(제작소 화면일 때만 동작, 내용이 바뀐 부분만 다시 그림)
   const equipped = getEquipped();
 
@@ -1042,7 +1043,8 @@ function equipSlotHtml(slot){
   if(!item){
     return `<div class="eq-slot ${slot.cellClass}" data-slot="${slot.key}"><span class="eq-slot-empty-label">${slot.label}</span></div>`;
   }
-  return `<div class="eq-slot filled ${slot.cellClass}" data-slot="${slot.key}">${item.iconHtml}<span class="tooltip">${item.tooltipHtml}</span></div>`;
+  // 테두리 색: 이 아이템의 이름 색(등급 색과 강화 단계 색 중 더 높은 쪽 — 인벤토리/강화 슬롯과 같은 규칙). CSS의 금색은 색 정보가 없을 때의 기본값.
+  return `<div class="eq-slot filled ${slot.cellClass}" data-slot="${slot.key}" style="border-color:${item.color};">${item.iconHtml}<span class="tooltip">${item.tooltipHtml}</span></div>`;
 }
 // 아티팩트 슬롯 — 현재 최대 슬롯 수(ARTIFACT_SLOT_MAX)만큼 자동 생성되므로, 이 숫자가 바뀌면
 // 장비창의 아티팩트 칸 개수도 코드 수정 없이 그대로 함께 바뀜(단, 상단 가로 배치 그리드 영역
@@ -1054,7 +1056,7 @@ function equipArtifactSlotsHtml(){
     const id = state.equippedArtifacts[i];
     if(!id) return `<div class="eq-slot eq-slot-artifact ${cellClass}"><span class="eq-slot-empty-label">아티팩트</span></div>`;
     const a = ARTIFACTS[id];
-    return `<div class="eq-slot eq-slot-artifact ${cellClass} filled">${itemIconHtml(a)}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`;
+    return `<div class="eq-slot eq-slot-artifact ${cellClass} filled" style="border-color:${artifactNameColor(id)};">${itemIconHtml(a)}<span class="tooltip">${buildArtifactTooltipHtml(id)}</span></div>`; // 테두리 = 아티팩트 등급 색
   }).join('');
 }
 // 장비창 아래 "장착 아이템 정보" — 현재 장착 중인 장비만 한 줄씩 출력(EQUIPMENT_SLOTS 기반이라
@@ -1468,7 +1470,7 @@ function charInfoSubtabPageStateKey(subtabId, dataAttr){
 // 구분함(캐릭터 메뉴="char-info-subtab", 던전 우측 패널="hunt-char-info-subtab").
 function buildCharInfoBlockHtml(activeSubtab, dataAttr){
   const tabsHtml = CHAR_INFO_SUBTABS.map(t =>
-    `<button class="inv-tab-btn${t.id === activeSubtab ? ' active' : ''}" data-${dataAttr}="${t.id}">${t.label}</button>`
+    `<button class="inv-tab-btn${t.id === activeSubtab ? ' active' : ''}" data-${dataAttr}="${t.id}" data-notify-path="character/info/${t.id}">${t.label}</button>`
   ).join('');
   const pageCount = CHAR_INFO_SUBTAB_PAGE_COUNT[activeSubtab];
   let bodyHtml;
@@ -1491,12 +1493,13 @@ function buildCharInfoBlockHtml(activeSubtab, dataAttr){
 // 패널(renderHuntSidePanel)의 "info" 탭과 완전히 동일한 공통 콘텐츠 빌더(buildCharInfoBlockHtml)를
 // 공유함.
 function renderCharacterMenu(){
+  notifyRequestSync(); // 알림 점(notify.js) — 탭/소탭을 옮기거나 다시 그릴 때 갱신
   const tabsRow = el('charTabsRow');
   const panelsWrap = el('charTabPanels');
   if(!tabsRow || !panelsWrap) return;
 
   tabsRow.innerHTML = CHARACTER_TABS.map(t =>
-    `<button class="inv-tab-btn${t.id === activeCharTab ? ' active' : ''}" data-char-tab="${t.id}">${t.label}</button>`
+    `<button class="inv-tab-btn${t.id === activeCharTab ? ' active' : ''}" data-char-tab="${t.id}" data-notify-path="character/${t.id}">${t.label}</button>`
   ).join('');
 
   const tab = CHARACTER_TABS.find(t => t.id === activeCharTab) || CHARACTER_TABS[0];
@@ -1541,7 +1544,7 @@ function buildSkillQuickSlotSectionHtml(quickSlotRowId, flaskRowId){
 // 스킬 탭 2페이지("공용/특화/기연 ~ 스킬 목록").
 function buildSkillListSectionHtml(){
   const catTabsHtml = SKILL_CATEGORIES.map(c =>
-    `<button class="inv-tab-btn${c.id === activeSkillCategory ? ' active' : ''}" data-skill-cat="${c.id}">${c.label}</button>`
+    `<button class="inv-tab-btn${c.id === activeSkillCategory ? ' active' : ''}" data-skill-cat="${c.id}" data-notify-path="character/skill/${c.id}">${c.label}</button>`
   ).join('');
   return `
     <div class="inv-tabs">${catTabsHtml}</div>
@@ -1639,7 +1642,7 @@ function buildSkillCategoryBodyHtml(categoryId){
   const pointsLabel = isAwakening ? '미사용 깨달음' : '미사용 스킬 포인트';
   const pointsValue = isAwakening ? (state.awakeningPoints || 0) : (state.skillPoints || 0);
   const kindTabsHtml = SKILL_KIND_TABS.map(k =>
-    `<button class="skill-kind-tab-btn${k.id === activeSkillKind ? ' active' : ''}" data-skill-kind="${k.id}">${k.label}</button>`
+    `<button class="skill-kind-tab-btn${k.id === activeSkillKind ? ' active' : ''}" data-skill-kind="${k.id}" data-notify-path="character/skill/${categoryId}/${k.id}">${k.label}</button>`
   ).join('');
   return `
     <div class="skill-points-row"><span>${pointsLabel}</span><span class="v">${pointsValue}</span></div>
@@ -1806,7 +1809,7 @@ function buildSkillIconBtnHtml(id){
   // 상태만 표현함 — 버튼 자체는 여전히 클릭 가능해서 내부 용어도 정상적으로 클릭됨.
   return `
     <div class="skill-tree-node-inner">
-      <button class="skill-icon-btn${learned ? '' : ' locked'}${cantLearn ? ' cant-learn' : ''}" data-learn-skill="${id}" ${cantLearn ? 'aria-disabled="true"' : ''} style="border-color:${grade ? grade.color : '#fff'};">
+      <button class="skill-icon-btn${learned ? '' : ' locked'}${cantLearn ? ' cant-learn' : ''}" data-learn-skill="${id}" data-notify-key="skill:${id}" ${cantLearn ? 'aria-disabled="true"' : ''} style="border-color:${grade ? grade.color : '#fff'};">
         <span class="skill-icon">${skillIconHtml(s)}</span>
         <span class="tooltip">${buildSkillTooltipHtml(id)}</span>
       </button>
@@ -2148,12 +2151,13 @@ function toggleHuntTopUi(){
 // 캐릭터 메뉴 쪽 상태와 완전히 독립적으로 관리함("지금 보고 있는 화면"만 다를 뿐 실제 데이터는 전부 공용
 // state를 그대로 읽으므로 두 화면 값은 항상 자동으로 일치함).
 function renderHuntSidePanel(){
+  notifyRequestSync(); // 알림 점(notify.js)
   const tabsRow = el('huntCharTabsRow');
   const panelsWrap = el('huntCharTabPanels');
   if(!tabsRow || !panelsWrap) return;
 
   tabsRow.innerHTML = CHARACTER_TABS.map(t =>
-    `<button class="inv-tab-btn${t.id === huntCharTab ? ' active' : ''}" data-hunt-char-tab="${t.id}">${t.label}</button>`
+    `<button class="inv-tab-btn${t.id === huntCharTab ? ' active' : ''}" data-hunt-char-tab="${t.id}" data-notify-path="character/${t.id}">${t.label}</button>`
   ).join('');
 
   const tab = CHARACTER_TABS.find(t => t.id === huntCharTab) || CHARACTER_TABS[0];

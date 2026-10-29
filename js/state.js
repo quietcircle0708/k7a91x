@@ -58,6 +58,7 @@ let state = {
   skipEffects: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
+  notifySeen: {}, // 알림 점(notify.js)에서 이미 확인한 항목 키 목록
   skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
   learnedSkills: [], learnedAwakeningSkills: [], // 습득한 스킬 id 목록(공용·특화 공용 / 기연 별도)
   unlockedAwakeningSkills: [], // 비급으로 해금된 기연 스킬 id 목록(습득 여부와 별개, 스킬 초기화해도 유지)
@@ -639,6 +640,8 @@ function applyLoadedRaw(raw){
     });
   });
   ensureSettingsDefaults();
+  // 알림 점 도입 이전 세이브: 지금 보유한 아이템/습득 가능 스킬을 모두 확인한 것으로 시작(업데이트 직후 전체에 점이 뜨지 않게)
+  if(loaded.notifySeen === undefined) notifySeedSeen();
 }
 async function loadState(){
   try{
@@ -719,6 +722,7 @@ function resetGame(){
     skipEffects:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
+    notifySeen: {},
     skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [], unlockedAwakeningSkills: [],
     skillQuickSlots: [null, null, null, null, null, null, null, null, null, null],
     consumables: newGameConsumables(),

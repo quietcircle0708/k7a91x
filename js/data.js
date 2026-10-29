@@ -5670,6 +5670,14 @@ const SETTINGS_SCHEMA = [
         default: 'box', // 저장된 선택값이 없을 때(새 게임/설정값이 없는 저장 데이터)의 기본값 = 신버전(박스). 이미 저장된 선택은 ensureSettingsDefaults가 덮어쓰지 않음
         options: INVENTORY_UI_OPTIONS,
       },
+      // 인벤토리/스킬/스탯의 확인할 것이 있을 때 탭·아이콘에 띄우는 빨간 점(notify.js). 꺼도 확인 처리는 그대로 진행되고 점만 숨겨짐.
+      {
+        id: 'notifyDots',
+        label: '알림 점 표시',
+        desc: '새 아이템, 습득 가능한 스킬, 투자 가능한 스탯이 있으면 빨간 점으로 알려줍니다.',
+        type: 'toggle',
+        default: true,
+      },
     ],
   },
   {

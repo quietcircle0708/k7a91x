@@ -1887,6 +1887,9 @@ body.shop-ui-new #shopView .shop-new-wrap{ display:block; }
 .shop-row.unavailable .shop-row-info{ cursor:not-allowed; }
 .shop-row.unavailable .shop-row-info:hover{ border-color: var(--forge-line); }
 .shop-row.purchase-flash .shop-row-info{ border-color: var(--forge-gold); }
+/* 검색 결과로 이동했을 때 그 항목을 잠깐 강조(shop_menu.js shopMenuGoTo가 클래스를 붙였다 뗌 — 검색어 강조색 .codex-hl과 같은 노란색) */
+@keyframes shopFoundPulse{ 0%{ box-shadow:0 0 0 0 rgba(255,225,77,.95); } 70%{ box-shadow:0 0 0 8px rgba(255,225,77,0); } 100%{ box-shadow:0 0 0 0 rgba(255,225,77,0); } }
+.shop-row.search-found .shop-row-info{ border-color:#ffe14d; animation: shopFoundPulse .6s ease-out 3; }
 @media (min-height:900px){ #shopView{ --shop-list-h: 440px; } }
 /* 모바일 화면 프리셋 전용 — 데스크톱 프리셋에는 영향 없음 */
 body.mobile-preset .shop-new-wrap{ padding:16px 12px; }
@@ -2109,3 +2112,16 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
   .box-grant-text{ min-height:38px; font-size:13px; color:#ffffff; line-height:1.6; margin-bottom:14px; }
   /* 비활성처럼 보이지만 실제 disabled가 아님 — 연출 중에는 어디를 눌러도 "연출 건너뛰기"로 처리해야 하므로 클릭을 받아야 함 */
   .nav-btn.is-disabled, .btn.is-disabled{ opacity:.4; cursor:not-allowed; }
+
+/* ---- 알림 점(빨간 원, notify.js) ----
+   탭/메뉴 버튼(data-notify-path)은 우측 상단 안쪽, 아이콘 슬롯(data-notify-key)은 좌측 상단(잠금 아이콘 위치 — 겹쳐도 됨)에 작게 표시.
+   상위 요소가 position:static이면 점 위치 기준이 안 잡혀서 해당 버튼들에만 relative를 줌(이미 relative/absolute인 요소는 건드리지 않음). */
+.inv-tab-btn.has-notify, .inv-box-tab.has-notify, .menu-grid-item.has-notify, .skill-kind-tab-btn.has-notify{ position:relative; }
+.has-notify::after{
+  content:''; position:absolute; width:9px; height:9px; border-radius:50%; background:#ff3b30;
+  box-shadow:0 0 0 1.5px rgba(0,0,0,.65); pointer-events:none; z-index:8;
+}
+[data-notify-path].has-notify::after{ top:3px; right:3px; }
+[data-notify-key].has-notify::after{ top:2px; left:2px; }
+body.mobile-preset .has-notify::after{ width:7px; height:7px; }
+body.notify-off .has-notify::after{ display:none; }

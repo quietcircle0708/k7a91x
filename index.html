@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=385">
+<link rel="stylesheet" href="css/style.css?v=387">
 </head>
 <body>
 <div class="wrap">
@@ -25,11 +25,11 @@
     <button class="back-btn" id="exitHuntBtn" style="display:none;">← 던전 나가기</button>
     <button class="topmenu-btn" id="openPatchNoteBtn" title="공지사항"><img src="assets/ui/patchnote_icon.png" class="patchnote-icon-img" alt="공지사항" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'patchnote-icon-fallback',textContent:'📣'}))"></button>
     <div class="menu-wrap" id="menuWrap">
-      <button class="topmenu-btn" id="menuToggleBtn" aria-expanded="false" aria-label="메뉴"><img src="assets/ui/icon_menu_button.png" class="topmenu-icon-img" alt="" draggable="false"><span class="topmenu-tip">메뉴</span></button>
+      <button class="topmenu-btn" id="menuToggleBtn" data-notify-path="*" aria-expanded="false" aria-label="메뉴"><img src="assets/ui/icon_menu_button.png" class="topmenu-icon-img" alt="" draggable="false"><span class="topmenu-tip">메뉴</span></button>
       <div class="menu-grid" id="menuGrid" style="display:none;">
-      <button class="menu-grid-item" id="openCharacterBtn"><img src="assets/ui/icon_menu_character.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">캐릭터</span></button>
+      <button class="menu-grid-item" id="openCharacterBtn" data-notify-path="character"><img src="assets/ui/icon_menu_character.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">캐릭터</span></button>
       <button class="menu-grid-item" id="openShopBtn"><img src="assets/ui/icon_menu_shop.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">상점</span></button>
-      <button class="menu-grid-item" id="openInventoryBtn"><img src="assets/ui/icon_menu_inventory.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">인벤토리</span></button>
+      <button class="menu-grid-item" id="openInventoryBtn" data-notify-path="inventory"><img src="assets/ui/icon_menu_inventory.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">인벤토리</span></button>
       <button class="menu-grid-item" id="openDungeonBtn"><img src="assets/ui/icon_menu_dungeon.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">던전</span></button>
       <button class="menu-grid-item" id="openForgeMenuBtn"><img src="assets/ui/icon_menu_forge.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">대장간</span></button>
       <button class="menu-grid-item" id="openCraftBtn"><img src="assets/ui/icon_menu_workshop.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">제작소</span></button>
@@ -149,6 +149,7 @@
           <div class="codex-search shop-search" id="shopSearch">
             <input type="text" id="shopSearchInput" placeholder="클릭하여 검색..." autocomplete="off" autocapitalize="off" spellcheck="false">
             <img src="assets/ui/icon_item_comparison.png" class="codex-search-icon" alt="" draggable="false">
+            <div class="codex-results" id="shopResults" style="display:none;"></div>
           </div>
         </div>
         <label class="shop-quick-check" id="shopQuickWrap"><input type="checkbox" id="shopQuickTrade"><span class="shop-quick-box" aria-hidden="true"></span><span class="shop-quick-label" id="shopQuickLabel">빠른 구매</span></label>
@@ -1076,23 +1077,24 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=385"></script>
-<script src="js/formulas.js?v=385"></script>
-<script src="js/catalyst.js?v=385"></script>
-<script src="js/state.js?v=385"></script>
-<script src="js/effects.js?v=385"></script>
-<script src="js/render.js?v=385"></script>
-<script src="js/actions.js?v=385"></script>
-<script src="js/dungeon.js?v=385"></script>
-<script src="js/navigation.js?v=385"></script>
-<script src="js/inventory_box.js?v=385"></script>
-<script src="js/codex.js?v=385"></script>
-<script src="js/codex_monster.js?v=385"></script>
-<script src="js/craft_menu.js?v=385"></script>
-<script src="js/craft_multi.js?v=385"></script>
-<script src="js/shop_menu.js?v=385"></script>
-<script src="js/box_menu.js?v=385"></script>
-<script src="js/forge_menu.js?v=385"></script>
-<script src="js/main.js?v=385"></script>
+<script src="js/data.js?v=387"></script>
+<script src="js/formulas.js?v=387"></script>
+<script src="js/catalyst.js?v=387"></script>
+<script src="js/state.js?v=387"></script>
+<script src="js/effects.js?v=387"></script>
+<script src="js/render.js?v=387"></script>
+<script src="js/actions.js?v=387"></script>
+<script src="js/dungeon.js?v=387"></script>
+<script src="js/navigation.js?v=387"></script>
+<script src="js/inventory_box.js?v=387"></script>
+<script src="js/notify.js?v=387"></script>
+<script src="js/codex.js?v=387"></script>
+<script src="js/codex_monster.js?v=387"></script>
+<script src="js/craft_menu.js?v=387"></script>
+<script src="js/craft_multi.js?v=387"></script>
+<script src="js/shop_menu.js?v=387"></script>
+<script src="js/box_menu.js?v=387"></script>
+<script src="js/forge_menu.js?v=387"></script>
+<script src="js/main.js?v=387"></script>
 </body>
 </html>

@@ -171,6 +171,25 @@ function invBoxBuildEntries(tab){
   return [];
 }
 
+// 탭별 아이템 키만 가볍게 돌려줌(알림 점 notify.js용) — 위 엔트리 빌더들과 같은 key 형식이며 아이콘/툴팁을 만들지 않아 자주 불러도 부담이 없음.
+// 엔트리 빌더의 key 규칙이나 탭 구성을 바꾸면 여기도 같이 맞춰야 함.
+function invBoxKeys(tab){
+  if(tab === 'equipment'){
+    const out = [];
+    [['weapon', state.inventory], ['armor', state.armorInventory], ['sub', state.subInventory], ['accessory', state.accessoryInventory]]
+      .forEach(([src, list]) => (list || []).forEach(item => out.push(src + ':' + item.id)));
+    return out;
+  }
+  if(tab === 'artifact') return (state.artifacts || []).filter(id => ARTIFACTS[id]).map(id => 'artifact:' + id);
+  if(tab === 'consumable'){
+    const out = Object.values(CONSUMABLES).filter(item => ((state.consumables && state.consumables[item.id]) || 0) > 0).map(item => 'consumable:' + item.id);
+    (state.traceInventory || []).forEach(t => out.push('trace:' + t.id));
+    return out;
+  }
+  if(tab === 'stone' || tab === 'misc') return Object.values(MISC_ITEMS).filter(item => item.itemClass === tab && (state[item.stateKey] || 0) > 0).map(item => tab + ':' + item.id);
+  return [];
+}
+
 // ---- 아이템 팝업(클릭 시) ----
 // 기존 프로젝트에는 인벤토리 아이콘을 눌렀을 때 뜨는 전용 팝업이 없고, 구버전 카드의 버튼(착용/강화 선택/판매/사용하기)이
 // 카드에 직접 붙어 있었음 — 그래서 여기서는 새 기능을 만들지 않고 "구버전 카드와 같은 버튼 구성/활성 조건/기존 처리 함수"
@@ -378,7 +397,7 @@ function invBoxSlotHtml(entry, query){
   // 검색어가 있으면 일치하지 않는 아이템은 숨기지 않고 비교 모드의 비활성 표시와 같은 방식(흐림)으로 표시 — 슬롯 위치는 그대로.
   const dimCls = query && !invBoxMatches(entry, query) ? ' search-dim' : '';
   const flashCls = entry.key === invBoxUI.focusKey ? ' flash' : '';
-  return `<div class="inv-box-slot filled ${entry.locked ? 'locked' : ''}${cmpCls}${dimCls}${flashCls}" data-key="${entry.key}"${lockAttrs} style="border-color:${entry.borderColor};">`
+  return `<div class="inv-box-slot filled ${entry.locked ? 'locked' : ''}${cmpCls}${dimCls}${flashCls}" data-key="${entry.key}" data-notify-key="inv:${entry.key}"${lockAttrs} style=""border-color:${entry.borderColor};">`
     + `${entry.iconHtml}${qtyHtml}${equipHtml}${invLockBadgeHtml(entry.locked)}<span class="tooltip">${entry.tooltipHtml}</span></div>`;
 }
 // ---- 인벤토리 검색 / 슬롯 영역 스크롤 ----
@@ -453,6 +472,7 @@ function invBoxSyncScroll(total){
   sc.style.maxHeight = Math.round(INV_BOX_ROWS * h + (INV_BOX_ROWS - 1) * gap + padTop + padBottom) + 'px';
 }
 function renderInventoryBox(){
+  notifyRequestSync(); // 알림 점(notify.js) — 탭을 옮기거나 다시 그릴 때마다 상태에 맞춰 갱신
   const wrap = el('invBoxWrap');
   if(!wrap) return; // 인벤토리 화면 DOM이 아직 없는 초기 타이밍 방어
   const tab = INV_BOX_TABS.some(t => t.id === invBoxUI.tab) ? invBoxUI.tab : 'equipment';
@@ -469,7 +489,7 @@ function renderInventoryBox(){
   const total = Math.max(INV_BOX_SLOTS_PER_PAGE, Math.ceil(Math.max(entries.length, inventorySlotMax(tab)) / INV_BOX_COLUMNS) * INV_BOX_COLUMNS);
 
   el('invBoxTabs').innerHTML = INV_BOX_TABS.map(t =>
-    `<button class="inv-box-tab ${t.id === tab ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('');
+    `<button class="inv-box-tab ${t.id === tab ? 'active' : ''}" data-tab="${t.id}" data-notify-path="inventory/${t.id}">${t.label}</button>`).join('');
 
   let cells = '';
   for(let i = 0; i < total; i++){

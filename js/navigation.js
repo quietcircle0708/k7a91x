@@ -5,6 +5,7 @@
 // ============================================================
 
 function showView(name){
+  notifyRequestSync(); // 알림 점(notify.js) — 화면을 옮기면 떠난 탭의 새 항목이 확인 처리됨
   if(currentView === 'collection' && name !== 'collection' && typeof codexOnLeave === 'function') codexOnLeave(); // 도감 툴팁/검색 결과창은 도감 화면 안에서만 유지됨
   if(currentView === 'inventory' && name !== 'inventory' && typeof invCompareReset === 'function') invCompareReset(); if(currentView === 'inventory' && name !== 'inventory' && typeof invBoxSearchReset === 'function') invBoxSearchReset(); // 인벤토리 검색어도 메뉴를 나가면 초기화 // 비교 모드도 인벤토리 메뉴 안에서만 유지됨(나가면 모드·기준·팝업·돋보기 커서 초기화)
   if(currentView === 'inventory' && name !== 'inventory') invLockModeSet(false); // 잠금 모드는 인벤토리 메뉴 안에서만 유지됨(나가면 해제 + 일반 커서 복원)
@@ -1294,6 +1295,7 @@ function toggleSetting(id){
   if(!state.settings) state.settings = {};
   state.settings[id] = !state.settings[id];
   renderSettings();
+  notifyRequestSync(); // 알림 점 표시 설정을 바꾼 경우 바로 반영
   saveState();
 }
 // radio 타입 설정값 선택(단일 선택) — toggleSetting/adjustSetting과 동일한 패턴(state.settings에 저장 후
