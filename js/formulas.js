@@ -3123,6 +3123,10 @@ function resolveDrops(monsterDef, dungeon, level, options){
 const REWARD_ITEM_CATEGORY_ORDER = ['equip', 'consumable', 'misc', 'stone'];
 function buildRewardDisplayItems(rewards){
   const slots = [];
+  // 알림 점(notify.js rewardNotifySync)용 슬롯 키 — 스택 아이템은 종류별 1개 키(qty가 늘면 다시 알림), 장비·아티팩트는 하나씩 따로라서
+  // "같은 종류·강화 단계의 n번째"로 구분함(드랍 목록은 뒤에 추가만 되므로 n번째는 다시 그려도 같은 슬롯을 가리킴).
+  const occ = {};
+  const nextOcc = base => { occ[base] = (occ[base] || 0) + 1; return base + '#' + occ[base]; };
   const pushEquipSlot = (type, level, grade) => {
     // equipInstanceDisplayInfo(render.js)를 그대로 재사용해 등급색/툴팁을 얻되, 보상창 전용 크기의
     // 아이콘만 새로 생성함(다른 화면들도 화면마다 아이콘 크기 클래스만 다르게 재사용하는 기존 방식과 동일).
@@ -3134,6 +3138,7 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: info.tooltipHtml,
       borderColor: info.color,
       qty: null,
+      nkey: nextOcc('equip:' + type + ':' + level),
     });
   };
   rewards.weaponDrops.forEach(w => pushEquipSlot(w.type, w.level, wpn(w.type).grade));
@@ -3149,6 +3154,7 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: buildArtifactTooltipHtml(id),
       borderColor: artifactNameColor(id),
       qty: null,
+      nkey: nextOcc('artifact:' + id),
     });
   });
   Object.keys(rewards.flaskDrops).forEach(itemId => {
@@ -3161,6 +3167,7 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: buildConsumableTooltipHtml(itemId),
       borderColor: consumableBorderColor(item), // 등급이 있으면 등급 색상(정렬 순위는 그대로 -1)
       qty: rewards.flaskDrops[itemId],
+      nkey: 'flask:' + itemId,
     });
   });
   // 비급(요구사항 13번) — 플라스크와 같은 소비 아이템 카테고리지만, 비급은 할당 스킬의 등급을 가지므로
@@ -3176,6 +3183,7 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: buildConsumableTooltipHtml(itemId),
       borderColor: g ? g.color : 'var(--forge-line)',
       qty: rewards.scrollDrops[itemId],
+      nkey: 'scroll:' + itemId,
     });
   });
   // 상자 — 소비 아이템이며 비급 바로 다음(subOrder 1). 같은 상자 안에서는 등급 높은 순. 아이콘은 등급별 기본 상자 이미지, 테두리는 등급 색.
@@ -3189,6 +3197,7 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: buildConsumableTooltipHtml(itemId),
       borderColor: consumableBorderColor(item),
       qty: rewards.boxDrops[itemId],
+      nkey: 'box:' + itemId,
     });
   });
   Object.keys(rewards.miscDrops).forEach(itemId => {
@@ -3201,6 +3210,7 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: buildMiscTooltipHtml(itemId),
       borderColor: miscNameColor(itemId),
       qty: rewards.miscDrops[itemId].qty,
+      nkey: 'misc:' + itemId,
     });
   });
   Object.keys(rewards.stoneDrops).forEach(itemId => {
@@ -3213,6 +3223,7 @@ function buildRewardDisplayItems(rewards){
       tooltipHtml: buildStoneTooltipHtml(itemId),
       borderColor: stoneNameColor(itemId),
       qty: rewards.stoneDrops[itemId],
+      nkey: 'stone:' + itemId,
     });
   });
 

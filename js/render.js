@@ -864,13 +864,15 @@ function renderQuickSlots(){
     const prev = Array.isArray(state.quickSlots) ? state.quickSlots : [];
     state.quickSlots = Array.from({ length: QUICK_SLOT_COUNT }, (_, i) => prev[i] || null);
   }
+  // 단축키 표기(hotkeys.js): 퀵슬롯1 = 왼쪽 칸, 2 = 오른쪽 칸 — 칸 좌상단 뱃지. 모바일 프리셋은 CSS로 숨김.
+  const keyBadge = (idx, onEmpty) => (typeof hotkeyBadgeHtml === 'function' ? hotkeyBadgeHtml('flask:' + (idx + 1), onEmpty) : '');
   const html = state.quickSlots.map((itemId, idx) => {
     if(!itemId){
-      return `<div class="quickslot-wrap"><button class="quickslot-btn empty" data-action="assign" data-slot="${idx}">+</button></div>`;
+      return `<div class="quickslot-wrap"><button class="quickslot-btn empty" data-action="assign" data-slot="${idx}">+</button>${keyBadge(idx, true)}</div>`;
     }
     const item = CONSUMABLES[itemId];
     if(!item){
-      return `<div class="quickslot-wrap"><button class="quickslot-btn empty" data-action="assign" data-slot="${idx}">+</button></div>`;
+      return `<div class="quickslot-wrap"><button class="quickslot-btn empty" data-action="assign" data-slot="${idx}">+</button>${keyBadge(idx, true)}</div>`;
     }
     const count = (state.consumables && state.consumables[itemId]) || 0;
     const cooldownLeft = flaskCooldownRemainingSec(itemId);
@@ -883,6 +885,7 @@ function renderQuickSlots(){
           <span class="quickslot-cooldown" style="display:${onCooldown ? 'flex' : 'none'};">${cooldownLeft.toFixed(1)}</span>
         </button>
         <button class="quickslot-clear" data-action="clear" data-slot="${idx}" title="슬롯 비우기">×</button>
+        ${keyBadge(idx, false)}
       </div>`;
   }).join('');
   QUICK_SLOT_ROW_IDS.forEach(id => { const row = el(id); if(row) row.innerHTML = html; });
@@ -1572,10 +1575,12 @@ function buildSkillTabHtml(){
 // 표시하지 않습니다"). 아이콘 아래에 등급 색상으로 스킬 이름을 표시하고(요구사항 6번 "퀵슬롯 UI"), 사용
 // 가능 여부(canUseSkillNow: 사냥 중 + 쿨타임 아님 + 자원 충분)에 따라 버튼을 비활성화함.
 function buildSkillQuickSlotsHtml(showRemove){
+  // 단축키 표기(hotkeys.js): 스킬1 = 첫 줄 가장 왼쪽 칸부터 — 칸 좌상단 뱃지. 모바일 프리셋은 CSS로 숨김.
+  const keyBadge = (idx, onEmpty) => (typeof hotkeyBadgeHtml === 'function' ? hotkeyBadgeHtml('skill:' + (idx + 1), onEmpty) : '');
   return state.skillQuickSlots.map((skillId, idx) => {
     const s = skillId ? SKILLS[skillId] : null;
     if(!s){
-      return `<div class="quickslot-wrap skill-quickslot-wrap"><button class="quickslot-btn empty" data-action="assign-skill" data-slot="${idx}">+</button></div>`;
+      return `<div class="quickslot-wrap skill-quickslot-wrap"><button class="quickslot-btn empty" data-action="assign-skill" data-slot="${idx}">+</button>${keyBadge(idx, true)}</div>`;
     }
     const grade = WEAPON_GRADES[s.grade];
     const remain = skillCooldownRemainingSec(skillId);
@@ -1589,6 +1594,7 @@ function buildSkillQuickSlotsHtml(showRemove){
         </button>
         <div class="skill-quickslot-name" style="color:${grade ? grade.color : '#fff'};">${s.name}</div>
         ${showRemove ? `<button class="quickslot-clear" data-action="clear-skill" data-slot="${idx}" title="슬롯 비우기">×</button>` : ''}
+        ${keyBadge(idx, false)}
       </div>`;
   }).join('');
 }
@@ -2098,6 +2104,13 @@ function updateHuntTopUiToggle(){
   const section = el('huntTopSection');
   const btn = el('huntTopToggleBtn');
   if(!section || !btn) return;
+  // 데스크탑 프리셋에서는 던전 우측 카드를 쓰지 않음 — 캐릭터/인벤토리/도감은 메뉴 팝업(menu_popup.js)으로 대신함. 모바일 프리셋은 그대로.
+  if(!(state.settings && state.settings.screenPreset === 'mobile')){
+    hunt.topUiExpanded = false;
+    btn.style.display = 'none';
+  }else{
+    btn.style.display = '';
+  }
   section.style.display = hunt.topUiExpanded ? 'block' : 'none';
   btn.textContent = hunt.topUiExpanded ? '›' : '‹';
   // 패널이 열려 있을 때만 .wrap의 480px 상한을 해제(요구사항 13번) — 닫히면 즉시 원복해서 다른 화면에
@@ -2118,6 +2131,7 @@ function updateHuntTopUiToggle(){
   if(typeof alignHuntHeader === 'function') alignHuntHeader(); // 패널 열림/닫힘으로 huntCard 위치가 바뀌므로 상단 영역 정렬 갱신
 }
 function toggleHuntTopUi(){
+  if(!(state.settings && state.settings.screenPreset === 'mobile')) return; // 데스크탑은 우측 카드 미사용(메뉴 팝업으로 대체)
   hunt.topUiExpanded = !hunt.topUiExpanded;
   if(hunt.topUiExpanded){
     // 던전 우측 카드를 열 때마다 캐릭터 메뉴 진입/캐릭터 정보 모달을 열 때와 동일한 규칙으로 draftStats를
@@ -2474,40 +2488,41 @@ function buildKillRewardMessagesHtml(rewards){
 // 툴팁 함수로 만들어둔 것을 그대로 꽂아 쓰기만 함(여기서는 새 아이콘/툴팁 규칙을 만들지 않음).
 function rewardItemSlotHtml(slot){
   const qtyHtml = slot.qty != null ? `<span class="reward-item-qty">${slot.qty}</span>` : '';
-  return `<span class="reward-item-slot" style="border-color:${slot.borderColor};">${slot.iconHtml}${qtyHtml}<span class="tooltip">${slot.tooltipHtml}</span></span>`;
+  // data-reward-key/qty: 알림 점(notify.js rewardNotifySync)이 이 슬롯이 새로 얻었거나 수량이 늘었는지 판정·확인 처리하는 데 씀(점 클래스는 그린 뒤 따로 붙임)
+  const nAttr = slot.nkey ? ` data-reward-key="${slot.nkey}"${slot.qty != null ? ` data-reward-qty="${slot.qty}"` : ''}` : '';
+  return `<span class="reward-item-slot"${nAttr} style="border-color:${slot.borderColor};">${slot.iconHtml}${qtyHtml}<span class="tooltip">${slot.tooltipHtml}</span></span>`;
 }
 // 4번 문서 "정렬 규칙": 슬롯을 5개씩 줄(row)로 나눠, 첫 번째 줄만 실제 개수에 맞춰 가운데 정렬하고
 // 두 번째 줄부터는 왼쪽 정렬한다 — flex-wrap 한 줄로는 이 두 정렬을 동시에 만들 수 없어(모든 줄이
 // 같은 justify-content를 공유하게 됨) 줄 단위 div로 직접 나눠 첫 줄에만 별도 클래스를 붙임.
+// 페이지 버튼 대신 영역 안 세로 스크롤: 전체 슬롯을 그리고, 한 번에 보이는 칸 수(PAGE_SIZE.killRewardItems, 5열 기준 행 수로 환산)만큼의
+// 높이로 .reward-item-scroll이 잘라서 넘치면 휠/터치/마우스 드래그로 스크롤함(드래그·툴팁은 main.js initRewardGridInteractions).
 function buildKillRewardItemSectionHtml(rewards){
   const items = buildRewardDisplayItems(rewards);
   if(items.length === 0) return '<div id="krRewardItemSection" style="display:none;"></div>';
-  const pageSize = PAGE_SIZE.killRewardItems;
-  const totalPageCount = pageCount(items.length, pageSize);
-  pageState.killRewardItems = clampPage(pageState.killRewardItems, totalPageCount);
-  const pageItems = pageSlice(items, pageState.killRewardItems, pageSize);
+  const visibleRows = Math.max(1, Math.ceil(PAGE_SIZE.killRewardItems / 5));
   const rowsHtml = [];
-  for(let i = 0; i < pageItems.length; i += 5){
-    const row = pageItems.slice(i, i + 5);
+  for(let i = 0; i < items.length; i += 5){
+    const row = items.slice(i, i + 5);
     const rowClass = i === 0 ? 'reward-item-row reward-item-row-first' : 'reward-item-row';
     rowsHtml.push(`<div class="${rowClass}">${row.map(rewardItemSlotHtml).join('')}</div>`);
   }
-  const pagerHtmlOut = totalPageCount > 1
-    ? `<div class="reward-item-pager">${pagerHtml('killRewardItems', pageState.killRewardItems, totalPageCount)}</div>`
-    : '';
   // 6개 이상(줄이 2개 이상)이면 .multi-row — 모든 줄이 같은 5열 격자를 쓰도록 해서 2줄째가 1줄째 첫 아이콘과 같은 X 위치에서 시작함(css 참고)
-  const gridClass = pageItems.length > 5 ? 'reward-item-grid multi-row' : 'reward-item-grid';
+  const gridClass = items.length > 5 ? 'reward-item-grid multi-row' : 'reward-item-grid';
   return `<div class="reward-item-section" id="krRewardItemSection">
-    <div class="${gridClass}">${rowsHtml.join('')}</div>
-    ${pagerHtmlOut}
+    <div class="reward-item-scroll" id="krRewardItemScroll" style="--reward-visible-rows:${visibleRows};"><div class="${gridClass}">${rowsHtml.join('')}</div></div>
   </div>`;
 }
-// pagerHtml의 "이전/다음" 클릭(goPage, main.js)이 PAGE_RENDER_FN['killRewardItems']로 이 함수를 호출함
-// — 보상창 전체를 다시 그리지 않고 아이템 그리드 부분(#krRewardItemSection)만 다시 그림.
+// 아이템 그리드 부분(#krRewardItemSection)만 다시 그림(스크롤 위치는 유지).
 function renderKillRewardItemSection(){
   const wrap = el('krRewardItemSection');
   if(!wrap) return; // 보상창이 닫혀있거나(11스테이지 보물상자 결과창 등) 아이템이 없던 경우
+  const sc = el('krRewardItemScroll');
+  const top = sc ? sc.scrollTop : 0;
   wrap.outerHTML = buildKillRewardItemSectionHtml(hunt.pendingRewards);
+  const sc2 = el('krRewardItemScroll');
+  if(sc2) sc2.scrollTop = top;
+  if(typeof rewardNotifySync === 'function') rewardNotifySync(); // 알림 점(notify.js)
 }
 
 // ---- 공지사항(패치노트) 모달 ----
@@ -2534,7 +2549,11 @@ function renderSettings(){
   const body = el('settingsBody');
   if(!cat){ body.innerHTML = `<div class="inv-empty">설정 항목이 없습니다.</div>`; return; }
 
+  const hkPrev = el('hotkeyScroll'), hkTop = hkPrev ? hkPrev.scrollTop : 0; // 단축키 목록은 키 하나 바꿀 때마다 다시 그려지므로 스크롤 위치를 기억했다가 복원
+  const modalBox = document.querySelector('#settingsModal .settings-modal');
+  if(modalBox) modalBox.classList.toggle('settings-modal-wide', cat.id === 'hotkeys'); // 단축키 탭은 슬롯 격자가 들어가서 모달을 조금 넓힘
   body.innerHTML = cat.items.map(item => {
+    if(item.type === 'hotkeys') return hotkeyPanelHtml(); // js/hotkeys.js
     if(item.type === 'toggle'){
       const on = !!(state.settings && state.settings[item.id]);
       return `
@@ -2607,6 +2626,7 @@ function renderSettings(){
     }
     return ''; // 새로운 설정 타입이 생기면 여기 분기만 추가하면 됨
   }).join('');
+  const hkNow = el('hotkeyScroll'); if(hkNow) hkNow.scrollTop = hkTop;
 }
 
 // ---- 사망 패널티(망자의 저주) 뱃지 ----

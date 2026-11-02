@@ -11,6 +11,12 @@ const INV_BOX_COLUMNS = 8;
 const INV_BOX_ROWS = 8;
 const INV_BOX_SLOTS_PER_PAGE = INV_BOX_COLUMNS * INV_BOX_ROWS; // 슬롯 영역에 한 번에 보이는 칸 수 = 8×8 = 64칸(이름은 예전 페이지 구조의 흔적). 이 칸 수를 넘는 슬롯이 생길 때만
                                                                // 슬롯 영역이 스크롤됨. 실제 카테고리별 최대 슬롯(INV_MAX, data.js)은 현재 64라 평소에는 스크롤이 생기지 않음(용량 규칙은 구버전과 공용 — formulas.js 참고)
+// 메뉴 팝업(던전 화면의 떠 있는 창, menu_popup.js)으로 열려 있을 때는 창 폭에 맞춰 4열 × 6행만 보이고 나머지는 세로 스크롤함. 칸 수(슬롯 용량)는 그대로.
+const INV_BOX_POPUP_COLUMNS = 4;
+const INV_BOX_POPUP_ROWS = 6;
+function invBoxPopupMode(){ return typeof menuPopupIsOpen === 'function' && menuPopupIsOpen('inventory'); }
+function invBoxCols(){ return invBoxPopupMode() ? INV_BOX_POPUP_COLUMNS : INV_BOX_COLUMNS; }
+function invBoxRows(){ return invBoxPopupMode() ? INV_BOX_POPUP_ROWS : INV_BOX_ROWS; }
 const INV_BOX_DOUBLE_CLICK_MS = 320; // 같은 슬롯을 이 시간 안에 두 번 누르면 더블 클릭(마우스/터치 공통)으로 처리
 
 // 신버전 탭 5개. 장비 소분류(무기/방어구/보조/장신구)는 쓰지 않고 장비 탭 하나에 전부 표시하며, 아티팩트는
@@ -188,6 +194,18 @@ function invBoxKeys(tab){
   }
   if(tab === 'stone' || tab === 'misc') return Object.values(MISC_ITEMS).filter(item => item.itemClass === tab && (state[item.stateKey] || 0) > 0).map(item => tab + ':' + item.id);
   return [];
+}
+
+// 스택(개수) 아이템의 현재 수량 — 키는 invBoxKeys와 같은 형식. 알림 점(notify.js)이 "확인한 뒤 수량이 늘었는지" 판정하는 데 씀.
+// 장비/아티팩트/흔적처럼 하나씩 따로 존재하는 아이템은 수량이 없으므로 포함하지 않음(새로 생겼을 때만 알림).
+function invBoxQtys(tab){
+  const out = {};
+  if(tab === 'consumable'){
+    Object.values(CONSUMABLES).forEach(item => { const n = (state.consumables && state.consumables[item.id]) || 0; if(n > 0) out['consumable:' + item.id] = n; });
+  }else if(tab === 'stone' || tab === 'misc'){
+    Object.values(MISC_ITEMS).forEach(item => { if(item.itemClass === tab){ const n = state[item.stateKey] || 0; if(n > 0) out[tab + ':' + item.id] = n; } });
+  }
+  return out;
 }
 
 // ---- 아이템 팝업(클릭 시) ----
@@ -397,7 +415,7 @@ function invBoxSlotHtml(entry, query){
   // 검색어가 있으면 일치하지 않는 아이템은 숨기지 않고 비교 모드의 비활성 표시와 같은 방식(흐림)으로 표시 — 슬롯 위치는 그대로.
   const dimCls = query && !invBoxMatches(entry, query) ? ' search-dim' : '';
   const flashCls = entry.key === invBoxUI.focusKey ? ' flash' : '';
-  return `<div class="inv-box-slot filled ${entry.locked ? 'locked' : ''}${cmpCls}${dimCls}${flashCls}" data-key="${entry.key}" data-notify-key="inv:${entry.key}"${lockAttrs} style=""border-color:${entry.borderColor};">`
+  return `<div class="inv-box-slot filled ${entry.locked ? 'locked' : ''}${cmpCls}${dimCls}${flashCls}" data-key="${entry.key}" data-notify-key="inv:${entry.key}"${lockAttrs} style="border-color:${entry.borderColor};">`
     + `${entry.iconHtml}${qtyHtml}${equipHtml}${invLockBadgeHtml(entry.locked)}<span class="tooltip">${entry.tooltipHtml}</span></div>`;
 }
 // ---- 인벤토리 검색 / 슬롯 영역 스크롤 ----
@@ -459,7 +477,7 @@ function invBoxSearchReset(){
 function invBoxSyncScroll(total){
   const sc = el('invBoxGridScroll'), grid = el('invBoxGrid');
   if(!sc || !grid) return;
-  const need = total > INV_BOX_SLOTS_PER_PAGE;
+  const need = total > invBoxCols() * invBoxRows(); // 전체 화면 8×8=64칸(넘을 때만 스크롤) / 팝업 4×6=24칸(대부분 스크롤)
   sc.classList.toggle('scrollable', need);
   sc.style.maxHeight = '';
   if(!need) return;
@@ -469,7 +487,7 @@ function invBoxSyncScroll(total){
   const cs = getComputedStyle(grid);
   const gap = parseFloat(cs.rowGap) || 4;
   const padTop = parseFloat(cs.paddingTop) || 0, padBottom = parseFloat(cs.paddingBottom) || 0;
-  sc.style.maxHeight = Math.round(INV_BOX_ROWS * h + (INV_BOX_ROWS - 1) * gap + padTop + padBottom) + 'px';
+  sc.style.maxHeight = Math.round(invBoxRows() * h + (invBoxRows() - 1) * gap + padTop + padBottom) + 'px';
 }
 function renderInventoryBox(){
   notifyRequestSync(); // 알림 점(notify.js) — 탭을 옮기거나 다시 그릴 때마다 상태에 맞춰 갱신
@@ -486,7 +504,8 @@ function renderInventoryBox(){
   // 슬롯 영역: 현재 탭의 아이템만 표시(검색어가 있어도 다른 탭 아이템은 가져오지 않음). 페이지 대신 스크롤 — 칸 수는 기본 64칸(8×8)이고,
   // 아이템 수/카테고리 슬롯 용량(inventorySlotMax)이 그보다 커지면(슬롯 확장 대비) 8칸 단위로 늘어나 스크롤됨. 용량 자체는 제한 그대로.
   const q = invBoxQueryNorm();
-  const total = Math.max(INV_BOX_SLOTS_PER_PAGE, Math.ceil(Math.max(entries.length, inventorySlotMax(tab)) / INV_BOX_COLUMNS) * INV_BOX_COLUMNS);
+  const cols = invBoxCols();
+  const total = Math.max(INV_BOX_SLOTS_PER_PAGE, Math.ceil(Math.max(entries.length, inventorySlotMax(tab)) / cols) * cols);
 
   el('invBoxTabs').innerHTML = INV_BOX_TABS.map(t =>
     `<button class="inv-box-tab ${t.id === tab ? 'active' : ''}" data-tab="${t.id}" data-notify-path="inventory/${t.id}">${t.label}</button>`).join('');
@@ -498,6 +517,7 @@ function renderInventoryBox(){
   const scroller = el('invBoxGridScroll');
   const keepScroll = invBoxUI.lastTab === tab && !invBoxUI.resetScroll; // 같은 탭을 다시 그릴 때(판매/착용 등)는 스크롤 위치 유지
   const prevScroll = scroller.scrollTop;
+  el('invBoxGrid').style.setProperty('--inv-box-cols', String(cols)); // 슬롯 격자 열 수(CSS .inv-box-grid가 이 값을 씀)
   el('invBoxGrid').innerHTML = cells;
   invBoxUI.cellCount = total;
   invBoxSyncScroll(total);
@@ -528,6 +548,7 @@ function renderInventoryBox(){
   el('invBoxGold').innerHTML = `소유 골드 <span class="inv-box-gold-val"><b>${state.gold.toLocaleString()}</b>${uiIconHtml('gold', 'ui-icon-inline')}</span>`;
   invBoxRefreshPopup();
   invCompareRenderPanel();
+  if(invBoxPopupMode() && typeof tabBarAfterRender === 'function') tabBarAfterRender(el('invBoxTabs'), false); // 팝업의 가로 스크롤 탭 줄: 가장자리 흐림 갱신 + 활성 탭이 보이게(제작소와 같은 방식)
 }
 
 // 비교 행 목록(invCompareBuildRows 결과) → 행 HTML. 인벤토리 비교 팝업과 도감 아이템 상세 정보(codex.js)가 같은 출력 방식을 쓰도록 공용으로 분리함.

@@ -153,6 +153,7 @@ const UI_ICONS = {
   huntLeave:  { image: 'menu_leave_icon',     icon: '🚪' }, // 던전 화면 하단 [던전 나가기] 버튼 이미지
   huntReward: { image: 'menu_current_reward', icon: '🎒' }, // 던전 화면 하단 [보상창] 버튼 이미지 + 누적 보상창 헤더 아이콘
   huntNextStage: { image: 'menu_enter_next_stage', icon: '⏩' }, // 스테이지 클리어 후 준비시간 중 [다음 스테이지 즉시 이동] 버튼 이미지
+  huntTreasureStage: { image: 'ui_relic_icon', icon: '📦' }, // 10스테이지 클리어 후(다음이 11스테이지=숨겨진 장소) 같은 버튼에 쓰는 상자 이미지 — 전투가 아니라 보상 상자라는 걸 알리려고 칼 이미지 대신 사용(dungeon.js syncHuntPrepNextIcon)
 };
 
 // 기타/아티팩트/소비 아이템 이미지 파일 경로 규칙(무기·몬스터와 동일한 방식). ARTIFACTS/CONSUMABLES/
@@ -3059,22 +3060,22 @@ const MISC_ITEMS = {
   oldEnchantStone: {
     id: 'oldEnchantStone', name: '빛바랜 강화석', icon: '💎', image: 'misc_old_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'normal',
     sellPrice: 200, stateKey: 'oldEnchantStones',
-    catalyst: { kind: 'enchantStone', successRatePct: 15, baseCost: { normal: 1 }, stepExtra: [0, 0, 0, 0, 0, 1, 1, 2, 2, 3] },
+    catalyst: { kind: 'enchantStone', successRatePct: 15, baseCost: { normal: 1 }, stepExtra: [0, 0, 0, 0, 0, 0, 1, 2, 3, 4] },
   },
   rareEnchantStone: {
     id: 'rareEnchantStone', name: '강화석', icon: '💎', image: 'misc_rare_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'rare',
     sellPrice: 1500, stateKey: 'rareEnchantStones',
-    catalyst: { kind: 'enchantStone', successRatePct: 20, baseCost: { normal: 1, rare: 2 }, stepExtra: [0, 0, 0, 0, 0, 1, 1, 2, 3, 4] },
+    catalyst: { kind: 'enchantStone', successRatePct: 20, baseCost: { normal: 1, rare: 2 }, stepExtra: [0, 0, 0, 0, 0, 0, 1, 2, 2, 3] },
   },
   epicEnchantStone: {
     id: 'epicEnchantStone', name: '예리한 강화석', icon: '💎', image: 'misc_epic_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'epic',
     sellPrice: 10000, stateKey: 'epicEnchantStones',
-    catalyst: { kind: 'enchantStone', successRatePct: 25, baseCost: { normal: 1, rare: 1, epic: 2 }, stepExtra: [0, 0, 0, 0, 0, 1, 2, 3, 4, 6] },
+    catalyst: { kind: 'enchantStone', successRatePct: 25, baseCost: { normal: 1, rare: 1, epic: 1 }, stepExtra: [0, 0, 0, 0, 0, 0, 1, 2, 2, 4] },
   },
   uniqueEnchantStone: {
     id: 'uniqueEnchantStone', name: '빛나는 강화석', icon: '💎', image: 'misc_unique_enchant_stone', itemClass: 'misc', miscKind: '촉매', grade: 'unique',
-    sellPrice: 80000, stateKey: 'uniqueEnchantStones',
-    catalyst: { kind: 'enchantStone', successRatePct: 30, baseCost: { normal: 1, rare: 1, epic: 1, unique: 2 }, stepExtra: [0, 0, 0, 1, 2, 3, 4, 5, 6, 9] },
+    sellPrice: 50000, stateKey: 'uniqueEnchantStones',
+    catalyst: { kind: 'enchantStone', successRatePct: 30, baseCost: { normal: 1, rare: 1, epic: 1, unique: 1 }, stepExtra: [0, 0, 0, 0, 0, 0, 1, 2, 2, 4] },
   },
   reviveStone: {
     id: 'reviveStone', name: '소생석', icon: '💠', image: 'misc_revive_stone', itemClass: 'misc', miscKind: '촉매', grade: 'epic',
@@ -3123,7 +3124,8 @@ const MISC_ITEMS = {
 
 // 장비 요구 레벨별 강화석 추가 소모량(요청글 4번). [최소 레벨, 추가 소모량] — 해당 레벨 이상 중 가장 큰 구간을 적용.
 // 강화석 계열은 사용 가능한 장비라면 촉매 등급과 관계없이 항상 이 값을 더함.
-const CATALYST_LEVEL_EXTRA = [[1, 0], [31, 1], [50, 2], [70, 3], [90, 4], [99, 5]];
+// (zip394 변경: 1~69 → 0 / 70~89 → 1 / 90~98 → 2 / 99 → 3. 요구 레벨 90 이상 장비는 나중에 추가될 예정이라 구간만 미리 둠)
+const CATALYST_LEVEL_EXTRA = [[1, 0], [70, 1], [90, 2], [99, 3]];
 
 // 강화석 계열 설명(요청글 9번 공통 템플릿) — 아이템별로 문구를 따로 적지 않고 템플릿 + 아이템 데이터 값으로 만듦.
 // [등급]: 이 촉매를 쓸 수 있는 가장 높은 장비 등급(baseCost 키 기준, 등급 색상+볼드) / [%]: successRatePct(초록+볼드).
@@ -3823,7 +3825,7 @@ const PAGE_SIZE = {
   restoreSelect: 6,     // 수리 탭 "손상 복구" 장비 선택 팝업
   craftSelect: 6,       // 제작소 "재료 장비 선택" 팝업
   dungeonList: 3,        // 던전 입구
-  killRewardItems: 15,   // 던전 전투 종료 보상창 "획득 아이템" 그리드(5열×3행)
+  killRewardItems: 15,   // 던전 전투 종료 보상창 "획득 아이템" 그리드가 한 번에 보여주는 칸 수(5열×3행) — 이제 페이지가 아니라 이 높이만큼 보이고 나머지는 영역 안에서 스크롤(render.js)
 };
 // 캐릭터 정보창 페이지 수. 이 화면은 아이템 목록을 잘라서 보여주는 게 아니라 "1페이지(장비창+캐릭터 정보) /
 // 2페이지(적용 중인 아티팩트 효과)"처럼 완전히 다른 내용을 페이지로 나눈 것이라 PAGE_SIZE(개수 기반 분할)는
@@ -5702,4 +5704,28 @@ const SETTINGS_SCHEMA = [
       },
     ],
   },
+  // 단축키 — 항목 목록은 설정 데이터가 아니라 실제 메뉴 그리드·퀵슬롯 개수에서 실행 시점에 만들어짐(js/hotkeys.js hotkeyActionList).
+  // 저장값 state.settings.hotkeyBindings = { 동작id: 키코드('KeyS' 등, ''=미지정) } — null이면 아직 한 번도 저장 안 함(기본값 사용).
+  {
+    id: 'hotkeys',
+    label: '단축키',
+    icon: '⌨️',
+    items: [
+      { id: 'hotkeyBindings', type: 'hotkeys', default: null },
+    ],
+  },
 ];
+
+// ---- 단축키 기본값(js/hotkeys.js) ----
+// 키는 글자(e.key)가 아니라 물리 키 위치(e.code)로 저장함 — 한글 입력 상태에서도 같은 키로 동작.
+// 메뉴 그리드 버튼 id → 기본 키. 여기 없는 새 메뉴는 아직 안 쓰는 첫 알파벳 키가 자동 배정됨(메뉴 단축키는 필수 등록이라서).
+const HOTKEY_MENU_DEFAULTS = {
+  openCharacterBtn: 'KeyS', openShopBtn: 'KeyB', openInventoryBtn: 'KeyI', openDungeonBtn: 'KeyD',
+  openForgeMenuBtn: 'KeyF', openCraftBtn: 'KeyC', openCollectionBtn: 'KeyN', openSettingsBtn: 'KeyO',
+};
+// 스킬 퀵슬롯 칸 순서대로(1번 = 첫 줄 가장 왼쪽). 슬롯이 이보다 많아지면 남는 칸은 기본값 없이 비어 있음(선택 항목이라 붉은색 아님).
+const HOTKEY_SKILL_DEFAULTS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT'];
+// 플라스크 퀵슬롯 칸 순서대로(1 = 왼쪽, 2 = 오른쪽)
+const HOTKEY_FLASK_DEFAULTS = ['KeyZ', 'KeyX'];
+// 상호작용 기본값 — 나가기는 Esc 고정(추가 키는 기본 없음). stage(스테이지 진행) = 준비시간 건너뛰고 다음 스테이지로 이동 + 11스테이지 보물 상자 열기
+const HOTKEY_ACTION_DEFAULTS = { target: 'KeyA', stage: 'Space', rewards: 'KeyV', exit: '' };

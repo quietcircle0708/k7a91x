@@ -59,6 +59,7 @@ let state = {
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
   statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
   notifySeen: {}, // 알림 점(notify.js)에서 이미 확인한 항목 키 목록
+  notifySeenQty: {}, // 스택 아이템을 확인한 시점의 수량(수량이 늘면 다시 알림) — notify.js
   skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
   learnedSkills: [], learnedAwakeningSkills: [], // 습득한 스킬 id 목록(공용·특화 공용 / 기연 별도)
   unlockedAwakeningSkills: [], // 비급으로 해금된 기연 스킬 id 목록(습득 여부와 별개, 스킬 초기화해도 유지)
@@ -722,7 +723,7 @@ function resetGame(){
     skipEffects:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
     statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
-    notifySeen: {},
+    notifySeen: {}, notifySeenQty: {},
     skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [], unlockedAwakeningSkills: [],
     skillQuickSlots: [null, null, null, null, null, null, null, null, null, null],
     consumables: newGameConsumables(),

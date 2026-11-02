@@ -492,7 +492,7 @@ function codexInfoIsOpen(){ return !!codexInfo.key; }
 
 // 비교 대상 선택 중 돋보기 커서(인벤토리 비교 모드와 같은 이미지/크기, 마우스 환경에서만)
 function codexCursorSync(){
-  const active = codexInfo.picking && currentView === 'collection';
+  const active = codexInfo.picking && viewIsActive('collection');
   document.body.classList.toggle('codex-picking', active);
   if(!active){ const c = document.getElementById('invCompareCursor'); if(c) c.style.display = 'none'; }
 }
@@ -593,7 +593,7 @@ function codexCursorSync(){
   });
   // 돋보기 커서(비교 대상 선택 중, 마우스 환경)
   document.addEventListener('mousemove', (ev) => {
-    if(!codexInfo.picking || currentView !== 'collection') return;
+    if(!codexInfo.picking || !viewIsActive('collection')) return;
     const c = invCompareCursorEl();
     if(!invLockHasMouse() || !ev.target.closest || !ev.target.closest('#codexPicker')){ c.style.display = 'none'; return; }
     c.style.left = ev.clientX + 'px'; c.style.top = ev.clientY + 'px'; c.style.display = 'block';
@@ -610,7 +610,7 @@ function codexCursorSync(){
     }
   });
   document.addEventListener('keydown', (ev) => {
-    if(ev.key !== 'Escape' || currentView !== 'collection') return;
+    if(ev.key !== 'Escape' || !viewIsActive('collection')) return;
     if(codexUI.tab === 'monster'){ if(typeof codexMonsterOnEscape === 'function') codexMonsterOnEscape(); return; }
     if(codexUI.popupKey){ codexClosePopup(); return; }
     if(codexInfo.picking){ codexInfo.picking = false; codexRenderOverlays(); return; } // 비교 대상 선택 취소 → 세부 정보로
@@ -620,7 +620,7 @@ function codexCursorSync(){
   window.addEventListener('resize', () => {
     codexHideTip();
     codexClosePopup();
-    if(currentView === 'collection'){
+    if(viewIsActive('collection')){
       if(codexUI.tab === 'monster' && typeof codexMonsterSyncGridHeight === 'function') codexMonsterSyncGridHeight();
       else codexSyncGridHeight();
     }

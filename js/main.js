@@ -67,7 +67,7 @@ function invLockCursorSetImg(c, unlock){
 document.addEventListener('mousemove', (e) => {
   if(!invLockMode) return;
   const c = invLockCursorEl();
-  if(!invLockHasMouse() || currentView !== 'inventory' || !e.target.closest || !e.target.closest('#inventoryView')){ c.style.display = 'none'; return; }
+  if(!invLockHasMouse() || !viewIsActive('inventory') || !e.target.closest || !e.target.closest('#inventoryView')){ c.style.display = 'none'; return; }
   const host = e.target.closest('[data-lock-src]');
   invLockCursorSetImg(c, !!(host && host.classList.contains('locked')));
   c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; c.style.display = 'block';
@@ -93,7 +93,7 @@ function invCompareCursorSync(){
 document.addEventListener('mousemove', (e) => {
   if(typeof invCompare === 'undefined' || !invCompare.on || invCompare.targetKey) return;
   const c = invCompareCursorEl();
-  if(!invLockHasMouse() || currentView !== 'inventory' || !e.target.closest || !e.target.closest('#inventoryView')){ c.style.display = 'none'; return; }
+  if(!invLockHasMouse() || !viewIsActive('inventory') || !e.target.closest || !e.target.closest('#inventoryView')){ c.style.display = 'none'; return; }
   c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; c.style.display = 'block';
 });
 document.addEventListener('mouseleave', () => { const c = document.getElementById('invCompareCursor'); if(c) c.style.display = 'none'; });
@@ -109,7 +109,7 @@ document.addEventListener('click', (e) => {
     render();
     return;
   }
-  if(!invLockMode || currentView !== 'inventory') return;
+  if(!invLockMode || !viewIsActive('inventory')) return;
   const host = e.target.closest('[data-lock-src]');
   if(!host) return; // 탭/페이지/정렬 등 아이템이 아닌 곳은 평소대로 동작
   e.stopPropagation(); e.preventDefault();
@@ -459,8 +459,8 @@ el('huntPrepNextBtn').addEventListener('click', skipHuntPrep);
 setInterval(updateHuntPrepUi, 100);
 el('huntRewardBtn').addEventListener('click', openLiveRewardView);
 el('krRetryBtn').addEventListener('click', retryDungeon);
-// 보상창 "획득 아이템" 그리드의 페이지 이동 버튼 — #krRewards는 innerHTML로 매번 다시 그려지므로
-// (그 안의 .reward-item-pager는 정적 요소가 아님), 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.
+// 보상창 클릭 위임 — #krRewards는 innerHTML로 매번 다시 그려지므로 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.
+// ("획득 아이템" 그리드는 이제 페이지 버튼 없이 영역 안 스크롤이라 아래 .pager-btn 처리는 이 창에서는 쓰이지 않음 — 처치 몬스터 툴팁 처리가 이 리스너의 현재 용도)
 el('krRewards').addEventListener('click', (e)=>{
   // 처치 몬스터 돋보기 아이콘 클릭/터치: 몬스터별 누적 처치 수 툴팁을 열고 닫음(PC는 호버로도 열림, 터치 환경용 보조)
   const killHost = e.target.closest('.kill-count-host');
@@ -922,6 +922,61 @@ function enableWheelHScroll(host, rowSelector){
   }, { passive: false });
 }
 
+// ---- 던전 보상창 "획득 아이템" 그리드 세로 스크롤(.reward-item-scroll) ----
+// 휠·터치 스와이프는 브라우저 기본 세로 스크롤을 그대로 쓰고, 마우스는 영역을 누른 채 위아래로 끌어 스크롤함(공용 enableDragScroll은 가로 전용이라 세로용을 따로 둠).
+// 영역 안에서는 슬롯 안 CSS 툴팁이 잘리므로 도감·인벤토리와 같은 고정 위치 툴팁(#codexTip)을 쓰고, 알림 점 확인 처리(마우스 올림/터치)도 여기서 받음.
+// 보상창 내용(#krRewards)은 다시 그려지므로 이벤트는 바뀌지 않는 #krRewards에 위임함.
+(function initRewardGridInteractions(){
+  const host = el('krRewards');
+  if(!host) return;
+  const DRAG_START_PX = 4; // 이 이상 움직여야 드래그로 인정(그 미만은 일반 클릭/호버)
+  let drag = null;
+  host.addEventListener('pointerdown', (e)=>{
+    if(e.pointerType !== 'mouse' || e.button !== 0) return;
+    const sc = e.target.closest('.reward-item-scroll');
+    if(!sc || sc.scrollHeight <= sc.clientHeight + 1) return;
+    drag = { sc, pointerId: e.pointerId, startY: e.clientY, startTop: sc.scrollTop, moved: false };
+  });
+  window.addEventListener('pointermove', (e)=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    const dy = e.clientY - drag.startY;
+    if(!drag.moved){
+      if(Math.abs(dy) < DRAG_START_PX) return;
+      drag.moved = true;
+      drag.sc.classList.add('is-dragging');
+      try{ drag.sc.setPointerCapture(e.pointerId); }catch(_){}
+      if(typeof codexHideTip === 'function') codexHideTip(); // 끄는 동안에는 툴팁을 띄우지 않음
+    }
+    drag.sc.scrollTop = drag.startTop - dy;
+  });
+  const endDrag = (e)=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    drag.sc.classList.remove('is-dragging');
+    try{ drag.sc.releasePointerCapture(e.pointerId); }catch(_){}
+    drag = null;
+  };
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  // 고정 위치 툴팁 — 슬롯 안 .tooltip의 내용을 그대로 꺼내 씀(내용 규칙은 buildRewardDisplayItems가 만든 기존 툴팁 그대로)
+  host.addEventListener('mouseover', (e)=>{
+    if(drag && drag.moved) return;
+    const s = e.target.closest('.reward-item-scroll .reward-item-slot');
+    const t = s && s.querySelector('.tooltip');
+    if(t && typeof codexShowTipHtml === 'function') codexShowTipHtml(s, t.innerHTML, 'reward:' + (s.dataset.rewardKey || ''));
+  });
+  host.addEventListener('mouseout', (e)=>{
+    if(e.target.closest('.reward-item-scroll .reward-item-slot') && typeof codexHideTip === 'function') codexHideTip();
+  });
+  host.addEventListener('scroll', ()=>{ if(typeof codexHideTip === 'function') codexHideTip(); }, true);
+  // 알림 점 확인 처리: 점이 켜진 슬롯에 마우스를 올리거나 터치/클릭하면 그 슬롯만 확인
+  const ack = (e)=>{
+    const s = e.target.closest && e.target.closest('.reward-item-slot.has-notify[data-reward-key]');
+    if(s && typeof rewardNotifyAck === 'function') rewardNotifyAck(s);
+  };
+  host.addEventListener('mouseover', ack);
+  host.addEventListener('pointerdown', ack);
+})();
+
 // ---- 던전 카드 "획득 가능 아이템" 줄 가로 스크롤 ----
 // 스크롤 위치는 던전별로 dungeonDropScroll에 기억(화면을 벗어나면 showView가 비움).
 (function initDungeonDropScroll(){
@@ -936,11 +991,11 @@ function enableWheelHScroll(host, rowSelector){
   window.addEventListener('resize', ()=>{ document.querySelectorAll('.drop-icon-row').forEach(dungeonDropScrollSync); });
 })();
 
-// ---- 분류 탭 줄(제작소 #craftCatTabs / 상점 #shopCatTabs, class drag-tabs) 가로 스크롤 ----
+// ---- 분류 탭 줄(제작소 #craftCatTabs / 상점 #shopCatTabs / 인벤토리 팝업 #invBoxTabs, class drag-tabs) 가로 스크롤 ----
 // 던전 카드 줄과 같은 마우스 드래그 + 탭 줄 위 마우스 휠(세로 휠 → 가로 이동) + 가장자리 흐림 표시. 터치는 기본 스와이프.
 // 활성 탭을 화면 안으로 옮기는 처리는 탭을 그릴 때(craft_menu.js/shop_menu.js → tabBarAfterRender, render.js)에 함.
 (function initDragTabs(){
-  const bars = ['craftCatTabs', 'shopCatTabs'].map(id => el(id)).filter(Boolean);
+  const bars = ['craftCatTabs', 'shopCatTabs', 'invBoxTabs'].map(id => el(id)).filter(Boolean); // invBoxTabs는 메뉴 팝업일 때만 drag-tabs 클래스가 붙어 동작함(menu_popup.js)
   bars.forEach(bar => {
     enableDragScroll(bar, '.drag-tabs', { suppressClick: true });
     enableWheelHScroll(bar, '.drag-tabs');

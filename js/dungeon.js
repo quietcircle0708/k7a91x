@@ -26,14 +26,31 @@ function advanceFromPrep(){
 function isHuntPrepButtonsVisible(){
   return currentView === 'hunt' && !!hunt.dungeon && !!hunt.nextStageTimeout && Date.now() >= (hunt.prepStartAt || 0);
 }
+// [다음 스테이지 즉시 이동] 버튼 모양: 다음 스테이지가 11스테이지(숨겨진 장소 = 전투 없이 보물 상자만 여는 곳)이면 칼 이미지 대신 상자 이미지로 바꾸고
+// 마우스 오버 문구를 "숨겨진 장소로 이동"으로 바꿈(전투를 또 하는 것으로 오해하지 않게). 클릭 동작·남은 시간 표시는 그대로이고, 아이콘 칸(.quickslot-icon)만 교체함.
+function syncHuntPrepNextIcon(){
+  const btn = el('huntPrepNextBtn');
+  if(!btn) return;
+  const treasure = (hunt.stage || 0) + 1 === DUNGEON_TREASURE_STAGE;
+  const kind = treasure ? 'treasure' : 'normal';
+  if(btn.dataset.kind === kind) return; // 바뀔 때만 다시 그림(100ms마다 호출되므로)
+  btn.dataset.kind = kind;
+  const icon = btn.querySelector('.quickslot-icon');
+  if(icon) icon.innerHTML = uiIconHtml(treasure ? 'huntTreasureStage' : 'huntNextStage', 'hunt-prep-icon');
+  const label = treasure ? '숨겨진 장소로 이동' : '다음 스테이지로 바로 이동';
+  btn.dataset.tip = label; // 마우스 오버 문구는 고정 위치 툴팁(hotkeys.js)이 이 값 뒤에 노란색 (단축키)를 붙여 보여줌 — 네이티브 title은 색을 못 입혀서 쓰지 않음
+  btn.removeAttribute('title');
+  btn.setAttribute('aria-label', label);
+}
 // 준비시간 버튼 표시/숨김 + 남은 시간(스킬 쿨타임과 같은 .quickslot-cooldown, toFixed(1)) 갱신. 100ms 주기(main.js) 및 상태 전환 시점마다 호출.
 // 숨길 땐 display:none(클릭 불가)로 처리하고, 남은 시간은 hunt.prepDeadline(실제 자동 진입 시각) 기준이라 타이머와 어긋나지 않음.
 function updateHuntPrepUi(){
   const box = el('huntPrepActions');
   if(!box) return;
+  syncHuntPrepNextIcon();
   const visible = isHuntPrepButtonsVisible();
   box.classList.toggle('show', visible);
-  if(!visible) return;
+  if(!visible){ if(typeof hotkeyHidePrepTip === 'function') hotkeyHidePrepTip(); return; } // 버튼이 사라지면 열려 있던 마우스 오버 툴팁도 같이 닫음
   const cd = el('huntPrepCountdown');
   if(cd) cd.textContent = (Math.max(0, hunt.prepDeadline - Date.now()) / 1000).toFixed(1);
 }
@@ -109,6 +126,8 @@ function enterDungeon(id){
   // 넘어가도 초기화하지 않음(재탐험도 enterDungeon을 거치므로 새로 시작). 실제 지급은 killMonsterInstance 등이 그대로
   // 처리하고, 여기에는 이미 지급이 끝난 결과가 합산되기만 함.
   hunt.pendingRewards = newDungeonRewards();
+  hunt.rewardSeen = {}; // 보상창 알림 점(notify.js rewardNotifySync)의 확인 목록도 던전 입장 때 새로 시작
+  rewardNotifySync();
   hunt.manualPause = false;
   hunt.deferredActions = [];
   hunt.rewardModalMode = null;
@@ -460,6 +479,15 @@ function selectTarget(instanceId){
   updateTargetHighlight();
 }
 
+// 단축키 [타겟 변경](hotkeys.js): 지금 살아 있는 몬스터를 화면 순서대로 돌아가며 다음 개체를 타겟으로 지정함.
+// 실제 지정은 몬스터 칸을 직접 클릭할 때와 같은 selectTarget을 그대로 씀(일시정지 중 무시 등 기존 조건 동일). 몬스터가 1마리 이하면 아무 일도 없음.
+function cycleTarget(){
+  if(currentView !== 'hunt' || !Array.isArray(hunt.monsters) || hunt.monsters.length < 2) return;
+  const idx = hunt.monsters.findIndex(m => m.instanceId === hunt.targetId);
+  const next = hunt.monsters[(idx + 1) % hunt.monsters.length]; // 현재 타겟이 없으면(-1) 첫 번째
+  if(next) selectTarget(next.instanceId);
+}
+
 // 몬스터 개체 하나의 공격: 각 개체는 자신의 공격 타이머로 독립 진행됨
 function monsterAttackTick(instanceId){
   if(hunt.paused) return;
@@ -783,6 +811,7 @@ function killMonsterInstance(instanceId){
   render();
   saveState();
   refreshLiveRewardModal(); // 보상창을 열어둔 채 전투가 진행 중이면 방금 반영된 누적 보상을 즉시 갱신
+  rewardNotifySync(); // 보상창이 닫혀 있어도 [보상창] 버튼 점은 새 보상에 맞춰 갱신
 
   if(hunt.monsters.length === 0){
     // 그룹 전멸 = 이번 전투의 종료 시점. 보상 창에 머무는 동안 회복 틱이 계속 반복되던 버그 수정:
@@ -849,6 +878,7 @@ function openKillResultModal(rewards, mode, opts){
   hunt.rewardHtmlCache = buildDungeonRewardHtml(rewards, hunt.rewardModalOpts);
   el('krRewards').innerHTML = hunt.rewardHtmlCache;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
+  rewardNotifySync(); // 알림 점(notify.js) — 그린 슬롯에 점 클래스 붙임
   const show = (id, on) => { el(id).style.display = on ? 'inline-block' : 'none'; };
   show('krCloseBtn', mode === 'view');
   show('krResumeBtn', mode === 'leave');
@@ -866,11 +896,15 @@ function refreshLiveRewardModal(){
   if(html === hunt.rewardHtmlCache) return;
   hunt.rewardHtmlCache = html;
   const wasOpen = !!el('krRewards').querySelector('.kill-count-host.open');
+  const scEl = el('krRewardItemScroll'), scTop = scEl ? scEl.scrollTop : 0; // 다시 그려도 아이템 그리드 스크롤 위치 유지
   el('krRewards').innerHTML = html;
   if(wasOpen){ const h = el('krKillCountHost'); if(h) h.classList.add('open'); }
+  const scEl2 = el('krRewardItemScroll'); if(scEl2) scEl2.scrollTop = scTop;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
+  rewardNotifySync(); // 알림 점(notify.js) — 다시 그린 슬롯에 점 클래스 붙임
 }
 function closeKillResultModal(){
+  if(typeof codexHideTip === 'function') codexHideTip(); // 보상창 아이템 툴팁(고정 위치)이 열린 채 닫히지 않게
   el('killResultModal').classList.remove('destroy-notice'); // 파괴 안내 전용 스타일 해제
   el('killResultModal').style.display = 'none';
   hunt.rewardModalMode = null;
@@ -931,6 +965,9 @@ function openTreasureStage(){
 // 보물 상자 클릭: 1초 흔들림 애니메이션 후 파괴되며 보상 지급(골드 확정 지급 + 모험가의 유해/마석/촉매는 기존 전역 드랍 공식 그대로 적용되어 드랍되지 않을 수도 있음)
 function clickTreasureChest(){
   if(hunt.chestOpened || hunt.stage !== DUNGEON_TREASURE_STAGE) return;
+  // 11스테이지 입장 메시지가 나가는 동안(stageEnterTimeout 대기 중)에는 아직 상자 단계가 준비되지 않았음 — 이때 열면 곧이어 실행되는 openTreasureStage가
+  // chestOpened를 다시 false로 되돌려 같은 상자를 한 번 더 열 수 있었음(Space 단축키로 빠르게 연타하면 쉽게 걸림). 준비되기 전 클릭은 무시함.
+  if(hunt.stageEnterTimeout) return;
   hunt.chestOpened = true;
   const chest = el('treasureChest');
   const hint = el('treasureHint');

@@ -771,6 +771,17 @@
 
   .quickslot-row{ display:flex; justify-content:center; gap:10px; margin-bottom:16px; }
   .quickslot-wrap{ position:relative; }
+  /* 단축키 표기(hotkeys.js hotkeyBadgeHtml): 칸 좌상단의 작은 흰색 굵은 글자 + 어두운 외곽선(칸 디자인은 그대로).
+     칸 폭이 46px로 고정이고 스킬 칸은 아래 이름 때문에 wrap이 더 넓을 수 있어서, wrap 가운데(50%)에서 칸 절반(-23px)만큼 되돌려 항상 "버튼의" 좌상단에 붙임.
+     비어 있는 칸(+)은 배경이 어두워 글자가 묻히므로 둥근 반투명 배경을 깜. 모바일 프리셋에서는 숨김. */
+  .quickslot-key{
+    position:absolute; top:2px; left:50%; margin-left:-20px; z-index:3; pointer-events:none;
+    font-size:11px; font-weight:800; line-height:1; color:#fff; letter-spacing:0;
+    text-shadow:-1px 0 #000, 1px 0 #000, 0 -1px #000, 0 1px #000, 0 0 3px #000;
+  }
+  .quickslot-key.long{ font-size:9px; }
+  .quickslot-key.on-empty{ margin-left:-21px; top:3px; min-width:16px; height:16px; padding:0 3px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.6); border-radius:8px; text-shadow:none; }
+  body.mobile-preset .quickslot-key, body.mobile-preset .menu-grid-key{ display:none; }
   .quickslot-btn{
     width:46px; height:46px; border-radius:10px; cursor:pointer;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -1090,7 +1101,14 @@
   }
   .reward-item-slot .tooltip{ width:200px; left:50%; transform:translateX(-50%); bottom:120%; line-height:1.6; }
   .reward-item-slot:hover .tooltip{ visibility:visible; opacity:1; }
-  .reward-item-pager{ display:flex; justify-content:center; margin-top:10px; }
+  /* 획득 아이템 그리드: 페이지 버튼 대신 영역 안 세로 스크롤. 보이는 높이 = (--reward-visible-rows)행(슬롯 42px + 줄 간격 6px) — 행 수는 render.js가 PAGE_SIZE.killRewardItems(한 번에 보이는 칸 수)에서 환산해 넘김. */
+  .reward-item-scroll{
+    --reward-visible-rows:3;
+    max-height: calc(var(--reward-visible-rows) * 42px + (var(--reward-visible-rows) - 1) * 6px + 4px);
+    padding:2px 0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+  }
+  .reward-item-scroll.is-dragging{ cursor:grabbing; user-select:none; }
+  .reward-item-scroll .reward-item-slot .tooltip{ display:none !important; } /* 스크롤 영역 안에서는 잘리므로 고정 위치 툴팁(#codexTip)을 대신 사용(main.js initRewardGridInteractions) */
 
   #spawnToast{
     position:absolute; top:2px; left:50%; transform:translate(-50%,-6px);
@@ -1103,6 +1121,50 @@
 
   /* ---- 설정 화면 ---- */
   .settings-modal{ max-width:380px; text-align:left; }
+  .settings-modal.settings-modal-wide{ max-width:470px; } /* 단축키 탭(슬롯 5열 격자) */
+  /* ---- 설정 > 단축키 (js/hotkeys.js) ---- */
+  .hotkey-panel{ display:flex; flex-direction:column; gap:8px; min-width:0; }
+  .hotkey-msg{ font-size:11.5px; color:var(--forge-cream-dim); line-height:1.45; min-height:17px; }
+  .hotkey-msg.notice{ color:var(--forge-gold); }
+  .hotkey-msg.error{ color:#ff8a80; }
+  /* 목록 영역만 세로 스크롤(설정창이 길어지지 않게 높이 제한) — 안내 문구와 [초기화][저장]은 스크롤 밖에 고정 */
+  .hotkey-scroll{ max-height:min(320px, 46vh); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; padding-right:6px; display:flex; flex-direction:column; gap:6px; }
+  .hotkey-section-title{ font-size:12px; font-weight:700; color:var(--forge-gold); margin-top:8px; padding-bottom:3px; border-bottom:1px solid var(--forge-line); }
+  .hotkey-section-title:first-child{ margin-top:0; }
+  .hotkey-req{ font-size:10px; color:#ff8a80; font-weight:400; margin-left:4px; }
+  .hotkey-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .hotkey-row-label{ font-size:13px; color:var(--forge-cream); font-weight:700; min-width:0; }
+  .hotkey-row-sub{ display:block; font-size:10.5px; color:var(--forge-cream-dim); font-weight:400; margin-top:1px; }
+  .hotkey-row-keys{ display:flex; gap:6px; flex-shrink:0; }
+  .hotkey-key{
+    min-width:58px; padding:5px 10px; border:1px solid var(--forge-line); background:var(--forge-panel-2); color:var(--forge-gold);
+    font-family:inherit; font-size:12.5px; font-weight:700; border-radius:6px; cursor:pointer; text-align:center; line-height:1.2;
+  }
+  .hotkey-key:hover{ border-color:var(--forge-gold); }
+  .hotkey-key.empty{ color:var(--forge-cream-dim); border-style:dashed; font-weight:400; }
+  .hotkey-key.missing, .hotkey-slot.missing{ border:1px solid #d9534f !important; background:rgba(200,40,40,.2); color:#ff8a80; border-style:solid; }
+  .hotkey-key.fixed{ cursor:default; color:var(--forge-cream); opacity:.75; display:inline-block; }
+  .hotkey-key.fixed:hover{ border-color:var(--forge-line); }
+  .hotkey-slot-grid{ display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:6px; }
+  .hotkey-flask-grid{ grid-template-columns:repeat(5, minmax(0, 1fr)); }
+  .hotkey-slot{
+    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:1px; padding:3px 2px 3px; min-height:50px;
+    border:1.5px solid var(--forge-line); border-radius:8px; background:var(--forge-panel-2); color:var(--forge-gold); font-family:inherit; cursor:pointer;
+  }
+  .hotkey-slot:hover{ filter:brightness(1.2); }
+  .hotkey-slot.empty{ color:var(--forge-cream-dim); border-style:dashed; }
+  .hotkey-slot-no{ position:absolute; top:1px; right:3px; font-size:9px; color:var(--forge-cream-dim); line-height:1; }
+  .hotkey-slot-icon{ width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:16px; overflow:hidden; }
+  .hotkey-slot-icon img{ max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; }
+  .hotkey-slot-key{ font-size:11.5px; font-weight:700; line-height:1.2; }
+  .hotkey-footer{ display:flex; gap:8px; justify-content:flex-end; padding-top:4px; }
+  .hotkey-footer .nav-btn, .hotkey-footer .btn{ width:auto; padding:7px 16px; font-size:13px; }
+  .hotkey-footer button:disabled{ opacity:.4; cursor:not-allowed; }
+  .hotkey-capture-box{ max-width:300px; text-align:center; }
+  .hotkey-capture-target{ font-size:13px; color:var(--forge-gold); font-weight:700; margin:6px 0 8px; }
+  .hotkey-capture-input{ border:1px dashed var(--forge-gold); border-radius:8px; padding:12px 8px; font-size:14px; color:var(--forge-cream-dim); background:var(--forge-panel-2); }
+  .hotkey-capture-input.error{ border-color:#d9534f; color:#ff8a80; }
+  .hotkey-capture-msg{ font-size:11.5px; color:var(--forge-cream-dim); line-height:1.5; margin-top:8px; }
 
   /* ---- 공지사항(패치노트) 모달 ---- */
   /* 세로로 긴 이미지에서도 닫기 버튼에 항상 접근 가능하도록 모달 박스 자체를 화면 높이 안으로
@@ -1291,6 +1353,9 @@
      화면은 이 선택자 범위 밖이라 전혀 영향받지 않고, 여기서도 자바스크립트는 손대지 않고 CSS
      우선순위만으로 이 화면에서만 배경을 투명하게 되돌림 — PNG의 원래 투명 영역이 그대로 투명하게 보임. */
   .drop-item-visual-inner .icon-grade-bg{ background: transparent; }
+  /* 촉매 아이콘(.catalyst-icon)은 공통 규칙상 등급 배경 폭×0.6으로 그려져 이 연출에서는 PNG 원본 크기에 따라 소생석·창조의 파편은 크게(38px),
+     강화석은 작게(13~15px) 나왔음 — 이 연출에서만 다른 아이템(.drop-item-visual-emoji, 22px)과 같은 크기로 고정함. 강화·제작·도감 등 다른 화면은 영향 없음. */
+  .drop-item-visual-inner .icon-grade-bg > img.item-icon-img.catalyst-icon{ width:22px !important; height:22px !important; max-width:none; }
 
   /* ============================================================
      신버전(박스) 인벤토리 — 설정의 인벤토리 UI가 '신버전(박스)'일 때만 보임(body.inventory-ui-box, navigation.js
@@ -1427,7 +1492,7 @@
   .inv-box-gridscroll.scrollable .inv-box-slot .tooltip{ display:none !important; } /* 스크롤 영역 안에서는 잘리므로 고정 위치 툴팁(#codexTip)을 대신 사용 */
   .inv-box-slot.flash{ box-shadow:0 0 0 2px var(--forge-gold); } /* 검색 결과로 이동한 아이템 강조 */
   .inv-box-grid{
-    display:grid; grid-template-columns: repeat(8, minmax(0, 42px)); gap:4px; justify-content:center; padding:4px 0 2px;
+    display:grid; grid-template-columns: repeat(var(--inv-box-cols, 8), minmax(0, 42px)); gap:4px; justify-content:center; padding:4px 0 2px;
   }
   .inv-box-slot{
     position:relative; width:100%; aspect-ratio:1 / 1; box-sizing:border-box; border-radius:9px;
@@ -1499,6 +1564,8 @@
   .menu-grid-item:disabled{ opacity:.4; cursor:not-allowed; }
   .menu-grid-icon{ width:32px; height:32px; display:block; pointer-events:none; }
   .menu-grid-label{ font-size:12px; line-height:1; color:#fff; white-space:nowrap; }
+  .menu-grid-key{ margin-left:1px; color:var(--forge-gold); font-weight:700; } /* 메뉴 이름 옆 "(키)" — hotkeys.js hotkeyRefreshMenuLabels */
+  .hotkey-tip-key{ color:var(--forge-gold); font-weight:700; white-space:nowrap; } /* 마우스 오버 문구 옆 "(키)" — hotkeys.js hotkeyTipSuffix */
   .menu-grid-item-last{ order:999; }
 
   /* 상단 메뉴 영역 안의 나가기 버튼(전투 화면 전용): 왼쪽 끝, 아래 여백 없음 */
@@ -2124,4 +2191,54 @@ body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
 [data-notify-path].has-notify::after{ top:3px; right:3px; }
 [data-notify-key].has-notify::after{ top:2px; left:2px; }
 body.mobile-preset .has-notify::after{ width:7px; height:7px; }
+/* 던전 보상창: 획득 아이템 슬롯 점은 인벤토리 슬롯과 같은 크기, [보상창] 버튼 점은 버튼 좌상단(탭·메뉴 점 크기 그대로) — notify.js rewardNotifySync */
+.reward-item-slot.has-notify::after{ top:2px; left:2px; width:6px; height:6px; box-shadow:0 0 0 1px rgba(0,0,0,.65); }
+body.mobile-preset .reward-item-slot.has-notify::after{ width:5px; height:5px; }
+.hunt-img-btn.has-notify{ position:relative; }
+.hunt-img-btn.has-notify::after{ top:0; left:0; }
+/* 인벤토리 슬롯(.inv-box-slot) 안의 점은 아이콘 안이라 더 작게(탭·메뉴 점과 스킬 슬롯 점은 위 크기 그대로) */
+.inv-box-slot.has-notify::after{ width:6px; height:6px; box-shadow:0 0 0 1px rgba(0,0,0,.65); }
+body.mobile-preset .inv-box-slot.has-notify::after{ width:5px; height:5px; }
 body.notify-off .has-notify::after{ display:none; }
+
+/* ============================================================
+   메뉴 팝업 (js/menu_popup.js) — 데스크탑 던전 화면에서 인벤토리 등을 떠 있는 창으로. 기존 화면 상자(#inventoryView 등)를 그대로 창으로 씀.
+   쌓임 순서: 팝업 20~39(JS가 인라인으로 지정) < 상단 메뉴 영역 .main-nav 40 < 아이템 세부 팝업 45 < 모달 50 < 툴팁 200
+   ============================================================ */
+.menu-popup-close{ display:none; }
+.menu-popup{
+  position:fixed; left:0; top:0; z-index:20; box-sizing:border-box;
+  width:var(--menu-popup-width, 236px); max-height:calc(100vh - 8px); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+  background:var(--forge-panel); border:1px solid var(--forge-gold); border-radius:0;
+  border-image-source:url(../assets/ui/frames/panel-transparent-center-009.png); border-image-slice:10; border-image-width:10px; border-image-repeat:stretch;
+  image-rendering:pixelated; /* 프레임을 또렷하게(.modal-box와 같은 방식) — 안쪽 이미지는 아래 :where 규칙으로 되돌림 */
+  padding:12px; box-shadow:0 8px 28px rgba(0,0,0,.55); text-align:left;
+}
+:where(.menu-popup) *{ image-rendering:auto; }
+.menu-popup.is-dragging{ box-shadow:0 12px 34px rgba(0,0,0,.68); }
+/* 제목줄 = 드래그 손잡이. [x] 버튼은 제목줄 오른쪽 끝에 작은 여백을 두고 16px(원본 32px의 정확히 1/2, 도트가 뭉개지지 않게 pixelated)로 표시 */
+.menu-popup .menu-popup-head{ position:relative; text-align:center; font-size:15px; line-height:1.4; margin:0 0 6px; padding:0 22px; cursor:move; user-select:none; -webkit-user-select:none; touch-action:none; }
+.menu-popup .menu-popup-close{
+  display:block; position:absolute; right:2px; top:50%; transform:translateY(-50%);
+  width:16px; height:16px; padding:0; margin:0; border:0; background:none; cursor:pointer; line-height:0;
+}
+.menu-popup .menu-popup-close img{ width:16px; height:16px; display:block; image-rendering:pixelated; }
+.menu-popup .menu-popup-close:hover img{ filter:brightness(1.25); }
+
+/* 인벤토리 팝업: 4열 × 6행(JS invBoxCols/invBoxRows가 열 수를 --inv-box-cols로 넘김) + 세로 스크롤(기존 다크 스크롤바), 탭 줄은 폭을 줄이고 가로 스크롤(제작소 방식) */
+#inventoryView.menu-popup{ --menu-popup-width:232px; } /* 슬롯 4칸(42px×4 + 간격 4px×3 = 180) + 스크롤바 6px + 상자 안쪽 여백이 들어가는 폭 */
+#inventoryView.menu-popup #invBoxWrap{ background:none; border:0; border-radius:0; padding:0; } /* 카드 모양(배경·테두리·여백)은 팝업 프레임이 대신함 */
+#inventoryView.menu-popup .inv-box-tabs{ margin-top:2px; flex-wrap:nowrap; overflow-x:auto; }
+#inventoryView.menu-popup .inv-box-tab{ flex:0 0 auto; min-width:44px; padding:6px 9px; font-size:11.5px; white-space:nowrap; }
+#inventoryView.menu-popup .inv-box-tab.active{ padding-bottom:9px; }
+#inventoryView.menu-popup .inv-box-panel{ padding:8px 8px 10px; }
+#inventoryView.menu-popup .inv-box-toolbar{ gap:6px; padding-bottom:6px; }
+#inventoryView.menu-popup .inv-box-search{ flex:1 1 100%; }
+#inventoryView.menu-popup .inv-box-search .codex-results{ left:0; right:0; width:auto; max-height:220px; } /* 검색 결과 목록은 팝업 폭 안에 맞춤(기본은 230px 이상으로 왼쪽으로 삐져나감) */
+#inventoryView.menu-popup .inv-box-footer{ flex-wrap:wrap; gap:4px 8px; margin-top:8px; }
+
+/* 캐릭터 / 도감 팝업 (js/menu_popup.js). 카드 모양(배경·테두리·여백)은 팝업 프레임이 대신하고, 폭은 각 화면 규격에 맞춤 */
+#characterView.menu-popup{ --menu-popup-width:320px; }
+#characterView.menu-popup .inv-card-wrap{ background:none; border:0; border-radius:0; padding:0; }
+#collectionView.menu-popup{ --menu-popup-width:420px; }
+#collectionView.menu-popup .codex-wrap{ background:none; border:0; border-radius:0; padding:0; }

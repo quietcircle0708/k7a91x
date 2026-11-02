@@ -4,11 +4,48 @@
 // 모달 열고 닫기를 담당. 실제 게임 로직 변경은 없음.
 // ============================================================
 
+// 화면을 떠날 때 그 화면 안에서만 유지되던 상태를 정리함. showView(전체 화면 이동)와 메뉴 팝업 닫기(menu_popup.js)가 함께 씀 —
+// 던전 위 팝업은 showView를 거치지 않으므로(거치면 던전이 종료됨) 같은 정리를 팝업을 닫을 때도 해줘야 함.
+function viewLeaveCleanup(view){
+  if(view === 'collection' && typeof codexOnLeave === 'function') codexOnLeave(); // 도감 툴팁/검색 결과창은 도감 화면 안에서만 유지됨
+  if(view === 'inventory'){
+    if(typeof invCompareReset === 'function') invCompareReset(); // 비교 모드도 인벤토리 메뉴 안에서만 유지됨(나가면 모드·기준·팝업·돋보기 커서 초기화)
+    if(typeof invBoxSearchReset === 'function') invBoxSearchReset(); // 인벤토리 검색어도 메뉴를 나가면 초기화
+    invLockModeSet(false); // 잠금 모드는 인벤토리 메뉴 안에서만 유지됨(나가면 해제 + 일반 커서 복원)
+  }
+  if(view === 'character'){
+    // 캐릭터 메뉴를 벗어날 때는 적용하지 않은 임시 스탯 배분을 버림(던전 우측 패널과 draftStats를
+    // 공유하는 데이터이므로, 두 화면 모두 같은 규칙으로 정리함).
+    draftStats = null;
+    draftStatPoints = null;
+    statAllocActive = { str: false, agi: false, int: false };
+  }
+}
+
+// 화면에 들어갈 때 하는 초기화(데이터 기준으로 목록/임시값을 새로 세팅). showView(전체 화면 이동)와 메뉴 팝업 열기(menu_popup.js)가 함께 씀.
+function viewEnterInit(view){
+  if(view === 'collection') codexOpen(); // 도감: 진입할 때마다 현재 장비 데이터로 목록을 새로 구성
+  if(view === 'character'){
+    // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
+    // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
+    draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+    draftStatPoints = state.statPoints || 0;
+    statAllocActive = { str: false, agi: false, int: false };
+    activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
+    activeCharInfoSubtab = CHAR_INFO_SUBTABS.length > 0 ? CHAR_INFO_SUBTABS[0].id : null; // 캐릭터 메뉴 진입할 때마다 항상 첫 소분류탭부터
+    pageState.charInfoEquip = 1;
+    pageState.charInfoStats = 1;
+    // 스킬 탭 상태도 캐릭터 정보 탭과 동일하게 진입할 때마다 첫 하위탭으로 초기화
+    activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
+    activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null; // 요구사항 3번: 진입할 때마다 항상 "공격" 탭부터
+    renderCharacterMenu();
+  }
+}
+
 function showView(name){
   notifyRequestSync(); // 알림 점(notify.js) — 화면을 옮기면 떠난 탭의 새 항목이 확인 처리됨
-  if(currentView === 'collection' && name !== 'collection' && typeof codexOnLeave === 'function') codexOnLeave(); // 도감 툴팁/검색 결과창은 도감 화면 안에서만 유지됨
-  if(currentView === 'inventory' && name !== 'inventory' && typeof invCompareReset === 'function') invCompareReset(); if(currentView === 'inventory' && name !== 'inventory' && typeof invBoxSearchReset === 'function') invBoxSearchReset(); // 인벤토리 검색어도 메뉴를 나가면 초기화 // 비교 모드도 인벤토리 메뉴 안에서만 유지됨(나가면 모드·기준·팝업·돋보기 커서 초기화)
-  if(currentView === 'inventory' && name !== 'inventory') invLockModeSet(false); // 잠금 모드는 인벤토리 메뉴 안에서만 유지됨(나가면 해제 + 일반 커서 복원)
+  if(typeof menuPopupCloseAll === 'function') menuPopupCloseAll(); // 던전 위에 떠 있던 메뉴 팝업은 화면이 바뀌면 모두 닫음(menu_popup.js)
+  if(currentView !== name) viewLeaveCleanup(currentView);
   if(currentView === 'hunt' && name !== 'hunt'){
     stopHuntLoop();
     closeKillResultModal();
@@ -27,13 +64,6 @@ function showView(name){
     // .wrap의 확장 클래스가 남아 다른 화면에 영향을 주지 않도록 항상 제거함.
     const wrapEl = document.querySelector('.wrap');
     if(wrapEl) wrapEl.classList.remove('hunt-panel-open');
-  }
-  if(currentView === 'character' && name !== 'character'){
-    // 캐릭터 메뉴를 벗어날 때는 적용하지 않은 임시 스탯 배분을 버림(던전 우측 패널과 draftStats를
-    // 공유하는 데이터이므로, 두 화면 모두 같은 규칙으로 정리함).
-    draftStats = null;
-    draftStatPoints = null;
-    statAllocActive = { str: false, agi: false, int: false };
   }
   if(currentView === 'craft' && name !== 'craft'){
     // 제작소를 벗어나면 제작 진행 팝업 관련 상태를 정리함(팝업이 열린 채로 화면을 벗어나는 경로는 없지만,
@@ -87,7 +117,7 @@ function showView(name){
   currentView = name;
   if(name !== 'dungeonlist') dungeonDropScroll = {}; // 던전 입구를 벗어나면 카드별 "획득 가능 아이템" 가로 스크롤 위치 초기화
   if(name === 'dungeonlist') renderDungeonList();
-  if(name === 'collection') codexOpen(); // 도감: 진입할 때마다 현재 장비 데이터로 목록을 새로 구성
+  if(name === 'collection') viewEnterInit('collection');
   if(name === 'hunt') renderHunt();
   alignHuntHeader();
   if(name === 'craft') craftMenuOpen(); // 제작소 메뉴(craft_menu.js)
@@ -95,21 +125,7 @@ function showView(name){
   if(name !== 'shop' && typeof shopMenuSearchReset === 'function') shopMenuSearchReset(); // 상점을 나가면 구매/판매 검색어 초기화(인벤토리 검색과 동일)
   if(name !== 'craft' && typeof craftMenuSearchReset === 'function') craftMenuSearchReset(); // 제작소를 나가면 검색어/결과 초기화(인벤토리 검색과 동일)
   skillSearchReset(); // 화면을 이동하면(캐릭터 메뉴/던전 우측 카드를 나가면) 스킬 검색어/결과 초기화(인벤토리 검색과 동일)
-  if(name === 'character'){
-    // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
-    // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
-    draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
-    draftStatPoints = state.statPoints || 0;
-    statAllocActive = { str: false, agi: false, int: false };
-    activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
-    activeCharInfoSubtab = CHAR_INFO_SUBTABS.length > 0 ? CHAR_INFO_SUBTABS[0].id : null; // 캐릭터 메뉴 진입할 때마다 항상 첫 소분류탭부터
-    pageState.charInfoEquip = 1;
-    pageState.charInfoStats = 1;
-    // 스킬 탭 상태도 캐릭터 정보 탭과 동일하게 진입할 때마다 첫 하위탭으로 초기화
-    activeSkillCategory = SKILL_CATEGORIES.length > 0 ? SKILL_CATEGORIES[0].id : null;
-    activeSkillKind = SKILL_KIND_TABS.length > 0 ? SKILL_KIND_TABS[0].id : null; // 요구사항 3번: 진입할 때마다 항상 "공격" 탭부터
-    renderCharacterMenu();
-  }
+  if(name === 'character') viewEnterInit('character'); // 캐릭터: 진입할 때마다 draft·탭 상태를 새로 세팅하고 그림
   render();
 }
 
@@ -142,6 +158,7 @@ function isActivelyFighting(){
   return !!hunt.nextStageTimeout || (hunt.stage > 1 && (!!hunt.stageEnterTimeout || !!hunt.encounterTimeout));
 }
 function guardedNav(name){
+  if(typeof menuPopupTryOpen === 'function' && menuPopupTryOpen(name)) return; // 던전 화면(데스크탑)에서 팝업 가능한 메뉴는 화면 이동 없이 팝업으로 열고/닫음(menu_popup.js)
   if(isActivelyFighting()){
     pendingNavTarget = name;
     beginHuntManualPause(); // 전투 중에는 기존처럼 hunt.paused = true, 스테이지 사이에는 진행 타이머도 함께 보류
@@ -1281,15 +1298,17 @@ async function initPatchNoteSystem(){
 // ---- 설정 모달 ----
 let activeSettingsCategory = SETTINGS_SCHEMA.length > 0 ? SETTINGS_SCHEMA[0].id : null;
 function openSettings(){
+  if(typeof hotkeyDraftInit === 'function') hotkeyDraftInit(); // 단축키 탭의 편집용 초안은 설정을 열 때마다 저장된 값에서 새로 시작
   renderSettings();
   el('settingsModal').style.display = 'flex';
 }
+// 단축키 탭에 저장하지 않은 변경이 있으면 닫기/탭 전환 전에 확인함(hotkeys.js hotkeyGuardLeave)
 function closeSettings(){
-  el('settingsModal').style.display = 'none';
+  hotkeyGuardLeave(() => { el('settingsModal').style.display = 'none'; });
 }
 function switchSettingsCategory(catId){
-  activeSettingsCategory = catId;
-  renderSettings();
+  if(catId === activeSettingsCategory) return;
+  hotkeyGuardLeave(() => { activeSettingsCategory = catId; renderSettings(); });
 }
 function toggleSetting(id){
   if(!state.settings) state.settings = {};
@@ -1337,6 +1356,8 @@ function applyScreenPreset(){
   document.body.classList.toggle('inventory-ui-legacy', invUi === 'legacy');
   document.body.classList.toggle('inventory-ui-box', invUi === 'box');
   relocateHuntTopToggleBtn(preset);
+  if(typeof menuPopupOnPresetChange === 'function') menuPopupOnPresetChange(); // 모바일 프리셋으로 바뀌면 열려 있던 메뉴 팝업을 닫음
+  if(typeof updateHuntTopUiToggle === 'function') updateHuntTopUiToggle(); // 데스크탑이면 던전 우측 카드를 닫고 토글 버튼을 숨김, 모바일이면 버튼을 다시 보이게 함
 }
 // 모바일 UI 개편 3단계: #huntTopToggleBtn은 원래 #combatArena 안에 깊이 중첩돼 있어서, 모바일에서
 // huntCard 전체를 display:none으로 숨기면 이 버튼도 함께 사라져 패널을 다시 닫을 방법이 없어짐(요구사항:
