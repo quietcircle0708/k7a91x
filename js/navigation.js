@@ -47,6 +47,7 @@ function showView(name){
   if(typeof menuPopupCloseAll === 'function') menuPopupCloseAll(); // 던전 위에 떠 있던 메뉴 팝업은 화면이 바뀌면 모두 닫음(menu_popup.js)
   if(currentView !== name) viewLeaveCleanup(currentView);
   if(currentView === 'hunt' && name !== 'hunt'){
+    if(hunt.dungeon) huntLog('dungeonLeave', { dungeon: hunt.dungeon.name }); // 전투 로그(화면을 떠나면 바로 사라져 거의 보이지 않음)
     stopHuntLoop();
     closeKillResultModal();
     hunt.dungeon = null;
@@ -1357,6 +1358,7 @@ function applyScreenPreset(){
   document.body.classList.toggle('inventory-ui-box', invUi === 'box');
   relocateHuntTopToggleBtn(preset);
   if(typeof menuPopupOnPresetChange === 'function') menuPopupOnPresetChange(); // 모바일 프리셋으로 바뀌면 열려 있던 메뉴 팝업을 닫음
+  if(typeof huntLogApplyVisibility === 'function') huntLogApplyVisibility(); // 전투 로그: 프리셋에 맞게 팝업(데스크탑)/인라인 상자(모바일)로 전환
   if(typeof updateHuntTopUiToggle === 'function') updateHuntTopUiToggle(); // 데스크탑이면 던전 우측 카드를 닫고 토글 버튼을 숨김, 모바일이면 버튼을 다시 보이게 함
 }
 // 모바일 UI 개편 3단계: #huntTopToggleBtn은 원래 #combatArena 안에 깊이 중첩돼 있어서, 모바일에서

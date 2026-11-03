@@ -46,12 +46,18 @@ const MENU_POPUP_HOOKS = {
   collection: {
     enter(){ viewEnterInit('collection'); },
   },
+  // 전투 로그(hunt_log.js): 기존 화면 상자가 아니라 전용 상자 #logView를 같은 방식으로 띄움. 열 때마다 보관된 줄을 다시 그리고 맨 아래로 이동.
+  log: {
+    enter(){ if(typeof huntLogRenderAll === 'function') huntLogRenderAll(); },
+  },
 };
+// Esc(나가기)로 닫지 않는 팝업 — 전투 로그는 기본으로 열려 있어서 Esc가 던전 나가기 흐름에 닿기 전에 먼저 닫히지 않게 함(닫기는 [x]·로그 버튼)
+const MENU_POPUP_NO_ESC = ['log'];
 
 // ---- 가능 여부(계산) ----
 function menuPopupDesktop(){ return !document.body.classList.contains('mobile-preset'); }
 function menuPopupViewEl(name){ return el(name + 'View'); } // 화면 상자 id 규칙: <화면이름>View (inventoryView / characterView / collectionView)
-function menuPopupMenuBtn(name){ return document.querySelector('#menuGrid [data-popup="' + name + '"]'); }
+function menuPopupMenuBtn(name){ return document.querySelector('[data-popup="' + name + '"]'); } // 메뉴 그리드 버튼 외에 던전 화면 [전투 로그] 버튼(#huntLogBtn)도 같은 속성을 씀
 // 설정에서 메뉴별로 끌 수 있게 하는 자리(3단계에서 설정 화면 연결) — 저장된 값이 false인 메뉴만 끔
 function menuPopupEnabledSetting(name){
   const s = state.settings && state.settings.menuPopup;
@@ -167,7 +173,7 @@ function menuPopupClose(name){
 }
 function menuPopupCloseAll(){ menuPopupUI.order.slice().forEach(menuPopupClose); }
 function menuPopupCloseTop(){
-  const name = menuPopupUI.order[menuPopupUI.order.length - 1];
+  const name = menuPopupUI.order.slice().reverse().find(n => !MENU_POPUP_NO_ESC.includes(n));
   if(!name) return false;
   menuPopupClose(name);
   return true;
@@ -186,7 +192,7 @@ function menuPopupOnPresetChange(){
 
 // ---- 제목줄 준비: 제목줄에 클래스를 붙이고 [x] 버튼을 넣음(팝업이 아닐 때는 CSS가 숨김) ----
 function menuPopupInitHeaders(){
-  document.querySelectorAll('#menuGrid [data-popup]').forEach(btn => {
+  document.querySelectorAll('[data-popup]').forEach(btn => {
     const name = btn.dataset.popup;
     const v = menuPopupViewEl(name);
     if(!v) return;
@@ -200,7 +206,11 @@ function menuPopupInitHeaders(){
       x.title = '닫기';
       x.setAttribute('aria-label', '닫기');
       x.innerHTML = `<img src="${MENU_POPUP_CLOSE_ICON}" alt="" draggable="false">`;
-      x.addEventListener('click', (e) => { e.stopPropagation(); menuPopupClose(name); });
+      x.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menuPopupClose(name);
+        if(name === 'log' && typeof huntLogOnUserClose === 'function') huntLogOnUserClose(); // 로그는 닫은 상태를 설정에 기억(다음 던전에서도 닫힘)
+      });
       head.appendChild(x);
     });
   });

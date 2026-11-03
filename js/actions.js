@@ -244,6 +244,7 @@ function processDestroyReward(itemId, type, level, isArmorItem, isAccessoryItem,
 
 // ---- 판매/장착 ----
 function sellItem(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(isEnhancing) return;
   const item = state.inventory.find(i => i.id === id);
   if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
@@ -324,6 +325,7 @@ function recheckEquipRequirements(){
 // "강화 선택"(selectForgeTargetFromInventory),
 // 대장간의 "강화 장비 선택" 팝업(selectForgeTarget) — 모두 같은 forgeTargetId를 사용함.
 function equipItem(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(isEnhancing) return;
   if(isEquipLockedById(id)) return; // 잠긴 장비는 강화 대상으로 선택할 수 없음(인벤토리 잠금)
   const weaponItem = state.inventory.find(i => i.id === id);
@@ -368,6 +370,7 @@ function equipItem(id){
 // 실제 착용 무기(equippedId)만 바꾸고 강화 대상(forgeTargetId)은 건드리지 않음. 착용 조건(레벨/스탯)과 양손 무기 ↔
 // 보조 아이템 상호 배타 조건(문서 3번)은 기존 무기 착용 로직 그대로 유지함. 구버전/신버전 인벤토리가 모두 이 함수를 호출함.
 function equipWeaponPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(isEnhancing) return;
   const weaponItem = state.inventory.find(i => i.id === id);
   if(!weaponItem) return;
@@ -381,6 +384,7 @@ function equipWeaponPiece(id){
   saveState();
 }
 function unequipWeaponPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(isEnhancing) return;
   if(state.equippedId !== id) return;
   state.equippedId = null; // 무기를 착용하지 않은 상태는 기존에도 가능했음(판매/요구 조건 미달 해제 등)
@@ -449,6 +453,7 @@ function buyArtifact(id, btn, silent){
 // 인벤토리에서 아티팩트를 직접 장착. 빈 슬롯이 없거나 이미 장착 중이면 아무 동작도 하지 않음
 // (동일한 아티팩트를 동시에 두 번 장착할 수 없음 — 애초에 아티팩트는 종류별로 1개만 보유 가능).
 function equipArtifact(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(!ownsArtifact(id) || isArtifactEquipped(id)) return;
   if(state.equippedArtifacts.length >= ARTIFACT_SLOT_MAX) return;
   if(artifactEquipBlocker(id)) return; // 같은 효과를 가진 아티팩트가 장착 중이면 먼저 해제해야 장착 가능
@@ -459,6 +464,7 @@ function equipArtifact(id){
 // 인벤토리에서 장착 중인 아티팩트를 해제. 해제 즉시 해당 능력치/효과가 사라짐
 // (ownsArtifact/isArtifactEquipped를 사용하는 모든 효과 판정이 이 배열을 직접 참조하므로 별도 처리 불필요).
 function unequipArtifact(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   const idx = state.equippedArtifacts.indexOf(id);
   if(idx === -1) return;
   state.equippedArtifacts.splice(idx, 1);
@@ -524,6 +530,7 @@ function buyWeapon(typeId, btn, silent){
 // ---- 장신구: 판매/착용/강화 ----
 // 강화는 방어구와 마찬가지로 대장간 화면(startEnhance/resolveEnhance)을 그대로 재사용함 — 별도 함수 없음.
 function sellAccessoryItem(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(isEnhancing) return;
   const item = (state.accessoryInventory || []).find(i => i.id === id);
   if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
@@ -554,6 +561,7 @@ function performSellAccessoryItem(id){
 // 가능하므로 방어구처럼 종류로 슬롯을 구분하지 않음). 두 슬롯이 모두 차 있으면 아무 동작도 하지 않음
 // (렌더링 쪽에서 이 경우 버튼을 비활성화해서 "슬롯 가득참"으로 안내함).
 function equipAccessoryPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   const item = (state.accessoryInventory || []).find(i => i.id === id);
   if(!item) return;
   if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
@@ -575,6 +583,7 @@ function equipAccessoryPiece(id){
   render(); saveState();
 }
 function unequipAccessoryPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(state.equippedNecklaceId === id){
     state.equippedNecklaceId = null;
     recheckEquipRequirements();
@@ -591,6 +600,7 @@ function unequipAccessoryPiece(id){
 
 // ---- 방어구: 판매/착용/강화 ----
 function sellArmorItem(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(isEnhancing) return;
   const item = (state.armorInventory || []).find(i => i.id === id);
   if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
@@ -619,6 +629,7 @@ function performSellArmorItem(id){
 // "강화 선택"(state.forgeTargetId, equipItem)과는 완전히 별개 개념 — 착용은 실제 능력치(방어도/체력/
 // 마나)에 곧바로 반영되고, 대장간 화면에 무엇이 표시되는지와는 무관함.
 function equipArmorPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   const item = (state.armorInventory || []).find(i => i.id === id);
   if(!item) return;
   const def = ARMOR_TYPES[item.type];
@@ -630,6 +641,7 @@ function equipArmorPiece(id){
   render(); saveState();
 }
 function unequipArmorPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   const item = (state.armorInventory || []).find(i => i.id === id);
   if(!item || !state.equippedArmor) return;
   const def = ARMOR_TYPES[item.type];
@@ -643,6 +655,7 @@ function unequipArmorPiece(id){
 // 강화는 아예 없음(문서 2번 규칙) — startEnhance/resolveEnhance 어느 쪽도 호출할 일이 없고, 인벤토리
 // 카드에도 "강화 선택" 버튼 자체가 없음(renderSubInventoryList 참고).
 function sellSubItem(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(isEnhancing) return;
   const item = (state.subInventory || []).find(i => i.id === id);
   if(!item || item.locked) return; // 잠긴 장비는 판매할 수 없음(인벤토리 잠금)
@@ -668,6 +681,7 @@ function performSellSubItem(id){
 // 종류별 슬롯이 아니라 통째로 1개). 레벨 조건과, 양손 무기를 장착하지 않은 경우에만 착용 가능하다는
 // 상호 배타 조건(canEquipSubItem, 문서 3번)을 함께 확인함.
 function equipSubPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   const item = (state.subInventory || []).find(i => i.id === id);
   if(!item) return;
   if(!meetsWeaponEquipRequirements(item.type, state.playerLevel, effectiveStats())) return;
@@ -677,6 +691,7 @@ function equipSubPiece(id){
   render(); saveState();
 }
 function unequipSubPiece(id){
+  if(guardCombatLock()) return; // 전투 중에는 불가(dungeon.js isHuntCombatActive)
   if(state.equippedSubId !== id) return;
   state.equippedSubId = null;
   recheckEquipRequirements();
@@ -844,6 +859,7 @@ function canUseSkillNow(id){
 function useSkill(id){
   if(!canUseSkillNow(id)) return;
   const s = SKILLS[id];
+  huntLog('skillUse', { skill: s.name }); // 전투 로그(hunt_log.js)
   if(s.resourceType === 'hp') state.playerHp = Math.max(0, (state.playerHp || 0) - s.resourceAmount);
   else state.playerMp = Math.max(0, (state.playerMp || 0) - s.resourceAmount);
   startSkillCooldown(id);
@@ -1002,6 +1018,7 @@ function useFlask(id){
   if((state.consumables[id] || 0) <= 0) return;
   state.consumables[id]--;
   startFlaskCooldown(id);
+  huntLog('flaskUse', { item: huntLogConsumableToken(id) }); // 전투 로그(hunt_log.js) — 수동/자동 사용 모두
   ensurePlayerVitals();
 
   // 즉시 회복류(healHpInstant/healMpInstant): 지속 회복(healHp/healMp)과 다른 종류의 회복 아이템이라

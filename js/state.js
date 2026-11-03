@@ -270,6 +270,7 @@ function startDeathCurseTicker(){
   deathCurseTickInterval = setInterval(() => {
     if(!isDeathCurseActive()){
       state.deathCurseUntil = null;
+      if(typeof huntLog === 'function') huntLog('curseEnd'); // 던전 안이면 전투 로그에 안내(던전 밖이면 무시됨)
       renderDeathCurseBadge();
       stopDeathCurseTicker();
       saveState();

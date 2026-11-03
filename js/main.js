@@ -458,6 +458,8 @@ el('huntPrepLeaveBtn').addEventListener('click', openHuntLeaveFlow); // 기존 [
 el('huntPrepNextBtn').addEventListener('click', skipHuntPrep);
 setInterval(updateHuntPrepUi, 100);
 el('huntRewardBtn').addEventListener('click', openLiveRewardView);
+el('huntLogBtn').innerHTML = uiIconHtml('huntLog', 'hunt-img-btn-icon');
+el('huntLogBtn').addEventListener('click', huntLogToggle); // 전투 로그 열기/닫기(hunt_log.js)
 el('krRetryBtn').addEventListener('click', retryDungeon);
 // 보상창 클릭 위임 — #krRewards는 innerHTML로 매번 다시 그려지므로 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.
 // ("획득 아이템" 그리드는 이제 페이지 버튼 없이 영역 안 스크롤이라 아래 .pager-btn 처리는 이 창에서는 쓰이지 않음 — 처치 몬스터 툴팁 처리가 이 리스너의 현재 용도)

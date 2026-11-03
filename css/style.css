@@ -2242,3 +2242,44 @@ body.notify-off .has-notify::after{ display:none; }
 #characterView.menu-popup .inv-card-wrap{ background:none; border:0; border-radius:0; padding:0; }
 #collectionView.menu-popup{ --menu-popup-width:420px; }
 #collectionView.menu-popup .codex-wrap{ background:none; border:0; border-radius:0; padding:0; }
+
+/* ============================================================
+   전투 로그 (hunt_log.js) — 문구는 HUNT_LOG_MESSAGES, 색은 이 블록에서만 바꿈
+   · 줄 색(tone): .hl-base(기본 회색) / .hl-system(진행 안내) / .hl-warn(경고) / .hl-levelup(레벨업) / .hl-relic(모험가의 유해)
+   · 값 색(token): .hl-t-gold(골드) / .hl-t-exp(경험치, 보상창의 .txt-exp와 같은 보라) / .hl-t-pct / .hl-t-level
+   · 아이템 이름색은 기존 이름색 규칙(등급·강화 단계)이 인라인으로 들어옴
+   ============================================================ */
+.hunt-img-btn.log-closed .hunt-img-btn-icon{ opacity:.55; } /* 로그가 닫혀 있을 때 버튼을 살짝 흐리게 */
+.hl-line{ padding:1px 0; overflow-wrap:anywhere; }
+.hl-base{ color:#9a9387; }
+.hl-system{ color:#b8b0a2; }
+.hl-warn{ color:#e0814f; }
+.hl-levelup{ color:var(--forge-gold); font-weight:700; }
+.hl-relic{ color:var(--forge-green); font-weight:700; }
+.hl-count{ opacity:.8; }
+.hl-t-gold{ color:var(--forge-gold); font-weight:700; }
+.hl-t-exp{ color:var(--forge-purple); font-weight:700; }
+.hl-t-pct{ color:var(--forge-purple); }
+.hl-t-level{ color:var(--forge-gold); font-weight:700; }
+.hunt-log-list{
+  height:190px; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+  font-size:12px; line-height:1.45; padding:2px 6px 2px 2px; text-align:left;
+  scrollbar-width:thin; scrollbar-color:#4a4036 transparent;
+}
+.hunt-log-list::-webkit-scrollbar{ width:6px; }
+.hunt-log-list::-webkit-scrollbar-thumb{ background:#4a4036; border-radius:3px; }
+/* 데스크탑: 메뉴 팝업(채팅창 느낌의 반투명 상자) */
+#logView.menu-popup{ --menu-popup-width:300px; background:rgba(30,24,21,.78); }
+#logView.menu-popup .hunt-log-wrap{ background:none; border:0; padding:0; }
+/* 모바일: 던전 카드 아래 인라인 상자(마지막 몇 줄이 보이고 위로 스크롤하면 이전 줄) */
+.hunt-log-inline{ margin:8px auto 0; width:100%; max-width:420px; box-sizing:border-box; background:rgba(30,24,21,.78); border:1px solid var(--forge-line); padding:6px 8px; }
+.hunt-log-inline-head{ font-size:12px; color:var(--forge-gold); margin-bottom:4px; }
+.hunt-log-inline .hunt-log-list{ height:84px; }
+body.desktop-preset .hunt-log-inline{ display:none !important; }
+
+/* 모바일: 하단 버튼이 3개([나가기]·[보상창]·[전투 로그])가 되면서 가운데 정렬 스테이지 메시지(#spawnToast)와 겹쳐, 버튼 오른쪽 남은 영역 안에서 가운데 정렬되게 함(길면 말줄임) */
+body.mobile-preset #spawnToast{
+  left:116px; right:0; margin:0 auto; width:max-content; max-width:calc(100% - 116px);
+  box-sizing:border-box; overflow:hidden; text-overflow:ellipsis; transform:translate(0,-6px);
+}
+body.mobile-preset #spawnToast.show{ transform:translate(0,0); }

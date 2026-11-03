@@ -11,6 +11,22 @@ function isStagePrepWindow(){
   return currentView === 'hunt' && !!hunt.dungeon && !!hunt.nextStageTimeout;
 }
 
+// 실제 전투 중인지: 던전 화면 + 전투 진행 상태(hunt.started — 입장/조우 메시지·11스테이지 보물상자·던전 나가기 전에는 false)이면서
+// 스테이지 사이 준비시간이 아닐 때. 수동 일시정지(나가기 확인·보상창)는 준비시간 타이머가 멈추므로 전투 중으로 취급해 막음.
+function isHuntCombatActive(){
+  return currentView === 'hunt' && !!hunt.dungeon && !!hunt.started && !isStagePrepWindow();
+}
+// 전투 중 장비 장착/해제·강화 선택·판매 공통 가드. 막혔으면 true(호출부는 바로 return).
+// 안내 문구는 전투 로그가 생기면 notifyCombatLocked 안에서 연결함(지금은 showMsg가 빈 함수라 화면에 표시되지 않음).
+function guardCombatLock(){
+  if(!isHuntCombatActive()) return false;
+  notifyCombatLocked();
+  return true;
+}
+function notifyCombatLocked(){
+  huntLog('combatLocked'); // 전투 로그에 안내(문구는 hunt_log.js HUNT_LOG_MESSAGES)
+}
+
 // 준비시간이 끝났거나(자동) [다음 스테이지 즉시 이동]을 눌렀을 때(수동) 똑같이 거치는 다음 스테이지 진입 처리.
 // 남은 타이머를 정리하고 준비시간 UI를 즉시 숨긴 뒤 기존 enterStage로 진행(보상/스테이지 진행 방식은 기존과 동일).
 function advanceFromPrep(){
@@ -78,6 +94,7 @@ function huntRunOrDefer(fn){
   fn();
 }
 function beginHuntManualPause(){
+  if(!hunt.manualPause) huntLog('huntPause');
   hunt.manualPause = true;
   hunt.paused = true;
   // 준비시간(다음 스테이지 자동 진입 대기) 중이었다면 남은 시간을 멈춰 둠 — 보상창/나가기 확인창을 보는 동안 준비시간이
@@ -97,6 +114,7 @@ function resumeHuntFromManualPause(){
     return;
   }
   hunt.manualPause = false;
+  huntLog('huntResume');
   if(hunt.prepPausedFireMs !== null && hunt.dungeon){ // 멈춰 둔 준비시간 재개(남은 시간 그대로)
     const now = Date.now();
     hunt.prepStartAt = now + hunt.prepPausedStartMs;
@@ -133,6 +151,11 @@ function enterDungeon(id){
   hunt.rewardModalMode = null;
   updateHuntTopUiToggle();
   showView('hunt');
+  // 전투 로그(hunt_log.js): 던전에 들어갈 때마다 새로 시작 — 입장 안내(+저주 적용 중이면 안내)를 남기고 설정에 맞춰 팝업/인라인 상자를 엶
+  huntLogReset();
+  huntLog('dungeonEnter', { dungeon: d.name });
+  if(isDeathCurseActive()) huntLog('curseActive', huntLogCurseParams(state.deathCurseUntil - Date.now()));
+  huntLogApplyVisibility();
   enterStage(1);
 }
 
@@ -167,6 +190,7 @@ function enterStage(stageNum){
   const playerIcon = el('combatPlayerIcon');
   if(playerIcon){ playerIcon.classList.remove('hit', 'dead'); } // 이전 전투의 피격/사망 애니메이션 잔재 제거
   showDungeonMsg(stageEnterMessage(stageNum, hunt.dungeon.name));
+  if(stageNum === DUNGEON_TREASURE_STAGE) huntLog('treasureStage');
   hunt.stageEnterTimeout = setTimeout(() => {
     hunt.stageEnterTimeout = null;
     huntRunOrDefer(() => {
@@ -254,6 +278,7 @@ function beginStageCombat(){
   if(!hunt.dungeon || hunt.monsters.length === 0 || hunt.started) return;
   hunt.started = true;
   hunt.paused = false;
+  huntLog('combatStart', { stage: stageLabel(hunt.stage) });
   startHuntLoop();
   renderHunt();
 }
@@ -456,6 +481,7 @@ function decreaseEquippedWeaponDurability(equipped){
   const cur = equipped.currentDurability != null ? equipped.currentDurability : maxDurabilityForItem(equipped);
   if(cur <= 0) return;
   equipped.currentDurability = cur - 1;
+  huntLogDurability(equipped, cur, cur - 1); // 전투 로그: 내구도 경고(hunt_log.js)
   if(equipped.currentDurability === 0) refreshPlayerAttackTimer();
 }
 // 방어구/장신구/보조: 몬스터 공격이 플레이어에게 정상 적중했을 때(monsterAttackTick) 현재 착용 중인
@@ -468,6 +494,7 @@ function decreaseWornDefensiveDurability(){
     const cur = item.currentDurability != null ? item.currentDurability : maxDurabilityForItem(item);
     if(cur <= 0) return;
     item.currentDurability = cur - 1;
+    huntLogDurability(item, cur, cur - 1); // 전투 로그: 내구도 경고(hunt_log.js)
   });
 }
 // 플레이어가 몬스터를 클릭해 공격 대상을 직접 지정
@@ -532,6 +559,8 @@ function playerDied(killerInstance){
   stopHuntLoop('discard'); // 사망 시에는 남은 플라스크 회복량을 적용하지 않고 폐기(HP 변경 없음)
   hunt.paused = true;
   const monsterDef = killerInstance ? MONSTERS[killerInstance.monsterId] : null;
+  huntLog('playerDeath', { monster: { name: monsterDef ? monsterDef.name : '몬스터', color: monsterDef ? MONSTER_GRADES[monsterDef.grade].color : '' } });
+  huntLog('curseNotice', huntLogCurseParams(DEATH_CURSE_DURATION_MS));
   openDeathModal(monsterDef);
 }
 function openDeathModal(monsterDef){
@@ -713,12 +742,16 @@ function killMonsterInstance(instanceId){
   result.gold = applyRewardLevelPenalty(result.gold, state.playerLevel, level);
   state.gold += result.gold;
   hunt.pendingRewards.gold += result.gold;
+  // 전투 로그용: 이번 처치의 지급 구간에서 "가득 차 못 받은 카테고리"를 따로 모으려고 임시 그릇을 쓰고, 지급이 끝나면 기존 누적 그릇에 그대로 합쳐 되돌림(보상창 동작은 동일).
+  const hlFullPrev = hunt.pendingRewards.fullCategories;
+  hunt.pendingRewards.fullCategories = {};
+  const hlExtraFull = {}; // 장비 드랍은 가득 차도 fullCategories에 기록하지 않는 기존 동작이라 로그 전용으로만 따로 기록
 
   if(result.weaponDrop){
     if(grantRelicEquipDrop(result.weaponDrop)){
       hunt.pendingRewards.weaponDrops.push(result.weaponDrop);
-      dropVisualItems.push({ kind: 'equip', type: result.weaponDrop.type });
-    } // 해당 장비 타입의 인벤토리가 가득 차면 기존과 동일하게 드랍 자체가 무산됨(합산 목록에도 반영 안 함)
+      dropVisualItems.push({ kind: 'equip', type: result.weaponDrop.type, level: result.weaponDrop.level, relic: true }); // level/relic/qty는 전투 로그(hunt_log.js)용 — 연출은 무시함
+    } else hlExtraFull.equipment = true; // 해당 장비 타입의 인벤토리가 가득 차면 기존과 동일하게 드랍 자체가 무산됨(합산 목록에도 반영 안 함)
   }
   if(result.weaponIdDrops && result.weaponIdDrops.length){
     for(const drop of result.weaponIdDrops){
@@ -727,8 +760,8 @@ function killMonsterInstance(instanceId){
       // drop.equipType 기준으로 무기/방어구/장신구 인벤토리에 맞게 나뉘어 들어가도록 함.
       if(grantRelicEquipDrop(drop)){
         hunt.pendingRewards.weaponIdDrops.push(drop);
-        dropVisualItems.push({ kind: 'equip', type: drop.type });
-      } // 공용 장비 슬롯이 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨
+        dropVisualItems.push({ kind: 'equip', type: drop.type, level: drop.level });
+      } else hlExtraFull.equipment = true; // 공용 장비 슬롯이 가득 차면 기존 무기 드랍과 동일하게 드랍 자체가 무산됨
     }
   }
   // 마석/플라스크/아티팩트/기타/비급은 장비와 마찬가지로 "획득 시점에 해당 카테고리의 슬롯 용량"으로 지급 여부를 판단함
@@ -739,7 +772,7 @@ function killMonsterInstance(instanceId){
     const item = MISC_ITEMS[result.stoneDrop.itemId];
     if(grantMiscStack(item, result.stoneDrop.qty)){
       hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] = (hunt.pendingRewards.stoneDrops[result.stoneDrop.itemId] || 0) + result.stoneDrop.qty;
-      dropVisualItems.push({ kind: 'item', itemId: result.stoneDrop.itemId });
+      dropVisualItems.push({ kind: 'item', itemId: result.stoneDrop.itemId, qty: result.stoneDrop.qty });
     } else hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true;
   }
   if(result.catalystDrop){
@@ -749,7 +782,7 @@ function killMonsterInstance(instanceId){
       const r = hunt.pendingRewards.miscDrops;
       if(!r[item.id]) r[item.id] = { icon: item.icon, name: item.name, qty: 0 };
       r[item.id].qty += result.catalystDrop.qty;
-      dropVisualItems.push({ kind: 'item', itemId: item.id });
+      dropVisualItems.push({ kind: 'item', itemId: item.id, qty: result.catalystDrop.qty });
     } else hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true;
   }
   if(result.flaskDrop){
@@ -757,7 +790,7 @@ function killMonsterInstance(instanceId){
     // 사용함 — 상점 구매/사용(actions.js) 등 기존 플라스크 지급 로직과 완전히 동일한 방식으로 지급.
     if(grantConsumableStack(result.flaskDrop.itemId, result.flaskDrop.qty)){
       hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] = (hunt.pendingRewards.flaskDrops[result.flaskDrop.itemId] || 0) + result.flaskDrop.qty;
-      dropVisualItems.push({ kind: 'consumable', itemId: result.flaskDrop.itemId });
+      dropVisualItems.push({ kind: 'consumable', itemId: result.flaskDrop.itemId, qty: result.flaskDrop.qty });
     } else hunt.pendingRewards.fullCategories.consumable = true;
   }
   if(result.artifactDropIds && result.artifactDropIds.length){
@@ -774,7 +807,7 @@ function killMonsterInstance(instanceId){
       if(!grantMiscStack(item, drop.qty)){ hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true; continue; }
       if(!hunt.pendingRewards.miscDrops[drop.itemId]) hunt.pendingRewards.miscDrops[drop.itemId] = { icon: drop.icon, name: drop.name, qty: 0 };
       hunt.pendingRewards.miscDrops[drop.itemId].qty += drop.qty;
-      dropVisualItems.push({ kind: 'item', itemId: drop.itemId });
+      dropVisualItems.push({ kind: 'item', itemId: drop.itemId, qty: drop.qty });
     }
   }
   if(result.scrollDrop){
@@ -782,7 +815,7 @@ function killMonsterInstance(instanceId){
     if(grantConsumableStack(result.scrollDrop.itemId, 1)){
       hunt.pendingRewards.scrollDrops[result.scrollDrop.itemId] = (hunt.pendingRewards.scrollDrops[result.scrollDrop.itemId] || 0) + 1;
       hunt.scrollGrantedThisBattle = true; // 이번 전투에서는 더 이상 비급을 지급하지 않음(요구사항 9번)
-      dropVisualItems.push({ kind: 'consumable', itemId: result.scrollDrop.itemId });
+      dropVisualItems.push({ kind: 'consumable', itemId: result.scrollDrop.itemId, qty: 1 });
     } else hunt.pendingRewards.fullCategories.consumable = true;
   }
   if(result.boxDropIds && result.boxDropIds.length){
@@ -791,17 +824,23 @@ function killMonsterInstance(instanceId){
     for(const boxId of result.boxDropIds){
       if(grantConsumableStack(boxId, 1)){
         hunt.pendingRewards.boxDrops[boxId] = (hunt.pendingRewards.boxDrops[boxId] || 0) + 1;
-        dropVisualItems.push({ kind: 'consumable', itemId: boxId });
+        dropVisualItems.push({ kind: 'consumable', itemId: boxId, qty: 1 });
       } else hunt.pendingRewards.fullCategories.consumable = true;
     }
   }
   // 실제 지급이 전부 끝난 뒤, 그 결과를 그대로 보여주기만 하는 연출 호출(연출 성패는 위 지급 로직과 완전히 무관함).
+  const hlFullNow = hunt.pendingRewards.fullCategories;
+  Object.keys(hlFullNow).forEach(c => { hlFullPrev[c] = true; });
+  hunt.pendingRewards.fullCategories = hlFullPrev;
+  const hlFulls = Object.assign({}, hlFullNow, hlExtraFull);
   playMonsterDropEffect(instanceId, dropVisualItems);
 
   let expGained = monsterExpFor(monsterDef, level); // 레벨별 기본 경험치 × 등급 배율 → 아래 사망 저주 → 레벨 차이 보정 순서(기존 보정 순서 유지)
   if(curseActive) expGained = Math.round(expGained * DEATH_CURSE_MULTIPLIER);
   expGained = applyRewardLevelPenalty(expGained, state.playerLevel, level); // 최종 경험치가 정해진 뒤 마지막 단계(골드와 같은 보정, gainExp 호출 전의 플레이어 레벨 기준)
+  const expReqBefore = state.playerLevel < PLAYER_MAX_LEVEL ? requiredExp(state.playerLevel) : 0; // 경험치 % 표시용(레벨업 전 기준)
   const levelsGained = gainExp(expGained);
+  huntLogKillRewards({ gold: result.gold, exp: expGained, expPct: expReqBefore > 0 ? expGained / expReqBefore * 100 : null, drops: dropVisualItems, fulls: hlFulls, levelsGained, newLevel: state.playerLevel }); // 전투 로그(hunt_log.js)
   hunt.pendingRewards.expGained += expGained;
   hunt.pendingRewards.levelsGained += levelsGained;
   hunt.pendingRewards.newPlayerLevel = state.playerLevel;
@@ -816,6 +855,7 @@ function killMonsterInstance(instanceId){
   if(hunt.monsters.length === 0){
     // 그룹 전멸 = 이번 전투의 종료 시점. 보상 창에 머무는 동안 회복 틱이 계속 반복되던 버그 수정:
     // 진행 중인 플라스크 회복이 있으면 남은 회복량을 즉시 전부 적용한 뒤 확실히 종료함.
+    huntLog('combatEnd', { stage: stageLabel(hunt.stage) });
     hunt.paused = true;
     stopFlaskHealTimers();
     // 스테이지 클리어: 보상창을 띄우지 않고, 마지막으로 죽은 몬스터의 사망 애니메이션이 끝난 뒤 준비 시간
@@ -1044,6 +1084,7 @@ function grantTreasureRewards(){
   return { gold, weaponDrop, stoneDrop, catalystDrop, miscDrop, scrollDrop, fullCategories };
 }
 function openTreasureResultModal(result){
+  huntLogTreasureResult(result); // 전투 로그: 상자 개봉 + 골드/아이템/가득참
   // 11스테이지 보상(gold/weaponDrop/stoneDrop/miscDrop/scrollDrop)을 던전 누적 보상(hunt.pendingRewards)에 합산한 뒤,
   // 1~11스테이지 전체 누적 보상을 최종 보상창으로 표시함. 합산은 이미 끝난 grantTreasureRewards()의 결과를 표시용 데이터에
   // 옮겨 담는 것뿐이며 실제 지급 로직이나 state는 전혀 건드리지 않음. (11스테이지는 경험치 보상이 없어 expGained는 그대로)
