@@ -25,6 +25,7 @@ function viewLeaveCleanup(view){
 // 화면에 들어갈 때 하는 초기화(데이터 기준으로 목록/임시값을 새로 세팅). showView(전체 화면 이동)와 메뉴 팝업 열기(menu_popup.js)가 함께 씀.
 function viewEnterInit(view){
   if(view === 'collection') codexOpen(); // 도감: 진입할 때마다 현재 장비 데이터로 목록을 새로 구성
+  if(view === 'achievements') achvOpen(); // 업적: 진입할 때마다 첫 분류 탭에서 현재 기록으로 새로 구성
   if(view === 'character'){
     // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
     // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
@@ -107,18 +108,20 @@ function showView(name){
   el('inventoryView').style.display = name === 'inventory' ? 'block' : 'none';
   el('craftView').style.display = name === 'craft' ? 'block' : 'none';
   el('collectionView').style.display = name === 'collection' ? 'block' : 'none';
+  el('achievementsView').style.display = name === 'achievements' ? 'block' : 'none';
   el('dungeonListView').style.display = name === 'dungeonlist' ? 'block' : 'none';
   el('characterView').style.display = name === 'character' ? 'block' : 'none';
   el('huntView').style.display = name === 'hunt' ? 'block' : 'none';
   el('exitHuntBtn').style.display = name === 'hunt' ? '' : 'none'; // 전투 화면의 나가기 버튼은 상단 메뉴 영역(메뉴 버튼과 같은 줄, 왼쪽)에 있음
   el('backFromDlistBtn').style.display = name === 'dungeonlist' ? '' : 'none'; // 던전 입구의 대장간 돌아가기 버튼도 상단 메뉴 영역에 있음
   // 상점/인벤토리/제작소/캐릭터 화면의 [대장간으로 돌아가기] 버튼도 상단 메뉴 영역에 있고, 해당 화면에서만 표시함
-  [['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character'],['backFromCollectionBtn','collection']]
+  [['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character'],['backFromCollectionBtn','collection'],['backFromAchievementsBtn','achievements']]
     .forEach(([id, view]) => { el(id).style.display = name === view ? '' : 'none'; });
   currentView = name;
   if(name !== 'dungeonlist') dungeonDropScroll = {}; // 던전 입구를 벗어나면 카드별 "획득 가능 아이템" 가로 스크롤 위치 초기화
   if(name === 'dungeonlist') renderDungeonList();
   if(name === 'collection') viewEnterInit('collection');
+  if(name === 'achievements') viewEnterInit('achievements');
   if(name === 'hunt') renderHunt();
   alignHuntHeader();
   if(name === 'craft') craftMenuOpen(); // 제작소 메뉴(craft_menu.js)
@@ -186,6 +189,7 @@ function openDungeonList(){ if(isEnhancing) return; guardedNav('dungeonlist'); }
 function openCharacterMenu(){ if(isEnhancing) return; guardedNav('character'); }
 function openCraft(){ if(isEnhancing) return; guardedNav('craft'); }
 function openCollection(){ if(isEnhancing) return; guardedNav('collection'); }
+function openAchievements(){ if(isEnhancing) return; guardedNav('achievements'); }
 function closeToForge(){ showView('forge'); }
 
 // ---- 인벤토리 탭 ----
@@ -631,6 +635,7 @@ function clickCraftAnimIcon(){
     craftAnim.resultReturnDamaged = false;
   }
   craftGrantResultItems(item); // 기존 인벤토리 지급 로직 재사용, craftAnim.resultSuccess/resultReturn을 그대로 적용
+  if(craftAnim.resultSuccess) achvCount('craftEquip'); // 업적: 장비 제작 성공(비장비는 craft_multi.js)
   craftPityRecordResult(item, craftAnim.resultSuccess); // 결과가 확정·지급되는 이 시점에 천장 누적 반영(실패 +1 / 성공 시 초기화, 아래 saveState로 함께 저장)
   craftAnim.phase = 'revealed';
   // 버그 수정: 제작 성공(또는 실패 반환) 아이템이 인벤토리에 지급된 뒤에도 저장이 안 되고 있었음
@@ -1077,6 +1082,7 @@ function confirmTraceRestore(){
   if(state.gold < cost) return;
 
   state.gold -= cost;
+  achvCount('traceRestore'); // 업적: 흔적 복구
   const idx = state.traceInventory.findIndex(t => t.id === trace.id);
   if(idx !== -1) state.traceInventory.splice(idx, 1);
 

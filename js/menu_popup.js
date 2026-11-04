@@ -46,6 +46,9 @@ const MENU_POPUP_HOOKS = {
   collection: {
     enter(){ viewEnterInit('collection'); },
   },
+  achievements: {
+    enter(){ viewEnterInit('achievements'); }, // 업적(achievements.js): 열 때마다 첫 분류 탭에서 새로 구성
+  },
   // 전투 로그(hunt_log.js): 기존 화면 상자가 아니라 전용 상자 #logView를 같은 방식으로 띄움. 열 때마다 보관된 줄을 다시 그리고 맨 아래로 이동.
   log: {
     enter(){ if(typeof huntLogRenderAll === 'function') huntLogRenderAll(); },

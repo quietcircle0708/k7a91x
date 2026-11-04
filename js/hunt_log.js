@@ -212,12 +212,7 @@ function huntLogKillRewards(info){
 function huntLogTreasureResult(result){
   huntLog('treasureOpen');
   if(result.gold > 0) huntLog('gold', { gold: result.gold });
-  const drops = [];
-  if(result.weaponDrop) drops.push({ kind: 'equip', type: result.weaponDrop.type, level: result.weaponDrop.level, relic: true });
-  if(result.stoneDrop) drops.push({ kind: 'item', itemId: result.stoneDrop.itemId, qty: result.stoneDrop.qty });
-  if(result.catalystDrop) drops.push({ kind: 'item', itemId: result.catalystDrop.itemId, qty: result.catalystDrop.qty });
-  if(result.miscDrop) drops.push({ kind: 'item', itemId: result.miscDrop.itemId, qty: result.miscDrop.qty });
-  if(result.scrollDrop) drops.push({ kind: 'consumable', itemId: result.scrollDrop.itemId, qty: 1 });
+  const drops = treasureResultDrops(result); // dungeon.js — 업적(achievements.js)과 같은 목록을 씀
   huntLogDropItems(drops);
   huntLogFullCategories(result.fullCategories);
 }

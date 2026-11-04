@@ -782,7 +782,7 @@ function killMonsterInstance(instanceId){
       const r = hunt.pendingRewards.miscDrops;
       if(!r[item.id]) r[item.id] = { icon: item.icon, name: item.name, qty: 0 };
       r[item.id].qty += result.catalystDrop.qty;
-      dropVisualItems.push({ kind: 'item', itemId: item.id, qty: result.catalystDrop.qty });
+      dropVisualItems.push({ kind: 'item', itemId: item.id, qty: result.catalystDrop.qty, catalyst: true });
     } else hunt.pendingRewards.fullCategories[miscItemCategory(item)] = true;
   }
   if(result.flaskDrop){
@@ -815,7 +815,7 @@ function killMonsterInstance(instanceId){
     if(grantConsumableStack(result.scrollDrop.itemId, 1)){
       hunt.pendingRewards.scrollDrops[result.scrollDrop.itemId] = (hunt.pendingRewards.scrollDrops[result.scrollDrop.itemId] || 0) + 1;
       hunt.scrollGrantedThisBattle = true; // 이번 전투에서는 더 이상 비급을 지급하지 않음(요구사항 9번)
-      dropVisualItems.push({ kind: 'consumable', itemId: result.scrollDrop.itemId, qty: 1 });
+      dropVisualItems.push({ kind: 'consumable', itemId: result.scrollDrop.itemId, qty: 1, scroll: true });
     } else hunt.pendingRewards.fullCategories.consumable = true;
   }
   if(result.boxDropIds && result.boxDropIds.length){
@@ -847,6 +847,8 @@ function killMonsterInstance(instanceId){
   hunt.pendingRewards.killedMonsters.push({ name: monsterDef.name, icon: monsterDef.icon, image: monsterDef.image, color: MONSTER_GRADES[monsterDef.grade].color });
 
   state.totalKills = (state.totalKills || 0) + 1;
+  achvCount('kill:' + monsterDef.grade); // 업적: 등급별 처치(일반/에픽/유니크)
+  achvCountDrops(dropVisualItems); // 업적: 획득한 장비 등급·유해·촉매·비급
   render();
   saveState();
   refreshLiveRewardModal(); // 보상창을 열어둔 채 전투가 진행 중이면 방금 반영된 누적 보상을 즉시 갱신
@@ -1083,7 +1085,18 @@ function grantTreasureRewards(){
   saveState();
   return { gold, weaponDrop, stoneDrop, catalystDrop, miscDrop, scrollDrop, fullCategories };
 }
+// 11스테이지 보물 상자 결과에서 "지급이 확정된 획득 항목" 목록을 만듦(전투 로그·업적 공용). 형식은 몬스터 처치의 dropVisualItems와 같음.
+function treasureResultDrops(result){
+  const drops = [];
+  if(result.weaponDrop) drops.push({ kind: 'equip', type: result.weaponDrop.type, level: result.weaponDrop.level, relic: true });
+  if(result.stoneDrop) drops.push({ kind: 'item', itemId: result.stoneDrop.itemId, qty: result.stoneDrop.qty });
+  if(result.catalystDrop) drops.push({ kind: 'item', itemId: result.catalystDrop.itemId, qty: result.catalystDrop.qty, catalyst: true });
+  if(result.miscDrop) drops.push({ kind: 'item', itemId: result.miscDrop.itemId, qty: result.miscDrop.qty });
+  if(result.scrollDrop) drops.push({ kind: 'consumable', itemId: result.scrollDrop.itemId, qty: 1, scroll: true });
+  return drops;
+}
 function openTreasureResultModal(result){
+  achvCountDrops(treasureResultDrops(result)); // 업적
   huntLogTreasureResult(result); // 전투 로그: 상자 개봉 + 골드/아이템/가득참
   // 11스테이지 보상(gold/weaponDrop/stoneDrop/miscDrop/scrollDrop)을 던전 누적 보상(hunt.pendingRewards)에 합산한 뒤,
   // 1~11스테이지 전체 누적 보상을 최종 보상창으로 표시함. 합산은 이미 끝난 grantTreasureRewards()의 결과를 표시용 데이터에

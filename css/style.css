@@ -195,12 +195,6 @@
 
 
 
-  .ledger{ margin-top: 18px; background: var(--forge-panel); border:1px solid var(--forge-line); border-radius: 14px; padding: 16px 18px; }
-  .ledger-title{ font-size:12px; letter-spacing:2px; text-transform:uppercase; color: var(--forge-cream-dim); margin-bottom:12px; }
-  .ledger-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
-  .ledger-item{ display:flex; justify-content:space-between; font-size:13px; border-bottom:1px dashed var(--forge-line); padding-bottom:6px; }
-  .ledger-item .k{ color: var(--forge-cream-dim); }
-  .ledger-item .v{ font-family:'JetBrains Mono', monospace; font-weight:700; color: var(--forge-cream); }
 
   .reset-link{ display:block; text-align:center; margin-top:16px; font-size:12px; color: var(--forge-cream-dim); text-decoration:underline; cursor:pointer; opacity:.6; }
   .reset-link:hover{ opacity:1; }
@@ -1981,7 +1975,6 @@ body.mobile-preset .shop-row-tag{ font-size:10px; }
 #forgeEnhNew{ display:none; }
 body.forge-enh-new #forgeEnhNew{ display:block; }
 /* 새 강화 화면에서는 대장간 기록부를 표시하지 않음(기록 수집/저장은 그대로). 수리 탭에서는 기존처럼 보임 */
-body.forge-enh-new.forge-tab-enhance #forgeView .ledger{ display:none; }
 
 .fe-wrap{ text-align:center; }
 /* 삼각 배치: 기도(왼쪽/오른쪽, 44px) — 위 꼭짓점 2개, 강화 장비(중앙, 52px), 촉매(아래 꼭짓점, 44px). 선은 SVG로 슬롯 뒤에 그림.
@@ -2273,7 +2266,7 @@ body.notify-off .has-notify::after{ display:none; }
 #logView.menu-popup .hunt-log-wrap{ background:none; border:0; padding:0; }
 /* 모바일: 던전 카드 아래 인라인 상자(마지막 몇 줄이 보이고 위로 스크롤하면 이전 줄) */
 .hunt-log-inline{ margin:8px auto 0; width:100%; max-width:420px; box-sizing:border-box; background:rgba(30,24,21,.78); border:1px solid var(--forge-line); padding:6px 8px; }
-.hunt-log-inline-head{ font-size:12px; color:var(--forge-gold); margin-bottom:4px; }
+.hunt-log-inline-head{ font-size:12px; color:var(--forge-gold); margin:-6px -8px 4px; padding:4px 8px; background:rgba(0,0,0,.4); border-bottom:1px solid #5a4c3c; } /* 이름표(어두운 배경) + 구분선 */
 .hunt-log-inline .hunt-log-list{ height:84px; }
 body.desktop-preset .hunt-log-inline{ display:none !important; }
 
@@ -2283,3 +2276,42 @@ body.mobile-preset #spawnToast{
   box-sizing:border-box; overflow:hidden; text-overflow:ellipsis; transform:translate(0,-6px);
 }
 body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
+
+/* 전투 로그 이름표(드래그 영역)와 로그 본문 구분: 이름표 배경을 어둡게 하고 아래에 구분선을 둠(데스크탑 팝업). 색은 여기서 조정 */
+#logView.menu-popup .menu-popup-head{ margin:0 0 4px; padding:4px 22px; background:rgba(0,0,0,.4); border-bottom:1px solid #5a4c3c; }
+
+/* ============================================================
+   업적 (achievements.js) — 행 구성: 제목+단계 / (목표) / [진행 바][보상 아이콘][수령]. 색은 이 블록에서만 바꿈
+   ============================================================ */
+.achv-wrap{ background:none; border:0; border-radius:0; padding:0; }
+.achv-panel{ padding:6px 10px 8px; }
+.achv-list{ max-height:min(62vh, 540px); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#4a4036 transparent; text-align:left; }
+.achv-list::-webkit-scrollbar{ width:6px; }
+.achv-list::-webkit-scrollbar-thumb{ background:#4a4036; border-radius:3px; }
+.achv-row{ padding:9px 4px 10px; border-bottom:1px solid var(--forge-line); }
+.achv-row:last-child{ border-bottom:0; }
+.achv-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.achv-title{ font-size:14px; font-weight:800; color:var(--forge-cream); }
+.achv-tier{ font-size:12px; color:var(--forge-cream-dim); white-space:nowrap; }
+.achv-ready-tag{ color:var(--forge-green); font-weight:800; margin-right:6px; }
+.achv-goal{ font-size:12px; color:var(--forge-cream-dim); margin:2px 0 7px; }
+.achv-foot{ display:flex; align-items:center; gap:8px; }
+.achv-bar{ position:relative; flex:1 1 auto; min-width:0; height:20px; background:#17120f; border:1px solid var(--forge-line); border-radius:4px; overflow:hidden; }
+.achv-bar-fill{ position:absolute; left:0; top:0; bottom:0; background:#8f7432; }
+.achv-bar-text{ position:relative; display:block; text-align:center; font-size:11px; line-height:18px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.8); }
+.achv-row.is-ready .achv-bar-fill{ background:#3f9a62; }
+.achv-row.is-ready{ background:rgba(95,214,138,.06); }
+.achv-row.is-done .achv-bar-fill{ background:#4a4036; }
+.achv-row.is-done .achv-title{ color:var(--forge-cream-dim); }
+.achv-reward{ flex:0 0 auto; display:flex; align-items:center; gap:3px; min-width:40px; justify-content:center; padding:2px 6px; background:#17120f; border:1px solid var(--forge-line); border-radius:4px; font-size:12px; font-weight:700; color:var(--forge-cream-dim); }
+.achv-reward-img{ width:18px; height:18px; image-rendering:pixelated; }
+.achv-claim{
+  flex:0 0 auto; display:flex; align-items:center; gap:4px; padding:3px 9px; font-family:inherit; font-size:12px; font-weight:800;
+  background:#2a231f; border:1px solid var(--forge-line); border-radius:6px; color:var(--forge-cream); cursor:pointer;
+}
+.achv-claim:disabled{ opacity:.45; cursor:not-allowed; }
+.achv-claim-img{ width:18px; height:18px; image-rendering:pixelated; }
+.achv-empty{ padding:24px 0; text-align:center; color:var(--forge-cream-dim); font-size:13px; }
+/* 던전 위 메뉴 팝업으로 열릴 때 */
+#achievementsView.menu-popup{ --menu-popup-width:420px; }
+#achievementsView.menu-popup .achv-list{ max-height:min(60vh, 440px); }

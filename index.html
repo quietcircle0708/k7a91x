@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=400">
+<link rel="stylesheet" href="css/style.css?v=403">
 </head>
 <body>
 <div class="wrap">
@@ -21,6 +21,7 @@
     <button class="back-btn back-from-craft" id="backFromCraftBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn back-from-character" id="backFromCharacterBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn back-from-collection" id="backFromCollectionBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn back-from-achievements" id="backFromAchievementsBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn back-from-dlist" id="backFromDlistBtn" style="display:none;">← 대장간으로 돌아가기</button>
     <button class="back-btn" id="exitHuntBtn" style="display:none;">← 던전 나가기</button>
     <button class="topmenu-btn" id="openPatchNoteBtn" title="공지사항"><img src="assets/ui/patchnote_icon.png" class="patchnote-icon-img" alt="공지사항" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'patchnote-icon-fallback',textContent:'📣'}))"></button>
@@ -34,6 +35,7 @@
       <button class="menu-grid-item" id="openForgeMenuBtn"><img src="assets/ui/icon_menu_forge.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">대장간</span></button>
       <button class="menu-grid-item" id="openCraftBtn"><img src="assets/ui/icon_menu_workshop.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">제작소</span></button>
       <button class="menu-grid-item" id="openCollectionBtn" data-popup="collection"><img src="assets/ui/icon_menu_collection.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">도감</span></button>
+      <button class="menu-grid-item" id="openAchievementsBtn" data-popup="achievements"><img src="assets/ui/icon_menu_achievements.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">업적</span></button>
       <!-- 설정은 항상 마지막(CSS order:999) — 이후 메뉴가 추가돼도 맨 끝에 유지됨 -->
       <button class="menu-grid-item menu-grid-item-last" id="openSettingsBtn"><img src="assets/ui/icon_menu_settings.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">설정</span></button>
       </div>
@@ -105,19 +107,6 @@
         </div>
         <div class="repair-hint">*슬롯을 클릭하여 개별 장비 수리*</div>
         <div id="repairEquipPanel"></div>
-      </div>
-    </div>
-
-    <div class="ledger">
-      <div class="ledger-title">대장간 기록부</div>
-      <div class="ledger-grid">
-        <div class="ledger-item"><span class="k">최고 기록</span><span class="v" id="bestLevel">+0</span></div>
-        <div class="ledger-item"><span class="k">전설 달성</span><span class="v" id="legendCount">0회</span></div>
-        <div class="ledger-item"><span class="k">총 시도</span><span class="v" id="totalAttempts">0회</span></div>
-        <div class="ledger-item"><span class="k">파괴 횟수</span><span class="v" id="totalDestroys">0회</span></div>
-        <div class="ledger-item"><span class="k">몬스터 처치</span><span class="v" id="totalKills">0마리</span></div>
-        <div class="ledger-item"><span class="k">누적 판매액</span><span class="v" id="totalSold">0 G</span></div>
-        <div class="ledger-item"><span class="k">보유 골드</span><span class="v" id="goldLedger">0 G</span></div>
       </div>
     </div>
 
@@ -332,6 +321,17 @@
             <button class="craft-make-btn" id="craftMakeBtn" disabled><span class="craft-make-label">제작</span><span class="craft-make-cost" id="craftMakeCost"></span></button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 업적(achievements.js): 일반 화면 + 던전 화면(데스크탑)에서는 메뉴 팝업(menu_popup.js 'achievements')으로도 열림. 업적 목록은 표(ACHIEVEMENT_DEFS)에서 자동 생성 -->
+  <div id="achievementsView" style="display:none;">
+    <div class="achv-wrap">
+      <div class="shop-title">업적</div>
+      <div class="inv-box-tabs achv-tabs" id="achvTabs"></div>
+      <div class="inv-box-panel achv-panel">
+        <div class="achv-list" id="achvList"></div>
       </div>
     </div>
   </div>
@@ -1117,27 +1117,28 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=400"></script>
-<script src="js/formulas.js?v=400"></script>
-<script src="js/catalyst.js?v=400"></script>
-<script src="js/state.js?v=400"></script>
-<script src="js/effects.js?v=400"></script>
-<script src="js/render.js?v=400"></script>
-<script src="js/actions.js?v=400"></script>
-<script src="js/dungeon.js?v=400"></script>
-<script src="js/navigation.js?v=400"></script>
-<script src="js/inventory_box.js?v=400"></script>
-<script src="js/notify.js?v=400"></script>
-<script src="js/codex.js?v=400"></script>
-<script src="js/codex_monster.js?v=400"></script>
-<script src="js/craft_menu.js?v=400"></script>
-<script src="js/craft_multi.js?v=400"></script>
-<script src="js/shop_menu.js?v=400"></script>
-<script src="js/box_menu.js?v=400"></script>
-<script src="js/forge_menu.js?v=400"></script>
-<script src="js/menu_popup.js?v=400"></script>
-<script src="js/hunt_log.js?v=400"></script>
-<script src="js/hotkeys.js?v=400"></script>
-<script src="js/main.js?v=400"></script>
+<script src="js/data.js?v=403"></script>
+<script src="js/formulas.js?v=403"></script>
+<script src="js/catalyst.js?v=403"></script>
+<script src="js/state.js?v=403"></script>
+<script src="js/effects.js?v=403"></script>
+<script src="js/render.js?v=403"></script>
+<script src="js/actions.js?v=403"></script>
+<script src="js/dungeon.js?v=403"></script>
+<script src="js/navigation.js?v=403"></script>
+<script src="js/inventory_box.js?v=403"></script>
+<script src="js/notify.js?v=403"></script>
+<script src="js/codex.js?v=403"></script>
+<script src="js/codex_monster.js?v=403"></script>
+<script src="js/craft_menu.js?v=403"></script>
+<script src="js/craft_multi.js?v=403"></script>
+<script src="js/shop_menu.js?v=403"></script>
+<script src="js/box_menu.js?v=403"></script>
+<script src="js/forge_menu.js?v=403"></script>
+<script src="js/menu_popup.js?v=403"></script>
+<script src="js/hunt_log.js?v=403"></script>
+<script src="js/achievements.js?v=403"></script>
+<script src="js/hotkeys.js?v=403"></script>
+<script src="js/main.js?v=403"></script>
 </body>
 </html>

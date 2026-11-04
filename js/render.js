@@ -18,7 +18,6 @@ function render(){
   // 들어가도 huntSkillQuickSlotRow가 처음부터 채워지도록 render()에서 항상 갱신함.
   renderSkillQuickSlots();
   el('goldText').textContent = state.gold.toLocaleString();
-  el('goldLedger').textContent = state.gold.toLocaleString() + ' G';
 
   // 기도(보호/집중)가 사용 불가 조건이 되면 자동으로 해제 — 강화 탭(forge_menu.js)은 이 정리를 하지 않고 state만 읽어 표시하므로 여기서 유지함.
   // (선택된 장비가 없을 때는 기존과 동일하게 아무 것도 바꾸지 않음)
@@ -29,12 +28,6 @@ function render(){
     if(!prayerCanUseFocus(type, level) && state.focusActive) state.focusActive = false;
   }
 
-  el('bestLevel').textContent = '+' + state.bestLevel;
-  el('legendCount').textContent = state.legendCount + '회';
-  el('totalAttempts').textContent = state.totalAttempts + '회';
-  el('totalDestroys').textContent = state.totalDestroys + '회';
-  el('totalKills').textContent = (state.totalKills||0) + '마리';
-  el('totalSold').textContent = state.totalSold.toLocaleString() + ' G';
 
 
   // 상점 화면 갱신(shop_menu.js — 상점 화면이 열려 있을 때만 내용이 바뀐 부분만 다시 그림)
@@ -62,6 +55,7 @@ function render(){
     el('openCharacterBtn').disabled = true;
     el('openCraftBtn').disabled = true;
     el('openCollectionBtn').disabled = true;
+    el('openAchievementsBtn').disabled = true;
   } else {
     el('openShopBtn').disabled = false;
     el('openInventoryBtn').disabled = false;
@@ -69,10 +63,12 @@ function render(){
     el('openCharacterBtn').disabled = false;
     el('openCraftBtn').disabled = false;
     el('openCollectionBtn').disabled = false;
+    el('openAchievementsBtn').disabled = false;
   }
 
   // 새 강화 탭 UI(forge_menu.js) 갱신 — 기존 강화 화면 계산이 끝난 뒤 같은 state로 그림(강화 화면일 때만 동작)
   if(typeof forgeEnhNewRefresh === 'function') forgeEnhNewRefresh();
+  if(typeof achvRefresh === 'function') achvRefresh(); // 업적 화면/팝업이 열려 있으면 바뀐 기록만 반영(achievements.js)
 }
 
 // ---- 대장간 "강화 장비 선택" 팝업 ----
@@ -388,7 +384,6 @@ function renderForgeTabs(){
   });
   el('forgeTabEnhance').style.display = forgeUI.tab === 'enhance' ? '' : 'none';
   el('forgeTabRepair').style.display = forgeUI.tab === 'repair' ? '' : 'none';
-  document.body.classList.toggle('forge-tab-enhance', forgeUI.tab === 'enhance'); // 새 강화 UI에서만 기록부를 숨기기 위한 표시(수리 탭에서는 기록부가 그대로 보임)
   if(forgeUI.tab === 'repair') renderRepairTab();
 }
 

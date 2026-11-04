@@ -65,6 +65,7 @@ function performSellQty(){
   if(action === 'sell-consumable') state.consumables[typeId] = owned - qty;
   else state[item.stateKey] = owned - qty;
   state.gold += total;
+  achvCount('shopSold', total); // 업적: 상점 판매 수익(종류 무관 누적)
   const anchor = document.querySelector(`#shopList .shop-row[data-action="${action}"][data-type="${typeId}"]`);
   closeBuyQtyModal(); // 판매 수량창 상태 정리(확인창은 confirmSell이 이미 닫음)
   purchaseEffect(anchor);
@@ -90,6 +91,7 @@ function startEnhance(){
 
   isEnhancing = true;
   state.gold -= breakdown.total;
+  achvCount('enhanceGold', breakdown.total); // 업적: 강화에 사용한 골드
   catalystConsume(catalystUsed); // 재료(골드)가 소모되는 시점에 적용된 촉매도 함께 소모
   forgeEnhOddsLock = attemptOdds ? attemptOdds.slice() : null;
   state.totalAttempts++;
@@ -136,6 +138,7 @@ function resolveEnhance(itemId, level, opts){
   // 계속 만족하는 한 render()가 알아서 ON 상태를 유지시키고, 조건이 깨지는 순간에만 자동으로 꺼짐.
 
   if(outcome === 'success'){
+    achvCount('enhanceSuccess'); // 업적
     item.level++;
     if(item.level > state.bestLevel) state.bestLevel = item.level;
     if(item.level >= MAX_LEVEL){
@@ -148,6 +151,7 @@ function resolveEnhance(itemId, level, opts){
       showMsg('강화 성공! +' + item.level, 'success');
     }
   } else if(outcome === 'stay'){
+    achvCount('enhanceFail'); // 업적(파괴는 기존 totalDestroys)
     showMsg('실패... 레벨 유지', 'stay');
   } else if(outcome === 'destroy'){
     state.totalDestroys++;
@@ -260,6 +264,7 @@ function performSellItem(id){
   const type = item.type || 'longsword';
   const value = durabilityAdjustedSellValue(sellValueFor(type, item.level), item);
   state.gold += value;
+  achvCount('shopSold', value); // 업적: 상점 판매 수익(종류 무관 누적)
   state.totalSold += value;
   showMsg(`${weaponName(type)}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.inventory.splice(idx, 1);
@@ -441,6 +446,7 @@ function buyArtifact(id, btn, silent){
   if(!a || a.buyPrice == null) return false;
   if(ownsArtifact(id) || state.gold < a.buyPrice || inventoryCategoryFull('artifact')) return false; // 아티팩트 인벤토리 가득 참 포함
   state.gold -= a.buyPrice;
+  achvCount('shopBought', a.buyPrice); // 업적: 상점 구매 금액
   state.artifacts.push(id);
   // 빈 장착 슬롯이 있을 때만 자동 장착(기존 장착 중인 아티팩트를 교체하지 않음).
   if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX && !artifactEquipBlocker(id)){ // 같은 효과 그룹의 아티팩트가 이미 장착 중이면 자동 장착하지 않음
@@ -483,6 +489,7 @@ function buyWeapon(typeId, btn, silent){
     const price = weaponBuyPrice(typeId);
     if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
+    achvCount('shopBought', price); // 업적: 상점 구매 금액
     const newItem = { id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) };
     state.inventory.push(newItem);
     // 구매한 무기는 인벤토리에만 추가되며, 강화 화면에는 대장간 버튼/인벤토리에서 플레이어가
@@ -499,6 +506,7 @@ function buyWeapon(typeId, btn, silent){
     if(!state.armorInventory) state.armorInventory = [];
     if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
+    achvCount('shopBought', price); // 업적: 상점 구매 금액
     state.armorInventory.push({ id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) });
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
@@ -512,6 +520,7 @@ function buyWeapon(typeId, btn, silent){
     if(!state.subInventory) state.subInventory = [];
     if(state.gold < price || equipInventoryFull()) return false;
     state.gold -= price;
+    achvCount('shopBought', price); // 업적: 상점 구매 금액
     state.subInventory.push({ id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) });
     if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
     return true;
@@ -522,6 +531,7 @@ function buyWeapon(typeId, btn, silent){
   if(!state.accessoryInventory) state.accessoryInventory = [];
   if(state.gold < accPrice || equipInventoryFull()) return false;
   state.gold -= accPrice;
+  achvCount('shopBought', accPrice); // 업적: 상점 구매 금액
   state.accessoryInventory.push({ id: state.nextItemId++, level: 0, type: typeId, currentDurability: freshCurrentDurability(typeId) });
   if(!silent){ purchaseEffect(btn || null); render(); saveState(); }
   return true;
@@ -545,6 +555,7 @@ function performSellAccessoryItem(id){
   const def = ACCESSORY_TYPES[item.type];
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   state.gold += value;
+  achvCount('shopSold', value); // 업적: 상점 판매 수익(종류 무관 누적)
   state.totalSold += value;
   showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.accessoryInventory.splice(idx, 1);
@@ -615,6 +626,7 @@ function performSellArmorItem(id){
   const def = ARMOR_TYPES[item.type];
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   state.gold += value;
+  achvCount('shopSold', value); // 업적: 상점 판매 수익(종류 무관 누적)
   state.totalSold += value;
   showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.armorInventory.splice(idx, 1);
@@ -670,6 +682,7 @@ function performSellSubItem(id){
   const def = SUB_TYPES[item.type];
   const value = durabilityAdjustedSellValue(sellValueFor(item.type, item.level), item);
   state.gold += value;
+  achvCount('shopSold', value); // 업적: 상점 판매 수익(종류 무관 누적)
   state.totalSold += value;
   showMsg(`${def.name}${levelSuffix(item.level)}를 ` + value.toLocaleString() + ' G에 판매했습니다', 'success');
   state.subInventory.splice(idx, 1);
@@ -709,6 +722,7 @@ function buyFlask(id, btn, silent){
   // 이미 보유 중인 종류면 기존 슬롯에 수량만 추가, 새 종류는 소비 인벤토리에 빈 슬롯이 있어야 구매 가능
   if(!canAcquireInCategory('consumable', (state.consumables[id] || 0) > 0)) return false;
   state.gold -= item.buyPrice;
+  achvCount('shopBought', item.buyPrice); // 업적: 상점 구매 금액
   state.consumables[id] = (state.consumables[id] || 0) + 1;
   if(!silent){
     purchaseEffect(btn || null);
@@ -732,6 +746,7 @@ function performSellAllFlask(id, btn){
   if(count <= 0) return;
   const total = count * item.sellPrice;
   state.gold += total;
+  achvCount('shopSold', total); // 업적: 상점 판매 수익(종류 무관 누적)
   state.consumables[id] = 0;
   purchaseEffect(btn || null);
   render(); saveState();
@@ -745,6 +760,7 @@ function sellAllMisc(id, btn){
   if(count <= 0) return;
   const total = count * item.sellPrice;
   state.gold += total;
+  achvCount('shopSold', total); // 업적: 상점 판매 수익(종류 무관 누적)
   state[item.stateKey] = 0;
   purchaseEffect(btn || null);
   render(); saveState();
@@ -860,6 +876,7 @@ function useSkill(id){
   if(!canUseSkillNow(id)) return;
   const s = SKILLS[id];
   huntLog('skillUse', { skill: s.name }); // 전투 로그(hunt_log.js)
+  achvCount('skillUse'); // 업적
   if(s.resourceType === 'hp') state.playerHp = Math.max(0, (state.playerHp || 0) - s.resourceAmount);
   else state.playerMp = Math.max(0, (state.playerMp || 0) - s.resourceAmount);
   startSkillCooldown(id);
@@ -1183,6 +1200,7 @@ function executeRestore(target){
   catalystConsume(catalystPlanUsed);
   const success = Math.random() * 100 < chance;
   if(success){
+    achvCount('damageRestore'); // 업적: 손상 복구 성공
     item.damaged = false;
     item.currentDurability = freshCurrentDurability(type); // 정상 최대 내구도의 100%
   }

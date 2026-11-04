@@ -660,6 +660,7 @@ async function loadState(){
   }
   ensurePlayerVitals();
   ensureSettingsDefaults();
+  ensureAchievementDefaults(); // 업적(achievements.js): 수령 기록 기본값 — 이전 세이브에는 없는 필드
   if(isDeathCurseActive()) startDeathCurseTicker(); else renderDeathCurseBadge();
   render();
   resumePendingEnhance(); // 연출 도중 새로고침·종료로 반영되지 못한 강화 결과가 있으면 선저장된 결과를 그대로 반영(actions.js)
@@ -737,6 +738,7 @@ function resetGame(){
   };
   ensurePlayerVitals();
   ensureSettingsDefaults();
+  ensureAchievementDefaults(); // 처음부터 다시 시작하면 업적(수령 기록)도 초기화됨
   renderDeathCurseBadge();
   showMsg('', '');
   showView('forge');

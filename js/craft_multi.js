@@ -154,7 +154,7 @@ function craftMultiProcessRound(run){
   const ret = success ? null : craftRollFailReturn(item);
   craftMultiGrantRound(run, item, success, ret, held);
   run.done++;
-  if(success) run.success++; else run.fail++;
+  if(success){ run.success++; achvCount(run.category === 'consumable' ? 'craftConsumable' : 'craftMaterial'); } else run.fail++; // 업적: 소비/재료(마석 포함) 제작 성공
   return true;
 }
 
