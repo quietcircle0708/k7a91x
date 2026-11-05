@@ -156,13 +156,21 @@ function catalystEnhanceAutoStone(type){
 function catalystEnhanceSync(){
   if(isEnhancing) return; // 강화 진행 중에는 상태를 바꾸지 않음(연출이 끝난 뒤 반영)
   const tg = catalystEnhanceTarget(), st = state.forgeStone;
-  if(!tg){ st.id = null; st.on = false; st.forId = null; }
-  else if(st.forId !== tg.id){ st.id = catalystEnhanceAutoStone(tg.type); st.on = false; st.forId = tg.id; }
+  // 초기화 규칙: 강화 대상 장비가 바뀌거나(forId와 다름) 사라지면 강화석 켜짐/종류와 소생석 투입 수량을 모두 처음 상태로 되돌림
+  if(!tg){ st.id = null; st.on = false; st.forId = null; state.forgeRevive = 0; }
+  else if(st.forId !== tg.id){ st.id = catalystEnhanceAutoStone(tg.type); st.on = false; st.forId = tg.id; state.forgeRevive = 0; }
   if(tg && st.id){
     const need = catalystRequiredQty({ id: st.id, qty: 1 }, catalystEnhanceCtx(tg.type, tg.level));
     if(st.on && (need == null || catalystOwned(st.id) < need)) st.on = false;
   }
   state.forgeRevive = Math.min(state.forgeRevive, catalystOwned('reviveStone'));
+}
+// 강화 화면 촉매 설정 초기화(강화석은 "선택 안 됨 + OFF"로 비워 다음 화면 갱신(catalystEnhanceSync)이 장비 등급에 맞는 강화석을 자동 선택하게 하고, 소생석 투입 수량은 0).
+// 호출 시점: 대장간 화면을 벗어날 때(navigation.js showView). 강화 대상 장비 변경/제거는 catalystEnhanceSync가 같은 방식으로 처리함. 강화 모드(기도/촉매)는 건드리지 않음.
+function catalystEnhanceReset(){
+  state.forgeStone = { id: null, on: false, forId: null };
+  state.forgeRevive = 0;
+  saveState();
 }
 function catalystEnhanceToggleStone(){
   const tg = catalystEnhanceTarget(), st = state.forgeStone;

@@ -814,6 +814,37 @@ function showHuntMsg(text){
 }
 
 // ---- 던전(사냥) 화면 ----
+// 던전 상단 HUD(아바타 프레임 + 이름/체력/마나/경험치/레벨)의 이름과 아바타. 지금은 고정값이고, 나중에 캐릭터 이름 시스템·
+// 규칙에 따른 아바타 변경이 생기면 아래 두 함수만 고치면 됨(이름 = state.playerName이 생기면 자동 적용).
+function huntHudPlayerName(){
+  return (state.playerName && String(state.playerName).trim()) || '플레이어';
+}
+function huntAvatarIconKey(){
+  return 'huntNextStage'; // UI_ICONS 키 — 지금은 menu_enter_next_stage 아이콘으로 고정
+}
+function huntHudRenderAvatar(){
+  const box = el('huntAvatar');
+  if(!box) return;
+  const key = huntAvatarIconKey();
+  if(box.dataset.key === key) return; // 값이 같으면 다시 그리지 않음(렌더가 자주 불림)
+  box.dataset.key = key;
+  box.innerHTML = uiIconHtml(key, 'hud-avatar-icon') + uiIconHtml('avatarFrame', 'hud-avatar-frame');
+}
+// 전투 영역 플레이어 체력/마나 바 번쩍임: 이전 값보다 줄어들었을 때만(회복·첫 렌더는 제외). 던전 입장 때 huntBarFlashReset()으로 기준값을 비움.
+const huntBarFlashPrev = { hp: null, mp: null };
+function huntBarFlashReset(){ huntBarFlashPrev.hp = null; huntBarFlashPrev.mp = null; }
+function huntBarFlash(fillId, cls){
+  const fill = el(fillId);
+  const wrap = fill && fill.parentElement;
+  if(!wrap) return;
+  wrap.classList.remove(cls); void wrap.offsetWidth; wrap.classList.add(cls);
+  setTimeout(() => wrap.classList.remove(cls), 400);
+}
+function huntBarFlashCheck(hp, mp){
+  if(huntBarFlashPrev.hp !== null && hp < huntBarFlashPrev.hp) huntBarFlash('combatPlayerHpFill', 'flash-hp');
+  if(huntBarFlashPrev.mp !== null && mp < huntBarFlashPrev.mp) huntBarFlash('combatPlayerMpFill', 'flash-mp');
+  huntBarFlashPrev.hp = hp; huntBarFlashPrev.mp = mp;
+}
 function renderHuntCharPanel(){
   const elLv = el('huntPlayerLevel');
   if(!elLv) return; // huntView가 아직 DOM에 없는 초기 타이밍 방어
@@ -825,7 +856,10 @@ function renderHuntCharPanel(){
   const mp = Math.min(state.playerMp, maxMp);
   const expInfo = expDisplayInfo(lv);
 
-  elLv.textContent = 'Lv.' + lv;
+  elLv.textContent = 'LV' + lv;
+  const hudName = el('huntPlayerName');
+  if(hudName) hudName.textContent = huntHudPlayerName();
+  huntHudRenderAvatar();
   // 던전 전투 화면(상단 패널 + 전투 영역)에서는 요청에 따라 체력/마나 텍스트에 현재 수치만 표시함
   // (최대치는 표시하지 않음 — 실제 계산·최대치 데이터 자체는 변경 없이 표시 형식만 다름).
   el('huntHpText').textContent = hp.toLocaleString();
@@ -834,6 +868,9 @@ function renderHuntCharPanel(){
   el('huntMpBar').style.width = (mp / maxMp * 100) + '%';
   el('huntExpText').textContent = expInfo.text;
   el('huntExpBar').style.width = expInfo.pct + '%';
+  // 라벨("체력/마나")을 없앤 대신 마우스를 올리면 현재/최대를 보여줌
+  el('huntHpWrap').title = '체력 ' + hp.toLocaleString() + ' / ' + maxHp.toLocaleString();
+  el('huntMpWrap').title = '마나 ' + mp.toLocaleString() + ' / ' + maxMp.toLocaleString();
 
   // 전투 화면 중앙(플레이어 슬롯)의 체력/마나 바도 동일한 값으로 함께 갱신(기존 몬스터 체력바와 같은
   // .hp-bar-wrap/.hp-bar-fill 구조를 재사용하므로, 감소 시 자연스러운 전환 애니메이션도 그대로 적용됨).
@@ -844,6 +881,7 @@ function renderHuntCharPanel(){
     el('combatPlayerMpFill').style.width = Math.max(0, Math.min(100, mp / maxMp * 100)) + '%';
     el('combatPlayerMpText').textContent = Math.max(0, mp).toLocaleString();
   }
+  huntBarFlashCheck(Math.max(0, hp), Math.max(0, mp)); // 전투 영역 플레이어 바: 체력/마나가 줄어들 때 붉은/푸른 빛 번쩍
   const combatLv = el('combatPlayerLevel');
   if(combatLv) combatLv.textContent = 'Lv.' + lv;
   // 토글 메뉴(캐릭터 정보 카드)가 펼쳐진 상태라면 그 안의 체력/마나/공격력 등도 전투 중 실시간으로 갱신.
@@ -2417,7 +2455,7 @@ function renderStatusBadges(){
            <span class="tooltip"><span style="display:block; text-align:center; color:${e.def.color}; font-weight:700;">${e.def.name}</span>${descHtml}</span>`;
       }
       const timeEl = node.querySelector('.monster-status-time');
-      timeEl.textContent = e.remainSec + '초'; // 요구사항 5번: 1초 단위 표시(소수점 없음)
+      timeEl.textContent = e.remainSec; // 1초 단위 숫자만 표시(소수점·'초' 없음 — 아이콘이 작아서 단위는 생략)
       timeEl.style.color = e.def.color; // 기존 뱃지가 쓰던 상태이상별 color를 그대로 유지
       if(row.children[idx] !== node) row.insertBefore(node, row.children[idx] || null);
     });

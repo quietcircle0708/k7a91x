@@ -152,6 +152,7 @@ function enterDungeon(id){
   updateHuntTopUiToggle();
   showView('hunt');
   // 전투 로그(hunt_log.js): 던전에 들어갈 때마다 새로 시작 — 입장 안내(+저주 적용 중이면 안내)를 남기고 설정에 맞춰 팝업/인라인 상자를 엶
+  huntBarFlashReset(); // 전투 영역 체력/마나 바 번쩍임 기준값 초기화(render.js)
   huntLogReset();
   huntLog('dungeonEnter', { dungeon: d.name });
   if(isDeathCurseActive()) huntLog('curseActive', huntLogCurseParams(state.deathCurseUntil - Date.now()));

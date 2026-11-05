@@ -427,27 +427,39 @@
   .dungeon-enter-btn:disabled{ opacity:.4; cursor:not-allowed; }
 
   /* ---- hunt view ---- */
-  /* 플레이어 정보(레벨/체력/마나/경험치) — 토글과 무관하게 항상 노출. combat-arena가 아니라
-     forge-card(#huntCard, position:relative)를 기준으로 절대좌표 배치해, "던전 이름 - 스테이지" 행과
-     같은 높이(top:0)에서 좌측 끝(left:0)에 붙도록 함(HTML상으로도 huntDungeonName 바로 다음, combat-arena
-     밖으로 이동). 가로 폭은 원래 크기(약 215px)를 유지하고, 폭만 억지로 줄여 글자가 비좁아지는 대신
-     zoom으로 전체(가로/세로/글자 크기 전부)를 70% 크기로 축소함(zoom은 transform:scale과 달리 실제
-     차지하는 레이아웃 공간도 함께 줄어듦). */
-  .hunt-player-info{
-    position:absolute; top:0; left:0; z-index:2; width:215px; zoom:.7;
+  /* 플레이어 정보(HUD) — 토글과 무관하게 항상 노출. "던전 이름 - 스테이지" 행 바로 아래 왼쪽에 문서 흐름대로 놓임(높이가 곧 아래 요소들의 위치).
+     구성: 왼쪽 아바타 프레임(80px 원본 크기, 링 부분이 패널 좌상단에 딱 붙도록 위/왼쪽 투명 여백만큼 음수 오프셋) +
+     오른쪽에 이름 / 체력 / 마나 / 경험치 / 레벨 줄. 프레임 링이 원이라 줄마다 바가 시작하는 x(left)를 링 곡선에 맞춰 다르게 줌
+     (링 중심 (29,30), 반지름 29 기준으로 "줄이 링과 가장 가까운 지점 + 여백 4px"로 계산한 값 — 프레임/줄 높이를 바꾸면 left만 다시 계산). */
+  .hunt-hud{ position:relative; width:168px; height:65px; margin-bottom:6px; z-index:2; }
+  .hud-avatar{ position:absolute; left:-11px; top:-9px; width:80px; height:80px; pointer-events:none; }
+  .hud-avatar-icon{ position:absolute; left:24px; top:23px; width:32px; height:32px; image-rendering:pixelated; user-select:none; -webkit-user-drag:none; } /* 프레임 구멍(지름 약 43px) 중앙에 원본 크기로 */
+  .hud-avatar-frame{ position:absolute; left:0; top:0; width:80px; height:80px; z-index:2; user-select:none; -webkit-user-drag:none; }
+  .hud-name, .hud-lv{ position:absolute; right:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:800; line-height:12px; text-shadow:0 1px 2px rgba(0,0,0,.9); }
+  .hud-name{ top:0; left:55px; font-size:11px; color:var(--forge-cream); }
+  .hud-lv{ top:53px; left:51px; font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--forge-gold); }
+  .hud-bar{ position:absolute; right:0; }
+  .hud-hp{ top:12px; left:61px; height:12px; }
+  .hud-mp{ top:26px; left:62px; height:12px; }
+  .hud-exp{ top:40px; left:60px; height:11px; }
+  .hud-track{ position:absolute; inset:0; box-sizing:border-box; background:var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:3px; overflow:hidden; }
+  .hud-fill{ height:100%; width:100%; transition:width .3s ease-out; }
+  .hud-fill.hp{ background:linear-gradient(90deg, #ff6a3d, #c13c3c); }
+  .hud-fill.mp{ background:linear-gradient(90deg, #4fa3d1, #2f6f96); }
+  .hud-fill.exp{ background:linear-gradient(90deg, #d9a92f, #a77c1a); }
+  .hud-bar-icon{ position:absolute; left:3px; top:50%; width:13px; height:13px; margin-top:-6.5px; z-index:1; image-rendering:pixelated; user-select:none; -webkit-user-drag:none; }
+  .hud-bar-icon.mp{ filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); } /* 진한 파랑 십자 아이콘이 파란 바 위에서 묻히지 않도록 얇은 흰 윤곽 */
+  .hud-text{
+    position:absolute; right:4px; top:0; bottom:0; display:flex; align-items:center; z-index:1; pointer-events:none;
+    font-family:'JetBrains Mono', monospace; font-weight:800; font-size:10px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.9), 0 0 2px #000;
   }
-  .hunt-char-panel{
-    background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:12px;
-    padding:12px 14px 10px; position:relative;
-  }
-  .hunt-char-panel.player-hit{ animation: player-hit-flash .3s; }
-  @keyframes player-hit-flash{
-    0%{ box-shadow: 0 0 0 0 rgba(193,60,60,0); border-color: var(--forge-line); }
-    30%{ box-shadow: 0 0 16px 3px rgba(193,60,60,.7); border-color: var(--forge-blood); }
-    100%{ box-shadow: 0 0 0 0 rgba(193,60,60,0); border-color: var(--forge-line); }
-  }
-  .dmg-popup.player-dmg{ top:-6px; color: var(--forge-blood); }
-  /* ---- 던전 전투화면 버프 지속시간 UI ---- 플레이어 정보 패널(.hunt-player-info) 오른쪽의 빈 공간에
+  .hud-exp .hud-text{ font-size:8.5px; }
+  /* 전투 영역의 플레이어 체력/마나 바(플레이어 이미지에 붙은 바) 사용·피격 번쩍임 — 체력 감소 때 붉게, 마나 감소(스킬 사용) 때 푸르게(render.js huntBarFlashCheck) */
+  @keyframes bar-flash-hp{ 0%{ box-shadow:0 0 0 0 rgba(255,70,50,0); } 20%{ box-shadow:0 0 9px 3px rgba(255,70,50,.95); } 100%{ box-shadow:0 0 0 0 rgba(255,70,50,0); } }
+  @keyframes bar-flash-mp{ 0%{ box-shadow:0 0 0 0 rgba(70,150,255,0); } 20%{ box-shadow:0 0 9px 3px rgba(70,150,255,.95); } 100%{ box-shadow:0 0 0 0 rgba(70,150,255,0); } }
+  .combat-arena .hp-bar-wrap.flash-hp{ animation:bar-flash-hp .35s ease-out; }
+  .combat-arena .hp-bar-wrap.flash-mp{ animation:bar-flash-mp .35s ease-out; }
+  /* ---- 던전 전투화면 버프 지속시간 UI ---- 플레이어 정보 HUD(.hunt-hud) 오른쪽의 빈 공간에
      떠 있는 완전히 독립된 절대좌표 오버레이라, 이 블록을 추가/삭제해도 다른 레이아웃(전투 영역 크기,
      플레이어/몬스터 위치, 퀵슬롯 위치)에 전혀 영향을 주지 않음. 아이콘 크기/간격/투명도는 커스텀
      속성(--hunt-buff-*) 3개로만 관리 — 요구사항대로 값만 바꾸면 전체가 한번에 조정됨.
@@ -461,7 +473,7 @@
      그 위에 absolute+z-index로 겹쳐서 슬롯 정중앙에 표시됨(슬롯 바깥으로 나가지 않음). */
   .hunt-buff-ui{
     --hunt-buff-icon-size: 24px; --hunt-buff-gap: 8px; --hunt-buff-icon-opacity: .38;
-    position:absolute; top:55px; right:20px; z-index:2;
+    position:absolute; top:51px; right:20px; z-index:2; /* 첫 줄 아이콘 높이 = 플레이어 HUD(.hunt-hud) 상단 높이(카드 위에서 51px: 카드 안쪽 여백 + 던전 이름 행). HUD 위치가 바뀌면 같이 조정 */
     display:flex; flex-wrap:wrap; align-content:flex-start;
     gap: var(--hunt-buff-gap);
     width: calc(var(--hunt-buff-icon-size) * 5 + var(--hunt-buff-gap) * 4);
@@ -623,6 +635,7 @@
   .dmg-popup{
     position:absolute; left:50%; top:20%; font-family:'JetBrains Mono', monospace; font-weight:700;
     font-size:17px; color:#ffffff; text-shadow: 0 0 6px rgba(0,0,0,.6); pointer-events:none; opacity:0;
+    white-space:nowrap; /* 좁은 슬롯(플레이어 칸 100px)에서 "회피!"가 줄바꿈되지 않게 */
   }
   .dmg-popup.float{ animation: dmg-float .8s ease-out forwards; }
   @keyframes dmg-float{
@@ -662,9 +675,10 @@
      그대로 유지됨. 가운데 컬럼/행 크기는 실제 화면에서 직접 테스트해 확정한 값(플레이어와 상/좌/우
      몬스터 사이 불필요한 간격을 줄임) — 임의로 다른 값을 쓰지 않음. */
   .combat-arena{
+    --player-size:100px; /* 플레이어 이미지 크기(데스크탑/모바일 공통) — 이 값 하나로 이미지·여백 계산이 함께 조정됨(128px로 올려 보았다가 너무 커서 100px로 복귀) */
     position:relative; display:grid;
     grid-template-columns: 96px 100px 96px;
-    grid-template-rows: 90px 130px;
+    grid-template-rows: 104px 130px; /* [상] 몬스터 줄(상태이상 아이콘이 몬스터 체력바 위로 뜨는 자리 포함) / [좌 플레이어 우] 줄 */
     grid-template-areas:
       ".    top    ."
       "left player right";
@@ -701,11 +715,15 @@
      (참고: .monster-icon-img가 부모 font-size를 1em 기준으로 그대로 물려받는 방식이라, 여기서도
      font-size로 크기를 조절함 — 몬스터와 동일한 방식.) */
   .combat-arena .monster-icon{ font-size:54px; } /* 몬스터 슬롯에서 공격력 표시를 뺀 만큼 이미지에 여유를 줌(46px → 54px, 그리드 트랙/전체 배치는 그대로) */
-  .combat-arena .player-icon{ font-size:100px; }
-  .player-slot .hp-bar-wrap{ width:100%; margin-bottom:1px; }
-  .player-slot .mp-bar-wrap{ margin-top:-2px; margin-bottom:-20px; }
+  /* 플레이어 칸 세로 순서: Lv(머리 위, 반투명) → 이미지 → 체력바 → 마나바(발 아래). 이미지 PNG는 위 25%·아래 30%가 투명 여백이라,
+     이미지 위/아래 마진을 --player-size 비례로 줄여 Lv를 머리 바로 위에, 바를 발 바로 아래에 붙임(크기를 바꿔도 같은 비율 유지). */
+  .combat-arena .player-icon{ font-size:var(--player-size); margin:calc(var(--player-size) * -0.25 + 12px) 0 calc(var(--player-size) * -0.3 + 4px); }
+  .player-slot{ margin-top:14px; } /* 칸 전체를 아래로 내려 머리 위 Lv가 위쪽 몬스터 이름과 겹치지 않게 함 */
+  .player-slot .hp-bar-wrap{ width:80px; margin-bottom:1px; } /* 바 폭(기존 100px에서 축소) */
+  .player-slot .mp-bar-wrap{ margin:0; }
+  .player-slot .hp-text{ font-size:9px; letter-spacing:0; white-space:nowrap; } /* 좁아진 바에서 "1234 / 1234"처럼 4자리 숫자도 한 줄에 들어가도록 */
   .player-lv-text{
-    margin-top:-10px; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:12px;
+    margin:0; opacity:.6; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:12px;
     color: var(--forge-gold); line-height:1;
   }
   .hp-bar-fill.mp{ background: linear-gradient(90deg, #4fa3d1, #2f6f96); }
@@ -719,14 +737,19 @@
       drop-shadow(0 0 8px rgba(255,59,59,.8));
   }
   .monster-slot .monster-name-row{ margin:6px 0 4px; font-size:12px; }
-  .monster-slot .monster-status-row{ margin:0 0 4px; }
+  /* 상태이상 줄은 몬스터 슬롯 안에서 체력바 바로 위에 "떠 있는"(절대 위치) 줄 — 상태이상이 생기거나 사라져도 몬스터 이미지/체력바가 밀리지 않음.
+     아이콘 17px, 간격 2px → 슬롯 폭(96px) 안에 한 줄 5개, 6개째부터는 위쪽 줄로 올라감(wrap-reverse). 크기를 바꾸려면 아래 두 변수만 조정. */
+  .monster-slot .monster-status-row{
+    --monster-status-icon-size:17px; --monster-status-gap:2px;
+    position:absolute; left:0; right:0; bottom:100%; margin:0 0 2px; flex-wrap:wrap-reverse;
+  }
   .target-marker{
     display:none; text-align:center; color:#ff3b3b; font-size:13px; line-height:1;
     margin-bottom:3px; text-shadow: 0 0 6px rgba(255,59,59,.85);
   }
   .monster-slot.targeted .target-marker{ display:block; }
   .monster-name-row{ display:flex; justify-content:center; align-items:baseline; gap:6px; margin-bottom:6px; flex-wrap:wrap; }
-  .monster-name{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:15px; }
+  .monster-name{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:13px; } /* 몬스터 이름(데스크탑/모바일 공통) */
   .monster-lv{ font-family:'JetBrains Mono', monospace; font-size:11px; color: var(--forge-cream-dim); }
   .hp-bar-wrap{ position:relative; width:100%; height:14px; background: var(--forge-panel-2); border:1px solid var(--forge-line); border-radius:999px; overflow:hidden; margin-bottom:6px; }
   .hp-bar-fill{ height:100%; width:100%; background: linear-gradient(90deg, #ff6a3d, #c13c3c); transition: width .25s ease-out; }
@@ -757,7 +780,7 @@
   .monster-status-time{
     position:absolute; inset:0; z-index:1;
     display:flex; align-items:center; justify-content:center;
-    font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:800; line-height:1;
+    font-family:'JetBrains Mono', monospace; font-size:9px; font-weight:800; line-height:1; letter-spacing:-.5px; /* 아이콘 안 남은 시간(숫자만) */
     text-shadow:0 1px 2px rgba(0,0,0,.85); white-space:nowrap; pointer-events:none;
   }
   .monster-status-icon .tooltip{ width:max-content; max-width:220px; left:50%; right:auto; bottom:130%; transform:translateX(-50%); white-space:normal; text-align:left; padding:5px 9px; }
@@ -2315,3 +2338,6 @@ body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
 /* 던전 위 메뉴 팝업으로 열릴 때 */
 #achievementsView.menu-popup{ --menu-popup-width:420px; }
 #achievementsView.menu-popup .achv-list{ max-height:min(60vh, 440px); }
+
+/* 전투 화면 체력/마나 바(플레이어·몬스터): 모서리를 완전한 알약 모양(999px) 대신 끝부분만 살짝 둥글게. 값은 여기서만 조정 */
+.combat-arena .hp-bar-wrap{ border-radius:3px; }

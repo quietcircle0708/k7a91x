@@ -1212,8 +1212,8 @@ function formatKoreanNumber(n){
 function expDisplayInfo(lv){
   if(lv < PLAYER_MAX_LEVEL){
     const expReq = requiredExp(lv);
-    const pct = Math.min(100, Math.round(state.playerExp / expReq * 1000) / 10);
-    return { text: pct.toFixed(1) + '%', pct };
+    const pct = Math.min(100, Math.floor(state.playerExp / expReq * 10000) / 100); // 소수 둘째 자리(버림 — 99.999%가 100.00%로 보이지 않게)
+    return { text: pct.toFixed(2) + '%', pct };
   }
   if(!ENABLE_MAX_LEVEL_EXP_SYSTEM){
     // 기존 방식(기본값) — Lv99 경험치는 gainExp()에서 항상 0으로 유지되므로 늘 꽉 찬 'MAX' 표시.

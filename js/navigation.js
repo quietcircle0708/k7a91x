@@ -47,6 +47,7 @@ function showView(name){
   notifyRequestSync(); // 알림 점(notify.js) — 화면을 옮기면 떠난 탭의 새 항목이 확인 처리됨
   if(typeof menuPopupCloseAll === 'function') menuPopupCloseAll(); // 던전 위에 떠 있던 메뉴 팝업은 화면이 바뀌면 모두 닫음(menu_popup.js)
   if(currentView !== name) viewLeaveCleanup(currentView);
+  if(currentView === 'forge' && name !== 'forge') catalystEnhanceReset(); // 대장간 화면을 벗어나면 강화 촉매/소생석 투입 설정 초기화(catalyst.js)
   if(currentView === 'hunt' && name !== 'hunt'){
     if(hunt.dungeon) huntLog('dungeonLeave', { dungeon: hunt.dungeon.name }); // 전투 로그(화면을 떠나면 바로 사라져 거의 보이지 않음)
     stopHuntLoop();

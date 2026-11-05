@@ -35,16 +35,7 @@ function purchaseEffect(target){
 
 // ---- 던전 전투 연출 ----
 function playerHitEffect(dmg){
-  const panel = document.querySelector('.hunt-char-panel');
-  if(panel){
-    panel.classList.remove('player-hit'); void panel.offsetWidth; panel.classList.add('player-hit');
-    const p = document.createElement('div');
-    p.className = 'dmg-popup float player-dmg';
-    p.textContent = '-' + dmg;
-    p.style.left = (42 + Math.random() * 16) + '%';
-    panel.appendChild(p);
-    setTimeout(() => { panel.classList.remove('player-hit'); p.remove(); }, 850);
-  }
+  // (던전 상단 HUD에는 피격 연출을 두지 않음 — 전투 영역의 플레이어 이미지·체력바 쪽에서만 보여줌)
   // 전투 화면 중앙 플레이어 아이콘도 몬스터와 동일한 피격 애니메이션(.hit, monster-hit 키프레임)을 재사용.
   const combatIcon = el('combatPlayerIcon');
   if(combatIcon){
@@ -55,20 +46,11 @@ function playerHitEffect(dmg){
   spawnDmgPopupIn(el('combatPlayerSlot'), dmg, false);
 }
 
-// 회피 성공 시 연출 — playerHitEffect와 완전히 동일한 두 위치(좌측 캐릭터 패널 + 전투 화면 중앙)에 같은
-// dmg-float 애니메이션으로 "회피!" 문구만 띄움. 정상 피격 때와 달리 화면 흔들림(.player-hit)과 캐릭터
+// 회피 성공 시 연출 — 전투 화면 중앙 플레이어 이미지에 같은 dmg-float 애니메이션으로 "회피!" 문구만 띄움.
+// 정상 피격 때와 달리 캐릭터
 // 아이콘 피격 모션(.hit)은 재생하지 않음 — 실제로 맞지 않았으므로(요구사항 5·6번: 새 연출 시스템을 만들지
 // 않고 기존 피해 숫자 출력 구조만 재활용, 정상 피격 처리와는 분리).
 function playerDodgeEffect(){
-  const panel = document.querySelector('.hunt-char-panel');
-  if(panel){
-    const p = document.createElement('div');
-    p.className = 'dmg-popup float player-dmg dodge';
-    p.textContent = '회피!';
-    p.style.left = (42 + Math.random() * 16) + '%';
-    panel.appendChild(p);
-    setTimeout(() => p.remove(), 850);
-  }
   spawnDmgPopupIn(el('combatPlayerSlot'), 0, false, true);
 }
 
@@ -143,14 +125,37 @@ function renderPlayerPose(){
 // 그대로 숫자만 표시함('-' 기호·'치명타!' 문구 없이). monsterHitEffect·playerHitEffect가 공통으로 사용.
 // isDodge: 회피 시 숫자 대신 "회피!" 문구를 같은 위치·타이밍(dmg-float 애니메이션)으로 띄움(dmg 인자는
 // 이때 쓰이지 않음) — 회피 전용 팝업을 새로 만들지 않고 기존 피해 숫자 출력 구조를 그대로 재활용.
+// ---- 같은 칸에서 거의 동시에 뜨는 숫자가 한 자리에 겹치지 않게 배치 ----
+// 숫자는 뜬 직후 DMG_POPUP_FLOAT_PX만큼 DMG_POPUP_FLOAT_MS 동안 위로 올라감(dmg-float 키프레임과 같은 값). 새 숫자는 같은 칸에서 아직 살아 있는
+// 다른 숫자들의 "지금 위치"와 DMG_POPUP_MIN_GAP_PX 이상 떨어지도록, 시작 위치를 필요한 만큼만 아래로 내려서 띄움(겹치지 않으면 내리지 않음).
+const DMG_POPUP_LIFE_MS = 850;      // 숫자가 화면에 남아 있는 시간
+const DMG_POPUP_FLOAT_MS = 800;     // 위로 올라가는 애니메이션 시간(style.css dmg-float)
+const DMG_POPUP_FLOAT_PX = 45;      // 위로 올라가는 거리(style.css dmg-float)
+const DMG_POPUP_MIN_GAP_PX = 5;    // 숫자끼리 최소 세로 간격(글자 높이 17~18px보다 조금 크게)
+const DMG_POPUP_STAGGER_STEP_PX = 4;
+function dmgPopupStartOffset(container){
+  const now = performance.now();
+  const alive = (container._dmgPopups || []).filter(q => now - q.t < DMG_POPUP_LIFE_MS);
+  let off = 0;
+  for(let i = 0; i < 40; i++){
+    const clash = alive.some(q => Math.abs(off - (q.off - DMG_POPUP_FLOAT_PX * Math.min(1, (now - q.t) / DMG_POPUP_FLOAT_MS))) < DMG_POPUP_MIN_GAP_PX);
+    if(!clash) break;
+    off += DMG_POPUP_STAGGER_STEP_PX;
+  }
+  alive.push({ t: now, off });
+  container._dmgPopups = alive;
+  return off;
+}
 function spawnDmgPopupIn(container, dmg, isCrit, isDodge){
   if(!container) return;
   const p = document.createElement('div');
   p.className = 'dmg-popup float' + (isCrit ? ' crit' : '') + (isDodge ? ' dodge' : '');
   p.textContent = isDodge ? '회피!' : String(dmg);
   p.style.left = (42 + Math.random() * 16) + '%';
+  const off = dmgPopupStartOffset(container);
+  if(off > 0) p.style.top = `calc(20% + ${off}px)`;
   container.appendChild(p);
-  setTimeout(() => p.remove(), 850);
+  setTimeout(() => p.remove(), DMG_POPUP_LIFE_MS);
 }
 
 function monsterHitEffect(instanceId, dmg, isCrit){
@@ -171,8 +176,10 @@ function statusTickEffect(instanceId, dmg, color){
   p.style.color = color;
   p.textContent = String(dmg);
   p.style.left = (42 + Math.random() * 16) + '%';
+  const off = dmgPopupStartOffset(slot); // 같은 몬스터에 틱/피격이 동시에 뜰 때 겹치지 않게
+  if(off > 0) p.style.top = `calc(20% + ${off}px)`;
   slot.appendChild(p);
-  setTimeout(() => p.remove(), 850);
+  setTimeout(() => p.remove(), DMG_POPUP_LIFE_MS);
 }
 
 // ---- 몬스터 처치 시 드랍 아이템 연출(시각 효과 전용, 실제 지급 로직과 완전히 분리됨) ----

@@ -154,6 +154,7 @@ const UI_ICONS = {
   huntReward: { image: 'menu_current_reward', icon: '🎒' }, // 던전 화면 하단 [보상창] 버튼 이미지 + 누적 보상창 헤더 아이콘
   achvClaim:  { image: 'menu_silver_key',  icon: '🔑' }, // 업적 [수령] 버튼 아이콘(achievements.js — 보상 수령은 아직 비활성)
   huntLog:    { image: 'menu_log',          icon: '💬' }, // 던전 화면 하단 [전투 로그] 열기/닫기 버튼 이미지(hunt_log.js)
+  avatarFrame: { image: 'avatar_frame', icon: '' }, // 던전 HUD 아바타 프레임(render.js huntHudRenderAvatar)
   huntNextStage: { image: 'menu_enter_next_stage', icon: '⏩' }, // 스테이지 클리어 후 준비시간 중 [다음 스테이지 즉시 이동] 버튼 이미지
   huntTreasureStage: { image: 'ui_relic_icon', icon: '📦' }, // 10스테이지 클리어 후(다음이 11스테이지=숨겨진 장소) 같은 버튼에 쓰는 상자 이미지 — 전투가 아니라 보상 상자라는 걸 알리려고 칼 이미지 대신 사용(dungeon.js syncHuntPrepNextIcon)
 };
