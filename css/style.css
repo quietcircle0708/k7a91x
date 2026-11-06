@@ -1032,9 +1032,27 @@
     background: var(--forge-panel-2); color: var(--forge-gold); font-weight:900; font-size:15px; cursor:pointer;
     display:flex; align-items:center; justify-content:center; line-height:1;
   }
-  .stat-alloc-btn.wide{ width:auto; padding:0 8px; font-size:12px; }
+  .stat-alloc-btn.wide{ width:34px; padding:0; font-size:12px; }
+  .stat-alloc-btn.wide.max{ width:40px; }
+  /* 길게 눌러 연속 증가(main.js statHold)하는 버튼 — 길게 눌러도 글자 선택/길게 누름 메뉴/확대가 뜨지 않게 함 */
+  .stat-alloc-btn{ touch-action:manipulation; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; flex:none; }
+  .stat-alloc-pending{ color: var(--forge-gold); } /* 아직 적용 안 한 임시 분배 포인트 — 아티팩트 보너스(초록 (+n))와 색으로 구분 */
+  /* 스탯 이름 옆 [?] — 정사각형 작은 슬롯. 툴팁은 .char-stat-tip(세부 능력치 계산 내역 툴팁)과 같은 표시 체계를 재사용하고 위치만 왼쪽 기준으로 바꿈 */
+  .stat-help-slot{
+    display:inline-flex; align-items:center; justify-content:center; vertical-align:middle;
+    width:16px; height:16px; margin-left:6px; box-sizing:border-box;
+    border:1px solid var(--forge-line); border-radius:3px; background: var(--forge-panel-2);
+    font-size:10px; font-weight:700; line-height:1; color: var(--forge-cream-dim); outline:none;
+  }
+  .stat-help-slot:hover, .stat-help-slot:focus{ border-color: var(--forge-gold); color: var(--forge-gold); }
+  .stat-help-slot .tooltip{ left:0; right:auto; width:210px; font-weight:400; }
+  .stat-help-slot:focus .tooltip{ visibility:visible; opacity:1; } /* 터치(탭 = 포커스)·키보드에서도 표시 */
   .stat-alloc-btn:hover:not(:disabled){ border-color: var(--forge-gold); }
   .stat-alloc-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  body.mobile-preset .stat-alloc-btn{ width:30px; height:30px; }
+  body.mobile-preset .stat-alloc-btn.wide{ width:34px; }
+  body.mobile-preset .stat-alloc-btn.wide.max{ width:40px; }
+  body.mobile-preset .stat-alloc-btn-group{ gap:4px; }
   .char-stat-sub-title{ font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color: var(--forge-cream-dim); margin-bottom:8px; }
   .char-stat-artifact{
     font-size:12.5px; color: var(--forge-cream-dim); line-height:1.6;

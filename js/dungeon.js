@@ -945,6 +945,7 @@ function refreshLiveRewardModal(){
   const scEl2 = el('krRewardItemScroll'); if(scEl2) scEl2.scrollTop = scTop;
   el('krInvTooltip').innerHTML = buildInvPeekHtml();
   rewardNotifySync(); // 알림 점(notify.js) — 다시 그린 슬롯에 점 클래스 붙임
+  if(typeof rewardGridRefreshTip === 'function') rewardGridRefreshTip(); // 열려 있던 슬롯 툴팁을 새 슬롯에 다시 붙임(main.js)
 }
 function closeKillResultModal(){
   if(typeof codexHideTip === 'function') codexHideTip(); // 보상창 아이템 툴팁(고정 위치)이 열린 채 닫히지 않게

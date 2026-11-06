@@ -600,7 +600,8 @@ function codexCursorSync(){
   });
 
   document.addEventListener('click', (ev) => {
-    if(!ev.target.closest('.codex-slot') && !ev.target.closest('#codexPopup') && !ev.target.closest('.codex-mdrop')){
+    // .reward-item-slot: 던전 보상창 슬롯도 이 공용 툴팁(#codexTip)을 쓰므로, 슬롯을 누른 클릭이 방금 띄운 툴팁을 바로 닫지 않게 제외함(터치에서 툴팁이 안 뜨던 원인).
+    if(!ev.target.closest('.codex-slot') && !ev.target.closest('#codexPopup') && !ev.target.closest('.codex-mdrop') && !ev.target.closest('.reward-item-slot')){
       codexHideTip();
       codexClosePopup(); // 메뉴 바깥 영역을 누르면 닫힘(신버전 인벤토리와 동일)
     }

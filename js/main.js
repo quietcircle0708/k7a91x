@@ -389,7 +389,11 @@ function handleCharPanelClick(e){
   if(statBtn && !statBtn.disabled){
     const statKey = statBtn.dataset.stat;
     const statAction = statBtn.dataset.statAction;
+    // [-]/[+]는 누르는 순간(pointerdown, 아래 statHold)에 이미 처리하므로 마우스/터치 클릭은 건너뜀 —
+    // 키보드(Enter/Space)로 누른 클릭(e.detail === 0)만 여기서 한 번 처리함.
+    if((statAction === 'add' || statAction === 'sub') && e.detail !== 0) return;
     if(statAction === 'add-bulk') allocateStatBulk(statKey);
+    else if(statAction === 'add-max') allocateStatMax(statKey);
     else if(statAction === 'sub') deallocateStat(statKey);
     else allocateStat(statKey);
     return;
@@ -406,6 +410,55 @@ function handleCharPanelClick(e){
 }
 el('charTabPanels').addEventListener('click', handleCharPanelClick);
 el('huntCharTabPanels').addEventListener('click', handleCharPanelClick);
+
+// ---- 스탯 [-]/[+] 길게 누르기 연속 증가 ----
+// 누르는 즉시 1번 실행하고, STAT_ALLOC_HOLD.startDelayMs 넘게 누르고 있으면 반복 시작 — 누른 시간이 길수록 간격이 줄어듦(data.js).
+// 스탯 줄은 포인트가 바뀔 때마다 통째로 다시 그려져 누르고 있던 버튼 요소가 사라지므로, 버튼이 아니라 (바뀌지 않는) 패널에
+// 포인터를 붙잡아 두고(setPointerCapture) 손을 뗄 때까지 패널 기준으로 추적함. 반복 대상은 (스탯 키, 동작)만 기억함.
+const statHold = { timer: null, key: null, action: null, startedAt: 0 };
+function statHoldCanStep(){
+  if(!draftStats || !statHold.key) return false;
+  return statHold.action === 'sub' ? pendingStatPoints(statHold.key) >= 1 : (draftStatPoints || 0) > 0;
+}
+function statHoldStop(){
+  clearTimeout(statHold.timer);
+  statHold.timer = null; statHold.key = null; statHold.action = null;
+}
+function statHoldIntervalMs(elapsedMs){
+  let ms = STAT_ALLOC_HOLD.tiers[0].intervalMs;
+  STAT_ALLOC_HOLD.tiers.forEach(t => { if(elapsedMs >= t.afterMs) ms = t.intervalMs; });
+  return ms;
+}
+function statHoldTick(){
+  if(!statHoldCanStep()){ statHoldStop(); return; }
+  if(statHold.action === 'sub') deallocateStat(statHold.key); else allocateStat(statHold.key);
+  if(!statHoldCanStep()){ statHoldStop(); return; }
+  statHold.timer = setTimeout(statHoldTick, statHoldIntervalMs(Date.now() - statHold.startedAt - STAT_ALLOC_HOLD.startDelayMs));
+}
+function handleStatHoldDown(e){
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  const b = e.target.closest('button[data-stat][data-stat-action="add"], button[data-stat][data-stat-action="sub"]');
+  if(!b || b.disabled) return;
+  statHoldStop();
+  statHold.key = b.dataset.stat;
+  statHold.action = b.dataset.statAction;
+  statHold.startedAt = Date.now();
+  try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(_){} // 다시 그려져도 손을 뗄 때(pointerup)까지 이 패널이 이벤트를 받음
+  if(statHold.action === 'sub') deallocateStat(statHold.key); else allocateStat(statHold.key); // 누르는 즉시 1회
+  if(statHoldCanStep()) statHold.timer = setTimeout(statHoldTick, STAT_ALLOC_HOLD.startDelayMs);
+  else statHoldStop();
+}
+['charTabPanels', 'huntCharTabPanels'].forEach(id => {
+  const host = el(id);
+  host.addEventListener('pointerdown', handleStatHoldDown);
+  host.addEventListener('pointerup', statHoldStop);
+  host.addEventListener('pointercancel', statHoldStop);
+  host.addEventListener('lostpointercapture', statHoldStop);
+  host.addEventListener('contextmenu', (e) => { if(e.target.closest('.stat-alloc-btn')) e.preventDefault(); }); // 터치 길게 누름 메뉴 차단
+});
+window.addEventListener('pointerup', statHoldStop);
+window.addEventListener('pointercancel', statHoldStop);
+window.addEventListener('blur', statHoldStop);
 el('charTabPanels').addEventListener('contextmenu', handleSkillIconContextMenu);
 el('huntCharTabPanels').addEventListener('contextmenu', handleSkillIconContextMenu);
 el('charTabPanels').addEventListener('dblclick', handleSkillIconDblClick);
@@ -926,6 +979,23 @@ function enableWheelHScroll(host, rowSelector){
   }, { passive: false });
 }
 
+// 보상창 슬롯 고정 위치 툴팁 공용 헬퍼 — 슬롯 키(data-reward-key)가 없으면 슬롯 순서로 대신함.
+function rewardGridTipKey(slot){
+  if(slot.dataset.rewardKey) return 'reward:' + slot.dataset.rewardKey;
+  return 'reward:#' + Array.prototype.indexOf.call(document.querySelectorAll('#krRewards .reward-item-slot'), slot);
+}
+function rewardGridShowTip(slot){
+  const t = slot.querySelector('.tooltip');
+  if(t && typeof codexShowTipHtml === 'function') codexShowTipHtml(slot, t.innerHTML, rewardGridTipKey(slot));
+}
+// 보기 전용 보상창이 다시 그려지면(dungeon.js refreshLiveRewardModal) 열려 있던 툴팁이 가리키던 슬롯 요소가 사라지므로,
+// 같은 키의 새 슬롯에 다시 붙이고(수량 등 바뀐 내용 반영) 없으면 닫음.
+function rewardGridRefreshTip(){
+  if(typeof codexUI === 'undefined' || !codexUI.tipKey || !String(codexUI.tipKey).startsWith('reward:')) return;
+  const key = codexUI.tipKey;
+  const slot = Array.prototype.find.call(document.querySelectorAll('#krRewards .reward-item-slot'), s => rewardGridTipKey(s) === key);
+  if(slot) rewardGridShowTip(slot); else codexHideTip();
+}
 // ---- 던전 보상창 "획득 아이템" 그리드 세로 스크롤(.reward-item-scroll) ----
 // 휠·터치 스와이프는 브라우저 기본 세로 스크롤을 그대로 쓰고, 마우스는 영역을 누른 채 위아래로 끌어 스크롤함(공용 enableDragScroll은 가로 전용이라 세로용을 따로 둠).
 // 영역 안에서는 슬롯 안 CSS 툴팁이 잘리므로 도감·인벤토리와 같은 고정 위치 툴팁(#codexTip)을 쓰고, 알림 점 확인 처리(마우스 올림/터치)도 여기서 받음.
@@ -962,15 +1032,25 @@ function enableWheelHScroll(host, rowSelector){
   window.addEventListener('pointerup', endDrag);
   window.addEventListener('pointercancel', endDrag);
   // 고정 위치 툴팁 — 슬롯 안 .tooltip의 내용을 그대로 꺼내 씀(내용 규칙은 buildRewardDisplayItems가 만든 기존 툴팁 그대로)
+  // 마우스 환경: hover로 표시 / 터치 환경(모바일): 슬롯을 눌러 표시, 같은 슬롯을 다시 누르거나 다른 곳을 누르면 닫힘
+  // (도감 몬스터 정보의 드랍 아이콘 툴팁과 같은 방식 — 터치에서는 hover 이벤트가 믿을 수 없어 click으로 처리함. 다른 곳을 눌렀을 때 닫는 건 codex.js의 문서 클릭 핸들러가 이미 함).
   host.addEventListener('mouseover', (e)=>{
     if(drag && drag.moved) return;
+    if(!invLockHasMouse()) return;
     const s = e.target.closest('.reward-item-scroll .reward-item-slot');
-    const t = s && s.querySelector('.tooltip');
-    if(t && typeof codexShowTipHtml === 'function') codexShowTipHtml(s, t.innerHTML, 'reward:' + (s.dataset.rewardKey || ''));
+    if(s) rewardGridShowTip(s);
   });
   host.addEventListener('mouseout', (e)=>{
+    if(!invLockHasMouse()) return;
     if(e.target.closest('.reward-item-scroll .reward-item-slot') && typeof codexHideTip === 'function') codexHideTip();
   });
+  host.addEventListener('click', (e)=>{
+    if(invLockHasMouse()) return;
+    const s = e.target.closest('.reward-item-scroll .reward-item-slot');
+    if(!s || typeof codexHideTip !== 'function') return;
+    if(codexUI.tipKey === rewardGridTipKey(s)) codexHideTip(); else rewardGridShowTip(s);
+  });
+
   host.addEventListener('scroll', ()=>{ if(typeof codexHideTip === 'function') codexHideTip(); }, true);
   // 알림 점 확인 처리: 점이 켜진 슬롯에 마우스를 올리거나 터치/클릭하면 그 슬롯만 확인
   const ack = (e)=>{
