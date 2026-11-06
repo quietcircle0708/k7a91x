@@ -1725,13 +1725,14 @@
   .codex-body.cmi-open > .codex-vtabs, .codex-body.cmi-open > .codex-gridscroll{ display:none; }
   .codex-body.cmi-open > .codex-minfo{ position:relative; left:auto; right:auto; top:auto; flex:1; min-width:0; height:auto; min-height: var(--codex-grid-h, 364px); margin-left:12px; }
   .cmi-body{ flex:1; min-height:0; overflow-y:auto; padding:2px 0 4px; }
-  .cmi-section{ margin:6px 0 3px; padding-bottom:2px; border-bottom:1px solid var(--forge-line); font-weight:700; color: var(--forge-gold); }
+  /* 전투 능력치에 경험치 줄이 늘어도 패널 높이가 늘어나지 않도록 구역 위/아래 간격(6/3→5/2px)과 줄 위아래 여백(2→1px)을 1px씩 줄임 */
+  .cmi-section{ margin:5px 0 2px; padding-bottom:2px; border-bottom:1px solid var(--forge-line); font-weight:700; color: var(--forge-gold); }
   .cmi-section:first-child{ margin-top:0; }
   /* 기본 정보: 아이콘은 왼쪽, 이름/레벨/등급/방어도 줄은 오른쪽(세로 공간 절약 — 드랍 아이템까지 한 화면에 들어오도록) */
   .cmi-basic{ display:flex; align-items:center; gap:8px; }
   .cmi-basic-rows{ flex:1; min-width:0; }
   .cmi-slot{ width:42px; flex:none; }
-  .cmi-row{ display:grid; grid-template-columns:64px 1fr; gap:6px; padding:2px 0; border-bottom:1px dashed rgba(255,255,255,.06); line-height:1.4; }
+  .cmi-row{ display:grid; grid-template-columns:64px 1fr; gap:6px; padding:1px 0; border-bottom:1px dashed rgba(255,255,255,.06); line-height:1.4; }
   .cmi-label{ color: var(--forge-cream-dim); }
   .cmi-val{ text-align:center; color: var(--forge-gold); word-break:keep-all; overflow-wrap:anywhere; min-width:0; }
   .cmi-dungeons{ text-align:center; color: var(--forge-cream); line-height:1.6; }

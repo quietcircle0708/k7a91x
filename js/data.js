@@ -2568,7 +2568,7 @@ const STAT_POINTS_PER_LEVEL = 4;
 // ---- 스탯 분배 버튼 설정(캐릭터 메뉴/던전 우측 카드 공용, render.js renderStatAllocRow · main.js 길게 누르기) ----
 // [+N] 버튼이 한 번에 분배하는 포인트(레벨업당 지급량 STAT_POINTS_PER_LEVEL과는 별개 값). 이 값을 바꾸면 버튼 문자도 함께 바뀜.
 const STAT_ALLOC_BULK_STEP = 5;
-// [-]/[+] 버튼 길게 누르기 연속 증가: startDelayMs 동안 누르고 있으면 반복이 시작되고, 누른 시간(afterMs 이상)이 길수록
+// [-]/[+]/[+N] 버튼 길게 누르기 연속 증가: startDelayMs 동안 누르고 있으면 반복이 시작되고, 누른 시간(afterMs 이상)이 길수록
 // 목록에서 가장 뒤쪽의 해당 구간 간격(intervalMs)을 써서 점점 빨라짐. 구간/속도는 이 표만 고치면 됨.
 const STAT_ALLOC_HOLD = {
   startDelayMs: 400,
@@ -2579,9 +2579,26 @@ const STAT_ALLOC_HOLD = {
     { afterMs: 2600, intervalMs: 30 },
   ],
 };
-// 스탯 옆 [?] 툴팁("투자 시 얻는 효과")이 효과를 재는 포인트 수 — 실제 계산 함수에 이 포인트 수만큼 더했을 때의 1포인트당 평균 변화를 보여줌
-// (formulas.js statInvestEffects). %보정의 반올림 때문에 1포인트만 재면 값이 들쭉날쭉해지는 것을 막기 위한 값.
-const STAT_EFFECT_PROBE_POINTS = 20;
+// ---- 스탯 1포인트당 효과 "안내" 표(스탯 옆 [?] 툴팁 전용) ----
+// 운영자가 정해 둔 스탯당 효과를 플레이어에게 그대로 보여주는 안내 문구용 데이터일 뿐이며, 실제 능력치 계산식(formulas.js)과는 연결돼 있지 않음 —
+// 계산은 기존 공식이 그대로 하고, 이 표는 수치를 바꿔도 계산에 영향이 없음(반대로 계산식을 바꾸면 이 표도 직접 맞춰 고쳐야 함).
+// 항목: label 표시 이름 / value 수치 / unit 단위('%' 등) / note 괄호 안 설명(합연산·배수 등). 배열 순서 = 툴팁에 나열되는 순서.
+const STAT_EFFECT_GUIDE = {
+  str: [
+    { label: '공격력',        value: 4 },
+    { label: '최대 체력',     value: 20 },
+    { label: '치명타 피해량', value: 0.05, unit: '%', note: '합연산' },
+  ],
+  agi: [
+    { label: '공격력',        value: 1 },
+    { label: '공격속도',      value: 0.1,  unit: '%', note: '배수' },
+    { label: '회피',          value: 0.04, unit: '%', note: '합연산' },
+    { label: '치명타 확률',   value: 0.1,  unit: '%', note: '합연산' },
+  ],
+  int: [
+    { label: '최대 마나',     value: 30 },
+  ],
+};
 
 // 몬스터 등급
 // 표시 순서 = 등급 순서(도감 정렬이 이 키 순서를 그대로 사용). 기존 '네임드'는 '유니크'로 이름/키만 바뀌었고

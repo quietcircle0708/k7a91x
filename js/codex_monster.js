@@ -400,11 +400,14 @@ CODEX_ACTION_PROVIDERS.monster = (e) => [
 // ============================================================
 // 체력/공격력은 실제 전투와 같은 계산 함수(monsterHPFor/monsterAtkFor)를 몬스터 기본 level로 호출한 최종값.
 // 공격 속도는 전투(dungeon.js startMonsterAttackTimer)와 같은 식(MONSTER_ATTACK_SPEED × speedMult)이며 플레이어 공격속도와 같은 '회/초' 표기.
+// 경험치는 도감에 표기하는 몬스터 기본 level 기준의 기본값(monsterExpFor: 레벨별 기본 경험치 × 등급 배율) — 전투 중 적용되는
+// 사망 저주·플레이어와의 레벨 차이 보정은 포함하지 않음(플레이어 레벨에 따라 달라지므로).
 function codexMonsterStats(def){
   const speedMult = (def.speedMult != null) ? def.speedMult : 1;
   return {
     hp: monsterHPFor(def, def.level),
     atk: monsterAtkFor(def, def.level),
+    exp: monsterExpFor(def, def.level),
     speed: MONSTER_ATTACK_SPEED * speedMult,
     defense: def.defense || 0, // 몬스터 방어도(데이터 값 그대로, 전투 중 상태이상 보정은 포함하지 않음)
   };
@@ -435,6 +438,7 @@ function codexMonsterRenderInfo(){
     + codexMonsterInfoRow('체력', st.hp.toLocaleString())
     + codexMonsterInfoRow('공격 속도', `${st.speed.toFixed(2)}회/초`)
     + codexMonsterInfoRow('공격력', st.atk.toLocaleString())
+    + codexMonsterInfoRow('경험치', st.exp.toLocaleString())
     + `<div class="cmi-section">출현 던전</div>`
     + `<div class="cmi-dungeons">${e.dungeons.map(d => `<div>${codexEsc(d.name)}</div>`).join('')}</div>`
     + `<div class="cmi-section">드랍 아이템</div>`

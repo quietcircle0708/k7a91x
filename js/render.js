@@ -968,13 +968,27 @@ function hasAnyStatInvestment(){
   return appliedSum > 0 || draftSum > 0;
 }
 
-// 스탯 한 줄: 이름 + [?](투자 효과 툴팁) / 값 / [-] [+] [+N] [최대].
-// 버튼은 항상 같은 자리에 같은 순서로 그리고(숨기지 않고) 못 쓰는 상태만 흐리게(disabled) 처리함 — 누르는 동안 버튼이 생기거나
-// 사라져 위치가 밀려 [-]를 잘못 누르는 일이 없도록. [?] 툴팁은 세부 능력치 계산 내역 툴팁과 같은 .char-stat-tip/.tooltip 체계를 재사용하고,
-// 내용(statInvestTooltipHtml)은 실제 계산 함수로 구하므로 스탯 효과가 바뀌어도 이 함수는 그대로임.
+// 스탯 옆 [?] 툴팁 — data.js STAT_EFFECT_GUIDE(운영자가 정한 스탯 1포인트당 효과 안내 표)를 그대로 나열함. 실제 능력치 계산과는 무관하며 계산하지 않음.
+// 모양은 세부 능력치 계산 내역 툴팁(combatStatTooltipHtml)과 같은 제목/줄 스타일을 따름.
+function statInvestTooltipHtml(statKey, statLabel){
+  const list = STAT_EFFECT_GUIDE[statKey] || [];
+  let html = `<div style="text-align:center; color:var(--forge-gold); font-weight:700; margin-bottom:6px;">${statLabel} 1포인트당</div>`;
+  if(list.length === 0) return html + `<div style="text-align:center; color:var(--forge-cream-dim);">효과 없음</div>`;
+  list.forEach(e => {
+    const v = `+${e.value}${e.unit || ''}${e.note ? `(${e.note})` : ''}`;
+    html += `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${e.label}</span><span style="color:var(--forge-cream);">${v}</span></div>`;
+  });
+  return html;
+}
+// 스탯 한 줄: 이름 + [?](1포인트당 효과 툴팁) / 값 / 버튼.
+// 접힌 상태(기본)에는 [+]만 보이고(사용 가능 포인트가 없으면 흐리게), 그 [+]를 누르면 [-] [최대] [+5] [+]로 펼쳐짐 — 포인트를 다 쓰면 다시 접힘.
+// 버튼 묶음은 줄 오른쪽 끝에 붙어 있고 [+]가 항상 맨 오른쪽이라, 펼쳐져도 [+]는 제자리에 있어 연타 중에 다른 버튼을 누르지 않음.
+// [?] 툴팁은 세부 능력치 계산 내역 툴팁과 같은 .char-stat-tip/.tooltip 체계를 재사용하고, 내용(statInvestTooltipHtml)은
+// 안내 표(STAT_EFFECT_GUIDE, data.js)를 그대로 읽으므로 안내 수치가 바뀌어도 이 함수는 그대로임.
 function renderStatAllocRow(key, label, value){
   const points = draftStatPoints || 0;
   const pending = pendingStatPoints(key);
+  const open = !!statAllocOpen[key] && points > 0;
   const bonus = artifactStatBonus(key);
   const valueHtml = (bonus > 0
     ? `${value + bonus} <span style="color:var(--forge-green);">(+${bonus})</span>`
@@ -982,16 +996,17 @@ function renderStatAllocRow(key, label, value){
     + (pending > 0 ? ` <span class="stat-alloc-pending">(+${pending})</span>` : '');
   const btn = (action, text, enabled, extraClass) =>
     `<button class="stat-alloc-btn${extraClass ? ' ' + extraClass : ''}" data-stat="${key}" data-stat-action="${action}" ${enabled ? '' : 'disabled'}>${text}</button>`;
+  const buttons = open
+    ? btn('sub', '-', pending >= 1)
+      + btn('add-max', '최대', points > 0, 'wide max')
+      + btn('add-bulk', `+${STAT_ALLOC_BULK_STEP}`, points >= STAT_ALLOC_BULK_STEP, 'wide')
+      + btn('add', '+', points > 0)
+    : btn('add', '+', points > 0);
   return `
     <div class="stat-alloc-row">
-      <span class="stat-alloc-label">${label}<span class="stat-help-slot char-stat-tip" tabindex="0" aria-label="${label} 투자 효과">?<span class="tooltip">${statInvestTooltipHtml(key, label)}</span></span></span>
+      <span class="stat-alloc-label">${label}<span class="stat-help-slot char-stat-tip" tabindex="0" aria-label="${label} 1포인트당 효과">?<span class="tooltip">${statInvestTooltipHtml(key, label)}</span></span></span>
       <span class="stat-alloc-value">${valueHtml}</span>
-      <div class="stat-alloc-btn-group">
-        ${btn('sub', '-', pending >= 1)}
-        ${btn('add', '+', points > 0)}
-        ${btn('add-bulk', `+${STAT_ALLOC_BULK_STEP}`, points >= STAT_ALLOC_BULK_STEP, 'wide')}
-        ${btn('add-max', '최대', points > 0, 'wide max')}
-      </div>
+      <div class="stat-alloc-btn-group">${buttons}</div>
     </div>
   `;
 }
@@ -2180,6 +2195,7 @@ function toggleHuntTopUi(){
     // 우측 카드의 스탯 배분 버튼이 전혀 동작하지 않는 문제가 있었음(요구사항: 던전에서도 스탯 투자 가능).
     draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
     draftStatPoints = state.statPoints || 0;
+    statAllocCollapseAll();
   }
   updateHuntTopUiToggle();
 }

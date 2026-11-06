@@ -2112,23 +2112,13 @@ function formatSignedBreakdownValue(v){
   const sign = rounded > 0 ? '+' : '';
   return sign + (Number.isInteger(rounded) ? rounded : rounded.toFixed(2));
 }
-// 계산 내역 툴팁의 제목/기여 줄/빈 안내 줄 HTML — combatStatTooltipHtml과 스탯 투자 효과 툴팁(statInvestTooltipHtml)이 같은 모양을 쓰도록 공용으로 뺌.
-function tooltipTitleHtml(text){
-  return `<div style="text-align:center; color:var(--forge-gold); font-weight:700; margin-bottom:6px;">${text}</div>`;
-}
-function tooltipRowHtml(label, valueText){
-  return `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${label}</span><span style="color:var(--forge-cream);">${valueText}</span></div>`;
-}
-function tooltipEmptyHtml(text){
-  return `<div style="text-align:center; color:var(--forge-cream-dim);">${text}</div>`;
-}
 function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
   const parts = combatStatBreakdown(key, ctx);
   const order = ['스탯', '장비', '스킬/패시브', '기타'];
   const grouped = order.map(cat => ({ cat, items: parts.filter(p => p.category === cat) })).filter(g => g.items.length);
-  let html = tooltipTitleHtml(`${titleLabel} ${totalText}`);
+  let html = `<div style="text-align:center; color:var(--forge-gold); font-weight:700; margin-bottom:6px;">${titleLabel} ${totalText}</div>`;
   if(grouped.length === 0){
-    html += tooltipEmptyHtml('기여 항목 없음');
+    html += `<div style="text-align:center; color:var(--forge-cream-dim);">기여 항목 없음</div>`;
   } else {
     grouped.forEach(g => {
       html += `<div style="color:var(--forge-cream-dim); font-size:10.5px; letter-spacing:1px; margin-top:6px;">${g.cat}</div>`;
@@ -2139,7 +2129,7 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
       const suffix = PERCENT_SUFFIX_KEYS.includes(key) ? '%' : '';
       g.items.forEach(p => {
         const valueText = p.text !== undefined ? p.text : formatSignedBreakdownValue(p.value) + suffix;
-        html += tooltipRowHtml(p.label, valueText);
+        html += `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${p.label}</span><span style="color:var(--forge-cream);">${valueText}</span></div>`;
       });
     });
   }
@@ -2164,7 +2154,7 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
     const finalMp = naturalMpRegenAmount(maxMp, regenVal);
     const deltaHp = finalHp - baseHp;
     const deltaMp = finalMp - baseMp;
-    const row = tooltipRowHtml;
+    const row = (label, value) => `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span>${label}</span><span style="color:var(--forge-cream);">${value}</span></div>`;
     html += `<div style="margin-top:8px; padding-top:6px; border-top:1px solid var(--forge-line);">`;
     html += row('체력 회복 주기', `${HP_REGEN_INTERVAL_MS / 1000}초`);
     html += row('마력 회복 주기', `${MP_REGEN_INTERVAL_MS / 1000}초`);
@@ -2174,67 +2164,6 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
     html += row('마력 회복량', `${finalMp}`);
     html += `</div>`;
   }
-  return html;
-}
-
-// ---- 스탯 투자 효과 툴팁(스탯 옆 [?]) ----
-// 효과 수치(힘 1당 공격력 +4 등)를 여기에 따로 적어 두지 않고, 이미 실제 전투·캐릭터 정보창이 쓰는 계산 함수를 그대로 호출해서
-// "이 스탯을 STAT_EFFECT_PROBE_POINTS만큼 더했을 때 각 능력치가 얼마나 변하는지"를 잰 뒤 1포인트당 평균으로 보여줌 — 그래서
-// 스탯 효과 공식이 바뀌거나(힘이 다른 능력치에도 영향을 주는 등) 장비/패시브 %보정이 붙어도 이 목록은 수정할 필요가 없음.
-// 새 능력치를 보여주고 싶을 때만 아래 STAT_EFFECT_PROBES에 한 줄(이름 + 실제 계산 함수) 추가하면 됨.
-//   mode 'flat'  : 변화량(후 - 전) / 포인트   → 공격력/체력/마나/치명타 확률·피해/회피 등(%p 단위면 unit '%')
-//   mode 'ratio' : 변화율((후/전 - 1) × 100) / 포인트(%) → 곱연산으로 쌓이는 공격속도
-// 계산 함수가 착용 무기를 요구하는 항목(공격력/공격속도/치명타 확률)은 착용 무기 기준(없으면 캐릭터 정보창과 같은 기본 무기)으로 잼.
-function statProbeWeaponCtx(){
-  const eq = getEquippedWeapon();
-  if(eq) return { type: eq.type || 'longsword', level: eq.level, damaged: eq.damaged, durabilityZero: isEquipDurabilityZero(eq) };
-  return { type: 'longsword', level: 0, damaged: false, durabilityZero: false };
-}
-const STAT_EFFECT_PROBES = [
-  { label: '공격력',      mode: 'flat',  unit: '',  get: (w) => effectiveAtk(w.type, w.level, w.damaged, w.durabilityZero) },
-  { label: '공격속도',    mode: 'ratio', unit: '%', get: (w) => effectiveAtkSpeed(w.type, w.level, w.durabilityZero) },
-  { label: '치명타 확률', mode: 'flat',  unit: '%', get: (w) => effectiveCritChance(w.type, w.level, w.durabilityZero) },
-  { label: '치명타 피해', mode: 'flat',  unit: '%', get: () => critMultiplierFor(null) * 100 },
-  { label: '방어도 무시', mode: 'flat',  unit: '',  get: () => playerDefenseIgnore() },
-  { label: '총 방어도',   mode: 'flat',  unit: '',  get: () => playerTotalDefense() },
-  { label: '회피',        mode: 'flat',  unit: '%', get: () => effectivePlayerEvasion() },
-  { label: '재생력',      mode: 'flat',  unit: '',  get: () => effectivePlayerRegen() },
-  { label: '최대 체력',   mode: 'flat',  unit: '',  get: () => effectiveMaxHp(state.playerLevel) },
-  { label: '최대 마나',   mode: 'flat',  unit: '',  get: () => effectiveMaxMp(state.playerLevel) },
-];
-// statKey('str'|'agi'|'int')에 포인트를 투자했을 때 변하는 능력치 목록 [{ label, value(1포인트당), unit }] — 변화가 없는 능력치는 제외.
-// state.stats를 잠깐 바꿔 계산한 뒤 반드시 원래 값으로 되돌림(동기 계산이라 다른 코드가 중간 값을 볼 수 없음).
-function statInvestEffects(statKey){
-  if(!state.stats || !(statKey in state.stats)) return [];
-  const n = STAT_EFFECT_PROBE_POINTS;
-  const w = statProbeWeaponCtx();
-  const read = () => STAT_EFFECT_PROBES.map(pr => pr.get(w));
-  const before = read();
-  const prev = state.stats[statKey];
-  let after;
-  try {
-    state.stats[statKey] = prev + n;
-    after = read();
-  } finally {
-    state.stats[statKey] = prev;
-  }
-  const out = [];
-  STAT_EFFECT_PROBES.forEach((pr, i) => {
-    const per = pr.mode === 'ratio'
-      ? (before[i] ? (after[i] / before[i] - 1) * 100 / n : 0)
-      : (after[i] - before[i]) / n;
-    const rounded = Math.round(per * 1000) / 1000; // 소수 셋째 자리까지 — 부동소수점 오차(0.05000000000000682 등)는 여기서 정리됨
-    if(rounded !== 0) out.push({ label: pr.label, value: rounded, unit: pr.unit });
-  });
-  return out;
-}
-function statInvestTooltipHtml(statKey, statLabel){
-  const effects = statInvestEffects(statKey);
-  let html = tooltipTitleHtml(`${statLabel} 1포인트 투자 시`);
-  if(effects.length === 0) return html + tooltipEmptyHtml('효과 없음');
-  effects.forEach(e => {
-    html += tooltipRowHtml(e.label, `${e.value > 0 ? '+' : ''}${e.value}${e.unit}`);
-  });
   return html;
 }
 

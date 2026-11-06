@@ -18,6 +18,7 @@ function viewLeaveCleanup(view){
     // 공유하는 데이터이므로, 두 화면 모두 같은 규칙으로 정리함).
     draftStats = null;
     draftStatPoints = null;
+    statAllocCollapseAll();
   }
 }
 
@@ -30,6 +31,7 @@ function viewEnterInit(view){
     // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
     draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
     draftStatPoints = state.statPoints || 0;
+    statAllocCollapseAll();
     activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
     activeCharInfoSubtab = CHAR_INFO_SUBTABS.length > 0 ? CHAR_INFO_SUBTABS[0].id : null; // 캐릭터 메뉴 진입할 때마다 항상 첫 소분류탭부터
     pageState.charInfoEquip = 1;
@@ -766,6 +768,10 @@ function closeQuickSlotPicker(){
 // '적용'을 누르기 전까지는 draftStats/draftStatPoints(임시 값)만 바뀌고 실제 state는 그대로 유지됨.
 let draftStats = null;
 let draftStatPoints = null;
+// 스탯별 "펼침" 여부. 처음엔 [+]만 보이고, 그 스탯의 [+]를 누르면 true가 되어 [-] [최대] [+5] [+]가 함께 펼쳐짐(render.js renderStatAllocRow).
+// 사용 가능 포인트를 전부 쓰면(refreshCharDisplays) 또는 임시 배분을 새로 시작할 때(초기화/적용/화면 진입) 다시 [+]만 남도록 접음.
+let statAllocOpen = { str: false, agi: false, int: false };
+function statAllocCollapseAll(){ statAllocOpen = { str: false, agi: false, int: false }; }
 // 해당 스탯의 "아직 적용되지 않은 임시 분배 포인트" 수 — 마지막으로 적용(state.stats)된 값 대비
 // draftStats가 얼마나 더 찍혀있는지로 계산함. -(마이너스) 버튼의 표시/차감 기준으로 쓰임.
 function pendingStatPoints(key){
@@ -776,6 +782,7 @@ function pendingStatPoints(key){
 // "한쪽에서 바뀌면 다른 쪽도 즉시 반영"되도록 스탯이 바뀌는 모든 지점에서 항상 둘 다 다시 그림(둘 중 숨겨진
 // 화면을 다시 그리는 건 비용이 거의 없음 — render()가 매번 상점/인벤토리를 다시 그리는 것과 동일한 방식).
 function refreshCharDisplays(){
+  if((draftStatPoints || 0) <= 0) statAllocCollapseAll(); // 포인트를 다 썼으면 다시 [+]만 보이게
   renderCharacterMenu();
   renderHuntSidePanel(); // 던전 우측 카드에 재사용 중인 캐릭터 정보 UI도 함께 갱신
 }
@@ -785,6 +792,7 @@ function allocateStat(key){
   if(!(key in draftStats)) return;
   draftStats[key]++;
   draftStatPoints--;
+  statAllocOpen[key] = true;
   refreshCharDisplays();
 }
 // +N 버튼(한 번에 분배하는 양 STAT_ALLOC_BULK_STEP, data.js) — 사용 가능 포인트가 그 이상일 때만 동작.
@@ -829,6 +837,7 @@ function applyStatAlloc(){
   saveState();
   draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
   draftStatPoints = state.statPoints;
+  statAllocCollapseAll();
   refreshCharDisplays();
 }
 // 초기화: 이번에 임시로 찍었던 포인트를 되돌려 마지막으로 적용된 상태에서 다시 찍을 수 있게 함
@@ -836,6 +845,7 @@ function resetStatAlloc(){
   if(!draftStats) return;
   draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
   draftStatPoints = state.statPoints || 0;
+  statAllocCollapseAll();
   refreshCharDisplays();
 }
 // 전체 초기화: 마지막으로 '적용'되어 실제 저장된 스탯까지 포함해 지금까지 찍은 모든 포인트를 되돌림.
@@ -845,6 +855,7 @@ function resetStatAllocFull(){
   const totalPoints = (state.statPoints || 0) + (state.stats.str || 0) + (state.stats.agi || 0) + (state.stats.int || 0);
   draftStats = { str: 0, agi: 0, int: 0 };
   draftStatPoints = totalPoints;
+  statAllocCollapseAll();
   refreshCharDisplays();
 }
 // ---- 대장간 "강화 장비 선택" 팝업 ----

@@ -389,9 +389,9 @@ function handleCharPanelClick(e){
   if(statBtn && !statBtn.disabled){
     const statKey = statBtn.dataset.stat;
     const statAction = statBtn.dataset.statAction;
-    // [-]/[+]는 누르는 순간(pointerdown, 아래 statHold)에 이미 처리하므로 마우스/터치 클릭은 건너뜀 —
+    // [-]/[+]/[+N]은 누르는 순간(pointerdown, 아래 statHold)에 이미 처리하므로 마우스/터치 클릭은 건너뜀 —
     // 키보드(Enter/Space)로 누른 클릭(e.detail === 0)만 여기서 한 번 처리함.
-    if((statAction === 'add' || statAction === 'sub') && e.detail !== 0) return;
+    if((statAction === 'add' || statAction === 'sub' || statAction === 'add-bulk') && e.detail !== 0) return;
     if(statAction === 'add-bulk') allocateStatBulk(statKey);
     else if(statAction === 'add-max') allocateStatMax(statKey);
     else if(statAction === 'sub') deallocateStat(statKey);
@@ -411,14 +411,22 @@ function handleCharPanelClick(e){
 el('charTabPanels').addEventListener('click', handleCharPanelClick);
 el('huntCharTabPanels').addEventListener('click', handleCharPanelClick);
 
-// ---- 스탯 [-]/[+] 길게 누르기 연속 증가 ----
+// ---- 스탯 [-]/[+]/[+N] 길게 누르기 연속 증가 ----
 // 누르는 즉시 1번 실행하고, STAT_ALLOC_HOLD.startDelayMs 넘게 누르고 있으면 반복 시작 — 누른 시간이 길수록 간격이 줄어듦(data.js).
 // 스탯 줄은 포인트가 바뀔 때마다 통째로 다시 그려져 누르고 있던 버튼 요소가 사라지므로, 버튼이 아니라 (바뀌지 않는) 패널에
 // 포인터를 붙잡아 두고(setPointerCapture) 손을 뗄 때까지 패널 기준으로 추적함. 반복 대상은 (스탯 키, 동작)만 기억함.
 const statHold = { timer: null, key: null, action: null, startedAt: 0 };
 function statHoldCanStep(){
   if(!draftStats || !statHold.key) return false;
-  return statHold.action === 'sub' ? pendingStatPoints(statHold.key) >= 1 : (draftStatPoints || 0) > 0;
+  if(statHold.action === 'sub') return pendingStatPoints(statHold.key) >= 1;
+  if(statHold.action === 'add-bulk') return (draftStatPoints || 0) >= STAT_ALLOC_BULK_STEP;
+  return (draftStatPoints || 0) > 0;
+}
+// 현재 누르고 있는 버튼 동작을 한 번 실행([-] 1포인트 회수 / [+] 1포인트 / [+N] N포인트)
+function statHoldRunOnce(){
+  if(statHold.action === 'sub') deallocateStat(statHold.key);
+  else if(statHold.action === 'add-bulk') allocateStatBulk(statHold.key);
+  else allocateStat(statHold.key);
 }
 function statHoldStop(){
   clearTimeout(statHold.timer);
@@ -431,20 +439,20 @@ function statHoldIntervalMs(elapsedMs){
 }
 function statHoldTick(){
   if(!statHoldCanStep()){ statHoldStop(); return; }
-  if(statHold.action === 'sub') deallocateStat(statHold.key); else allocateStat(statHold.key);
+  statHoldRunOnce();
   if(!statHoldCanStep()){ statHoldStop(); return; }
   statHold.timer = setTimeout(statHoldTick, statHoldIntervalMs(Date.now() - statHold.startedAt - STAT_ALLOC_HOLD.startDelayMs));
 }
 function handleStatHoldDown(e){
   if(e.pointerType === 'mouse' && e.button !== 0) return;
-  const b = e.target.closest('button[data-stat][data-stat-action="add"], button[data-stat][data-stat-action="sub"]');
+  const b = e.target.closest('button[data-stat][data-stat-action="add"], button[data-stat][data-stat-action="sub"], button[data-stat][data-stat-action="add-bulk"]');
   if(!b || b.disabled) return;
   statHoldStop();
   statHold.key = b.dataset.stat;
   statHold.action = b.dataset.statAction;
   statHold.startedAt = Date.now();
   try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(_){} // 다시 그려져도 손을 뗄 때(pointerup)까지 이 패널이 이벤트를 받음
-  if(statHold.action === 'sub') deallocateStat(statHold.key); else allocateStat(statHold.key); // 누르는 즉시 1회
+  statHoldRunOnce(); // 누르는 즉시 1회
   if(statHoldCanStep()) statHold.timer = setTimeout(statHoldTick, STAT_ALLOC_HOLD.startDelayMs);
   else statHoldStop();
 }
