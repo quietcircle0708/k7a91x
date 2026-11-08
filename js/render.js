@@ -958,13 +958,13 @@ function updateQuickSlotCooldowns(){
 // draft(임시 배분)가 마지막으로 적용된 state.stats와 다른지 여부 — 적용/초기화 버튼 활성화 판단용
 function hasStatDraftChanges(){
   if(!draftStats) return false;
-  return draftStats.str !== state.stats.str || draftStats.agi !== state.stats.agi || draftStats.int !== state.stats.int
+  return STAT_KEYS.some(k => (draftStats[k] || 0) !== (state.stats[k] || 0))
     || draftStatPoints !== state.statPoints;
 }
 // 이미 적용된 스탯이든 draft에 임시로 찍은 값이든, 되돌릴 게 하나라도 있는지 — 전체 초기화 버튼 활성화 판단용
 function hasAnyStatInvestment(){
-  const appliedSum = (state.stats.str || 0) + (state.stats.agi || 0) + (state.stats.int || 0);
-  const draftSum = draftStats ? (draftStats.str || 0) + (draftStats.agi || 0) + (draftStats.int || 0) : 0;
+  const appliedSum = STAT_KEYS.reduce((sum, k) => sum + (state.stats[k] || 0), 0);
+  const draftSum = draftStats ? STAT_KEYS.reduce((sum, k) => sum + (draftStats[k] || 0), 0) : 0;
   return appliedSum > 0 || draftSum > 0;
 }
 
@@ -1414,6 +1414,7 @@ function buildCharLevelStatsHtml(){
     ${renderStatAllocRow('str', '힘', (draftStats || state.stats).str)}
     ${renderStatAllocRow('agi', '민첩', (draftStats || state.stats).agi)}
     ${renderStatAllocRow('int', '지능', (draftStats || state.stats).int)}
+    ${renderStatAllocRow('will', '의지', (draftStats || state.stats).will || 0)}
     <div class="stat-alloc-actions">
       <button class="nav-btn" data-action="reset-stats-full" ${hasAnyStatInvestment() ? '' : 'disabled'}>전체 초기화</button>
       <div class="stat-alloc-actions-right">
@@ -1462,6 +1463,7 @@ function buildCharCombatStatsHtml(){
     <div class="char-stat-row big"><span>총 방어도</span>${charStatValueWithTip('defense', ctx, '총 방어도', `${totalDef}`)}</div>
     <div class="char-stat-row big"><span>회피</span>${charStatValueWithTip('evasion', ctx, '회피', `${Math.round(effectivePlayerEvasion() * 100) / 100}%`)}</div>
     <div class="char-stat-row big"><span>재생력</span>${charStatValueWithTip('regen', ctx, '재생력', `${effectivePlayerRegen()}`)}</div>
+    <div class="char-stat-row big"><span>상태 이상 저항</span>${charStatValueWithTip('statusResist', ctx, '상태 이상 저항', `${formatResistPercent(playerStatusResistTotal())}%`)}</div>
   `;
 }
 // [세부 능력치] 2페이지 — 최대 체력/최대 마나/힘/민첩/지능의 "최종 스탯"만(모두 기존 계산 함수 그대로
@@ -1478,6 +1480,7 @@ function buildCharFinalStatsHtml(){
     <div class="char-stat-row big"><span>힘</span>${charStatValueWithTip('str', {}, '힘', `${s.str}`)}</div>
     <div class="char-stat-row big"><span>민첩</span>${charStatValueWithTip('agi', {}, '민첩', `${s.agi}`)}</div>
     <div class="char-stat-row big"><span>지능</span>${charStatValueWithTip('int', {}, '지능', `${s.int}`)}</div>
+    <div class="char-stat-row big"><span>의지</span>${charStatValueWithTip('will', {}, '의지', `${s.will}`)}</div>
   `;
 }
 // "적용 중인 아티팩트 효과" HTML 조립. 무기가 장착돼 있을 때만 표시되며(무기 미장착 시 안내 문구),
@@ -2193,7 +2196,7 @@ function toggleHuntTopUi(){
     // 다시 세팅함(적용하지 않은 이전 임시 배분은 버리고 항상 최신 state.stats 기준으로 시작) — 이게 없으면
     // 던전에 입장한 뒤 캐릭터 메뉴를 한 번도 연 적이 없는 상태에서는 draftStats가 비어 있어(null) 던전
     // 우측 카드의 스탯 배분 버튼이 전혀 동작하지 않는 문제가 있었음(요구사항: 던전에서도 스탯 투자 가능).
-    draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+    draftStats = statsCopy(state.stats);
     draftStatPoints = state.statPoints || 0;
     statAllocCollapseAll();
   }
@@ -2314,6 +2317,12 @@ function renderHunt(){
 // :hover 상태가 끊기고 툴팁이 깜빡이므로, data-key(스킬id 또는 'curse')로 기존 노드를 찾아 재사용하고
 // 남은시간 텍스트만 갱신함 — 노드는 그 버프가 실제로 사라지거나 새로 생길 때만 추가/제거됨. 순서가 바뀔 때만
 // insertBefore로 재배치함(순위가 실제로 바뀐 경우뿐이라 그때 hover가 끊기는 것은 정상 동작).
+// 플레이어 상태이상 아이콘 툴팁 — 몬스터 상태이상 줄(renderStatusBadges)과 같은 구성: 이름(상태이상 색) + 용어사전 설명 + 보조 줄(분류·마법 수준).
+function statusBuffTooltipHtml(key, def){
+  const g = glossaryEntry(key);
+  return `<span style="display:block; text-align:center; color:${def.color}; font-weight:700;">${def.name}</span>`
+    + (g && g.desc ? `<br><span style="font-weight:400;">${g.desc}</span>` : '') + (g && g.metaHtml ? g.metaHtml : '');
+}
 const HUNT_BUFF_UI_MAX = 15; // 한 줄 5개 × 최대 3줄(CSS .hunt-buff-ui의 고정폭/최대높이와 반드시 같이 맞춰야 함)
 function renderHuntBuffUi(){
   const wrap = el('huntBuffUi');
@@ -2322,6 +2331,14 @@ function renderHuntBuffUi(){
   if(isDeathCurseActive()){
     entries.push({ key: 'curse', kind: 'curse', remainMs: state.deathCurseUntil - Date.now() });
   }
+  // 플레이어에게 걸린 상태이상(몬스터 스킬의 기절 등)도 같은 영역에 같은 정렬 규칙으로 표시 — 아이콘·이름·설명은 몬스터 상태이상 줄과 같은 데이터(STATUS_EFFECTS·용어사전)를 씀.
+  // 지속 피해형(중독 등)의 남은 시간은 남은 틱 수 × 틱 간격(몬스터 상태이상 줄과 같은 방식).
+  ((hunt.player && hunt.player.statusEffects) || []).forEach(s => {
+    const def = STATUS_EFFECTS[s.key];
+    if(!def) return;
+    const remainMs = def.type === 'dot' ? s.ticksRemaining * def.tickIntervalMs : s.expiresAt - Date.now();
+    if(remainMs > 0) entries.push({ key: 'status-' + s.key, kind: 'status', statusKey: s.key, def, remainMs });
+  });
   entries.sort((a, b) => b.remainMs - a.remainMs);
   const capped = entries.slice(0, HUNT_BUFF_UI_MAX);
 
@@ -2340,6 +2357,10 @@ function renderHuntBuffUi(){
         ? `<img src="assets/ui/DEATH_CURSE.svg" class="hunt-buff-icon-img" alt="" draggable="false">
            <span class="hunt-buff-time"></span>
            <span class="tooltip">망자의 저주<br><span class="hunt-buff-curse-desc"></span></span>`
+        : e.kind === 'status'
+        ? `${statusEffectIconHtml(e.def, 'hunt-buff-icon-img')}
+           <span class="hunt-buff-time"></span>
+           <span class="tooltip">${statusBuffTooltipHtml(e.statusKey, e.def)}</span>`
         : `${skillIconHtml(SKILLS[e.id], 'hunt-buff-icon-img')}
            <span class="hunt-buff-time"></span>
            <span class="tooltip">${buildSkillTooltipHtml(e.id)}</span>`;
@@ -2469,7 +2490,8 @@ function renderStatusBadges(){
         // 여기서 새로 만들거나 바꾸지 않음. 노드가 diffing으로 재사용되므로 이 innerHTML은 최초 생성 시
         // 한 번만 구성되고, 이후엔 남은시간 텍스트만 갱신됨(zip163과 동일한 패턴, 툴팁 깜빡임 없음).
         const g = glossaryEntry(e.key);
-        const descHtml = g && g.desc ? `<br><span style="font-weight:400;">${g.desc}</span>` : '';
+        // metaHtml: 설명 아래 보조 줄 "분류 ○○ · 마법 수준 N"(data.js glossaryEntry)
+        const descHtml = (g && g.desc ? `<br><span style="font-weight:400;">${g.desc}</span>` : '') + (g && g.metaHtml ? g.metaHtml : '');
         // 이번 수정: 이름 줄만 가로 중앙 정렬(display:block 컨테이너에 text-align:center) — 설명 줄
         // 서식(descHtml)과 툴팁 전체 레이아웃/디자인은 전혀 손대지 않음(요구사항 1번).
         node.innerHTML = `${statusEffectIconHtml(e.def)}

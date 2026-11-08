@@ -57,6 +57,7 @@ function playerDodgeEffect(){
 // 플레이어 사망 시 전투 화면 중앙 아이콘에 몬스터와 동일한 사망 애니메이션(.dead, monster-dead 키프레임)을
 // 재생함. 새로 만들지 않고 기존 클래스/키프레임을 그대로 재사용(요구사항: 플레이어 전용 기능 신규 제작 지양).
 function playerDeathEffect(){
+  clearSpeechBubbles(); // 사망하면 떠 있던 말풍선은 즉시 제거
   const combatIcon = el('combatPlayerIcon');
   if(!combatIcon) return;
   combatIcon.classList.remove('hit');
@@ -146,16 +147,36 @@ function dmgPopupStartOffset(container){
   container._dmgPopups = alive;
   return off;
 }
-function spawnDmgPopupIn(container, dmg, isCrit, isDodge){
+function spawnDmgPopupIn(container, dmg, isCrit, isDodge, label){
   if(!container) return;
   const p = document.createElement('div');
   p.className = 'dmg-popup float' + (isCrit ? ' crit' : '') + (isDodge ? ' dodge' : '');
-  p.textContent = isDodge ? '회피!' : String(dmg);
+  p.textContent = label || (isDodge ? '회피!' : String(dmg)); // label: 회피 팝업을 재활용하는 다른 문구(예: 상태이상 저항)
   p.style.left = (42 + Math.random() * 16) + '%';
   const off = dmgPopupStartOffset(container);
   if(off > 0) p.style.top = `calc(20% + ${off}px)`;
   container.appendChild(p);
   setTimeout(() => p.remove(), DMG_POPUP_LIFE_MS);
+}
+
+// 플레이어에게 걸린 지속 피해형 상태이상(중독 등)의 틱 피해 숫자 — 몬스터용 statusTickEffect와 같은 모양으로 플레이어 칸 위에 띄움(피해 계산은 dungeon.js tickPlayerStatusEffects).
+function playerStatusTickEffect(dmg, color){
+  const slot = el('combatPlayerSlot');
+  if(!slot) return;
+  const p = document.createElement('div');
+  p.className = 'dmg-popup float';
+  p.style.color = color;
+  p.textContent = String(dmg);
+  p.style.left = (42 + Math.random() * 16) + '%';
+  const off = dmgPopupStartOffset(slot);
+  if(off > 0) p.style.top = `calc(20% + ${off}px)`;
+  slot.appendChild(p);
+  setTimeout(() => p.remove(), DMG_POPUP_LIFE_MS);
+}
+// 상태이상 저항 연출 — 회피와 같은 팝업(같은 색·위치·타이밍)에 "[상태이상 이름] 저항" 문구를 띄움. target: 몬스터 개체 또는 플레이어(hunt.player).
+function statusResistEffect(target, statusName){
+  const slot = target && target.instanceId ? el('monster-slot-' + target.instanceId) : el('combatPlayerSlot');
+  spawnDmgPopupIn(slot, 0, false, true, `${statusName} 저항`);
 }
 
 function monsterHitEffect(instanceId, dmg, isCrit){
@@ -264,6 +285,115 @@ function playMonsterDropEffect(instanceId, items){
     const jitter = (i - (items.length - 1) / 2) * 14 + (Math.random() * 8 - 4);
     setTimeout(() => spawnDropItemVisual(arena, baseLeft + jitter, baseTop, item), i * 90);
   });
+}
+
+// ---- 말풍선(speech bubble) ----
+// showSpeechBubble(기준 요소, 글, 프리셋 이름, 옵션): 기준 요소의 "머리 위"에 말풍선을 띄움 — 모양/색/시간은 data.js SPEECH_BUBBLE_PRESETS.
+// 말풍선은 전투 영역 안이 아니라 화면 전체 위에 겹치는 전용 층(#speechBubbleLayer, body 직속)에 그려서 어떤 영역의 overflow에도 잘리지 않고,
+// 화면 가장자리에서 벗어나면 안쪽으로 밀어 넣으며(꼬리는 계속 기준 요소를 가리킴) 플레이어/몬스터 등 어떤 요소에도 같은 방식으로 쓸 수 있음.
+//   opts.headTopRatio: 기준 요소 높이 중 "머리 윗부분"이 시작되는 위치 비율(0=요소 맨 위, 기본 0) — 이미지 위쪽에 투명 여백이 있는 요소용
+//   (플레이어는 PLAYER_HEAD_TOP_RATIO). 같은 기준 요소에는 말풍선이 하나만 있으며 새로 띄우면 이전 것을 대체함.
+// 말풍선이 떠 있는 동안 매 프레임 기준 요소 위치를 따라가고, 기준 요소가 사라지거나 화면에서 안 보이면(던전 이탈 등) 바로 없앰.
+const SPEECH_BUBBLE_TAIL_PX = 7; // 꼬리 높이(style.css .speech-bubble::after와 같은 값)
+const speechBubbles = new Map(); // 기준 요소 → { el, preset, headTopRatio, startedAt }
+let speechBubbleLayer = null;
+let speechBubbleRaf = null;
+function speechBubbleLayerEl(){
+  if(speechBubbleLayer && document.body.contains(speechBubbleLayer)) return speechBubbleLayer;
+  speechBubbleLayer = document.createElement('div');
+  speechBubbleLayer.id = 'speechBubbleLayer';
+  document.body.appendChild(speechBubbleLayer);
+  return speechBubbleLayer;
+}
+// 말풍선 하나의 위치를 기준 요소의 현재 위치에 맞춤. 기준 요소가 사라졌거나 안 보이면 false.
+function speechBubbleGapPx(preset){
+  return (document.body.classList.contains('mobile-preset') && preset.gapPxMobile != null) ? preset.gapPxMobile : preset.gapPx;
+}
+// 몸통+꼬리를 "하나의 윤곽선"으로 그림 — 몸통과 꼬리를 따로 그리면 둘 사이에 선이 보이므로, 하나의 경로(path)로 이어서 채우고 테두리를 그림.
+// 바깥쪽에 어두운 외곽선(1px)을 한 겹 더 두르고, 좌표는 말풍선 테두리 박스 기준(테두리 선 두께 2px의 가운데 = 안쪽 1px).
+// tailX: 꼬리 끝이 가리키는 가로 위치(박스 왼쪽 기준). 꼬리 길이(SPEECH_BUBBLE_TAIL_PX)는 어두운 외곽선까지 포함해 박스 아래로 튀어나오는 길이.
+function speechBubbleShapePath(bw, bh, tailX, fontSize){
+  const x0 = 1, y0 = 1, x1 = bw - 1, y1 = bh - 1;
+  const r = Math.max(2, Math.min(Math.round(fontSize * 0.85), (bh - 2) / 2, (bw - 2) / 2));
+  const tw = 5;                                   // 꼬리 밑변의 절반
+  const tipY = bh + SPEECH_BUBBLE_TAIL_PX - 2;    // 꼬리 끝(둥근 이음 + 외곽선이 약 2px 더 나감)
+  return `M${x0 + r},${y0} H${x1 - r} A${r},${r} 0 0 1 ${x1},${y0 + r} V${y1 - r} A${r},${r} 0 0 1 ${x1 - r},${y1} `
+       + `H${tailX + tw} L${tailX},${tipY} L${tailX - tw},${y1} H${x0 + r} A${r},${r} 0 0 1 ${x0},${y1 - r} `
+       + `V${y0 + r} A${r},${r} 0 0 1 ${x0 + r},${y0} Z`;
+}
+function updateSpeechBubbleShape(b, bw, bh, tailX){
+  const key = bw + 'x' + bh + '@' + tailX;
+  if(b.shapeKey === key) return;
+  b.shapeKey = key;
+  const svg = b.el.firstChild;
+  svg.setAttribute('width', bw); svg.setAttribute('height', bh);
+  const d = speechBubbleShapePath(bw, bh, tailX, b.preset.fontSize);
+  svg.firstChild.setAttribute('d', d); svg.lastChild.setAttribute('d', d);
+}
+function placeSpeechBubble(anchor, b){
+  if(!anchor.isConnected) return false;
+  const r = anchor.getBoundingClientRect();
+  if(r.width === 0 && r.height === 0) return false;
+  const bw = b.el.offsetWidth, bh = b.el.offsetHeight;
+  const m = SPEECH_BUBBLE_VIEWPORT_MARGIN_PX;
+  const cx = r.left + r.width / 2;
+  const headY = r.top + r.height * b.headTopRatio;
+  const left = Math.min(Math.max(cx - bw / 2, m), Math.max(m, (document.documentElement.clientWidth || window.innerWidth) - bw - m));
+  const top = Math.max(headY - speechBubbleGapPx(b.preset) - SPEECH_BUBBLE_TAIL_PX - bh, m);
+  b.el.style.left = left + 'px';
+  b.el.style.top = top + 'px';
+  // 밀려도 꼬리는 기준 요소를 가리키되, 꼬리가 둥근 모서리에 걸리지 않도록 직선 구간 안으로 제한
+  const tailMin = Math.min(Math.round(b.preset.fontSize * 0.85) + 7, bw / 2);
+  const tailX = Math.round(Math.min(Math.max(cx - left, tailMin), Math.max(tailMin, bw - tailMin)));
+  b.el.style.setProperty('--tail-x', tailX + 'px');
+  updateSpeechBubbleShape(b, bw, bh, tailX);
+  return true;
+}
+function removeSpeechBubble(anchor){
+  const b = speechBubbles.get(anchor);
+  if(!b) return;
+  b.el.remove();
+  speechBubbles.delete(anchor);
+}
+// anchor를 주면 그 요소의 말풍선만, 안 주면 전부 즉시 제거(플레이어 사망 등).
+function clearSpeechBubbles(anchor){
+  if(anchor){ removeSpeechBubble(anchor); return; }
+  Array.from(speechBubbles.keys()).forEach(removeSpeechBubble);
+}
+function speechBubbleTick(){
+  speechBubbleRaf = null;
+  const now = performance.now();
+  Array.from(speechBubbles.entries()).forEach(([anchor, b]) => {
+    const elapsed = now - b.startedAt;
+    if(elapsed >= b.preset.durationMs || !placeSpeechBubble(anchor, b)){ removeSpeechBubble(anchor); return; }
+    if(elapsed >= b.preset.durationMs - b.preset.fadeOutMs) b.el.classList.add('hide');
+  });
+  if(speechBubbles.size > 0) speechBubbleRaf = requestAnimationFrame(speechBubbleTick);
+}
+function showSpeechBubble(anchor, text, presetKey, opts){
+  const preset = SPEECH_BUBBLE_PRESETS[presetKey] || SPEECH_BUBBLE_PRESETS[SPEECH_BUBBLE_DEFAULT_PRESET];
+  if(!anchor || !preset) return;
+  removeSpeechBubble(anchor); // 같은 대상에는 하나만 — 새 말풍선이 이전 것을 대체
+  const e = document.createElement('div');
+  e.className = 'speech-bubble';
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'sb-shape'); svg.setAttribute('aria-hidden', 'true');
+  ['sb-outline', 'sb-body'].forEach(c => { const pth = document.createElementNS(NS, 'path'); pth.setAttribute('class', c); svg.appendChild(pth); });
+  const label = document.createElement('span');
+  label.className = 'sb-text';
+  label.textContent = text;
+  e.appendChild(svg); e.appendChild(label);
+  const st = e.style;
+  st.setProperty('--sb-fill', preset.fill); st.setProperty('--sb-border', preset.border); st.setProperty('--sb-text', preset.text);
+  st.setProperty('--sb-size', preset.fontSize + 'px'); st.setProperty('--sb-max', preset.maxWidthPx + 'px');
+  st.setProperty('--sb-fade-in', preset.fadeInMs + 'ms'); st.setProperty('--sb-fade-out', preset.fadeOutMs + 'ms');
+  speechBubbleLayerEl().appendChild(e);
+  const b = { el: e, preset, headTopRatio: (opts && opts.headTopRatio) || 0, startedAt: performance.now() };
+  speechBubbles.set(anchor, b);
+  if(!placeSpeechBubble(anchor, b)){ removeSpeechBubble(anchor); return; }
+  void e.offsetWidth; e.classList.add('show'); // 위치를 잡은 뒤 나타나는 전환 시작
+  if(!speechBubbleRaf) speechBubbleRaf = requestAnimationFrame(speechBubbleTick);
 }
 
 let spawnToastTimeout = null;

@@ -680,7 +680,7 @@ function monsterDefenseFor(instance){
 // 상태이상으로 인한 방어도 보너스(요구사항 6번) — 특정 상태이상(예: 파쇄)만 직접 확인하던 기존 구조를
 // 일반화해, 대상에게 걸린 상태이상 중 STATUS_EFFECTS의 type이 'defenseBoost'인 것을 전부 훑어 그
 // defenseBonus를 합산함. 현재는 파쇄(+20)·저주(+40)가 이 타입이며 서로 동시에 존재할 수 없도록
-// STATUS_EFFECT_INTERACTIONS(data.js)에서 막고 있어 실질적으로는 항상 둘 중 하나의 보너스만 적용되지만,
+// 같은 분류(방어도 감소)의 마법 수준 우선순위(data.js·state.js applyStatusEffect)로 서로 덮어쓰고 있어 실질적으로는 항상 둘 중 하나의 보너스만 적용되지만,
 // 이 함수 자체는 여러 defenseBoost 상태이상이 동시에 걸리는 경우도 자연스럽게 합산 처리함 — 앞으로 새
 // defenseBoost 상태이상이 추가되면 STATUS_EFFECTS에 defenseBonus 값만 등록하면 자동으로 반영됨(기존
 // monsterDefenseFor/방어도 계산 공식 자체는 무변경). target은 statusEffects 배열을 가진 대상이면
@@ -1712,8 +1712,33 @@ function rollEvasion(evasionPercent){
 // 회피와 완전히 동일한 패턴 — 이미 있는 범용 함수들을 'regen' 키로 그대로 재호출해 합산만 함(요구사항 10번:
 // 특정 아이템/스킬 하드코딩 금지). 현재 값이 나오는 곳은 목걸이 고유 옵션(성장형 regen)이며, 아티팩트·버프 쪽에는 아직
 // 값을 가진 데이터가 없음 — 해당 데이터에 'regen' 값만 채우면 이 함수 수정 없이 자동 반영됨.
+// 의지 포인트(투자 + 장비 스탯 보너스) — 재생력·상태 이상 저항 계산에 쓰는 값(힘→체력처럼 패시브·% 보정 없이 원시 합계).
+function playerWillPoints(){
+  return ((state.stats && state.stats.will) || 0) + artifactStatBonus('will');
+}
+// 상태 이상 저항 합계(%) — 모든 출처의 합연산(현재 출처는 의지뿐, 새 출처가 생기면 여기에 더함). 상태 이상별 환산은 playerStatusResistPercent.
+function playerStatusResistTotal(){
+  return Math.max(0, playerWillPoints() * WILL_STATUS_RESIST_PER_POINT);
+}
+// 마법 수준에 따른 저항 효율 배수(STATUS_RESIST_MAGIC_LEVEL_EFFICIENCY — fromLevel 이상 중 가장 높은 항목, 해당 없으면 1)
+function statusResistEfficiency(magicLevel){
+  let mult = 1;
+  STATUS_RESIST_MAGIC_LEVEL_EFFICIENCY.forEach(e => { if((magicLevel || 0) >= e.fromLevel) mult = e.mult; });
+  return mult;
+}
+// 그 상태 이상의 최종 저항 확률(%, 0~STATUS_RESIST_MAX_PERCENT) — 상태 이상이 부여될 때 이 확률로 저항 판정(dungeon.js applyStatusEffectToPlayer)하고,
+// 캐릭터 정보창 저항 툴팁도 같은 함수를 읽으므로 표시와 실제 판정이 어긋날 수 없음.
+function playerStatusResistPercent(key){
+  const def = STATUS_EFFECTS[key];
+  if(!def) return 0;
+  return Math.min(STATUS_RESIST_MAX_PERCENT, Math.max(0, playerStatusResistTotal() * statusResistEfficiency(def.magicLevel)));
+}
+// 저항 % 표기용 — 소수는 필요할 때만 최대 2자리(예: 35, 4.9, 0.35)
+function formatResistPercent(v){
+  return String(Math.round((v || 0) * 100) / 100);
+}
 function effectivePlayerRegen(){
-  const total = weaponUniqueOptionStatBonus('regen') + weaponUniqueOptionGrowthStat('regen')
+  const total = weaponUniqueOptionStatBonus('regen') + weaponUniqueOptionGrowthStat('regen') + playerWillPoints() * WILL_REGEN_PER_POINT
     + armorUniqueOptionStatBonus('regen') + armorUniqueOptionGrowthStat('regen')
     + learnedPassiveSkillBonus('regen') + activeBuffBonus('regen');
   return Math.max(0, total); // 요구사항 1번: 0 미만 불가(상한은 문서에 없어 별도로 두지 않음)
@@ -1851,6 +1876,7 @@ function effectiveStats(){
     str: applyPercentBonus((s.str || 0) + artifactStatBonus('str') + learnedPassiveSkillBonus('strFlat'), 'str'),
     agi: applyPercentBonus((s.agi || 0) + artifactStatBonus('agi') + learnedPassiveSkillBonus('agiFlat'), 'agi'),
     int: applyPercentBonus((s.int || 0) + artifactStatBonus('int') + learnedPassiveSkillBonus('intFlat'), 'int'),
+    will: applyPercentBonus((s.will || 0) + artifactStatBonus('will') + learnedPassiveSkillBonus('willFlat'), 'will'),
   };
 }
 // 착용 중인 방어구+장신구+아티팩트 전체의 방어도 합산. 아티팩트는 방어형 장비 목록(wornEquipmentItems)에
@@ -2020,7 +2046,7 @@ function combatStatBreakdown(key, ctx){
       if(def) push('장비', wpn(item.type).name, def);
     });
     push('장비', '아티팩트 방어도 보정', artifactDefenseBonus());
-  } else if(key === 'str' || key === 'agi' || key === 'int'){
+  } else if(key === 'str' || key === 'agi' || key === 'int' || key === 'will'){
     // [세부 능력치] 2페이지 힘/민첩/지능 — effectiveStats()의 각 스탯이 정확히 이 두 항목의 합이므로
     // (state.stats[stat] + artifactStatBonus(stat)), 그 두 항목에만 이름표를 붙임. artifactStatBonus
     // 자체가 아티팩트 고정 보너스+무기/방어구 고유 옵션(고정형·성장형)을 이미 전부 합산해 반환하므로
@@ -2028,6 +2054,10 @@ function combatStatBreakdown(key, ctx){
     push('스탯', '투자한 스탯', (state.stats && state.stats[key]) || 0);
     push('장비', '장비 스탯 보너스', artifactStatBonus(key));
     push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus(key + 'Flat'));
+  } else if(key === 'statusResist'){
+    // 저항 합계(%) 항목 — 상태 이상별 최종 확률은 툴팁 아래쪽(combatStatTooltipHtml)에서 이 합계에 마법 수준 효율을 곱해 보여줌
+    push('스탯', '의지', ((state.stats && state.stats.will) || 0) * WILL_STATUS_RESIST_PER_POINT);
+    push('장비', '장비 스탯 보너스(의지)', artifactStatBonus('will') * WILL_STATUS_RESIST_PER_POINT);
   } else if(key === 'maxHp'){
     const lv = state.playerLevel;
     const str = (state.stats && state.stats.str) || 0;
@@ -2073,6 +2103,8 @@ function combatStatBreakdown(key, ctx){
     push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus('evasion'));
     push('스킬/패시브', '전투 버프', activeBuffBonus('evasion'));
   } else if(key === 'regen'){
+    push('스탯', '의지', ((state.stats && state.stats.will) || 0) * WILL_REGEN_PER_POINT);
+    push('장비', '장비 스탯 보너스(의지)', artifactStatBonus('will') * WILL_REGEN_PER_POINT);
     push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('regen'));
     push('장비', '무기 고유 옵션(성장형)', weaponUniqueOptionGrowthStat('regen'));
     push('장비', '방어구/보조/장신구 고유 옵션', armorUniqueOptionStatBonus('regen'));
@@ -2125,7 +2157,7 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
       // 치명타 확률/치명타 피해/회피는 항목 하나하나가 전부 "%로 합연산"되는 수치라서(사용자 요청) 각
       // 줄 끝에 %를 붙여줌 — text가 이미 지정된 항목(예: 위 %패시브 줄의 "300(+5%)")은 자체적으로 단위가
       // 붙어있으므로 건드리지 않음.
-      const PERCENT_SUFFIX_KEYS = ['crit', 'critDamage', 'evasion'];
+      const PERCENT_SUFFIX_KEYS = ['crit', 'critDamage', 'evasion', 'statusResist'];
       const suffix = PERCENT_SUFFIX_KEYS.includes(key) ? '%' : '';
       g.items.forEach(p => {
         const valueText = p.text !== undefined ? p.text : formatSignedBreakdownValue(p.value) + suffix;
@@ -2162,6 +2194,17 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
     html += row('재생력 회복량(기본 대비)', `체력 ${deltaHp >= 0 ? '+' : ''}${deltaHp} / 마력 ${deltaMp >= 0 ? '+' : ''}${deltaMp}`);
     html += row('체력 회복량', `${finalHp}`);
     html += row('마력 회복량', `${finalMp}`);
+    html += `</div>`;
+  }
+  if(key === 'statusResist'){
+    // 현존하는 모든 상태 이상(STATUS_EFFECTS 등록 순서)의 최종 저항 확률 — 상태 이상이 추가·삭제되면 이 목록도 자동으로 따라감.
+    // 확률은 실제 저항 판정(dungeon.js applyStatusEffectToPlayer)이 읽는 playerStatusResistPercent 그대로라 표시와 판정이 어긋날 수 없음.
+    html += `<div style="margin-top:8px; padding-top:6px; border-top:1px solid var(--forge-line);">`;
+    Object.keys(STATUS_EFFECTS).forEach(k => {
+      const d = STATUS_EFFECTS[k];
+      html += `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span><b style="color:${d.color};">${d.name}</b> 저항</span><span style="color:var(--forge-cream);">${formatResistPercent(playerStatusResistPercent(k))}%</span></div>`;
+    });
+    html += `<div style="margin-top:6px; font-size:10.5px; color:var(--forge-cream-dim);">마법 수준에 따라 저항 효율이 다르며, 최대 ${STATUS_RESIST_MAX_PERCENT}%까지 적용됩니다.</div>`;
     html += `</div>`;
   }
   return html;
@@ -2510,6 +2553,25 @@ function monsterAtk(level){
   return Math.round(expectedHp / 8);
 }
 
+// 몬스터가 쓸 수 있는 스킬 목록(우선순위 순, 같은 숫자면 등록 순). 구성: ① 기본 규칙(MONSTER_DEFAULT_SKILL_RULES — 등급·레벨 조건) + ② 몬스터 데이터의 skills(스킬 id 문자열 또는 id가 든 스킬 객체) − ③ excludeSkills.
+// 반환은 스킬 객체 배열(각 객체에 id가 들어 있음) — 개체를 만들 때(dungeon.js createMonsterInstance) 한 번만 계산해 둠.
+function monsterSkillDefsFor(monsterDef){
+  if(!monsterDef) return [];
+  const list = [];
+  const add = (entry) => {
+    const def = typeof entry === 'string'
+      ? (MONSTER_SKILLS[entry] ? Object.assign({ id: entry }, MONSTER_SKILLS[entry]) : null)
+      : (entry && entry.id ? entry : null);
+    if(def && !list.some(s => s.id === def.id)) list.push(def);
+  };
+  MONSTER_DEFAULT_SKILL_RULES.forEach(r => {
+    if(r.grades.includes(monsterDef.grade) && (monsterDef.level || 0) >= (r.minLevel || 0)) add(r.skill);
+  });
+  (monsterDef.skills || []).forEach(add);
+  const excluded = monsterDef.excludeSkills || [];
+  const pri = s => (s.priority != null ? s.priority : 99);
+  return list.filter(s => !excluded.includes(s.id)).sort((a, b) => pri(a) - pri(b));
+}
 function monsterAtkFor(monsterDef, level){
   const base = monsterAtk(level);
   // 등급 공격력 배율(MONSTER_GRADE_ATK_MULT: 일반 1.0 / 에픽 1.3 / 유니크 1.5)을 먼저 적용한 뒤 몬스터별 atkMult를 한 번 적용(공격 속도는 등급 배율 없음)

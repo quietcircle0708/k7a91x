@@ -91,7 +91,9 @@ const WEAPON_PROFILES = {
 function getWeaponProfile(w){
   return (WEAPON_PROFILES[w.weaponKind] || {})[w.handType] || null;
 }
-const STAT_LABELS = { str: '힘', agi: '민첩', int: '지능' };
+const STAT_LABELS = { str: '힘', agi: '민첩', int: '지능', will: '의지' };
+// 레벨업으로 투자하는 스탯 목록(순서 = 스탯 배분 화면 표시 순서). 새 스탯이 생기면 여기에 키를 더하고 STAT_LABELS·STAT_EFFECT_GUIDE에 항목을 추가함.
+const STAT_KEYS = ['str', 'agi', 'int', 'will'];
 
 // 무기 등급(레어도). 색상만 우선 정의 — 텍스트 테두리 강조 등 시각 효과는 추후 추가 예정.
 const WEAPON_GRADES = {
@@ -2583,6 +2585,9 @@ const STAT_ALLOC_HOLD = {
 // 운영자가 정해 둔 스탯당 효과를 플레이어에게 그대로 보여주는 안내 문구용 데이터일 뿐이며, 실제 능력치 계산식(formulas.js)과는 연결돼 있지 않음 —
 // 계산은 기존 공식이 그대로 하고, 이 표는 수치를 바꿔도 계산에 영향이 없음(반대로 계산식을 바꾸면 이 표도 직접 맞춰 고쳐야 함).
 // 항목: label 표시 이름 / value 수치 / unit 단위('%' 등) / note 괄호 안 설명(합연산·배수 등). 배열 순서 = 툴팁에 나열되는 순서.
+// 의지(will) 1포인트당 효과 — 실제 계산(formulas.js effectivePlayerRegen·playerStatusResistTotal)과 아래 안내 표(STAT_EFFECT_GUIDE)가 이 값을 함께 읽음.
+const WILL_REGEN_PER_POINT = 4;            // 재생력 +4
+const WILL_STATUS_RESIST_PER_POINT = 0.5;  // 상태 이상 저항 +0.5%(합연산)
 const STAT_EFFECT_GUIDE = {
   str: [
     { label: '공격력',        value: 4 },
@@ -2598,7 +2603,22 @@ const STAT_EFFECT_GUIDE = {
   int: [
     { label: '최대 마나',     value: 30 },
   ],
+  will: [
+    { label: '재생력',         value: WILL_REGEN_PER_POINT },
+    { label: '상태 이상 저항', value: WILL_STATUS_RESIST_PER_POINT, unit: '%', note: '합연산' },
+  ],
 };
+// ---- 플레이어 상태 이상 저항(%) 규칙 ----
+// 저항 합계(%)는 모든 출처(현재는 의지)를 더한 값이고, 상태 이상마다 그 상태 이상의 마법 수준(STATUS_EFFECTS[key].magicLevel)에 따른
+// 효율(mult)을 곱한 값이 "그 상태 이상의 최종 저항 확률"임. 부여될 때 이 확률로 한 번 판정해 저항하면 걸리지 않으며(지속시간 감소 효과는 없음),
+// 최종 확률은 STATUS_RESIST_MAX_PERCENT를 넘지 않음. fromLevel 이상 ~ 다음 항목 전까지 해당 mult 적용(작은 수준부터 적을 것) — 표만 고치면 반영됨.
+const STATUS_RESIST_MAX_PERCENT = 75;
+const STATUS_RESIST_MAGIC_LEVEL_EFFICIENCY = [
+  { fromLevel: 1, mult: 2 },    // 마법 수준 1: 저항 1%당 2%
+  { fromLevel: 2, mult: 1 },    // 마법 수준 2~4: 1%
+  { fromLevel: 5, mult: 0.7 },  // 마법 수준 5~7: 0.7%
+  { fromLevel: 8, mult: 0.5 },  // 마법 수준 8 이상: 0.5%
+];
 
 // 몬스터 등급
 // 표시 순서 = 등급 순서(도감 정렬이 이 키 순서를 그대로 사용). 기존 '네임드'는 '유니크'로 이름/키만 바뀌었고
@@ -4415,6 +4435,7 @@ const STATUS_EFFECTS = {
   poison: {
     id: 1,
     name: '중독',
+    magicLevel: 2, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'poison', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(확장자 제외) — 기존엔 이모지 '☠️'였음
     color: '#7fd67f', // 초록 계열
     type: 'dot',
@@ -4425,6 +4446,7 @@ const STATUS_EFFECTS = {
   stun: {
     id: 2,
     name: '기절',
+    magicLevel: 3, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'stun', // 기존 이모지 '💤'
     color: '#ff5e26',
     type: 'disable',
@@ -4432,6 +4454,7 @@ const STATUS_EFFECTS = {
   slow: {
     id: 3,
     name: '둔화',
+    magicLevel: 1, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'slow', // 기존 이모지 '🐌'
     color: '#fff5ae',
     type: 'atkSpeedMult',
@@ -4440,6 +4463,7 @@ const STATUS_EFFECTS = {
   burn: {
     id: 4,
     name: '화상',
+    magicLevel: 3, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'burn', // 기존 이모지 '🔥'
     color: '#db353c',
     type: 'dot',
@@ -4454,6 +4478,7 @@ const STATUS_EFFECTS = {
   shredding: {
     id: 5,
     name: '파쇄',
+    magicLevel: 4, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'shredding', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(shredding.svg)
     color: '#001eff',
     type: 'defenseBoost', // dot(중독·화상)도 disable(기절)도 atkSpeedMult(둔화)도 아닌 신규 타입 —
@@ -4467,11 +4492,12 @@ const STATUS_EFFECTS = {
   },
   // 저주 — 파쇄와 동일한 defenseBoost 타입(방어도 보너스만 다름). 고정 maxDuration을 두지 않고 부여하는
   // 쪽(스킬/장비 등)이 durationMs를 넘겨 지정하는 것도 기절/둔화/파쇄와 동일함. 이번 작업 범위는 데이터
-  // +적용 로직+상태이상 간 상호작용(STATUS_EFFECT_INTERACTIONS)뿐이며, 실제로 저주를 부여하는 스킬/장비는
+  // +적용 로직+마법 수준 우선순위(위 상태이상 마법 수준 규칙)뿐이며, 실제로 저주를 부여하는 스킬/장비는
   // 아직 없음(추후 별도 작업).
   curse: {
     id: 6,
     name: '저주',
+    magicLevel: 5, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'curse', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(curse.svg)
     color: '#c50d0d',
     type: 'defenseBoost', // 파쇄와 같은 타입 — statusDefenseBonusFor(formulas.js)가 defenseBoost 타입을
@@ -4480,22 +4506,34 @@ const STATUS_EFFECTS = {
   },
 };
 
-// ---- 상태이상 간 상호작용 규칙(요구사항 4·5번) ----
-// "if(curse) ..." 처럼 저주/파쇄 관계를 여러 함수에 하드코딩하지 않기 위한 데이터 구조. 상태이상마다
-// 필요한 관계만 명시적으로 정의함(전역 상위/하위 등급 체계가 아님) — applyStatusEffect(state.js)가 상태
-// 이상을 적용하기 직전에 이 표를 참조해 처리함.
-// - overrides: 이 상태이상이 적용되는 순간, 목록에 있는 상태이상을 남은 지속시간과 무관하게 즉시 제거.
-// - blockedBy: 목록에 있는 상태이상이 이미 적용 중이면, 이 상태이상은 적용하지 않음(적용 시도 자체를 무시).
-// 향후 새 상태이상 관계(예: "지속시간 초기화", "동시 존재 가능"의 명시적 표기 등)가 필요해지면 이 표에
-// 새 키(예: resetsDurationOf)만 추가하고 applyStatusEffect에서 해당 키를 확인하는 처리만 더하면 됨.
-const STATUS_EFFECT_INTERACTIONS = {
-  curse: {
-    overrides: ['shredding'],
-  },
-  shredding: {
-    blockedBy: ['curse'],
-  },
+// ---- 상태이상 마법 수준 규칙 ----
+// 예전의 "저주↔파쇄만 서로 막는" 개별 규칙표(STATUS_EFFECT_INTERACTIONS)는 아래 마법 수준 규칙으로 일반화되어 대체됨.
+// [분류] 비슷한 효과를 내는 상태이상끼리 묶음. 상태이상 데이터의 category로 지정하고, 없으면 type이 곧 분류가 됨(새 상태이상은
+//   type만 정해도 자동으로 분류됨). 분류 이름은 용어사전 툴팁 표시용.
+//   dot 지속 피해(중독·화상) / defenseBoost 방어도 감소(파쇄·저주) / disable 기절 계열(기절, 추후 기절+추가 효과) / atkSpeedMult 공격속도 감소(둔화)
+// [같은 분류의 적용 규칙] (state.js applyStatusEffect)
+//   · 이미 걸린 같은 분류의 상태이상보다 마법 수준이 높으면 → 기존 것을 지우고 덮어씀
+//   · 마법 수준이 같거나 낮으면 → 적용하지 않음(먼저 걸린 것 유지, 아무 표시 없음)
+//   · 다른 분류끼리는 마법 수준과 상관없이 동시에 걸림
+//   · 같은 상태이상을 다시 거는 규칙(중독·화상 갱신 안 됨 / 기절·둔화 시간 갱신 / 파쇄 시간 가산)은 그대로
+const STATUS_CATEGORY_LABELS = {
+  dot: '지속 피해',
+  defenseBoost: '방어도 감소',
+  disable: '기절 계열',
+  atkSpeedMult: '공격속도 감소',
 };
+// [몬스터 저항] 몬스터는 등급에 따라 "마법 저항 수준"을 가지며, 부여되는 상태이상의 마법 수준과 비교해
+//   · 상태이상 수준 < 저항 수준 → 완전 저항(부여 안 됨, "[이름] 저항" 텍스트)
+//   · 상태이상 수준 = 저항 수준 → 적용 시간 STATUS_RESIST_DURATION_MULT배(중독·화상은 틱 수를 올림, 최소 1틱)
+//   · 상태이상 수준 > 저항 수준 → 온전히 부여
+// 몬스터 개체마다 따로 판정함(여러 몬스터를 동시에 맞혀도 각자 계산). 확률 없는 확정 판정.
+// 몬스터 데이터(MONSTERS[id])에 아래 선택 필드를 두면 등급 규칙 위에 개별 기믹을 얹을 수 있음(지금은 지정된 몬스터 없음):
+//   magicResistLevel: 숫자  → 등급표 대신 이 저항 수준을 씀
+//   statusMods: { 상태이상키: { immune: true, durationMult: 배수 } } → 그 상태이상만 완전 면역 / 적용 시간 배수(예: 1.5면 약점, 0.5면 추가 저항)
+//     (예: statusMods: { burn: { immune: true } } → 등급과 상관없이 화상 면역)
+// 플레이어의 저항 수준은 현재 0(전부 부여) — 추후 '의지' 스탯 등으로 확률 저항이 추가될 예정(state.js targetMagicResistLevel/resolveStatusApplication이 확장 지점).
+const MONSTER_GRADE_MAGIC_RESIST = { normal: 0, epic: 1, unique: 3 };
+const STATUS_RESIST_DURATION_MULT = 0.75; // 수준이 같을 때의 적용 시간 배수(25% 감소)
 
 // ---- 용어사전(GLOSSARY) ----
 // 상태이상뿐 아니라 향후 방어도/치명타 피해/공격 속도 등 다른 게임 용어도 같은 방식으로 등록할 수 있는
@@ -4522,7 +4560,10 @@ function glossaryEntry(id){
   if(g.type === 'statusEffect'){
     const def = STATUS_EFFECTS[g.statusKey];
     if(!def) return null;
-    return { name: def.name, color: def.color, desc: g.desc };
+    // metaHtml: 설명 아래 작은 보조 줄 "분류 ○○ · 마법 수준 N" — 두 덩어리를 각각 줄바꿈 불가(nowrap)로 묶어, 좁으면 덩어리 사이에서만 줄이 바뀜.
+    const catLabel = STATUS_CATEGORY_LABELS[def.category || def.type] || (def.category || def.type);
+    const metaHtml = `<div class="gloss-meta"><span>분류 ${catLabel}</span> <span>· 마법 수준 ${def.magicLevel || 0}</span></div>`;
+    return { name: def.name, color: def.color, desc: g.desc, metaHtml };
   }
   return { name: g.name, color: g.color, desc: g.desc }; // 향후 statusEffect가 아닌 용어 대비
 }
@@ -4920,6 +4961,7 @@ const MONSTERS = {
   },
   epicspider2: {
     id: 'epicspider2', name: '백현귀', icon: '🕷️', grade: 'epic', level: 50, image: 'epicspider2',
+    skills: ['poison'], // 몬스터 스킬(MONSTER_SKILLS) — 등급 기본 스킬(강타)에 더해 중독도 씀
     defense: -10, hpMult: 1.0, atkMult: 1.3, speedMult: 1.15,
     epicSpawnWeight: 50, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js)
     drops: [
@@ -4944,6 +4986,7 @@ const MONSTERS = {
   },
   epicscorpion: {
     id: 'epicscorpion', name: '현랑전갈', icon: '🦂', grade: 'epic', level: 53, image: 'epicscorpion',
+    skills: ['poison'], // 몬스터 스킬(MONSTER_SKILLS) — 등급 기본 스킬(강타)에 더해 중독도 씀
     defense: -10, hpMult: 1.0, atkMult: 1.2, speedMult: 1.0,
     epicSpawnWeight: 50, // 전갈굴 전용 — 현랑장과 합쳐 100%(pickEpicMonsterId, formulas.js)
     drops: [
@@ -5266,6 +5309,7 @@ const MONSTERS = {
   },
   goblinking: {
     id: 'goblinking', name: '도깨비왕', icon: '👑', grade: 'unique', level: 90, image: 'unique_goblin_king',
+    skills: ['stun'], // 몬스터 스킬(MONSTER_SKILLS) — 등급 기본 스킬(강타)에 더해 도깨비왕만 기절을 씀
     defense: -50, hpMult: 1.0, atkMult: 1.1, speedMult: 1.2,
     epicSpawnWeight: 7, epicSpawnStages: [10], // 10굴에서만 등장(pickEpicMonsterId, formulas.js) — 첫 유니크 몬스터 데이터
     drops: [
@@ -5543,6 +5587,26 @@ const MONSTER_POS_TO_PLAYER_DIRECTION = { top: 'up', left: 'left', right: 'right
 const PLAYER_ATTACK_MOTION_MS = 250;
 const PLAYER_BUFF_MOTION_MS = 400;
 
+// ---- 말풍선(speech bubble) 프리셋 — effects.js showSpeechBubble이 읽음 ----
+// 말풍선은 "프리셋 이름"으로 모양·색·시간을 한 번에 정함 — 다른 상황(몬스터 대사·스킬 등)에서 쓸 때는 아래에 프리셋을 한 줄 추가하고
+// showSpeechBubble(기준 요소, 글, '프리셋 이름')만 부르면 됨. '바람의 나라' 말풍선(어두운 남색 바탕 + 보랏빛 파랑 테두리 + 연파랑 글자)을 본뜸.
+//   fill/border/text: 바탕·테두리·글자 색 / fontSize: 글자 크기(px) / durationMs: 화면에 있는 전체 시간(페이드인·아웃 포함)
+//   fadeInMs/fadeOutMs: 나타나고 사라지는 시간 / gapPx: 기준 지점(머리 위)과 말풍선 꼬리 끝 사이 여백(px) / gapPxMobile: 모바일 프리셋에서만 쓰는 여백(없으면 gapPx) / maxWidthPx: 이보다 길면 줄바꿈
+const SPEECH_BUBBLE_PRESETS = {
+  scroll: { fill: '#0b0b30', border: '#6c70e6', text: '#8f94ff', fontSize: 11, durationMs: 1800, fadeInMs: 100, fadeOutMs: 300, gapPx: 10, gapPxMobile: 12, maxWidthPx: 220 },
+  // 몬스터 스킬 시전용(붉은 계열). 기준 요소는 몬스터 칸의 상태이상 줄(위치가 아이콘 줄 맨 위) — gapPx는 그 위로 띄우는 여백.
+  monsterSkill: { fill: '#2a0b0b', border: '#e66c6c', text: '#ff9494', fontSize: 11, durationMs: 1500, fadeInMs: 100, fadeOutMs: 300, gapPx: 4, maxWidthPx: 160 },
+};
+const SPEECH_BUBBLE_DEFAULT_PRESET = 'scroll'; // 존재하지 않는 프리셋 이름을 줬을 때 쓰는 프리셋
+const SPEECH_BUBBLE_VIEWPORT_MARGIN_PX = 4;    // 말풍선이 화면 가장자리에서 최소로 떨어지는 거리(화면 밖으로 잘리지 않게 이 안으로 밀어 넣음)
+// 스킬 분류(SKILLS[id].category) → 사용 시 띄울 말풍선 프리셋. 여기에 분류를 추가하면 그 분류 스킬은 자동으로 "스킬 이름!" 말풍선을 띄움.
+// 비급 스킬 = 기연(awakening) 분류(비연검~비천검).
+const SKILL_BUBBLE_PRESET_BY_CATEGORY = { awakening: 'scroll' }; // 분류별 모양 지정(예외 표) — 여기 없는 분류도 스킬을 쓰면 말풍선이 뜨며 SPEECH_BUBBLE_DEFAULT_PRESET을 씀
+const SKILL_BUBBLE_SUFFIX = '!';
+// 플레이어 이미지에서 머리 윗부분의 위치(이미지 높이 대비 비율) — 말풍선이 머리 위에 오도록 기준으로 씀.
+// assets/ui/player 대기·버프 자세 이미지의 불투명 영역 윗선(64/256) 기준이며, 공격 자세는 무기가 이보다 약 10% 위까지 올라옴(gapPx 12가 그 위로 띄움).
+const PLAYER_HEAD_TOP_RATIO = 0.25;
+
 // 스테이지 입장 메시지. {name}은 던전 이름으로 치환됨(1스테이지 전용).
 const STAGE_ENTER_MSG = {
   first: '{name}에 발을 들입니다.',   // 1스테이지
@@ -5585,6 +5649,28 @@ const LEVEL_DIFF_REWARD_BASE = 5;            // 기준값(플레이어가 몬스
 const LEVEL_DIFF_REWARD_STEP = 2.5;          // 보정값 1당 감소율(%)
 const LEVEL_DIFF_REWARD_MAX_REDUCTION = 50;  // 최대 감소율(%)
 const MONSTER_ATTACK_SPEED = 1.0;    // 몬스터 공격속도(초당 공격 횟수) = 1초에 1번
+
+// ---- 몬스터 스킬 ----
+// 몬스터가 기본 공격 한 번을 대신해 쓰는 스킬 표(전투 처리: dungeon.js pickMonsterSkill·useMonsterSkill). 필드 이름·단위는 플레이어 스킬(SKILLS)과 같게 맞춤.
+//   name / desc: 이름·설명({dp}·{hits}·{duration} 치환은 플레이어 스킬과 같은 resolveSkillDescText를 씀)
+//   damagePercent: 몬스터 공격력 기준 피해 %, hits: 타수(생략 = 1), hitDelayMs: 타수 사이 지연(초 단위 — 플레이어 스킬과 같은 방식, 생략하면 모든 타수 즉시)
+//   cooldown: 재사용 대기시간(초, 사용한 순간부터 셈 — 값만 바꾸면 됨)
+//   firstUseAttacks / firstUseSec: 전투 시작 후 첫 사용까지 기다릴 "몬스터 공격 횟수" / "초". 둘 다 적으면 먼저 도달하는 쪽, 둘 다 없으면 전투 시작 직후부터 사용 가능
+//   priority: 여러 스킬을 동시에 쓸 수 있을 때 낮은 숫자가 먼저(같은 숫자면 목록 순서)
+const MONSTER_SKILLS = {
+  smash: { name: '강타', desc: '{dp}%의 데미지로 공격.', damagePercent: 150, hits: 1, cooldown: 8.0, firstUseAttacks: 3, priority: 1 },
+  // onHitStatus: 스킬 1회당 한 번(첫 적중에서) 플레이어에게 거는 상태이상 { key: STATUS_EFFECTS 키, durationMs } — 다타수여도 타수마다 다시 걸지 않으며, 전부 회피하면 걸리지 않음.
+  //   durationMs는 기절·둔화 같은 지속시간형만 씀(중독·화상은 STATUS_EFFECTS의 틱 설정을 따름). 플레이어 저항·등급 규칙은 applyStatusEffectToPlayer가 처리.
+  // damagePercent를 0으로 두면 피해 없이 상태이상만 거는 스킬 — 적중과 무관하게 걸리므로 플레이어 회피 능력치가 적용되지 않음(피해가 있는 스킬은 타수마다 회피 판정).
+  poison:{ name: '중독', desc: '중독 상태이상을 입힘.', damagePercent: 0, onHitStatus: { key: 'poison' }, cooldown: 30, firstUseAttacks: 3, priority: 2 },
+  stun:  { name: '기절', desc: '{dp}%의 데미지로 공격하고 {duration}초 동안 기절시킴.', damagePercent: 50, hits: 1, onHitStatus: { key: 'stun', durationMs: 2000 }, cooldown: 20, firstUseAttacks: 3, priority: 3 },
+};
+// 등급·레벨 조건에 맞으면 별도 지정 없이 기본으로 갖는 스킬 규칙. grades: 해당 등급 몬스터, minLevel: 몬스터 데이터 level 이상.
+// 특정 몬스터에만 더하려면 MONSTERS[id].skills = ['스킬id', …]에 적고, 기본 스킬을 빼려면 MONSTERS[id].excludeSkills = ['스킬id'].
+// 이 몬스터만의 스킬은 skills 목록에 id가 든 스킬 객체({ id, name, damagePercent, … })를 직접 적어도 됨(formulas.js monsterSkillDefsFor).
+const MONSTER_DEFAULT_SKILL_RULES = [
+  { skill: 'smash', grades: ['epic', 'unique'], minLevel: 50 },
+];
 
 // 강화단계 그룹별 표시 이름(대장간 화면 상단 라벨, 인벤토리 카드 등에서 사용)
 const TIER_META = [

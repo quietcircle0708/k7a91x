@@ -883,6 +883,11 @@ function useSkill(id){
   renderHuntCharPanel();
   renderSkillQuickSlots();
   skillUseFlash(id);
+  // 말풍선(effects.js showSpeechBubble): 모든 스킬을 사용한 순간 플레이어 머리 위에 "스킬 이름!"을 띄움. 분류별로 다른 모양을 쓰고 싶으면
+  // data.js SKILL_BUBBLE_PRESET_BY_CATEGORY에 분류를 적으면 되고, 적혀 있지 않은 분류는 기본 프리셋을 씀.
+  // canUseSkillNow를 통과한 실제 사용에만 뜨므로 쿨타임 중 눌러서 실패한 경우엔 안 뜸.
+  const bubblePreset = SKILL_BUBBLE_PRESET_BY_CATEGORY[s.category] || SPEECH_BUBBLE_DEFAULT_PRESET;
+  showSpeechBubble(el('combatPlayerIcon'), s.name + SKILL_BUBBLE_SUFFIX, bubblePreset, { headTopRatio: PLAYER_HEAD_TOP_RATIO });
   saveState();
   if(s.castTime && s.castTime > 0){
     setTimeout(() => resolveSkillEffect(id), Math.round(s.castTime * 1000));

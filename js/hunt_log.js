@@ -37,6 +37,7 @@ const HUNT_LOG_MESSAGES = {
   // 사용
   skillUse:       { text: '{skill|을/를} 시전합니다.', tone: 'base' },
   flaskUse:       { text: '{item|을/를} 사용했습니다.', tone: 'base' },
+  monsterSkillUse:{ text: '{target|이/가} {skill|을/를} 시전합니다.', tone: 'base' }, // 몬스터 스킬(dungeon.js useMonsterSkill) — target은 몬스터 이름·등급 색
   // 안내·경고
   inventoryFull:  { text: '{category} 인벤토리가 가득 찼습니다.', tone: 'warn', merge: true },
   combatLocked:   { text: '전투 중에는 할 수 없습니다.', tone: 'warn', merge: true },
@@ -46,6 +47,8 @@ const HUNT_LOG_MESSAGES = {
   curseNotice:    { text: '마을에서 부활하면 망자의 저주가 부여됩니다. (골드·경험치 {pct} 감소, {time})', tone: 'warn' },
   curseActive:    { text: '망자의 저주가 적용 중입니다. (골드·경험치 {pct} 감소, 남은 시간 {time})', tone: 'warn' },
   curseEnd:       { text: '망자의 저주가 풀렸습니다.', tone: 'system' },
+  // 상태이상 저항(dungeon.js announceStatusResist) — 어떤 대상(플레이어/몬스터)이 어떤 상태이상을 저항했는지 표기
+  statusResist:   { text: '{target|이/가} {status} 상태이상에 저항했습니다.', tone: 'base', merge: true },
 };
 
 // ---- ② 값 서식 표 ----
@@ -58,6 +61,8 @@ const HUNT_LOG_TOKENS = {
   // 아이템·몬스터처럼 이름색이 따로 있는 값: { name, color, qty } 형태로 받음(색은 기존 이름색 규칙에서 호출부가 계산)
   item:     { fmt: v => ({ text: v.name + (v.qty > 1 ? ` ×${v.qty}` : ''), color: v.color }) },
   monster:  { fmt: v => ({ text: v.name, color: v.color }) },
+  target:   { fmt: v => ({ text: v.name, color: v.color }) }, // 플레이어/몬스터처럼 이름색이 있을 수도 없을 수도 있는 대상
+  status:   { fmt: v => String(v) },
   skill:    { fmt: v => String(v) },       // 스킬 이름은 기본 회색(색을 주고 싶으면 cls를 추가)
   dungeon:  { fmt: v => String(v) },
   stage:    { fmt: v => String(v) },

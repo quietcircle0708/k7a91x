@@ -210,6 +210,8 @@ function enterStage(stageNum){
 function spawnMonsters(){
   const d = hunt.dungeon;
   if(!d) return;
+  // 플레이어에게 걸려 있던 지속 피해형 상태이상(중독 등)은 스테이지를 넘어 이어지지 않음(기절·둔화는 실제 시간으로 흘러 자연히 끝남)
+  if(hunt.player && hunt.player.statusEffects) hunt.player.statusEffects = hunt.player.statusEffects.filter(s => !STATUS_EFFECTS[s.key] || STATUS_EFFECTS[s.key].type !== 'dot');
   const count = pickMonsterCount(hunt.stage);
   const grades = pickStageMonsterGrades(hunt.stage, count);
   hunt.monsters = grades.map(grade => createMonsterInstance(d, grade));
@@ -259,6 +261,8 @@ function createMonsterInstance(dungeon, grade){
     instanceId: hunt.nextInstanceId++,
     monsterId: monsterDef.id, level, hp: maxHp, maxHp, atk, statusEffects: [],
     atkIntervalId: null, atkFirstTimeout: null,
+    // 몬스터 스킬: 쓸 수 있는 스킬 목록, 지금까지 한 공격 횟수(기본 공격·스킬 모두 1회로 셈), 전투 중 흐른 시간(일시정지 중엔 멈춤 — 상태이상 틱 루프가 올림), 스킬별 다음 사용 가능 시각(시계 기준, 없으면 아직 한 번도 안 씀)
+    skills: monsterSkillDefsFor(monsterDef), attackCount: 0, skillClockMs: 0, skillReadyAtMs: {},
   };
 }
 // 주어진 등급에 해당하는 이 던전의 몬스터 종류 중 하나를 결정.
@@ -343,35 +347,75 @@ function refreshMonsterAttackTimer(instance){
   const speed = baseSpeed * attackSpeedMultiplier(instance);
   instance.atkIntervalId = setInterval(() => monsterAttackTick(instance.instanceId), Math.round(1000 / speed));
 }
+// ---- 상태 이상 부여의 공통 진입점(플레이어/몬스터 공용) ----
+// 스킬·무기/방어구 고유 옵션 등 모든 부여 경로는 아래 두 함수를 거침. 순서:
+//  ① 저항 판정(state.js resolveStatusApplication — 개별 면역 / 등급 저항 수준) → 완전 저항이면 "[이름] 저항" 텍스트 + 전투 로그를 남기고 끝(기존 상태이상은 그대로)
+//  ② 같은 분류 마법 수준 우선순위 + 적용 시간 감소(state.js applyStatusEffect) — 우선순위에 막히면 아무 표시 없이 끝
+//  ③ 적용된 경우에만 타이머 재계산/뱃지 갱신
+// 반환: 실제로 적용됐으면 true, 저항했거나 우선순위에 막혔으면 false.
+const STATUS_RESIST_NOTICE_COOLDOWN_MS = 1000; // 같은 대상이 같은 상태이상을 연속으로 저항할 때 텍스트/로그를 한 번만 띄우는 간격
+function announceStatusResist(target, key){
+  const def = STATUS_EFFECTS[key];
+  if(!def) return;
+  const now = Date.now();
+  if(!target._resistNoticeAt) target._resistNoticeAt = {};
+  if(now - (target._resistNoticeAt[key] || 0) < STATUS_RESIST_NOTICE_COOLDOWN_MS) return;
+  target._resistNoticeAt[key] = now;
+  statusResistEffect(target, def.name); // 회피와 같은 팝업에 "[이름] 저항"(effects.js)
+  const md = target.monsterId ? MONSTERS[target.monsterId] : null;
+  huntLog('statusResist', {
+    target: md ? { name: md.name, color: MONSTER_GRADES[md.grade].color } : { name: '플레이어', color: '' },
+    status: def.name,
+  });
+}
 // 플레이어에게 상태 이상을 부여하는 공통 진입점(기절/둔화를 실제로 부여하는 스킬/아이템 기능은 추후 추가 —
 // 그 기능들이 이 함수를 호출하게 될 예정). 공격속도 배율형 상태 이상은 부여 즉시 타이머에 반영하고,
 // 지속시간형 상태 이상은 만료되는 정확한 시점에 자동으로 정리 + 타이머 재계산까지 처리함.
-function applyStatusEffectToPlayer(key, durationMs){
-  applyStatusEffect(hunt.player, key, durationMs);
+// source(선택): 상태이상을 건 몬스터 개체 — 지속 피해형이 플레이어를 쓰러뜨렸을 때 "누구에게 사망했는지"를 표시하는 데 씀(tickPlayerStatusEffects).
+function applyStatusEffectToPlayer(key, durationMs, source){
   const def = STATUS_EFFECTS[key];
-  if(!def) return;
+  if(!def) return false;
+  const r = resolveStatusApplication(hunt.player, key);
+  if(r.resisted){ announceStatusResist(hunt.player, key); return false; }
+  // 플레이어 상태 이상 저항(의지 등): 부여되는 순간 그 상태 이상의 최종 저항 확률로 한 번 판정 — 저항하면 걸리지 않고(지속시간 감소 효과는 없음),
+  // 지속 피해형이 이미 걸려 있으면 어차피 다시 걸리지 않으므로 굴리지 않음.
+  if(!(def.type === 'dot' && hasActiveStatusEffect(hunt.player, key)) && Math.random() * 100 < playerStatusResistPercent(key)){
+    announceStatusResist(hunt.player, key);
+    return false;
+  }
+  if(!applyStatusEffect(hunt.player, key, durationMs, r.durationMult)) return false;
+  if(source && def.type === 'dot'){
+    const st = hunt.player.statusEffects.find(x => x.key === key);
+    if(st && !st.sourceMonsterId) st.sourceMonsterId = source.monsterId; // 이미 걸려 있던 중독은 재부여되지 않으므로 처음 건 몬스터가 유지됨
+  }
+  const ms = Math.round((durationMs || 0) * r.durationMult);
   if(def.type === 'atkSpeedMult') refreshPlayerAttackTimer();
-  if(def.type !== 'dot' && durationMs > 0){
+  if(def.type !== 'dot' && ms > 0){
     setTimeout(() => {
       pruneExpiredStatusEffects(hunt.player);
       if(def.type === 'atkSpeedMult') refreshPlayerAttackTimer();
-    }, durationMs);
+    }, ms);
   }
+  return true;
 }
 // 몬스터 개체에게 상태 이상을 부여하는 공통 진입점(용도는 위 applyStatusEffectToPlayer와 동일)
 function applyStatusEffectToMonster(instance, key, durationMs){
-  applyStatusEffect(instance, key, durationMs);
   const def = STATUS_EFFECTS[key];
-  if(!def) return;
+  if(!def) return false;
+  const r = resolveStatusApplication(instance, key);
+  if(r.resisted){ announceStatusResist(instance, key); return false; }
+  if(!applyStatusEffect(instance, key, durationMs, r.durationMult)) return false;
+  const ms = Math.round((durationMs || 0) * r.durationMult);
   if(def.type === 'atkSpeedMult') refreshMonsterAttackTimer(instance);
-  if(def.type !== 'dot' && durationMs > 0){
+  if(def.type !== 'dot' && ms > 0){
     setTimeout(() => {
       pruneExpiredStatusEffects(instance);
       if(def.type === 'atkSpeedMult') refreshMonsterAttackTimer(instance);
       renderStatusBadges();
-    }, durationMs);
+    }, ms);
   }
   renderStatusBadges();
+  return true;
 }
 // flaskEndMode: 'flush'(기본, 생존 상태로 전투 종료 — 남은 회복량 즉시 적용 후 종료) |
 //               'discard'(사망으로 전투 종료 — 남은 회복량 적용 없이 폐기, HP 변경 없음)
@@ -445,15 +489,13 @@ function attackTick(){
     // 각각 합산해 1회만 판정(activeEffectChance, formulas.js). 소스가 하나도 없으면 0%로 판정 안 됨.
     const poisonChance = activeEffectChance('poison_on_hit');
     if(poisonChance > 0 && Math.random() * 100 < poisonChance){
-      applyStatusEffect(target, 'poison');
-      renderStatusBadges();
+      applyStatusEffectToMonster(target, 'poison'); // 공통 진입점(저항 판정·분류 우선순위 포함, 뱃지 갱신까지 처리)
     }
     // 화상 부여(백화검 고유 옵션, effectId 'burn_on_hit') — 중독과 완전히 동일한 판정 방식(합산확률 1회
     // 판정)이되 별도의 독립적인 판정으로 처리함(요구사항 5번: 서로 다른 상태 이상은 동시 적용 가능).
     const burnChance = activeEffectChance('burn_on_hit');
     if(burnChance > 0 && Math.random() * 100 < burnChance){
-      applyStatusEffect(target, 'burn');
-      renderStatusBadges();
+      applyStatusEffectToMonster(target, 'burn');
     }
     // 저주 부여(진월도/진혼검/혈영비도 고유 옵션, effectId 'curse_on_hit') — 중독/화상과 동일한 판정
     // 방식(합산확률 1회 판정)이되 별도의 독립적인 판정으로 처리함(서로 다른 상태 이상은 동시 적용 가능).
@@ -462,8 +504,7 @@ function attackTick(){
     // applyStatusEffect 참고).
     const curseChance = activeEffectChance('curse_on_hit');
     if(curseChance > 0 && Math.random() * 100 < curseChance){
-      applyStatusEffect(target, 'curse', 4000);
-      renderStatusBadges();
+      applyStatusEffectToMonster(target, 'curse', 4000);
     }
   }
   if(target.hp <= 0){
@@ -524,6 +565,10 @@ function monsterAttackTick(instanceId){
   if(isStunned(instance)) return; // 기절 중인 몬스터는 공격하지 못함
   ensurePlayerVitals();
   if(state.playerHp <= 0) return; // 이미 쓰러진 상태면 추가 피해 없음
+  // 몬스터 스킬: 쓸 수 있는 스킬이 있으면 이번 공격 한 번을 기본 공격 대신 스킬로 씀(스킬도 공격 1회로 셈). 아래 기본 공격 처리는 그대로임.
+  const skill = pickMonsterSkill(instance);
+  instance.attackCount++;
+  if(skill){ useMonsterSkill(instance, skill); return; }
   // 회피 판정(요구사항 1·2·3·5번): 몬스터 기본 공격 1회당 최종 회피율로 딱 한 번만 판정. 성공하면 기존
   // 피해 계산(레벨 차이 보정/방어도 적용 등)과 내구도 감소·중독 역격·화면 갱신·사망 판정을 전부 건너뛰고
   // 회피 연출만 출력 — 기존 기본 공격 피해 처리 로직은 한 줄도 건드리지 않음. 몬스터 스킬 공격·상태 이상은
@@ -543,8 +588,7 @@ function monsterAttackTick(instanceId){
   // 대상으로 함(activeEffectChance의 무기 고유 옵션 패턴과 동일하게 합산 후 1회만 판정).
   const poisonBackChance = armorUniqueOptionChance('poison_on_taking_damage');
   if(poisonBackChance > 0 && Math.random() * 100 < poisonBackChance){
-    applyStatusEffect(instance, 'poison');
-    renderStatusBadges();
+    applyStatusEffectToMonster(instance, 'poison');
   }
   renderHuntCharPanel();
   if(state.playerHp <= 0){
@@ -553,6 +597,82 @@ function monsterAttackTick(instanceId){
   } else {
     checkAutoHeal();
   }
+}
+
+// ---- 몬스터 스킬 ----
+// 이번 공격 차례에 쓸 스킬 하나를 고름(없으면 null → 기본 공격). instance.skills는 우선순위 순이라 먼저 쓸 수 있는 것이 선택됨.
+// 아직 한 번도 안 쓴 스킬은 firstUseAttacks(공격 횟수)·firstUseSec(초) 중 먼저 도달하는 쪽을 기다리고(둘 다 없으면 바로 가능), 한 번 쓴 뒤에는 cooldown(초)이 지나야 다시 가능.
+function pickMonsterSkill(instance){
+  if(!instance.skills || instance.skills.length === 0) return null;
+  for(const s of instance.skills){
+    const readyAt = instance.skillReadyAtMs[s.id];
+    if(readyAt === undefined){
+      const byAttacks = s.firstUseAttacks != null && instance.attackCount >= s.firstUseAttacks;
+      const bySeconds = s.firstUseSec != null && instance.skillClockMs >= s.firstUseSec * 1000;
+      const noWait = s.firstUseAttacks == null && s.firstUseSec == null;
+      if(byAttacks || bySeconds || noWait) return s;
+    } else if(instance.skillClockMs >= readyAt){
+      return s;
+    }
+  }
+  return null;
+}
+// 몬스터 스킬 시전: 쿨타임 시작 → 전투 로그 → 말풍선(상태이상 줄 위) → 타수만큼 피해(타수 사이 지연 hitDelayMs초).
+function useMonsterSkill(instance, skill){
+  const monsterDef = MONSTERS[instance.monsterId];
+  instance.skillReadyAtMs[skill.id] = instance.skillClockMs + (skill.cooldown || 0) * 1000;
+  huntLog('monsterSkillUse', { target: { name: monsterDef.name, color: MONSTER_GRADES[monsterDef.grade].color }, skill: skill.name });
+  const bubbleAnchor = el('monster-status-' + instance.instanceId);
+  if(bubbleAnchor) showSpeechBubble(bubbleAnchor, skill.name + SKILL_BUBBLE_SUFFIX, 'monsterSkill');
+  const ctx = { reacted: false }; // 방어구 내구도 감소·피해 입을 때 옵션(중독 역격)은 스킬 1회당 첫 적중에서만
+  monsterSkillHit(instance.instanceId, skill, ctx, false);
+  const hits = skill.hits || 1;
+  for(let i = 1; i < hits; i++){
+    if(skill.hitDelayMs) setTimeout(() => monsterSkillHit(instance.instanceId, skill, ctx, true), Math.round(skill.hitDelayMs * i * 1000));
+    else monsterSkillHit(instance.instanceId, skill, ctx, false);
+  }
+}
+// 몬스터 스킬 1타. 기본 공격과 같은 순서(회피 판정 → 레벨 차이 보정 → 방어도)로 계산하고, 회피하면 피해 없음.
+// 지연 타수는 그 사이 몬스터가 처치됐거나 전투가 끝났으면 취소하고, 일시정지 중이면 풀릴 때까지 기다림.
+function monsterSkillHit(instanceId, skill, ctx, delayed){
+  if(delayed && (currentView !== 'hunt' || !hunt.started)) return;
+  const instance = hunt.monsters.find(m => m.instanceId === instanceId);
+  if(!instance) return;
+  if(delayed && hunt.paused){ setTimeout(() => monsterSkillHit(instanceId, skill, ctx, true), 100); return; }
+  if(isStunned(instance)) return; // 타수 사이에 기절하면 남은 타수는 나가지 않음
+  ensurePlayerVitals();
+  if(state.playerHp <= 0) return;
+  const pct = skill.damagePercent != null ? skill.damagePercent : 100;
+  // 회피는 타수마다 따로 판정함(한 타를 피해도 다른 타는 맞을 수 있음). 피해가 없는 스킬(damagePercent 0 — 적중과 무관하게 상태이상만 거는 스킬)은 회피 대상이 아님.
+  if(pct > 0 && rollEvasion(effectivePlayerEvasion())){
+    playerDodgeEffect();
+    return;
+  }
+  if(pct > 0){ // damagePercent 0 = 피해 없이 상태이상만 거는 스킬
+    const levelDiff = state.playerLevel - instance.level;
+    let dmg = Math.max(1, Math.round((instance.atk || 0) * pct / 100 * monsterDamageMultiplier(levelDiff)));
+    dmg = Math.max(1, Math.round(dmg * defenseDamageMultiplier(playerTotalDefense())));
+    state.playerHp = Math.max(0, state.playerHp - dmg);
+    playerHitEffect(dmg);
+    if(!ctx.reacted){
+      ctx.reacted = true;
+      decreaseWornDefensiveDurability();
+      const poisonBackChance = armorUniqueOptionChance('poison_on_taking_damage');
+      if(poisonBackChance > 0 && Math.random() * 100 < poisonBackChance) applyStatusEffectToMonster(instance, 'poison');
+    }
+    renderHuntCharPanel();
+    if(state.playerHp <= 0){
+      playerDeathEffect();
+      setTimeout(() => playerDied(instance), MONSTER_DEAD_ANIM_MS);
+      return; // 쓰러뜨렸다면 상태이상은 걸지 않음
+    }
+  }
+  // 상태이상은 스킬 1회당 한 번만(첫 적중에서) — 다타수 스킬이어도 타수마다 다시 걸지 않음(지속시간 자체가 스킬 효과)
+  if(skill.onHitStatus && !ctx.statusApplied){
+    ctx.statusApplied = true;
+    applyStatusEffectToPlayer(skill.onHitStatus.key, skill.onHitStatus.durationMs, instance);
+  }
+  checkAutoHeal();
 }
 
 // ---- 사망 처리 ----
@@ -591,13 +711,21 @@ function respawnAtVillage(){
 // 주기는 "그 판정을 놓치지 않을 만큼 촘촘하게 확인하는 해상도"일 뿐, 실제 틱 간격을 결정하지 않음.
 const STATUS_TICK_RESOLUTION_MS = 100;
 let statusTickInterval = null;
+let statusTickLastAt = 0;
 function startStatusTicker(){
   stopStatusTicker();
+  statusTickLastAt = Date.now();
   statusTickInterval = setInterval(() => {
+    // 몬스터 스킬 시계(skillClockMs): 이 루프가 도는 동안(=일시정지가 아닌 전투 중)에만 흐름. 일시정지 중에도 시각은 갱신해 두어 재개 때 한꺼번에 더해지지 않음.
+    const nowTs = Date.now();
+    const clockDt = Math.min(nowTs - statusTickLastAt, 250);
+    statusTickLastAt = nowTs;
     if(hunt.paused || hunt.monsters.length === 0) return;
+    tickPlayerStatusEffects(); // 플레이어에게 걸린 지속 피해형 상태이상(몬스터 스킬의 중독 등)
     // 순회 중 killMonsterInstance가 hunt.monsters를 변경할 수 있으므로 스냅샷을 떠서 순회
     const snapshot = hunt.monsters.slice();
     for(const instance of snapshot){
+      instance.skillClockMs += clockDt;
       pruneExpiredStatusEffects(instance); // 기절/둔화 등 지속시간형 상태 이상의 실제 만료 처리는 정확한
       // 시점에 applyStatusEffectToMonster의 setTimeout이 이미 처리하므로, 여기서는 배열 정리(뱃지 표시 동기화) 용도
       if(!instance.statusEffects || instance.statusEffects.length === 0) continue;
@@ -617,6 +745,29 @@ function startStatusTicker(){
     pruneExpiredStatusEffects(hunt.player);
     renderStatusBadges();
   }, STATUS_TICK_RESOLUTION_MS);
+}
+// 플레이어에게 걸린 지속 피해형 상태이상의 틱 피해 처리 — 몬스터 쪽(위 루프)과 같은 tickStatusEffects(state.js)를 쓰고, 최대 체력은 플레이어 값으로 넣어 줌.
+// 피해는 방어도·회피와 무관(몬스터 중독과 같은 방식), 피해 숫자만 플레이어 위에 상태이상 색으로 띄움. 쓰러지면 건 몬스터 이름으로 사망 처리.
+function tickPlayerStatusEffects(){
+  const p = hunt.player;
+  if(!p || !p.statusEffects || p.statusEffects.length === 0) return;
+  ensurePlayerVitals();
+  if(state.playerHp <= 0) return;
+  p.maxHp = effectiveMaxHp(state.playerLevel);
+  const dotEntry = p.statusEffects.find(s => STATUS_EFFECTS[s.key] && STATUS_EFFECTS[s.key].type === 'dot');
+  const color = dotEntry ? STATUS_EFFECTS[dotEntry.key].color : '#7fd67f';
+  const killerMonsterId = dotEntry ? dotEntry.sourceMonsterId : null;
+  const dmg = tickStatusEffects(p);
+  if(dmg <= 0) return;
+  state.playerHp = Math.max(0, state.playerHp - dmg);
+  playerStatusTickEffect(dmg, color);
+  renderHuntCharPanel();
+  if(state.playerHp <= 0){
+    playerDeathEffect();
+    setTimeout(() => playerDied(killerMonsterId ? { monsterId: killerMonsterId } : null), MONSTER_DEAD_ANIM_MS);
+  } else {
+    checkAutoHeal();
+  }
 }
 function stopStatusTicker(){
   if(statusTickInterval){ clearInterval(statusTickInterval); statusTickInterval = null; }

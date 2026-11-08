@@ -169,6 +169,9 @@
 .tooltip-sell-price.reduced{ color:#ff6a6a; }
 
 /* 용어 클릭 시 뜨는 팝업(hover 전용인 위 .tooltip과 별개의 클릭 전용 UI, main.js가 표시/위치 담당) */
+  /* 용어사전/상태이상 툴팁의 보조 줄("분류 ○○ · 마법 수준 N") — 설명과 얇은 선으로 구분하고, 두 덩어리는 각각 줄바꿈 없이 묶여 좁으면 덩어리 사이에서만 줄이 바뀜 */
+  .gloss-meta{ margin-top:5px; padding-top:4px; border-top:1px solid rgba(255,255,255,.14); font-size:.85em; font-weight:400; line-height:1.45; color: var(--forge-cream-dim); }
+  .gloss-meta span{ white-space:nowrap; }
   .glossary-popup{
     display:none; z-index:50; max-width:240px; background:#0e0b09; border:1px solid var(--forge-line);
     border-radius:8px; padding:10px 12px; font-size:11.5px; font-weight:400; color: var(--forge-cream-dim);
@@ -632,6 +635,24 @@
     20%,40%,60%,80%{ transform: translateX(6px) rotate(6deg); }
     90%{ transform: translateX(-3px) rotate(-3deg); }
   }
+  /* 말풍선(effects.js showSpeechBubble) — 화면 전체 위에 겹치는 전용 층(body 직속)이라 전투 영역 등의 overflow에 잘리지 않음. 색·크기·시간은 프리셋(data.js)에서 변수로 받음.
+     층 z-index 45: 메인 메뉴(40)보다 위, 모달(50)보다 아래. */
+  #speechBubbleLayer{ position:fixed; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:45; }
+  .speech-bubble{
+    position:absolute; box-sizing:border-box; width:max-content; max-width:var(--sb-max, 220px);
+    padding:.38em .8em .42em; text-align:center; word-break:keep-all; line-height:1.15;
+    font-family:'Noto Sans KR', sans-serif; font-weight:700; letter-spacing:.5px; font-size:var(--sb-size, 11px);
+    border:2px solid transparent; color:var(--sb-text); text-shadow:0 0 2px #05051c; /* 모양(바탕·테두리·꼬리)은 아래 .sb-shape SVG가 하나의 윤곽선으로 그림 */
+    opacity:0; transform:translateY(4px) scale(.94); transform-origin:var(--tail-x, 50%) 100%;
+    transition: opacity var(--sb-fade-in, 100ms) linear, transform var(--sb-fade-in, 100ms) ease-out;
+  }
+  .speech-bubble.show{ opacity:1; transform:none; }
+  .speech-bubble.hide{ opacity:0; transition: opacity var(--sb-fade-out, 300ms) linear; }
+  /* 몸통+꼬리를 하나의 SVG 경로로 그려 둘 사이에 선이 보이지 않음(effects.js speechBubbleShapePath) — 안쪽 어두운 외곽선 → 바탕+테두리 순 */
+  .speech-bubble .sb-shape{ position:absolute; left:-2px; top:-2px; overflow:visible; pointer-events:none; filter:drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+  .speech-bubble .sb-outline{ fill:#05051c; stroke:#05051c; stroke-width:4; stroke-linejoin:round; }
+  .speech-bubble .sb-body{ fill:var(--sb-fill); stroke:var(--sb-border); stroke-width:2; stroke-linejoin:round; }
+  .speech-bubble .sb-text{ position:relative; }
   .dmg-popup{
     position:absolute; left:50%; top:20%; font-family:'JetBrains Mono', monospace; font-weight:700;
     font-size:17px; color:#ffffff; text-shadow: 0 0 6px rgba(0,0,0,.6); pointer-events:none; opacity:0;

@@ -857,7 +857,7 @@ function showGlossaryPopup(termId, anchorRect){
   const g = glossaryEntry(termId);
   if(!g) return; // 용어사전에 등록 안 된 id면 아무것도 하지 않음(원문 태그는 이미 resolveGlossaryTermsHtml 단계에서 평문으로 정리됨)
   const popup = ensureGlossaryPopup();
-  popup.innerHTML = `<div style="color:${g.color}; font-weight:700; margin-bottom:4px;">${g.name}</div><div>${g.desc}</div>`;
+  popup.innerHTML = `<div style="color:${g.color}; font-weight:700; margin-bottom:4px;">${g.name}</div><div>${g.desc}</div>${g.metaHtml || ''}`;
   popup.style.display = 'block';
   popup.style.position = 'fixed';
   popup.style.transform = 'none';

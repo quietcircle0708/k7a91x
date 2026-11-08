@@ -29,7 +29,7 @@ function viewEnterInit(view){
   if(view === 'character'){
     // 던전 우측 패널을 열 때(toggleHuntTopUi)와 동일한 초기화 규칙: 매번 진입할 때마다
     // state 기준으로 draft를 새로 세팅하고, 항상 첫 탭·첫 소분류탭부터 보여줌.
-    draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+    draftStats = statsCopy(state.stats);
     draftStatPoints = state.statPoints || 0;
     statAllocCollapseAll();
     activeCharTab = CHARACTER_TABS.length > 0 ? CHARACTER_TABS[0].id : null;
@@ -770,8 +770,8 @@ let draftStats = null;
 let draftStatPoints = null;
 // 스탯별 "펼침" 여부. 처음엔 [+]만 보이고, 그 스탯의 [+]를 누르면 true가 되어 [-] [최대] [+5] [+]가 함께 펼쳐짐(render.js renderStatAllocRow).
 // 사용 가능 포인트를 전부 쓰면(refreshCharDisplays) 또는 임시 배분을 새로 시작할 때(초기화/적용/화면 진입) 다시 [+]만 남도록 접음.
-let statAllocOpen = { str: false, agi: false, int: false };
-function statAllocCollapseAll(){ statAllocOpen = { str: false, agi: false, int: false }; }
+let statAllocOpen = {};
+function statAllocCollapseAll(){ statAllocOpen = {}; }
 // 해당 스탯의 "아직 적용되지 않은 임시 분배 포인트" 수 — 마지막으로 적용(state.stats)된 값 대비
 // draftStats가 얼마나 더 찍혀있는지로 계산함. -(마이너스) 버튼의 표시/차감 기준으로 쓰임.
 function pendingStatPoints(key){
@@ -828,14 +828,14 @@ function deallocateStat(key){
 function applyStatAlloc(){
   if(!draftStats) return;
   ensurePlayerVitals();
-  state.stats = { str: draftStats.str, agi: draftStats.agi, int: draftStats.int };
+  state.stats = statsCopy(draftStats);
   state.statPoints = draftStatPoints;
   recheckEquipRequirements(); // 스탯이 바뀌었으므로(전체 초기화 포함) 현재 장착 중인 장비 요구조건 재검사, 만족 못하면 즉시 해제
   // 스탯으로 늘어난 최대 체력/마나만큼 그대로 채워줌 (아직 피해를 입는 시스템이 없으므로 항상 풀피 유지)
   state.playerHp = effectiveMaxHp(state.playerLevel);
   state.playerMp = effectiveMaxMp(state.playerLevel);
   saveState();
-  draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+  draftStats = statsCopy(state.stats);
   draftStatPoints = state.statPoints;
   statAllocCollapseAll();
   refreshCharDisplays();
@@ -843,7 +843,7 @@ function applyStatAlloc(){
 // 초기화: 이번에 임시로 찍었던 포인트를 되돌려 마지막으로 적용된 상태에서 다시 찍을 수 있게 함
 function resetStatAlloc(){
   if(!draftStats) return;
-  draftStats = { str: state.stats.str, agi: state.stats.agi, int: state.stats.int };
+  draftStats = statsCopy(state.stats);
   draftStatPoints = state.statPoints || 0;
   statAllocCollapseAll();
   refreshCharDisplays();
@@ -852,8 +852,8 @@ function resetStatAlloc(){
 // draft만 바뀌므로 실제로 확정되려면 여전히 '적용'을 눌러야 함.
 function resetStatAllocFull(){
   if(!draftStats) return;
-  const totalPoints = (state.statPoints || 0) + (state.stats.str || 0) + (state.stats.agi || 0) + (state.stats.int || 0);
-  draftStats = { str: 0, agi: 0, int: 0 };
+  const totalPoints = (state.statPoints || 0) + STAT_KEYS.reduce((sum, k) => sum + (state.stats[k] || 0), 0);
+  draftStats = statsCopy(null);
   draftStatPoints = totalPoints;
   statAllocCollapseAll();
   refreshCharDisplays();

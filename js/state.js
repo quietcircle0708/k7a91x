@@ -57,7 +57,7 @@ let state = {
   acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0, redOrbShards: 0, goblinKingMedals: 0, oldCoins: 0, // 기타(재료) 아이템 보유 개수
   skipEffects: false,
   playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null, // 캐릭터 레벨/경험치/체력/마나
-  statPoints: 4, stats: { str: 0, agi: 0, int: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
+  statPoints: 4, stats: { str: 0, agi: 0, int: 0, will: 0 }, // 미할당 스탯 포인트 및 투자한 스탯
   notifySeen: {}, // 알림 점(notify.js)에서 이미 확인한 항목 키 목록
   notifySeenQty: {}, // 스택 아이템을 확인한 시점의 수량(수량이 늘면 다시 알림) — notify.js
   skillPoints: 1, awakeningPoints: 0, // 미사용 스킬 포인트(공용·특화 공유) / 미사용 깨달음(기연 전용) — 레벨1 기준 공식값
@@ -371,28 +371,54 @@ function grantArtifactSafe(id){
 }
 
 // ---- 상태 이상(디버프) 적용 ----
+// 상태이상의 분류(data.js STATUS_CATEGORY_LABELS) — 데이터의 category, 없으면 type.
+function statusCategoryOf(key){
+  const d = STATUS_EFFECTS[key];
+  return d ? (d.category || d.type) : null;
+}
+// 대상의 마법 저항 수준 — 몬스터 개체: MONSTERS[id].magicResistLevel(개별 지정)이 있으면 그 값, 없으면 등급표(MONSTER_GRADE_MAGIC_RESIST).
+// 몬스터가 아닌 대상(플레이어)은 0 — 추후 '의지' 스탯 등으로 확률 저항이 생기면 이 함수와 아래 resolveStatusApplication을 확장함.
+function targetMagicResistLevel(target){
+  const md = target && target.monsterId ? MONSTERS[target.monsterId] : null;
+  if(!md) return 0;
+  if(md.magicResistLevel != null) return md.magicResistLevel;
+  return MONSTER_GRADE_MAGIC_RESIST[md.grade] || 0;
+}
+// 상태이상 부여 전 "저항 판정"(확정 판정, 확률 없음) — 순서: ① 몬스터 개별 면역(statusMods[key].immune) → ② 등급 저항 수준과 비교
+// (상태이상 수준이 낮으면 완전 저항, 같으면 시간 배수 적용) → ③ 몬스터 개별 시간 배수(statusMods[key].durationMult).
+// 반환: { resisted:true, reason:'immune'|'level' } | { resisted:false, durationMult }. 대상에게 아무것도 바꾸지 않는 순수 판정.
+function resolveStatusApplication(target, key){
+  const def = STATUS_EFFECTS[key];
+  if(!def) return { resisted: false, durationMult: 1 };
+  const md = target && target.monsterId ? MONSTERS[target.monsterId] : null;
+  const mod = md && md.statusMods ? md.statusMods[key] : null;
+  if(mod && mod.immune) return { resisted: true, reason: 'immune' };
+  const lvl = def.magicLevel || 0;
+  const resist = targetMagicResistLevel(target);
+  if(lvl < resist) return { resisted: true, reason: 'level' };
+  let mult = (resist > 0 && lvl === resist) ? STATUS_RESIST_DURATION_MULT : 1;
+  if(mod && mod.durationMult != null) mult *= mod.durationMult;
+  return { resisted: false, durationMult: mult };
+}
 // 대상(target: {maxHp?, statusEffects:[]})에게 상태 이상을 적용(이미 걸려있으면 지속시간 갱신).
 // - 중독(type:'dot')처럼 틱 기반 상태 이상은 def.maxTicks를 그대로 사용(durationMs는 무시 — 기존 로직과 100% 동일)
 // - 기절/둔화처럼 지속시간형(type:'disable'|'atkSpeedMult') 상태 이상은 호출부(스킬/아이템 등)가 durationMs(밀리초)를
 //   넘겨서 그때그때 지속시간을 지정함(요구사항 4번). 만료 시각(expiresAt)을 저장해두고 매번 실시간으로 판정하므로
 //   1.25초처럼 1초 틱 간격에 맞아떨어지지 않는 지속시간도 정확하게 처리됨.
-function applyStatusEffect(target, key, durationMs){
+// - durationMult(선택, 기본 1): 적용 시간 배수. 지속시간형은 durationMs에 곱하고, 틱 기반은 틱 수에 곱해 올림(최소 1틱).
+// - 같은 분류(statusCategoryOf)의 다른 상태이상이 이미 걸려 있으면 마법 수준(magicLevel)으로 우선순위를 가림 — 새 상태이상이
+//   더 높으면 기존 것을 지우고 덮어쓰고, 같거나 낮으면 적용하지 않고 false를 반환(먼저 걸린 것 유지). 다른 분류와는 서로 무관.
+// 반환: 적용 시도가 같은 분류 우선순위에 막혔으면 false, 그 외 true. (저항 판정은 호출부가 resolveStatusApplication으로 먼저 함)
+function applyStatusEffect(target, key, durationMs, durationMult){
   const def = STATUS_EFFECTS[key];
-  if(!def) return;
+  if(!def) return false;
   if(!target.statusEffects) target.statusEffects = [];
-  // 상태이상 간 상호작용 규칙(STATUS_EFFECT_INTERACTIONS, data.js) 적용 — 저주/파쇄처럼 특정 상태이상
-  // 조합을 여러 곳에 하드코딩하지 않고 여기 한 곳에서만 처리함(요구사항 5번).
-  const interaction = STATUS_EFFECT_INTERACTIONS[key];
-  if(interaction){
-    // blockedBy: 목록에 있는 상태이상이 이미 걸려 있으면 이번 적용 자체를 무시(대상의 기존 상태에는
-    // 영향 없음 — 예: 저주가 있는 동안 파쇄를 적용하려 하면 그냥 적용하지 않고 끝냄).
-    if(interaction.blockedBy && interaction.blockedBy.some(k => hasActiveStatusEffect(target, k))) return;
-    // overrides: 이 상태이상이 적용되는 순간, 목록에 있는 상태이상을 남은 지속시간과 무관하게 즉시 제거
-    // (예: 저주 적용 시 기존 파쇄를 바로 제거).
-    if(interaction.overrides && interaction.overrides.length > 0){
-      target.statusEffects = target.statusEffects.filter(s => !interaction.overrides.includes(s.key));
-    }
-  }
+  const mult = durationMult == null ? 1 : durationMult;
+  const cat = statusCategoryOf(key);
+  const lvl = def.magicLevel || 0;
+  const rivals = target.statusEffects.filter(s => s.key !== key && statusCategoryOf(s.key) === cat);
+  if(rivals.some(s => hasActiveStatusEffect(target, s.key) && (STATUS_EFFECTS[s.key].magicLevel || 0) >= lvl)) return false;
+  if(rivals.length > 0) target.statusEffects = target.statusEffects.filter(s => !rivals.includes(s));
   const existing = target.statusEffects.find(s => s.key === key);
   if(def.type === 'dot'){
     // lastTickAt: 이 상태 이상 자신의 tickIntervalMs 간격을 실시간으로 재는 기준 시각.
@@ -400,22 +426,23 @@ function applyStatusEffect(target, key, durationMs){
     // 요구사항(중독·화상 재부여 방지): 이미 같은 dot 상태 이상이 적용되어 있으면 재부여하지 않고, 남은
     // 지속시간(ticksRemaining)이나 다음 틱까지 남은 시간(lastTickAt)도 초기화하지 않음 — 완전히 종료되어
     // 배열에서 빠진 뒤에만 다시 새로 부여될 수 있음.
-    if(existing) return;
-    target.statusEffects.push({ key, ticksRemaining: def.maxTicks, lastTickAt: Date.now() });
-    return;
+    if(existing) return true;
+    target.statusEffects.push({ key, ticksRemaining: Math.max(1, Math.ceil(def.maxTicks * mult - 1e-9)), lastTickAt: Date.now() });
+    return true;
   }
-  const addMs = Math.max(0, durationMs || 0);
+  const addMs = Math.max(0, Math.round((durationMs || 0) * mult));
   // 파쇄 전용 규칙(요구사항 3번, def.stackDurationAdditive): 이미 적용 중인 대상에게 재부여되면 기존
   // 남은 지속시간을 새 지속시간으로 덮어쓰지 않고 "기존 남은 시간 + 새로 부여된 시간"으로 더함. 이
   // 플래그가 없는 기존 상태이상(기절/둔화)은 아래 기존 덮어쓰기 동작을 그대로 유지함(회귀 없음).
   if(existing && def.stackDurationAdditive){
     const remainingBase = Math.max(existing.expiresAt, Date.now()); // 이미 만료된 채 배열에 남아있는 경우 방어
     existing.expiresAt = remainingBase + addMs;
-    return;
+    return true;
   }
   const expiresAt = Date.now() + addMs;
   if(existing) existing.expiresAt = expiresAt;
   else target.statusEffects.push({ key, expiresAt });
+  return true;
 }
 // 대상에게 걸린 상태 이상 중 "지속 피해형(중독 등, type:'dot')"만 판정해, 이번 호출 시점까지 실제로 발생한
 // 총 피해를 반환. 각 상태 이상 인스턴스가 자신의 lastTickAt을 갖고, "이번 호출 시점 - lastTickAt >= 그 상태 이상의
@@ -531,8 +558,10 @@ function applyLoadedRaw(raw){
   // 구버전(스탯 시스템 이전) 마이그레이션: 이미 얻은 레벨만큼 포인트 소급 지급
   if(loaded.statPoints === undefined){
     state.statPoints = 4 * (state.playerLevel || 1);
-    state.stats = { str: 0, agi: 0, int: 0 };
+    state.stats = { str: 0, agi: 0, int: 0, will: 0 };
   }
+  // 스탯이 추가되기 전 세이브(예: 의지 이전)에는 해당 키가 없으므로 STAT_KEYS 기준으로 0을 채워 둠
+  state.stats = statsCopy(state.stats);
   // 구버전(스킬 시스템 이전) 마이그레이션: 스탯 포인트와 동일한 방식으로, 이미 도달한 레벨 기준
   // 공식(totalSkillPointsForLevel/totalAwakeningPointsForLevel)으로 포인트를 소급 지급함.
   // 공용·특화(skillPoints)는 필드가 이미 있는 세이브라도 "현재 레벨 기준 총 지급량 - 실제 습득에 쓴
@@ -645,6 +674,12 @@ function applyLoadedRaw(raw){
   // 알림 점 도입 이전 세이브: 지금 보유한 아이템/습득 가능 스킬을 모두 확인한 것으로 시작(업데이트 직후 전체에 점이 뜨지 않게)
   if(loaded.notifySeen === undefined) notifySeedSeen();
 }
+// 스탯 객체 복사(STAT_KEYS 전부 숫자로 채움, 없는 키는 0) — 스탯 배분 임시값(draftStats)과 저장 스탯을 서로 옮길 때 씀.
+function statsCopy(src){
+  const out = {};
+  STAT_KEYS.forEach(k => { out[k] = (src && src[k]) || 0; });
+  return out;
+}
 async function loadState(){
   try{
     if(hasClaudeStorage()){
@@ -724,7 +759,7 @@ function resetGame(){
     acorns: 0, ratMeats: 0, batMeats: 0, snakeMeats: 0, deerMeats: 0, deerAntlers: 0, bearHides: 0, bearBiles: 0, mountainBoarMeats: 0, forestBoarMeats: 0, foxFurs: 0, tigerHides: 0, ambers: 0, purpleAmbers: 0, snakeFangs: 0, tigerFangs: 0, spiderFangs: 0, remnants: 0, blackIrons: 0, oldEnchantStones: 0, rareEnchantStones: 0, epicEnchantStones: 0, uniqueEnchantStones: 0, reviveStones: 0, creationShards: 0, goblinHorns: 0, greenOrbShards: 0, redOrbShards: 0, goblinKingMedals: 0, oldCoins: 0,
     skipEffects:false,
     playerLevel: 1, playerExp: 0, playerHp: null, playerMp: null,
-    statPoints: 4, stats: { str: 0, agi: 0, int: 0 },
+    statPoints: 4, stats: { str: 0, agi: 0, int: 0, will: 0 },
     notifySeen: {}, notifySeenQty: {},
     skillPoints: 1, awakeningPoints: 0, learnedSkills: [], learnedAwakeningSkills: [], unlockedAwakeningSkills: [],
     skillQuickSlots: [null, null, null, null, null, null, null, null, null, null],
