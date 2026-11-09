@@ -1716,9 +1716,19 @@ function rollEvasion(evasionPercent){
 function playerWillPoints(){
   return ((state.stats && state.stats.will) || 0) + artifactStatBonus('will');
 }
-// 상태 이상 저항 합계(%) — 모든 출처의 합연산(현재 출처는 의지뿐, 새 출처가 생기면 여기에 더함). 상태 이상별 환산은 playerStatusResistPercent.
+// 의지 포인트 투자로 얻는 저항(%) — 포인트당 WILL_STATUS_RESIST_PER_POINT, 이 부분만 WILL_STATUS_RESIST_MAX_PERCENT가 상한.
+function playerWillStatusResist(){
+  return Math.min(WILL_STATUS_RESIST_MAX_PERCENT, Math.max(0, playerWillPoints() * WILL_STATUS_RESIST_PER_POINT));
+}
+// 의지 외 저항(%) 출처 합 — 재생력과 같은 방식으로 장비 고유 옵션(statBonus·growthStat)·패시브·버프의 'statusResist' 키를 읽음(아직 데이터는 없음, 상한 없이 더해짐).
+function playerStatusResistOtherSources(){
+  return weaponUniqueOptionStatBonus('statusResist') + weaponUniqueOptionGrowthStat('statusResist')
+    + armorUniqueOptionStatBonus('statusResist') + armorUniqueOptionGrowthStat('statusResist')
+    + learnedPassiveSkillBonus('statusResist') + activeBuffBonus('statusResist');
+}
+// 상태 이상 저항 합계(%) — 모든 출처의 합연산. 상태 이상별 환산은 playerStatusResistPercent.
 function playerStatusResistTotal(){
-  return Math.max(0, playerWillPoints() * WILL_STATUS_RESIST_PER_POINT);
+  return Math.max(0, playerWillStatusResist() + playerStatusResistOtherSources());
 }
 // 마법 수준에 따른 저항 효율 배수(STATUS_RESIST_MAGIC_LEVEL_EFFICIENCY — fromLevel 이상 중 가장 높은 항목, 해당 없으면 1)
 function statusResistEfficiency(magicLevel){
@@ -1726,12 +1736,12 @@ function statusResistEfficiency(magicLevel){
   STATUS_RESIST_MAGIC_LEVEL_EFFICIENCY.forEach(e => { if((magicLevel || 0) >= e.fromLevel) mult = e.mult; });
   return mult;
 }
-// 그 상태 이상의 최종 저항 확률(%, 0~STATUS_RESIST_MAX_PERCENT) — 상태 이상이 부여될 때 이 확률로 저항 판정(dungeon.js applyStatusEffectToPlayer)하고,
+// 그 상태 이상의 최종 저항 확률(%, 0~100) — 상태 이상이 부여될 때 이 확률로 저항 판정(dungeon.js applyStatusEffectToPlayer)하고,
 // 캐릭터 정보창 저항 툴팁도 같은 함수를 읽으므로 표시와 실제 판정이 어긋날 수 없음.
 function playerStatusResistPercent(key){
   const def = STATUS_EFFECTS[key];
   if(!def) return 0;
-  return Math.min(STATUS_RESIST_MAX_PERCENT, Math.max(0, playerStatusResistTotal() * statusResistEfficiency(def.magicLevel)));
+  return Math.min(100, Math.max(0, playerStatusResistTotal() * statusResistEfficiency(def.magicLevel)));
 }
 // 저항 % 표기용 — 소수는 필요할 때만 최대 2자리(예: 35, 4.9, 0.35)
 function formatResistPercent(v){
@@ -1891,7 +1901,7 @@ function artifactDefenseBonus(){
 function effectiveMaxHp(level){
   const s = state.stats || { str: 0, agi: 0, int: 0 };
   const str = (s.str || 0) + artifactStatBonus('str');
-  let hp = playerBaseHp(level) + str * 20;
+  let hp = playerBaseHp(level) + str * 20 + playerWillPoints() * WILL_MAX_HP_PER_POINT; // 힘 1당 +20, 의지 1당 +50
   if(isArtifactEquipped('antlerflag')) hp += 200; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   if(isArtifactEquipped('squareshield')) hp += 300; // 힘 보너스와 별개로 적용되는 고정 체력 보너스
   hp += learnedPassiveSkillBonus('hpFlat'); // 습득한 패시브 스킬(예: 모험가의 의지)의 고정 체력 보너스
@@ -2056,14 +2066,21 @@ function combatStatBreakdown(key, ctx){
     push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus(key + 'Flat'));
   } else if(key === 'statusResist'){
     // 저항 합계(%) 항목 — 상태 이상별 최종 확률은 툴팁 아래쪽(combatStatTooltipHtml)에서 이 합계에 마법 수준 효율을 곱해 보여줌
-    push('스탯', '의지', ((state.stats && state.stats.will) || 0) * WILL_STATUS_RESIST_PER_POINT);
-    push('장비', '장비 스탯 보너스(의지)', artifactStatBonus('will') * WILL_STATUS_RESIST_PER_POINT);
+    push('스탯', '의지', playerWillStatusResist()); // 상한(WILL_STATUS_RESIST_MAX_PERCENT)을 적용한 값 — 장비 스탯 보너스로 늘어난 의지 포인트도 포함됨
+    push('장비', '무기 고유 옵션', weaponUniqueOptionStatBonus('statusResist'));
+    push('장비', '무기 고유 옵션(성장형)', weaponUniqueOptionGrowthStat('statusResist'));
+    push('장비', '방어구/보조/장신구 고유 옵션', armorUniqueOptionStatBonus('statusResist'));
+    push('장비', '방어구/보조/장신구 고유 옵션(성장형)', armorUniqueOptionGrowthStat('statusResist'));
+    push('스킬/패시브', '패시브 스킬', learnedPassiveSkillBonus('statusResist'));
+    push('스킬/패시브', '전투 버프', activeBuffBonus('statusResist'));
   } else if(key === 'maxHp'){
     const lv = state.playerLevel;
     const str = (state.stats && state.stats.str) || 0;
     push('기타', '레벨 기본 체력', playerBaseHp(lv));
     push('스탯', '힘', str * 20);
     push('장비', '장비 스탯 보너스(힘)', artifactStatBonus('str') * 20);
+    push('스탯', '의지', ((state.stats && state.stats.will) || 0) * WILL_MAX_HP_PER_POINT);
+    push('장비', '장비 스탯 보너스(의지)', artifactStatBonus('will') * WILL_MAX_HP_PER_POINT);
     if(isArtifactEquipped('antlerflag')) push('장비', `${ARTIFACTS.antlerflag.name}(아티팩트)`, 200);
     // squareshield: 과거 아티팩트가 zip117에서 삭제되어 isArtifactEquipped('squareshield')는 항상
     // false로만 평가됨(effectiveMaxHp의 해당 분기와 완전히 동일한, 이미 알려진 죽은 코드 — data.js의
@@ -2204,7 +2221,7 @@ function combatStatTooltipHtml(key, ctx, titleLabel, totalText){
       const d = STATUS_EFFECTS[k];
       html += `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:2px;"><span><b style="color:${d.color};">${d.name}</b> 저항</span><span style="color:var(--forge-cream);">${formatResistPercent(playerStatusResistPercent(k))}%</span></div>`;
     });
-    html += `<div style="margin-top:6px; font-size:10.5px; color:var(--forge-cream-dim);">마법 수준에 따라 저항 효율이 다르며, 최대 ${STATUS_RESIST_MAX_PERCENT}%까지 적용됩니다.</div>`;
+    html += `<div style="margin-top:6px; font-size:10.5px; color:var(--forge-cream-dim);">마법 수준에 따라 저항 효율이 다르며, 의지로 얻는 저항은 최대 ${WILL_STATUS_RESIST_MAX_PERCENT}%까지입니다.</div>`;
     html += `</div>`;
   }
   return html;

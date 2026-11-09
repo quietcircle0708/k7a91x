@@ -2631,6 +2631,7 @@ function renderSettings(){
   if(modalBox) modalBox.classList.toggle('settings-modal-wide', cat.id === 'hotkeys'); // 단축키 탭은 슬롯 격자가 들어가서 모달을 조금 넓힘
   body.innerHTML = cat.items.map(item => {
     if(item.type === 'hotkeys') return hotkeyPanelHtml(); // js/hotkeys.js
+    if(item.type === 'data') return dataTransferPanelHtml(); // js/data_transfer.js
     if(item.type === 'toggle'){
       const on = !!(state.settings && state.settings[item.id]);
       return `

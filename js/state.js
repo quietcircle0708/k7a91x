@@ -248,7 +248,7 @@ function ensureSettingsDefaults(){
     cat.items.forEach(item => {
       if(item.type === 'stepper-row'){
         item.fields.forEach(f => { if(!(f.id in state.settings)) state.settings[f.id] = f.default; });
-      } else if(!(item.id in state.settings)){
+      } else if(item.type !== 'data' && !(item.id in state.settings)){ // 'data'(js/data_transfer.js)는 저장할 설정 값이 없는 전용 패널
         state.settings[item.id] = item.default;
       }
     });
@@ -700,22 +700,26 @@ async function loadState(){
   render();
   resumePendingEnhance(); // 연출 도중 새로고침·종료로 반영되지 못한 강화 결과가 있으면 선저장된 결과를 그대로 반영(actions.js)
 }
+// 마지막 저장 결과(옵션 > 데이터 탭이 표시): { at: 시각(ms), where: 'claude'|'local', ok: 성공 여부 }
+let lastSaveInfo = null;
 async function saveState(){
   const payload = JSON.stringify(state);
   if(hasClaudeStorage()){
     try{
       await window.storage.set(STORAGE_KEY, payload, false);
-      return;
+      lastSaveInfo = { at: Date.now(), where: 'claude', ok: true };
+      return true;
     }catch(e){
       await new Promise(res => setTimeout(res, 600));
       try{
         await window.storage.set(STORAGE_KEY, payload, false);
-        return;
+        lastSaveInfo = { at: Date.now(), where: 'claude', ok: true };
+        return true;
       }catch(e2){ /* Claude storage 실패 시 아래 localStorage로 폴백 */ }
     }
   }
-  try{ localStorage.setItem(STORAGE_KEY, payload); }
-  catch(e){ console.error('저장 실패', e); }
+  try{ localStorage.setItem(STORAGE_KEY, payload); lastSaveInfo = { at: Date.now(), where: 'local', ok: true }; return true; }
+  catch(e){ console.error('저장 실패', e); lastSaveInfo = { at: Date.now(), where: 'local', ok: false }; return false; }
 }
 
 // ---- 초기화(리셋) ----

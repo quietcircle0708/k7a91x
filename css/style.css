@@ -1176,7 +1176,8 @@
   #spawnToast.show{ opacity:1; transform:translate(-50%,0); }
 
   /* ---- 설정 화면 ---- */
-  .settings-modal{ max-width:380px; text-align:left; }
+  /* 화면보다 긴 탭(데이터 탭 등)에서 위쪽이 잘리지 않도록 모달 안에서 스크롤함(화면 높이 - 오버레이 여백 40px) */
+  .settings-modal{ max-width:380px; text-align:left; max-height:calc(100vh - 40px); max-height:calc(100dvh - 40px); overflow-y:auto; overscroll-behavior:contain; }
   .settings-modal.settings-modal-wide{ max-width:470px; } /* 단축키 탭(슬롯 5열 격자) */
   /* ---- 설정 > 단축키 (js/hotkeys.js) ---- */
   .hotkey-panel{ display:flex; flex-direction:column; gap:8px; min-width:0; }
@@ -1241,7 +1242,8 @@
     border-radius:8px; padding:8px 10px; font-size:12.5px; cursor:pointer; font-family:'Noto Sans KR', sans-serif;
   }
   .settings-cat-btn.active{ background:#2c2415; border-color: var(--forge-gold); color: var(--forge-gold); }
-  .settings-body{ flex:1; display:flex; flex-direction:column; gap:14px; min-width:0; }
+  /* 기존 탭(화면·전투·단축키)의 본문 높이(최대 약 391px)보다 살짝 큰 값을 한도로 두고, 이를 넘는 탭(데이터 탭 등)은 본문 안에서 스크롤함 — 기존 탭은 한도 아래라 변화 없음 */
+  .settings-body{ flex:1; display:flex; flex-direction:column; gap:14px; min-width:0; max-height:400px; overflow-y:auto; overscroll-behavior:contain; }
   .settings-item{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
   /* 라디오형 설정(화면 프리셋 등) 전용 — 좌우 배치 대신 라벨이 위, 선택지가 그 아래 한 줄로 오도록 함
      (요구사항: "화면 프리셋" 텍스트 한 줄 + 아래에 [데스크톱][모바일] 버튼 줄). 같은 요소에
@@ -2381,3 +2383,22 @@ body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
 
 /* 전투 화면 체력/마나 바(플레이어·몬스터): 모서리를 완전한 알약 모양(999px) 대신 끝부분만 살짝 둥글게. 값은 여기서만 조정 */
 .combat-arena .hp-bar-wrap{ border-radius:3px; }
+
+  /* ---- 옵션 > 데이터 탭(js/data_transfer.js) ---- 저장하기/내보내기/불러오기. 색은 기존 설정 화면 값을 재사용. */
+  .dt-panel{ display:flex; flex-direction:column; gap:12px; }
+  .dt-box{ display:flex; flex-direction:column; gap:8px; padding:10px 12px; border:1px solid var(--forge-line); border-radius:8px; background: var(--forge-panel-2); }
+  .dt-box.dt-confirm{ border-color: var(--forge-gold); background:#2c2415; }
+  .dt-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .dt-text{
+    width:100%; box-sizing:border-box; resize:vertical; background:#15110d; color: var(--forge-cream); border:1px solid var(--forge-line); border-radius:6px;
+    padding:8px; font-family:'JetBrains Mono', monospace; font-size:11px; line-height:1.4; word-break:break-all;
+  }
+  .dt-text:focus{ outline:none; border-color: var(--forge-gold); }
+  .dt-msg{ padding:8px 10px; border-radius:6px; font-size:12px; line-height:1.45; border:1px solid var(--forge-line); }
+  .dt-msg-ok{ color:#9fe3a0; border-color:#3d6b3e; background:#16241a; }
+  .dt-msg-err{ color:#ff9a9a; border-color:#7a3030; background:#2a1515; }
+  .dt-msg-info{ color: var(--forge-cream-dim); }
+  .dt-table{ width:100%; border-collapse:collapse; font-size:12px; }
+  .dt-table th{ text-align:left; color: var(--forge-cream-dim); font-weight:400; padding:3px 6px 3px 0; }
+  .dt-table td{ padding:3px 6px 3px 0; color: var(--forge-cream); }
+  .dt-table td:first-child{ color: var(--forge-cream-dim); }

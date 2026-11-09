@@ -2588,6 +2588,8 @@ const STAT_ALLOC_HOLD = {
 // 의지(will) 1포인트당 효과 — 실제 계산(formulas.js effectivePlayerRegen·playerStatusResistTotal)과 아래 안내 표(STAT_EFFECT_GUIDE)가 이 값을 함께 읽음.
 const WILL_REGEN_PER_POINT = 4;            // 재생력 +4
 const WILL_STATUS_RESIST_PER_POINT = 0.5;  // 상태 이상 저항 +0.5%(합연산)
+const WILL_STATUS_RESIST_MAX_PERCENT = 75; // 의지 포인트 투자로 얻을 수 있는 저항의 상한(%) — 장비 고유 옵션 등 다른 획득처는 이 상한과 별개로 더해짐
+const WILL_MAX_HP_PER_POINT = 50;          // 최대 체력 +50
 const STAT_EFFECT_GUIDE = {
   str: [
     { label: '공격력',        value: 4 },
@@ -2605,14 +2607,15 @@ const STAT_EFFECT_GUIDE = {
   ],
   will: [
     { label: '재생력',         value: WILL_REGEN_PER_POINT },
-    { label: '상태 이상 저항', value: WILL_STATUS_RESIST_PER_POINT, unit: '%', note: '합연산' },
+    { label: '상태 이상 저항', value: WILL_STATUS_RESIST_PER_POINT, unit: '%', note: `합연산, 의지로는 최대 ${WILL_STATUS_RESIST_MAX_PERCENT}%` },
+    { label: '최대 체력',     value: WILL_MAX_HP_PER_POINT },
   ],
 };
 // ---- 플레이어 상태 이상 저항(%) 규칙 ----
-// 저항 합계(%)는 모든 출처(현재는 의지)를 더한 값이고, 상태 이상마다 그 상태 이상의 마법 수준(STATUS_EFFECTS[key].magicLevel)에 따른
-// 효율(mult)을 곱한 값이 "그 상태 이상의 최종 저항 확률"임. 부여될 때 이 확률로 한 번 판정해 저항하면 걸리지 않으며(지속시간 감소 효과는 없음),
-// 최종 확률은 STATUS_RESIST_MAX_PERCENT를 넘지 않음. fromLevel 이상 ~ 다음 항목 전까지 해당 mult 적용(작은 수준부터 적을 것) — 표만 고치면 반영됨.
-const STATUS_RESIST_MAX_PERCENT = 75;
+// 저항 합계(%)는 모든 출처를 더한 값이고(의지 투자분은 WILL_STATUS_RESIST_MAX_PERCENT까지만, 장비 고유 옵션 등 다른 출처는 상한 없이 더함 — 장비 옵션은
+// statBonus / growthStat 키 'statusResist'로 등록하면 자동으로 합산됨), 상태 이상마다 그 상태 이상의 마법 수준(STATUS_EFFECTS[key].magicLevel)에 따른
+// 효율(mult)을 곱한 값이 "그 상태 이상의 최종 저항 확률"(0~100%)임. 부여될 때 이 확률로 한 번 판정해 저항하면 걸리지 않으며(지속시간 감소 효과는 없음).
+// fromLevel 이상 ~ 다음 항목 전까지 해당 mult 적용(작은 수준부터 적을 것) — 표만 고치면 반영됨.
 const STATUS_RESIST_MAGIC_LEVEL_EFFICIENCY = [
   { fromLevel: 1, mult: 2 },    // 마법 수준 1: 저항 1%당 2%
   { fromLevel: 2, mult: 1 },    // 마법 수준 2~4: 1%
@@ -5835,6 +5838,15 @@ const SETTINGS_SCHEMA = [
     icon: '⌨️',
     items: [
       { id: 'hotkeyBindings', type: 'hotkeys', default: null },
+    ],
+  },
+  // 데이터 — 저장하기/내보내기/불러오기(js/data_transfer.js). 설정 값을 저장하지 않는 전용 패널이라 ensureSettingsDefaults가 건너뜀.
+  {
+    id: 'data',
+    label: '데이터',
+    icon: '💾',
+    items: [
+      { id: 'dataTransfer', type: 'data' },
     ],
   },
 ];
