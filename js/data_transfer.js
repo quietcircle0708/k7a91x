@@ -13,6 +13,11 @@
 // 이 파일은 main.js의 loadState() 이전에 로드되어야 함(기본 상태 스냅샷을 그 시점에 떠 두기 때문).
 // ============================================================
 
+// 불러오기(및 백업으로 되돌리기) 사용 여부 스위치 — false면 [불러오기] 영역의 버튼이 모두 비활성화됨(저장하기·내보내기는 그대로).
+// 강화 실패를 불러오기로 되돌리는 식의 악용을 막기 위해 현재는 꺼 둠. 다시 켜려면 true로 바꾸기만 하면 됨.
+const DT_IMPORT_ENABLED = false;
+const DT_IMPORT_DISABLED_MSG = '불러오기 기능은 현재 사용할 수 없습니다.';
+
 const DT_GAME_ID = 'enhance-slay';
 const DT_FORMAT_VERSION = 1;                 // 내보내기 형식 버전 — 형식을 바꾸면 올리고, 더 새로운 파일을 옛 빌드가 불러오는 경우만 거절함
 const DT_BACKUP_KEY = 'forge-backup-before-import'; // 불러오기/되돌리기 직전의 현재 데이터 백업 1개(localStorage)
@@ -318,7 +323,7 @@ function dataTransferPanelHtml(){
       <div class="dt-box">
         <div class="settings-item-label">직전 데이터 백업</div>
         <div class="settings-item-desc">불러오기 직전의 이 기기 데이터입니다(${dtFmtTime(backup.at)} · ${lv}). 실수로 불러왔다면 되돌릴 수 있습니다.</div>
-        <div class="dt-row"><button type="button" class="nav-btn" data-dt-act="restore" ${dtBusy ? 'disabled' : ''}>백업으로 되돌리기</button></div>
+        <div class="dt-row"><button type="button" class="nav-btn" data-dt-act="restore" ${dtBusy || !DT_IMPORT_ENABLED ? 'disabled' : ''}>백업으로 되돌리기</button></div>
       </div>`;
   }
   let pendingHtml = '';
@@ -364,11 +369,11 @@ function dataTransferPanelHtml(){
       </div>
       <div class="dt-box">
         <div class="settings-item-label">불러오기</div>
-        <div class="settings-item-desc">내보낸 코드를 붙여넣거나 파일을 선택하세요. 먼저 검사한 뒤, 바꿀 내용을 확인하고 적용합니다.</div>
-        <textarea id="dtImportText" class="dt-text" rows="4" spellcheck="false" placeholder="여기에 코드를 붙여넣으세요">${dtEsc(dtImportText)}</textarea>
+        <div class="settings-item-desc">${DT_IMPORT_ENABLED ? '내보낸 코드를 붙여넣거나 파일을 선택하세요. 먼저 검사한 뒤, 바꿀 내용을 확인하고 적용합니다.' : DT_IMPORT_DISABLED_MSG}</div>
+        <textarea id="dtImportText" class="dt-text" rows="4" spellcheck="false" placeholder="여기에 코드를 붙여넣으세요" ${DT_IMPORT_ENABLED ? '' : 'disabled'}>${dtEsc(dtImportText)}</textarea>
         <div class="dt-row">
-          <button type="button" class="nav-btn" data-dt-act="pick" ${dtBusy ? 'disabled' : ''}>파일 선택</button>
-          <button type="button" class="btn btn-main" data-dt-act="check" ${dtBusy ? 'disabled' : ''}>코드 검사</button>
+          <button type="button" class="nav-btn" data-dt-act="pick" ${dtBusy || !DT_IMPORT_ENABLED ? 'disabled' : ''}>파일 선택</button>
+          <button type="button" class="btn btn-main" data-dt-act="check" ${dtBusy || !DT_IMPORT_ENABLED ? 'disabled' : ''}>코드 검사</button>
           <input type="file" id="dtFileInput" accept=".txt,text/plain" style="display:none;">
         </div>
       </div>
@@ -385,6 +390,7 @@ function dtCaptureText(){
   if(t) dtImportText = t.value;
 }
 async function dtCheckImport(text){
+  if(!DT_IMPORT_ENABLED){ dtSetMsg(DT_IMPORT_DISABLED_MSG, 'err'); dtRefresh(); return; }
   dtPending = null;
   dtBusy = true; dtSetMsg('코드를 검사하는 중입니다...', 'info'); dtRefresh();
   try{
@@ -442,6 +448,7 @@ function dtDoDownload(){
   dtRefresh();
 }
 async function dtDoApply(){
+  if(!DT_IMPORT_ENABLED){ dtSetMsg(DT_IMPORT_DISABLED_MSG, 'err'); dtRefresh(); return; }
   if(!dtPending || dtBusy) return;
   const blocked = dtBlockedReason();
   if(blocked){ dtSetMsg(blocked, 'err'); dtRefresh(); return; }
@@ -457,6 +464,7 @@ async function dtDoApply(){
   }
 }
 function dtDoRestorePrepare(){
+  if(!DT_IMPORT_ENABLED){ dtSetMsg(DT_IMPORT_DISABLED_MSG, 'err'); dtRefresh(); return; }
   const backup = dtReadBackup();
   if(!backup){ dtSetMsg('백업이 없습니다.', 'err'); dtRefresh(); return; }
   try{
@@ -478,6 +486,7 @@ function dtDoRestorePrepare(){
     if(!e.target || e.target.id !== 'dtFileInput') return;
     const file = e.target.files && e.target.files[0];
     if(!file) return;
+    if(!DT_IMPORT_ENABLED){ dtSetMsg(DT_IMPORT_DISABLED_MSG, 'err'); dtRefresh(); return; }
     const reader = new FileReader();
     reader.onload = () => { dtImportText = String(reader.result || ''); dtCheckImport(dtImportText); };
     reader.onerror = () => { dtSetMsg('파일을 읽지 못했습니다.', 'err'); dtRefresh(); };

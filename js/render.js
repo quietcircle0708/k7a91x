@@ -2325,6 +2325,8 @@ function statusBuffTooltipHtml(key, def){
 }
 const HUNT_BUFF_UI_MAX = 15; // 한 줄 5개 × 최대 3줄(CSS .hunt-buff-ui의 고정폭/최대높이와 반드시 같이 맞춰야 함)
 function renderHuntBuffUi(){
+  syncPlayerStatusVisuals(); // 플레이어 체력바 색 + 상태이상 이펙트(effects.js) — 버프 UI 영역 유무와 무관하게 갱신
+  syncStatusFxPlayback();    // 일시정지 중 이펙트 정지/재개
   const wrap = el('huntBuffUi');
   if(!wrap) return;
   const entries = activeBuffListForUi().map(b => ({ key: b.id, kind: 'skill', id: b.id, remainMs: b.remainMs }));
@@ -2504,6 +2506,7 @@ function renderStatusBadges(){
       if(row.children[idx] !== node) row.insertBefore(node, row.children[idx] || null);
     });
     existing.forEach(node => node.remove()); // 더 이상 걸려있지 않은 상태이상 노드만 제거
+    syncMonsterStatusVisuals(instance); // 지속 피해 체력바 색 + 스프라이트 이펙트(effects.js)
   });
 }
 

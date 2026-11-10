@@ -58,6 +58,7 @@ function playerDodgeEffect(){
 // 재생함. 새로 만들지 않고 기존 클래스/키프레임을 그대로 재사용(요구사항: 플레이어 전용 기능 신규 제작 지양).
 function playerDeathEffect(){
   clearSpeechBubbles(); // 사망하면 떠 있던 말풍선은 즉시 제거
+  clearStatusFx(el('combatPlayerSlot')); // 상태이상 이펙트도 즉시 제거(체력 0 동안은 syncPlayerStatusVisuals가 다시 만들지 않음)
   const combatIcon = el('combatPlayerIcon');
   if(!combatIcon) return;
   combatIcon.classList.remove('hit');
@@ -426,4 +427,124 @@ function showTownToast(text){
   toast.classList.add('show');
   clearTimeout(townToastTimeout);
   townToastTimeout = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+// ---- 상태이상 시각 표현: 지속 피해 체력바 색 + 스프라이트 시트 이펙트 ----
+// 데이터(색·시트 규격)는 data.js STATUS_EFFECTS(color·fx)에 있고, 여기는 그리는 쪽만 담당함. 뱃지·텍스트·피해 숫자 표시와는 별개로 동작함.
+// 대상의 지속 피해형(type:'dot') 상태이상 중 걸려 있는 첫 번째의 색(없으면 null). 중독·화상은 같은 분류라 동시에 걸리지 않음.
+function dotStatusColorOf(target){
+  const list = (target && target.statusEffects) || [];
+  for(const s of list){
+    const def = STATUS_EFFECTS[s.key];
+    if(def && def.type === 'dot') return def.color || null;
+  }
+  return null;
+}
+// #rrggbb 색을 factor배로 어둡게(체력바 그라데이션 끝색용). 형식이 다르면 그대로 돌려줌.
+function shadeHexColor(hex, factor){
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if(!m) return hex;
+  const n = parseInt(m[1], 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v * factor))));
+  return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+// 체력바 채움 요소의 색을 지속 피해 색으로 바꾸거나(color 있음) 원래 색(CSS)으로 되돌림(color null). 같은 색이면 건드리지 않음.
+function applyHpBarStatusColor(fillEl, color){
+  if(!fillEl) return;
+  const key = color || '';
+  if(fillEl.dataset.dotColor === key) return;
+  fillEl.dataset.dotColor = key;
+  fillEl.style.background = color ? `linear-gradient(90deg, ${color}, ${shadeHexColor(color, 0.65)})` : '';
+}
+// 시트 이펙트 노드 1개를 만들어 재생 시작(만들어진 시점 = 상태이상이 걸린 시점부터 주기가 시작됨).
+// 프레임은 Web Animations API로 background-position을 한 장씩 끊어 넘기고(steps), 재생이 끝나면 cycleMs까지 투명하게 쉼. 지원하지 않는 환경에서는 첫 프레임만 정지 표시함.
+function buildStatusFxNode(key, fx){
+  const n = document.createElement('div');
+  n.className = 'status-fx';
+  n.dataset.key = key;
+  n.style.width = fx.frameW + 'px';
+  n.style.height = fx.frameH + 'px';
+  n.style.backgroundImage = `url("${STATUS_EFFECT_FX_DIR}${fx.sheet}.png")`;
+  const pos = i => `${-(i % fx.cols) * fx.frameW}px ${-Math.floor(i / fx.cols) * fx.frameH}px`;
+  n.style.backgroundPosition = pos(0);
+  if(typeof n.animate === 'function'){
+    const playMs = fx.frames * fx.frameMs;
+    const cycleMs = Math.max(fx.cycleMs || playMs, playMs);
+    const kf = [];
+    for(let i = 0; i < fx.frames; i++){
+      kf.push({ offset: (i * fx.frameMs) / cycleMs, backgroundPosition: pos(i), opacity: 1, easing: 'steps(1, end)' });
+    }
+    const last = pos(fx.frames - 1);
+    if(cycleMs > playMs) kf.push({ offset: playMs / cycleMs, backgroundPosition: last, opacity: 0, easing: 'steps(1, end)' });
+    kf.push({ offset: 1, backgroundPosition: last, opacity: cycleMs > playMs ? 0 : 1 });
+    n._fxAnim = n.animate(kf, { duration: cycleMs, iterations: Infinity });
+  }
+  return n;
+}
+// 이펙트 노드를 아이콘 기준 위치에 놓음(아이콘 위치는 슬롯 기준 offset 값). 아이콘 안에 넣지 않고 슬롯에 두는 이유: 아이콘에는 "공격 대상" 붉은 테두리·피격 흰색 번쩍임 같은 filter가 걸려 있어
+// 안에 있으면 이펙트 색까지 물들기 때문(아이콘의 흔들림은 따라가지 않음). 레이아웃이 바뀌어도 맞도록 동기화 때마다 다시 놓음.
+// headTopRatio: 'head' 이펙트를 놓을 머리 기준선 위치(아이콘 높이 대비 비율 — 몬스터 0, 플레이어 PLAYER_HEAD_TOP_RATIO).
+function placeStatusFxNode(n, icon, fx, headTopRatio){
+  const cx = icon.offsetLeft + icon.offsetWidth / 2;
+  n.style.left = cx + 'px';
+  if(fx.anchor === 'head'){
+    n.style.top = (icon.offsetTop + icon.offsetHeight * (headTopRatio || 0)) + 'px';
+    n.style.transform = `translate(-50%, calc(-100% + ${fx.headOverlapPx || 0}px))`;
+  } else {
+    n.style.top = (icon.offsetTop + icon.offsetHeight / 2) + 'px';
+    n.style.transform = 'translate(-50%, -50%)';
+  }
+}
+// host(몬스터 슬롯·플레이어 슬롯, position:relative) 안의 이펙트 노드를 대상의 현재 상태이상 목록과 맞춤: 새로 걸린 것만 추가, 풀린 것만 제거(이미 재생 중인 노드는 그대로 둠).
+function syncStatusFx(host, icon, statusEffects, headTopRatio){
+  if(!host || !icon) return;
+  const want = new Map();
+  (statusEffects || []).forEach(s => {
+    const def = STATUS_EFFECTS[s.key];
+    if(def && def.fx) want.set(s.key, def.fx);
+  });
+  const have = Array.from(host.children).filter(c => c.classList && c.classList.contains('status-fx'));
+  have.forEach(n => {
+    if(!want.has(n.dataset.key)){ if(n._fxAnim) n._fxAnim.cancel(); n.remove(); }
+  });
+  want.forEach((fx, key) => {
+    let node = have.find(n => n.dataset.key === key && n.parentNode);
+    if(!node){
+      node = buildStatusFxNode(key, fx);
+      if(hunt.paused && node._fxAnim){ node._fxAnim.pause(); node._fxPaused = true; }
+      host.appendChild(node);
+    }
+    placeStatusFxNode(node, icon, fx, headTopRatio);
+  });
+}
+// 슬롯의 이펙트를 모두 지움(몬스터 처치 연출이 시작될 때).
+function clearStatusFx(host){
+  if(!host) return;
+  Array.from(host.children).forEach(c => {
+    if(c.classList && c.classList.contains('status-fx')){ if(c._fxAnim) c._fxAnim.cancel(); c.remove(); }
+  });
+}
+// 전투가 일시정지된 동안 이펙트도 멈추고, 재개되면 이어서 재생(renderHuntBuffUi가 100ms마다 호출).
+function syncStatusFxPlayback(){
+  document.querySelectorAll('.status-fx').forEach(n => {
+    if(!n._fxAnim || n._fxPaused === !!hunt.paused) return;
+    n._fxPaused = !!hunt.paused;
+    if(hunt.paused) n._fxAnim.pause(); else n._fxAnim.play();
+  });
+}
+// 몬스터 개체 1마리의 체력바 색 + 이펙트 동기화(renderStatusBadges에서 호출).
+function syncMonsterStatusVisuals(instance){
+  applyHpBarStatusColor(el('monster-hpfill-' + instance.instanceId), dotStatusColorOf(instance));
+  syncStatusFx(el('monster-slot-' + instance.instanceId), el('monster-icon-' + instance.instanceId), instance.statusEffects, 0);
+}
+// 플레이어의 체력바(던전 상단 HUD·전투 영역 두 곳) 색 + 이펙트 동기화(renderHuntBuffUi가 100ms마다, 상태이상 부여 직후에도 호출).
+function syncPlayerStatusVisuals(){
+  const p = hunt.player;
+  const color = dotStatusColorOf(p);
+  applyHpBarStatusColor(el('huntHpBar'), color);
+  applyHpBarStatusColor(el('combatPlayerHpFill'), color);
+  const slot = el('combatPlayerSlot');
+  if(slot && slot.style.display === 'none') return; // 11스테이지(숨겨진 장소)에서는 플레이어가 안 보임
+  if(state.playerHp <= 0){ clearStatusFx(slot); return; } // 쓰러진 동안은 이펙트를 그리지 않음
+  syncStatusFx(slot, el('combatPlayerIcon'), p && p.statusEffects, PLAYER_HEAD_TOP_RATIO);
 }

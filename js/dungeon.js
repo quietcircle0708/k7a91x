@@ -388,6 +388,7 @@ function applyStatusEffectToPlayer(key, durationMs, source){
     const st = hunt.player.statusEffects.find(x => x.key === key);
     if(st && !st.sourceMonsterId) st.sourceMonsterId = source.monsterId; // 이미 걸려 있던 중독은 재부여되지 않으므로 처음 건 몬스터가 유지됨
   }
+  syncPlayerStatusVisuals(); // 걸린 순간부터 체력바 색·이펙트 재생 시작
   const ms = Math.round((durationMs || 0) * r.durationMult);
   if(def.type === 'atkSpeedMult') refreshPlayerAttackTimer();
   if(def.type !== 'dot' && ms > 0){
@@ -733,7 +734,9 @@ function startStatusTicker(){
       const dmg = tickStatusEffects(instance);
       if(dmg > 0){
         instance.hp -= dmg;
-        const color = STATUS_EFFECTS[activeKeys[0]] ? STATUS_EFFECTS[activeKeys[0]].color : '#7fd67f';
+        // 틱 숫자 색은 "지속 피해형(dot)" 상태이상의 색 — 맨 앞 상태이상(파쇄 등)의 색을 쓰면 중독 숫자가 파란색으로 나왔음(zip422 수정)
+        const dotKey = activeKeys.find(k => STATUS_EFFECTS[k] && STATUS_EFFECTS[k].type === 'dot');
+        const color = dotKey ? STATUS_EFFECTS[dotKey].color : '#7fd67f';
         statusTickEffect(instance.instanceId, dmg, color);
         if(instance.hp <= 0){
           killMonsterInstance(instance.instanceId);
@@ -873,6 +876,7 @@ function killMonsterInstance(instanceId){
     void icon.offsetWidth;
     icon.classList.add('dead');
   }
+  clearStatusFx(el('monster-slot-' + instanceId)); // 처치 연출이 시작되면 상태이상 이펙트도 즉시 제거
   const removalTimeout = setTimeout(() => {
     const slot = el('monster-slot-' + instanceId);
     if(slot) slot.remove();

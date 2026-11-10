@@ -4440,7 +4440,8 @@ const STATUS_EFFECTS = {
     name: '중독',
     magicLevel: 2, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'poison', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(확장자 제외) — 기존엔 이모지 '☠️'였음
-    color: '#7fd67f', // 초록 계열
+    color: '#7fd67f', // 초록 계열 — 중독 틱 숫자·시간 숫자·툴팁 이름·체력바 색(지속 피해 중일 때)에 쓰임
+    fx: { sheet: 'status_poison', frameW: 48, frameH: 48, frames: 24, cols: 5, frameMs: 40, cycleMs: 1000, anchor: 'center' }, // 항목 설명은 아래 "상태이상 이펙트" 주석 참고
     type: 'dot',
     tickIntervalMs: 500,         // 0.5초마다
     maxTicks: 10,                // 최대 10틱(=0.5초×10=5초) 지속
@@ -4452,6 +4453,7 @@ const STATUS_EFFECTS = {
     magicLevel: 3, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'stun', // 기존 이모지 '💤'
     color: '#ff5e26',
+    fx: { sheet: 'status_stun', frameW: 48, frameH: 32, frames: 16, cols: 8, frameMs: 60, anchor: 'head', headOverlapPx: 18 }, // cycleMs 생략 = 쉬지 않고 계속 재생
     type: 'disable',
   },
   slow: {
@@ -4468,7 +4470,8 @@ const STATUS_EFFECTS = {
     name: '화상',
     magicLevel: 3, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'burn', // 기존 이모지 '🔥'
-    color: '#db353c',
+    color: '#ffa726', // 호박색(예전 #db353c) — 기본 체력바의 붉은색과 구분되게 바꿈. 화상 틱 숫자·시간 숫자·툴팁 이름·체력바 색에 쓰임
+    fx: { sheet: 'status_burn', frameW: 40, frameH: 64, frames: 5, cols: 3, frameMs: 80, cycleMs: 500, anchor: 'center' }, // 1초에 2번 재생(0.4초 재생 + 0.1초 쉼)
     type: 'dot',
     tickIntervalMs: 600,        // 0.6초마다
     maxTicks: 5,                // 최대 5틱(=0.6초×5=3초) 지속
@@ -4508,6 +4511,15 @@ const STATUS_EFFECTS = {
     defenseBonus: 40, // 적용 중인 동안 피해 계산에 사용하는 방어도에만 +40(요구사항 2번).
   },
 };
+
+// ---- 상태이상 이펙트(스프라이트 시트) / 지속 피해 체력바 색 ----
+// STATUS_EFFECTS[키].fx를 적으면 그 상태이상이 걸려 있는 동안 대상(몬스터·플레이어) 아이콘 위에 시트 애니메이션을 반복 재생함(effects.js syncStatusFx).
+//   sheet: STATUS_EFFECT_FX_DIR 기준 파일명(확장자 PNG 제외) / frameW·frameH: 프레임 1장의 크기(px, 원본 1:1로 그림) / frames: 프레임 수 / cols: 시트 한 줄의 프레임 수(왼쪽→오른쪽, 위→아래 순서)
+//   frameMs: 프레임 1장이 보이는 시간 / cycleMs: 재생을 시작하는 간격(생략하면 frames×frameMs = 쉬지 않고 계속 재생, 재생 길이보다 길면 남는 시간은 이펙트가 사라져 있음)
+//   anchor: 'center'(아이콘 가운데) | 'head'(아이콘 머리 쪽 — 몬스터는 아이콘 맨 위, 플레이어는 PLAYER_HEAD_TOP_RATIO 위치에 맞춤) / headOverlapPx: head일 때 이펙트 아래쪽이 머리 기준선보다 아래로 내려오는 정도(px)
+// 재생은 상태이상이 걸린 시점부터 시작함. 이펙트는 아이콘 안에 그려져 몬스터 위·말풍선(#speechBubbleLayer) 아래 순서로 겹침.
+// 지속 피해형(type:'dot') 상태이상이 걸려 있는 동안은 대상의 체력바가 그 상태이상의 color로 바뀜(상태이상 데이터의 color를 그대로 따름).
+const STATUS_EFFECT_FX_DIR = STATUS_EFFECT_IMAGE_DIR; // assets/status/
 
 // ---- 상태이상 마법 수준 규칙 ----
 // 예전의 "저주↔파쇄만 서로 막는" 개별 규칙표(STATUS_EFFECT_INTERACTIONS)는 아래 마법 수준 규칙으로 일반화되어 대체됨.

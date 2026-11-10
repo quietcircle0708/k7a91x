@@ -2402,3 +2402,7 @@ body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
   .dt-table th{ text-align:left; color: var(--forge-cream-dim); font-weight:400; padding:3px 6px 3px 0; }
   .dt-table td{ padding:3px 6px 3px 0; color: var(--forge-cream); }
   .dt-table td:first-child{ color: var(--forge-cream-dim); }
+
+/* 상태이상 스프라이트 이펙트(effects.js syncStatusFx) — 몬스터 슬롯·플레이어 슬롯(position:relative) 안에 놓이고 위치는 JS가 아이콘 기준으로 정함.
+   아이콘(z-index 1)보다 위(2), 말풍선 층(#speechBubbleLayer, z-index 45)보다 아래라 몬스터 → 이펙트 → 말풍선 순으로 겹침. 크기는 원본 1:1(data.js STATUS_EFFECTS[].fx). */
+.status-fx{ position:absolute; z-index:2; pointer-events:none; background-repeat:no-repeat; image-rendering:pixelated; }
