@@ -911,7 +911,10 @@ function resolveSkillEffect(id){
   // 버프 모션(요구사항 6번): target이 'buff'인 스킬은 회복형(healFlat)이어도 skillKindOf가 그대로 'buff'를
   // 반환하므로 여기서 한 번에 처리함(아래 healFlat 조기 반환보다 먼저 판정) — 현재 바라보고 있는 방향
   // 그대로 버프 이미지를 잠깐 보여주고 자동으로 기본 자세로 복귀함(effects.js triggerPlayerBuffMotion).
-  if(skillKindOf(s) === 'buff') triggerPlayerBuffMotion();
+  if(skillKindOf(s) === 'buff'){
+    triggerPlayerBuffMotion();
+    playSkillFx(id, null, 0); // 버프 스킬 이펙트(스프라이트 시트) — 효과가 적용되는 이 순간 플레이어 아이콘에 재생(회복형 대지·바다·하늘의 기운도 이 위에서 걸림)
+  }
   if(s.healFlat){
     // 회복형 스킬(예: 대지의 기운) — 데미지 계산 없이 시전 완료 시점에 고정량 회복, 최대체력 초과 회복 안 함
     state.playerHp = Math.min(effectiveMaxHp(state.playerLevel), (state.playerHp || 0) + s.healFlat);
@@ -950,7 +953,7 @@ function resolveSkillEffect(id){
   // hitDelayMs가 지정된 스킬(예: 이연격)은 타수 사이에 지연을 두는 별도 경로로 처리하고 여기서 끝냄 —
   // 지정되지 않은 스킬은 아래 기존 동기 루프를 그대로 타므로 다른 스킬은 전혀 영향받지 않음.
   if(s.hitDelayMs){
-    targets.forEach(t => { if(t) applyDelayedSkillHits(t, s, perHit, critChance); });
+    targets.forEach(t => { if(t) applyDelayedSkillHits(t, s, perHit, critChance, id); });
     return;
   }
   targets.forEach(t => {
@@ -968,6 +971,7 @@ function resolveSkillEffect(id){
       dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(t)));
       t.hp -= dmg;
       monsterHitEffect(t.instanceId, dmg, isCrit);
+      playSkillFx(id, t.instanceId, i); // 스킬 이펙트(스프라이트 시트) — 적중한 몬스터마다 재생
       // 적중(=피해를 입혀 대상이 생존)한 경우에만 상태 이상 부여(예: 소드 스트라이크의 기절). 처치되는
       // 순간의 히트에는 부여하지 않음 — s.onHitStatus가 없는 기존 스킬들은 전혀 영향받지 않음.
       if(t.hp > 0 && s.onHitStatus && !(s.onceOnHitStatus && onceStatusApplied)){
@@ -986,7 +990,7 @@ function resolveSkillEffect(id){
 // 1타는 즉시 적용하고, 이후 타수는 hitDelayMs*순번(ms) 뒤에 setTimeout으로 순차 적용함. 지연된 타수는
 // 실행 시점에 전투가 여전히 진행 중이고 대상이 아직 hunt.monsters에 남아있는지(=생존) 다시 확인한 뒤 적용함 —
 // 그 사이 전투 종료/대상 처치/화면 이동 가능성이 있으므로 target 객체를 그대로 붙들지 않고 instanceId로 매번 재조회함.
-function applyDelayedSkillHits(target, s, perHit, critChance){
+function applyDelayedSkillHits(target, s, perHit, critChance, skillId){
   const instanceId = target.instanceId;
   const hits = s.hits || 1;
   // onceOnHitStatus:true인 스킬(예: 파쇄격)은 이번 스킬 시전에서 적중(=생존)한 "최초의" 타격에만
@@ -1006,6 +1010,7 @@ function applyDelayedSkillHits(target, s, perHit, critChance){
     dmg = Math.max(1, Math.round(dmg * targetStatusDamageMultiplier(t)));
     t.hp -= dmg;
     monsterHitEffect(t.instanceId, dmg, isCrit);
+    playSkillFx(skillId, t.instanceId, hitIndex); // 스킬 이펙트(스프라이트 시트) — 적중한 몬스터마다 재생
     // onHitStatusOnLastHit:true인 스킬(예: 파쇄격)은 마지막 타격에서만(대상 생존 시) 부여해, 그 스킬 자신의 피해는 해당 상태이상을 받지 않음.
     // 이 옵션이 없는 스킬은 기존 규칙(매 타격 / onceOnHitStatus는 최초 생존 타격 1회)을 그대로 따름.
     const statusAllowed = s.onHitStatusOnLastHit ? (hitIndex === hits - 1) : !(s.onceOnHitStatus && onceStatusApplied);

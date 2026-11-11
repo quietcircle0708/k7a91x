@@ -3943,6 +3943,81 @@ const HUNT_CHAR_SKILL_PAGE_COUNT = 2;
 //     따라감). 지정하지 않으면(대부분의 기존 스킬) 기존 방식 그대로 독립적으로 습득 가능 — 지금은 구조만
 //     마련해둔 상태이고 실제로 upgradeFrom이 지정된 스킬은 아직 없음(적용 대상은 추후 개별 지정 예정).
 // }
+// ---- 공격 스킬 이펙트(스프라이트 시트) ----
+// 공격 스킬의 피해가 몬스터에게 들어가는 순간(적중), 적중한 몬스터 아이콘 위치에 시트 애니메이션을 1회 재생함(effects.js playSkillFx).
+// 광역 스킬은 적중한 몬스터마다 각각 재생. 이펙트는 몬스터 칸이 아니라 화면 전체 위의 전용 층(#skillFxLayer)에 그려서, 몬스터가 죽어도 끝까지 재생되고 어떤 영역에도 잘리지 않음.
+// 층 순서: 몬스터·상태이상 이펙트 < 스킬 이펙트(z-index 15) < 메뉴 팝업 < 말풍선(45). 사용자가 수동 일시정지(hunt.manualPause)하면 같이 멈추고 재개하면 이어서 재생 —
+// 스테이지 클리어 뒤 준비 시간처럼 전투가 끝나 hunt.paused가 true가 된 경우에는 멈추지 않고 끝까지 재생함. 던전을 나가면 즉시 지움.
+// 시트(SKILL_FX_SHEETS): 파일은 SKILL_FX_DIR/<키>.png, 칸은 왼쪽→오른쪽·위→아래 순서(시트 4는 첫 칸이 빈 칸이지만 그대로 재생함)
+//   frameW·frameH: 프레임 1장 크기(px) / frames: 재생할 칸 수 / cols: 시트 한 줄의 칸 수 / frameMs: 프레임 1장 시간 / scale: 출력 배수(1=원본) / filter: CSS 색 보정(선택)
+const SKILL_FX_DIR = 'assets/skill_fx/';
+const SKILL_FX_SHEETS = {
+  skill_ground_smash: { frameW: 84,  frameH: 56,  frames: 14, cols: 8, frameMs: 40 },               // 672x112 — 지면 강타
+  skill_ankle_slash:  { frameW: 72,  frameH: 32,  frames: 8,  cols: 8, frameMs: 40 },               // 576x64  — 발목 가르기
+  skill_slash:        { frameW: 128, frameH: 104, frames: 8,  cols: 8, frameMs: 55, scale: 0.8 },   // 1024x208 — 내려베기·중압검·압쇄검·파쇄격·참격 1~4성(기본 0.8배 — 내려베기·중압검·압쇄검·파쇄격은 SKILL_FX에서 0.7배로 덮어씀)
+  skill_cleave_wave:  { frameW: 72,  frameH: 72,  frames: 8,  cols: 5, frameMs: 55 },               // 360x144 — 진'참격·극진참격(첫 칸은 빈 칸)
+  skill_flying_sword: { frameW: 104, frameH: 64,  frames: 13, cols: 8, frameMs: 35 },               // 832x128 — 비연검·비류검·비월검·비천검
+  // 버프 스킬(플레이어에게 재생) — 모두 72x72, 첫 칸이 빈 칸이어도 그대로 재생. filter: 시트 전체에 거는 CSS 색 보정(선택)
+  skill_buff_preemptive:  { frameW: 72, frameH: 72, frames: 13, cols: 5, frameMs: 55 },              // 360x216 — 선공
+  skill_buff_surge:       { frameW: 72, frameH: 72, frames: 15, cols: 5, frameMs: 50 },              // 360x216 — 타력·벽력·개벽
+  skill_buff_vigor_moon:  { frameW: 72, frameH: 72, frames: 9,  cols: 5, frameMs: 90 },              // 360x144 — 대지의 기운·바다의 기운
+  skill_buff_vigor_sky:   { frameW: 72, frameH: 72, frames: 9,  cols: 5, frameMs: 90 },              // 360x144 — 하늘의 기운
+  skill_buff_clone:       { frameW: 72, frameH: 72, frames: 8,  cols: 5, frameMs: 90 },              // 360x144 — 분신·무영
+  skill_buff_rage:        { frameW: 72, frameH: 72, frames: 10, cols: 5, frameMs: 70, filter: 'hue-rotate(125deg) saturate(8) brightness(0.85) contrast(1.2)' }, // 360x144 — 분노(원본은 푸른 보라색이라 붉은 색조로 변경 — 색이 연하면 saturate를, 너무 진하면 brightness를 조정)
+  // 연격류 타격 시트 — 타수마다 순서대로 재생(SKILL_FX의 sequence). frameMs는 기본값이고 스킬별로 sequence 항목에서 덮어씀
+  skill_combo_hit1:    { frameW: 64,  frameH: 64, frames: 5,  cols: 5, frameMs: 25 },   // 320x64  — 타격1
+  skill_combo_hit2:    { frameW: 64,  frameH: 64, frames: 5,  cols: 5, frameMs: 25 },   // 320x64  — 타격2
+  skill_combo_hit3:    { frameW: 64,  frameH: 64, frames: 9,  cols: 5, frameMs: 40 },   // 320x128 — 타격3(마무리)
+  skill_combo_hit4:    { frameW: 64,  frameH: 64, frames: 7,  cols: 5, frameMs: 45 },   // 320x128 — 타격4(마무리)
+  skill_combo_thunder: { frameW: 180, frameH: 72, frames: 13, cols: 8, frameMs: 45 },   // 1440x144 — 폭뢰격(가로로 긴 번개)
+};
+// 연격류 sequence 항목 만들기: n번 타격 시트를 frameMs로 재생
+const comboHit = (n, frameMs) => ({ sheet: 'skill_combo_hit' + n, frameMs });
+// 스킬 id → 이펙트(여기에 없는 스킬은 이펙트 없음). 항목: sheet(시트 키) / anchor: 'center'(몬스터 아이콘 중앙, 기본) | 'feet'(아이콘 발밑 — 프레임 아래쪽이 아이콘 아래쪽에 맞음)
+//   target: 'self'(플레이어 아이콘에 재생 — 버프 스킬) | 생략(적중한 몬스터에 재생) / playOn: 'every'(타마다 재생, 기본) | 'first'(시전 1회당 첫 타에서만) / offsetX·offsetY: 위치 보정(px, +는 오른쪽·아래쪽) / scale·frameMs: 시트 기본값 덮어쓰기
+//   sequence: [{sheet, frameMs, jitter}, ...] — 타수 순서(0번째 타부터)대로 다른 시트를 재생(연격류, sheet 대신 사용) / jitter: 타격마다 위치를 ±N px 무작위로 흔듦 / flipX: true면 그 타격(sequence 항목)을 좌우반전
+const SKILL_FX = {
+  sword_strike:      { sheet: 'skill_ground_smash', anchor: 'feet' },    // 지면 강타
+  ankle_slash:       { sheet: 'skill_ankle_slash' },                     // 발목 가르기
+  slash:             { sheet: 'skill_slash', scale: 0.7 },               // 내려베기(0.7배 — 시트 기본 0.8배를 이 스킬만 덮어씀)
+  crushing_sword:    { sheet: 'skill_slash', scale: 0.7 },               // 중압검(0.7배)
+  crushing_sword2:   { sheet: 'skill_slash', scale: 0.7 },               // 압쇄검(0.7배)
+  shred_strike:      { scale: 0.7, sequence: [{ sheet: 'skill_slash' }, { sheet: 'skill_slash', flipX: true }] }, // 파쇄격(0.7배, 2타 — 타마다 재생하되 2타는 좌우반전)
+  cleave:            { sheet: 'skill_slash' },                           // 참격 1성
+  cleave2:           { sheet: 'skill_slash' },                           // 참격 2성
+  cleave3:           { sheet: 'skill_slash' },                           // 참격 3성
+  cleave4:           { sheet: 'skill_slash' },                           // 참격 4성
+  jin_cleave:        { sheet: 'skill_cleave_wave' },                     // 진'참격
+  geukjin_cleave:    { sheet: 'skill_cleave_wave' },                     // 극진참격
+  swallow_sword:     { sheet: 'skill_flying_sword', playOn: 'first' },   // 비연검(3타 — 시전당 1회)
+  flowing_sword:     { sheet: 'skill_flying_sword', playOn: 'first' },   // 비류검
+  cascade_sword:     { sheet: 'skill_flying_sword', playOn: 'first' },   // 비월검
+  soaring_sword:     { sheet: 'skill_flying_sword', playOn: 'first' },   // 비천검
+  // 버프 스킬 — target: 'self'면 몬스터가 아니라 플레이어 아이콘 중앙에 재생(효과가 적용되는 순간: actions.js resolveSkillEffect의 버프 모션 줄 옆).
+  preemptive_strike: { sheet: 'skill_buff_preemptive', target: 'self' }, // 선공
+  beast_heart:       { sheet: 'skill_buff_surge', target: 'self' },      // 타력
+  byeoklyeok:        { sheet: 'skill_buff_surge', target: 'self' },      // 벽력
+  gaebyeok:          { sheet: 'skill_buff_surge', target: 'self' },      // 개벽
+  earth_vigor:       { sheet: 'skill_buff_vigor_moon', target: 'self' }, // 대지의 기운
+  sea_vigor:         { sheet: 'skill_buff_vigor_moon', target: 'self' }, // 바다의 기운
+  sky_vigor:         { sheet: 'skill_buff_vigor_sky', target: 'self' },  // 하늘의 기운
+  bunsin:            { sheet: 'skill_buff_clone', target: 'self' },      // 분신
+  muyeong:           { sheet: 'skill_buff_clone', target: 'self' },      // 무영
+  rage:              { sheet: 'skill_buff_rage', target: 'self' },       // 분노
+  // 연격류 — sequence: 타수 순서(0번째 타부터)대로 재생할 시트(frameMs로 그 타격의 프레임 시간을 덮어씀). 순서가 끝난 뒤의 타수에는 이펙트가 없음.
+  // jitter: 타격마다 위치를 ±N px 무작위로 흔들어 같은 자리에서 반복되는 단조로움을 줄임(0/생략 = 끄기).
+  // 프레임 시간은 타격 간격(hitDelayMs)에 맞춤: 0.25초→45ms, 0.15초→30ms, 0.12초·0.1초→25ms, 마무리 타격(3·4·폭뢰격)은 길게.
+  double_strike: { jitter: 6, sequence: [comboHit(1, 45), comboHit(2, 45)] },                                                  // 이연격
+  triple_strike: { jitter: 6, sequence: [comboHit(1, 45), comboHit(2, 45), comboHit(1, 45)] },                                 // 삼연격
+  quad_strike:   { jitter: 6, sequence: [comboHit(1, 30), comboHit(2, 30), comboHit(1, 30), comboHit(3, 40)] },                // 사연격
+  five_strike:   { jitter: 6, sequence: [comboHit(1, 25), comboHit(2, 25), comboHit(1, 25), comboHit(2, 25), comboHit(3, 40)] }, // 오연격
+  six_strike:    { jitter: 6, sequence: [comboHit(1, 25), comboHit(2, 25), comboHit(1, 25), comboHit(2, 25), comboHit(1, 25), comboHit(3, 40)] }, // 육연격
+  seven_strike:  { jitter: 6, sequence: [comboHit(1, 25), comboHit(2, 25), comboHit(1, 25), comboHit(2, 25), comboHit(1, 25), comboHit(2, 25), comboHit(3, 40)] }, // 칠연격
+  chain_strike:  { jitter: 6, sequence: [comboHit(1, 25), comboHit(2, 25), comboHit(1, 25), comboHit(2, 25), comboHit(3, 40), comboHit(4, 45)] }, // 연환격
+  // 폭뢰격(7타) — 1~4타 타격1→2→3→4, 5타 폭뢰격(번개), 6·7타는 이펙트 없음. 폭뢰격 시트는 몬스터 중앙에 프레임 가운데를 맞춤
+  thunder_strike: { jitter: 6, sequence: [comboHit(1, 25), comboHit(2, 25), comboHit(3, 40), comboHit(4, 45), { sheet: 'skill_combo_thunder', frameMs: 45, jitter: 0 }] },
+};
+
 const SKILLS = {
   adventurer_will: {
     name: '건신', desc: '[패시브] 체력 +{hpFlat}',
@@ -4462,6 +4537,7 @@ const STATUS_EFFECTS = {
     magicLevel: 1, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'slow', // 기존 이모지 '🐌'
     color: '#fff5ae',
+    fx: { sheet: 'status_slow', frameW: 64, frameH: 64, frames: 16, cols: 4, frameMs: 70, anchor: 'center', scale: 0.6 }, // 시계 — 몸 중앙(처음엔 머리 쪽), 쉬지 않고 반복, 0.6배(원본이 몬스터 아이콘만큼 커서 줄임)
     type: 'atkSpeedMult',
     atkSpeedMultiplier: 0.65, // 공격속도(초당 공격 횟수) x 0.65
   },
@@ -4471,7 +4547,7 @@ const STATUS_EFFECTS = {
     magicLevel: 3, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'burn', // 기존 이모지 '🔥'
     color: '#ffa726', // 호박색(예전 #db353c) — 기본 체력바의 붉은색과 구분되게 바꿈. 화상 틱 숫자·시간 숫자·툴팁 이름·체력바 색에 쓰임
-    fx: { sheet: 'status_burn', frameW: 40, frameH: 64, frames: 5, cols: 3, frameMs: 80, cycleMs: 500, anchor: 'center' }, // 1초에 2번 재생(0.4초 재생 + 0.1초 쉼)
+    fx: { sheet: 'status_burn', frameW: 64, frameH: 64, frames: 16, cols: 4, frameMs: 60, anchor: 'feet', offsetY: -4 }, // 새 시트(64x64 16장) — 쉬지 않고 반복, 발밑(처음엔 40x64 5장 시트였음)
     type: 'dot',
     tickIntervalMs: 600,        // 0.6초마다
     maxTicks: 5,                // 최대 5틱(=0.6초×5=3초) 지속
@@ -4487,6 +4563,7 @@ const STATUS_EFFECTS = {
     magicLevel: 4, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'shredding', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(shredding.svg)
     color: '#001eff',
+    fx: { sheet: 'status_shredding', frameW: 64, frameH: 64, frames: 16, cols: 4, frameMs: 60, anchor: 'feet', offsetY: -4 }, // 납작한 원반 — 발밑, 쉬지 않고 반복
     type: 'defenseBoost', // dot(중독·화상)도 disable(기절)도 atkSpeedMult(둔화)도 아닌 신규 타입 —
                           // 기존 타입별 분기(attackSpeedMultiplier의 atkSpeedMult 체크 등)에 전혀 걸리지
                           // 않으므로 기존 상태이상 로직에 영향이 없음(요구사항: 기존 로직 무영향).
@@ -4506,6 +4583,7 @@ const STATUS_EFFECTS = {
     magicLevel: 5, // 마법 수준(규칙은 아래 "상태이상 마법 수준 규칙" 참고)
     icon: 'curse', // STATUS_EFFECT_IMAGE_DIR 기준 파일명(curse.svg)
     color: '#c50d0d',
+    fx: { sheet: 'status_curse', frameW: 64, frameH: 64, frames: 16, cols: 4, frameMs: 60, anchor: 'center' }, // 보라색 구슬 — 몸 중앙, 쉬지 않고 반복
     type: 'defenseBoost', // 파쇄와 같은 타입 — statusDefenseBonusFor(formulas.js)가 defenseBoost 타입을
                           // 전부 훑어 합산하므로 이 타입으로 등록하는 것만으로 방어도 계산에 자동 반영됨.
     defenseBonus: 40, // 적용 중인 동안 피해 계산에 사용하는 방어도에만 +40(요구사항 2번).
@@ -4517,6 +4595,8 @@ const STATUS_EFFECTS = {
 //   sheet: STATUS_EFFECT_FX_DIR 기준 파일명(확장자 PNG 제외) / frameW·frameH: 프레임 1장의 크기(px, 원본 1:1로 그림) / frames: 프레임 수 / cols: 시트 한 줄의 프레임 수(왼쪽→오른쪽, 위→아래 순서)
 //   frameMs: 프레임 1장이 보이는 시간 / cycleMs: 재생을 시작하는 간격(생략하면 frames×frameMs = 쉬지 않고 계속 재생, 재생 길이보다 길면 남는 시간은 이펙트가 사라져 있음)
 //   anchor: 'center'(아이콘 가운데) | 'head'(아이콘 머리 쪽 — 몬스터는 아이콘 맨 위, 플레이어는 PLAYER_HEAD_TOP_RATIO 위치에 맞춤) / headOverlapPx: head일 때 이펙트 아래쪽이 머리 기준선보다 아래로 내려오는 정도(px)
+//   | 'feet'(발밑 — 이펙트 프레임의 가운데를 아이콘 발 위치에 맞춤. 몬스터는 아이콘 맨 아래, 플레이어는 PLAYER_FEET_BOTTOM_RATIO 위치) / offsetX·offsetY: 위치 보정(px, +는 오른쪽·아래쪽)
+//   scale: 출력 배수(기본 1=원본) / opacity: 투명도(기본 1=100%) — 이미지 파일을 고치지 않고 크기·밝기를 줄이고 싶을 때 이 두 값만 조정함
 // 재생은 상태이상이 걸린 시점부터 시작함. 이펙트는 아이콘 안에 그려져 몬스터 위·말풍선(#speechBubbleLayer) 아래 순서로 겹침.
 // 지속 피해형(type:'dot') 상태이상이 걸려 있는 동안은 대상의 체력바가 그 상태이상의 color로 바뀜(상태이상 데이터의 color를 그대로 따름).
 const STATUS_EFFECT_FX_DIR = STATUS_EFFECT_IMAGE_DIR; // assets/status/
@@ -5621,6 +5701,8 @@ const SKILL_BUBBLE_SUFFIX = '!';
 // 플레이어 이미지에서 머리 윗부분의 위치(이미지 높이 대비 비율) — 말풍선이 머리 위에 오도록 기준으로 씀.
 // assets/ui/player 대기·버프 자세 이미지의 불투명 영역 윗선(64/256) 기준이며, 공격 자세는 무기가 이보다 약 10% 위까지 올라옴(gapPx 12가 그 위로 띄움).
 const PLAYER_HEAD_TOP_RATIO = 0.25;
+// 플레이어 이미지에서 발(불투명 영역 아랫선)의 위치(이미지 높이 대비 비율) — 상태이상 이펙트 'feet' 기준. assets/ui/player 대기·버프·공격 자세 이미지의 아랫선(약 0.70) 기준.
+const PLAYER_FEET_BOTTOM_RATIO = 0.70;
 
 // 스테이지 입장 메시지. {name}은 던전 이름으로 치환됨(1스테이지 전용).
 const STAGE_ENTER_MSG = {

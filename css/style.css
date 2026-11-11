@@ -2406,3 +2406,8 @@ body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
 /* 상태이상 스프라이트 이펙트(effects.js syncStatusFx) — 몬스터 슬롯·플레이어 슬롯(position:relative) 안에 놓이고 위치는 JS가 아이콘 기준으로 정함.
    아이콘(z-index 1)보다 위(2), 말풍선 층(#speechBubbleLayer, z-index 45)보다 아래라 몬스터 → 이펙트 → 말풍선 순으로 겹침. 크기는 원본 1:1(data.js STATUS_EFFECTS[].fx). */
 .status-fx{ position:absolute; z-index:2; pointer-events:none; background-repeat:no-repeat; image-rendering:pixelated; }
+
+/* 공격 스킬 이펙트 층(effects.js playSkillFx) — 화면 전체 위의 고정 층이라 전투 영역 밖으로 나가도 잘리지 않음.
+   몬스터·상태이상 이펙트(슬롯 안) 위, 메뉴 팝업(20)·하단 메뉴(40)·말풍선(45)보다 아래. 위치·크기는 JS가 정함(data.js SKILL_FX_SHEETS·SKILL_FX). */
+#skillFxLayer{ position:fixed; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:15; overflow:visible; }
+.skill-fx{ position:absolute; background-repeat:no-repeat; pointer-events:none; }

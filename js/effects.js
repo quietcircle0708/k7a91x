@@ -467,36 +467,50 @@ function buildStatusFxNode(key, fx){
   n.style.backgroundImage = `url("${STATUS_EFFECT_FX_DIR}${fx.sheet}.png")`;
   const pos = i => `${-(i % fx.cols) * fx.frameW}px ${-Math.floor(i / fx.cols) * fx.frameH}px`;
   n.style.backgroundPosition = pos(0);
+  const op = fx.opacity != null ? fx.opacity : 1; // 투명도(기본 100%) — 재생 애니메이션이 opacity를 직접 다루므로 키프레임 값에 반영
   if(typeof n.animate === 'function'){
     const playMs = fx.frames * fx.frameMs;
     const cycleMs = Math.max(fx.cycleMs || playMs, playMs);
     const kf = [];
     for(let i = 0; i < fx.frames; i++){
-      kf.push({ offset: (i * fx.frameMs) / cycleMs, backgroundPosition: pos(i), opacity: 1, easing: 'steps(1, end)' });
+      kf.push({ offset: (i * fx.frameMs) / cycleMs, backgroundPosition: pos(i), opacity: op, easing: 'steps(1, end)' });
     }
     const last = pos(fx.frames - 1);
     if(cycleMs > playMs) kf.push({ offset: playMs / cycleMs, backgroundPosition: last, opacity: 0, easing: 'steps(1, end)' });
-    kf.push({ offset: 1, backgroundPosition: last, opacity: cycleMs > playMs ? 0 : 1 });
+    kf.push({ offset: 1, backgroundPosition: last, opacity: cycleMs > playMs ? 0 : op });
     n._fxAnim = n.animate(kf, { duration: cycleMs, iterations: Infinity });
+  } else {
+    n.style.opacity = op;
   }
   return n;
 }
 // 이펙트 노드를 아이콘 기준 위치에 놓음(아이콘 위치는 슬롯 기준 offset 값). 아이콘 안에 넣지 않고 슬롯에 두는 이유: 아이콘에는 "공격 대상" 붉은 테두리·피격 흰색 번쩍임 같은 filter가 걸려 있어
-// 안에 있으면 이펙트 색까지 물들기 때문(아이콘의 흔들림은 따라가지 않음). 레이아웃이 바뀌어도 맞도록 동기화 때마다 다시 놓음.
+// 안에 있으면 이펙트 색까지 물들기 때문(아이콘의 흔들림은 따라가지 않음). 레이아웃이 바뀌어도 맞도록 동기화 때마다 다시 놓되, 값이 같으면 건드리지 않음.
 // headTopRatio: 'head' 이펙트를 놓을 머리 기준선 위치(아이콘 높이 대비 비율 — 몬스터 0, 플레이어 PLAYER_HEAD_TOP_RATIO).
-function placeStatusFxNode(n, icon, fx, headTopRatio){
-  const cx = icon.offsetLeft + icon.offsetWidth / 2;
-  n.style.left = cx + 'px';
+// feetBottomRatio: 'feet' 이펙트를 놓을 발 위치(아이콘 높이 대비 비율 — 몬스터 1, 플레이어 PLAYER_FEET_BOTTOM_RATIO).
+function placeStatusFxNode(n, icon, fx, headTopRatio, feetBottomRatio){
+  const cx = icon.offsetLeft + icon.offsetWidth / 2 + (fx.offsetX || 0);
+  const sc = fx.scale && fx.scale !== 1 ? ` scale(${fx.scale})` : '';
+  let top, tf;
   if(fx.anchor === 'head'){
-    n.style.top = (icon.offsetTop + icon.offsetHeight * (headTopRatio || 0)) + 'px';
-    n.style.transform = `translate(-50%, calc(-100% + ${fx.headOverlapPx || 0}px))`;
+    top = icon.offsetTop + icon.offsetHeight * (headTopRatio || 0) + (fx.offsetY || 0);
+    tf = `translate(-50%, calc(-100% + ${fx.headOverlapPx || 0}px))` + sc;
+  } else if(fx.anchor === 'feet'){
+    top = icon.offsetTop + icon.offsetHeight * (feetBottomRatio == null ? 1 : feetBottomRatio) + (fx.offsetY || 0);
+    tf = 'translate(-50%, -50%)' + sc;
   } else {
-    n.style.top = (icon.offsetTop + icon.offsetHeight / 2) + 'px';
-    n.style.transform = 'translate(-50%, -50%)';
+    top = icon.offsetTop + icon.offsetHeight / 2 + (fx.offsetY || 0);
+    tf = 'translate(-50%, -50%)' + sc;
   }
+  const key = cx + '|' + top + '|' + tf;
+  if(n._placeKey === key) return;
+  n._placeKey = key;
+  n.style.left = cx + 'px';
+  n.style.top = top + 'px';
+  n.style.transform = tf;
 }
 // host(몬스터 슬롯·플레이어 슬롯, position:relative) 안의 이펙트 노드를 대상의 현재 상태이상 목록과 맞춤: 새로 걸린 것만 추가, 풀린 것만 제거(이미 재생 중인 노드는 그대로 둠).
-function syncStatusFx(host, icon, statusEffects, headTopRatio){
+function syncStatusFx(host, icon, statusEffects, headTopRatio, feetBottomRatio){
   if(!host || !icon) return;
   const want = new Map();
   (statusEffects || []).forEach(s => {
@@ -514,7 +528,7 @@ function syncStatusFx(host, icon, statusEffects, headTopRatio){
       if(hunt.paused && node._fxAnim){ node._fxAnim.pause(); node._fxPaused = true; }
       host.appendChild(node);
     }
-    placeStatusFxNode(node, icon, fx, headTopRatio);
+    placeStatusFxNode(node, icon, fx, headTopRatio, feetBottomRatio);
   });
 }
 // 슬롯의 이펙트를 모두 지움(몬스터 처치 연출이 시작될 때).
@@ -524,18 +538,22 @@ function clearStatusFx(host){
     if(c.classList && c.classList.contains('status-fx')){ if(c._fxAnim) c._fxAnim.cancel(); c.remove(); }
   });
 }
-// 전투가 일시정지된 동안 이펙트도 멈추고, 재개되면 이어서 재생(renderHuntBuffUi가 100ms마다 호출).
+// 일시정지된 동안 이펙트도 멈추고, 재개되면 이어서 재생(renderHuntBuffUi가 100ms마다 호출). 스킬 이펙트의 정지 기준은 아래 주석 참고.
 function syncStatusFxPlayback(){
-  document.querySelectorAll('.status-fx').forEach(n => {
-    if(!n._fxAnim || n._fxPaused === !!hunt.paused) return;
-    n._fxPaused = !!hunt.paused;
-    if(hunt.paused) n._fxAnim.pause(); else n._fxAnim.play();
+  if(currentView !== 'hunt') clearSkillFx(); // 던전을 나가면 남은 스킬 이펙트도 즉시 지움
+  document.querySelectorAll('.status-fx, .skill-fx').forEach(n => {
+    if(!n._fxAnim) return;
+    // 상태이상 이펙트는 전투 일시정지(hunt.paused), 스킬 이펙트는 수동 일시정지(hunt.manualPause)일 때만 멈춤
+    const want = n.classList.contains('skill-fx') ? !!hunt.manualPause : !!hunt.paused;
+    if(n._fxPaused === want) return;
+    n._fxPaused = want;
+    if(want) n._fxAnim.pause(); else n._fxAnim.play();
   });
 }
 // 몬스터 개체 1마리의 체력바 색 + 이펙트 동기화(renderStatusBadges에서 호출).
 function syncMonsterStatusVisuals(instance){
   applyHpBarStatusColor(el('monster-hpfill-' + instance.instanceId), dotStatusColorOf(instance));
-  syncStatusFx(el('monster-slot-' + instance.instanceId), el('monster-icon-' + instance.instanceId), instance.statusEffects, 0);
+  syncStatusFx(el('monster-slot-' + instance.instanceId), el('monster-icon-' + instance.instanceId), instance.statusEffects, 0, 1);
 }
 // 플레이어의 체력바(던전 상단 HUD·전투 영역 두 곳) 색 + 이펙트 동기화(renderHuntBuffUi가 100ms마다, 상태이상 부여 직후에도 호출).
 function syncPlayerStatusVisuals(){
@@ -546,5 +564,82 @@ function syncPlayerStatusVisuals(){
   const slot = el('combatPlayerSlot');
   if(slot && slot.style.display === 'none') return; // 11스테이지(숨겨진 장소)에서는 플레이어가 안 보임
   if(state.playerHp <= 0){ clearStatusFx(slot); return; } // 쓰러진 동안은 이펙트를 그리지 않음
-  syncStatusFx(slot, el('combatPlayerIcon'), p && p.statusEffects, PLAYER_HEAD_TOP_RATIO);
+  syncStatusFx(slot, el('combatPlayerIcon'), p && p.statusEffects, PLAYER_HEAD_TOP_RATIO, PLAYER_FEET_BOTTOM_RATIO);
+}
+
+// ---- 공격 스킬 이펙트(스프라이트 시트) ----
+// 데이터는 data.js SKILL_FX_SHEETS·SKILL_FX. 적중 지점(actions.js resolveSkillEffect·applyDelayedSkillHits)에서 playSkillFx를 부른다.
+// 이펙트는 body 직속 전용 층(#skillFxLayer, position:fixed)에 그려 몬스터 칸이 처치 후 지워져도 끝까지 재생되고 전투 영역 밖으로 나가도 잘리지 않음.
+// 위치는 호출 순간의 몬스터 아이콘 화면 좌표 기준(재생 중에는 움직이지 않음).
+let skillFxLayer = null;
+function skillFxLayerEl(){
+  if(skillFxLayer && document.body.contains(skillFxLayer)) return skillFxLayer;
+  skillFxLayer = document.createElement('div');
+  skillFxLayer.id = 'skillFxLayer';
+  document.body.appendChild(skillFxLayer);
+  return skillFxLayer;
+}
+// skillId: SKILLS 키 / instanceId: 적중한 몬스터(버프 스킬은 null) / hitIndex: 이번 시전의 몇 번째 타(0부터)
+function playSkillFx(skillId, instanceId, hitIndex){
+  let cfg = SKILL_FX[skillId];
+  if(!cfg) return;
+  // 연격류: sequence[타수]에 적힌 시트를 재생(적힌 순서를 넘어선 타수에는 이펙트 없음). 항목의 값이 스킬 공통 값을 덮어씀
+  if(cfg.sequence){
+    const item = cfg.sequence[hitIndex];
+    if(!item) return;
+    cfg = { ...cfg, ...item };
+  }
+  if(cfg.playOn === 'first' && hitIndex > 0) return;
+  const sheet = SKILL_FX_SHEETS[cfg.sheet];
+  if(!sheet) return;
+  // target:'self'(버프 스킬)는 플레이어 아이콘, 그 외는 적중한 몬스터 아이콘
+  const icon = cfg.target === 'self' ? el('combatPlayerIcon') : el('monster-icon-' + instanceId);
+  if(!icon) return;
+  const r = icon.getBoundingClientRect();
+  if(r.width === 0 && r.height === 0) return;
+  const scale = cfg.scale != null ? cfg.scale : (sheet.scale != null ? sheet.scale : 1);
+  const frameMs = cfg.frameMs != null ? cfg.frameMs : sheet.frameMs;
+  const w = sheet.frameW * scale, h = sheet.frameH * scale; // 화면에 보이는 크기
+  // jitter: 타격마다 위치를 ±N px 무작위로 흔듦(연격류의 단조로움 방지)
+  const jx = cfg.jitter ? (Math.random() * 2 - 1) * cfg.jitter : 0;
+  const jy = cfg.jitter ? (Math.random() * 2 - 1) * cfg.jitter : 0;
+  let cx = r.left + r.width / 2 + (cfg.offsetX || 0) + jx;
+  let boxTop = (cfg.anchor === 'feet' ? r.bottom - h : r.top + r.height / 2 - h / 2) + (cfg.offsetY || 0) + jy;
+  // 화면 가장자리 보정: 이펙트가 화면 밖으로 나가 잘리지 않게, 나갈 때만 안쪽으로 밀어 넣음(좁은 화면의 폭뢰격 등 — 평소에는 영향 없음)
+  const vw = document.documentElement.clientWidth || window.innerWidth, vh = window.innerHeight;
+  if(w <= vw) cx = Math.min(Math.max(cx, w / 2), vw - w / 2);
+  if(h <= vh) boxTop = Math.min(Math.max(boxTop, 0), vh - h);
+  const n = document.createElement('div');
+  n.className = 'skill-fx';
+  n.style.width = sheet.frameW + 'px';
+  n.style.height = sheet.frameH + 'px';
+  // 크기를 줄이는 배수는 transform(가운데 기준)으로 처리 — 놓을 위치는 줄어든 상자 기준으로 계산하고 원래 크기 상자를 그 가운데에 맞춤
+  n.style.left = (cx - sheet.frameW / 2) + 'px';
+  n.style.top = (boxTop + h / 2 - sheet.frameH / 2) + 'px';
+  // 크기 배수와 좌우반전(flipX)은 transform(가운데 기준)으로 처리 — 반전해도 놓인 상자 위치는 그대로
+  if(scale !== 1 || cfg.flipX) n.style.transform = `scale(${cfg.flipX ? -scale : scale}, ${scale})`;
+  n.style.backgroundImage = `url("${SKILL_FX_DIR}${cfg.sheet}.png")`;
+  if(sheet.filter) n.style.filter = sheet.filter;
+  const pos = i => `${-(i % sheet.cols) * sheet.frameW}px ${-Math.floor(i / sheet.cols) * sheet.frameH}px`;
+  n.style.backgroundPosition = pos(0);
+  const totalMs = sheet.frames * frameMs;
+  skillFxLayerEl().appendChild(n);
+  if(typeof n.animate === 'function'){
+    const kf = [];
+    for(let i = 0; i < sheet.frames; i++) kf.push({ offset: (i * frameMs) / totalMs, backgroundPosition: pos(i), easing: 'steps(1, end)' });
+    kf.push({ offset: 1, backgroundPosition: pos(sheet.frames - 1) });
+    const a = n.animate(kf, { duration: totalMs, iterations: 1, fill: 'forwards' });
+    n._fxAnim = a;
+    // 스킬 이펙트는 "수동 일시정지"일 때만 멈춤 — 마지막 몬스터 처치 뒤 준비 시간(hunt.paused=true이지만 수동 일시정지 아님)에도 끝까지 재생해야 함
+    n._fxPaused = !!hunt.manualPause;
+    if(n._fxPaused) a.pause();
+    a.onfinish = () => n.remove();
+  } else {
+    setTimeout(() => n.remove(), totalMs);
+  }
+}
+// 스킬 이펙트를 모두 지움(던전 나가기 등).
+function clearSkillFx(){
+  if(!skillFxLayer) return;
+  Array.from(skillFxLayer.children).forEach(c => { if(c._fxAnim) c._fxAnim.cancel(); c.remove(); });
 }
