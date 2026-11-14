@@ -34,7 +34,7 @@ function townShopDef(action, id){
 // 마을 화면에 있는 동안 자연 회복(재생)이 몇 배로 진행되는지(던전·그 밖의 화면은 1배)
 function townRegenSpeed(){ return currentView === 'town' ? TOWN_REGEN_SPEED : 1; }
 
-const townUI = { selected: null, builtFor: null };
+const townUI = { selected: null, builtFor: null, showBuffs: false }; // showBuffs: HUD 자리에 버프 아이콘을 보여주는 중(효과 버튼 토글, 저장하지 않음)
 
 // ---- 마을 이미지 + 클릭 영역 만들기(마을이 바뀔 때만 다시 만듦) ----
 function townBuildMap(){
@@ -161,14 +161,16 @@ function townTravel(id){
 
 // ---- 화면에 따라 공용 UI를 마을 패널 ↔ 원래 자리로 옮기기 ----
 //  · 플레이어 HUD(#huntPlayerInfo): 마을 패널(#townHudSlot) ↔ 던전 카드(#huntCard, 던전 이름 바로 아래)
+//  · 버프 아이콘 영역(#huntBuffUi): 마을 패널의 HUD 자리(#townHudSlot, 효과 버튼으로 HUD와 토글) ↔ 던전 카드(HUD 바로 다음). render.js renderHuntBuffUi가 100ms마다 어느 화면이든 같은 방식으로 채움
 //  · 공지사항 버튼(#openPatchNoteBtn)·메뉴(#menuWrap = 버튼 + 그리드): 마을 패널(#townNavSlot) ↔ 위쪽 줄(#mainNav, 맨 뒤 두 칸)
 //  요소 자체를 옮기는 것이라 아이디·이벤트·알림 점·단축키가 그대로 유지됨. 마을에서는 비어 버린 #mainNav 줄을 숨김.
 function townUiPlace(name){
   const hud = el('huntPlayerInfo');
   const slot = el('townHudSlot'), navSlot = el('townNavSlot'), nav = el('mainNav');
-  const patch = el('openPatchNoteBtn'), menu = el('menuWrap');
+  const buff = el('huntBuffUi'), patch = el('openPatchNoteBtn'), menu = el('menuWrap');
   if(name === 'town'){
     if(hud && slot && hud.parentElement !== slot) slot.appendChild(hud);
+    if(buff && slot && buff.parentElement !== slot) slot.appendChild(buff); // HUD와 같은 자리(토글로 번갈아 표시)
     if(navSlot){
       if(patch && patch.parentElement !== navSlot) navSlot.appendChild(patch);
       if(menu && menu.parentElement !== navSlot) navSlot.appendChild(menu);
@@ -176,7 +178,8 @@ function townUiPlace(name){
     if(nav) nav.style.display = 'none';
   } else {
     const home = el('huntCard');
-    if(hud && home && hud.parentElement !== home) home.insertBefore(hud, el('huntBuffUi')); // 원래 자리: 던전 이름 바로 아래
+    if(buff && home && buff.parentElement !== home) home.insertBefore(buff, el('monsterStage')); // 원래 자리: HUD 바로 다음(던전 카드 안)
+    if(hud && home && hud.parentElement !== home) home.insertBefore(hud, buff); // 원래 자리: 던전 이름 바로 아래
     if(nav){
       if(patch && patch.parentElement !== nav) nav.appendChild(patch); // 원래 순서: 공지사항 → 메뉴(뒤로가기 버튼들 다음)
       if(menu && menu.parentElement !== nav) nav.appendChild(menu);
@@ -191,7 +194,7 @@ function townLogApply(){
   const box = el('townLog');
   if(box) box.style.display = townLogIsOpen() ? 'flex' : 'none';
   const btn = el('townLogBtn');
-  if(btn) btn.classList.toggle('log-closed', !townLogIsOpen());
+  if(btn) btn.classList.toggle('active', townLogIsOpen());
   if(townLogIsOpen()) huntLogRenderAll();
 }
 function townLogToggle(){
@@ -199,6 +202,21 @@ function townLogToggle(){
   state.settings.townLogOpen = !townLogIsOpen();
   saveState();
   townLogApply();
+}
+
+// ---- 효과(버프) 토글: HUD ↔ 적용 중인 버프·망자의 저주 아이콘 ----
+function townBuffsApply(){
+  const slot = el('townHudSlot'), btn = el('townBuffBtn');
+  if(slot) slot.classList.toggle('show-buffs', townUI.showBuffs);
+  if(btn){
+    btn.classList.toggle('active', townUI.showBuffs);
+    const buff = el('huntBuffUi');
+    btn.classList.toggle('has-effect', !townUI.showBuffs && !!buff && buff.children.length > 0);
+  }
+}
+function townBuffsToggle(){
+  townUI.showBuffs = !townUI.showBuffs;
+  townBuffsApply();
 }
 
 // ---- 마을 화면에 들어올 때(navigation.js showView / 게임 시작) ----
@@ -212,6 +230,7 @@ function townOnEnter(prev){
   if(name) name.textContent = currentTownDef().name;
   const logBtn = el('townLogBtn');
   if(logBtn && !logBtn.firstElementChild) logBtn.innerHTML = uiIconHtml('huntLog', 'hunt-img-btn-icon');
+  townBuffsApply();
   if(prev === 'hunt' || prev === 'load'){
     huntLog('townArrive', { town: currentTownDef().name });
     huntLog('townNotice', { text: TOWN_TEXT.regenNotice });
@@ -225,3 +244,10 @@ setInterval(() => {
   const b = currentTownDef().buildings.find(x => x.id === townUI.selected);
   if(b && b.kind === 'shrine') townRenderBubble();
 }, 1000);
+
+// 효과 버튼 표시: 적용 중인 버프·망자의 저주가 있는데 HUD가 보이는 동안에는 버튼에 작은 점을 띄워 알려 줌
+setInterval(() => {
+  if(currentView !== 'town') return;
+  const btn = el('townBuffBtn'), buff = el('huntBuffUi');
+  if(btn && buff) btn.classList.toggle('has-effect', !townUI.showBuffs && buff.children.length > 0);
+}, 500);

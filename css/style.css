@@ -2427,13 +2427,23 @@ body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
 .town-panel-row{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .town-hud-slot{ flex:0 0 auto; width:168px; height:65px; margin:9px 0 2px 11px; } /* HUD 아바타가 왼쪽·위로 튀어나온 만큼 여백 */
 .town-hud-slot .hunt-hud{ margin-bottom:0; }
-.town-nav-slot{ flex:1 1 0; min-width:0; max-height:76px; display:flex; flex-wrap:wrap; justify-content:flex-end; align-content:center; gap:6px; }
+/* HUD 자리에서 토글: 효과 버튼(#townBuffBtn)을 누르면 .show-buffs가 붙어 HUD가 숨고 던전 버프 UI(.hunt-buff-ui)가 같은 자리에 나옴(던전과 같은 24px 아이콘·남은 시간 내림차순·최대 5열×3줄).
+   두 요소가 던전 카드로 돌아가면 이 규칙은 적용되지 않으므로 던전 화면에는 영향이 없음. 버프 칸은 absolute라 아이콘이 늘어도 패널이 길어지지 않음. */
+.town-hud-slot{ position:relative; }
+.town-hud-slot.show-buffs #huntPlayerInfo{ display:none; }
+.town-hud-slot:not(.show-buffs) #huntBuffUi{ display:none; }
+.town-hud-slot .hunt-buff-ui{ position:absolute; top:-9px; left:0; right:auto; width:calc(var(--hunt-buff-icon-size) * 5 + var(--hunt-buff-gap) * 4); column-gap:var(--hunt-buff-gap); row-gap:3px; max-height:calc(var(--hunt-buff-icon-size) * 3 + 3px * 2); }
+.town-tool-slot{ flex:1 1 0; min-width:0; display:flex; flex-wrap:wrap; justify-content:center; align-content:center; gap:4px; }
+.town-tool-btn{ position:relative; }
+.town-tool-icon{ width:24px; height:24px; image-rendering:pixelated; display:block; margin:4px; }
+.town-tool-btn.active{ outline:2px solid var(--forge-gold); outline-offset:-2px; background:rgba(240,200,100,.18); }
+.town-tool-btn.has-effect::after{ content:''; position:absolute; top:2px; right:2px; width:7px; height:7px; border-radius:50%; background:var(--forge-gold); box-shadow:0 0 4px rgba(240,200,100,.9); } /* 적용 중인 효과가 있는데 HUD가 보이는 동안 알려 주는 작은 점 */
+.town-nav-slot{ flex:0 0 auto; display:flex; align-items:center; gap:6px; }
 .town-nav-slot .menu-wrap{ display:block; }
 .town-name-row{ display:flex; align-items:center; gap:8px; height:22px; }
 .town-divider{ flex:1 1 0; height:10px; background:url(../assets/ui/frames/divider-town-002.png) center / 100% 100% no-repeat; image-rendering:pixelated; }
 .town-divider-r{ transform:scaleX(-1); } /* 왼쪽은 서서히 짙어지고 오른쪽은 반대로 사라지게 좌우를 뒤집음 */
 .town-region{ flex:0 0 auto; font-family:'Noto Serif KR',serif; font-weight:900; font-size:16px; line-height:1; color:var(--forge-gold); text-shadow:0 2px 4px rgba(0,0,0,.6); }
-.town-log-btn{ flex:0 0 auto; }
 /* 마을 이미지 테두리: 팝업(.modal-box)과 같은 프레임 이미지 panel-transparent-center-009.png (9-slice, 모서리 10px 고정·가장자리 늘임) */
 .town-stage-wrap{
   position:relative; box-sizing:border-box; background:#17120f;
@@ -2483,3 +2493,4 @@ body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
 .town-log-close{ background:none; border:0; color:var(--forge-cream-dim); font-size:12px; cursor:pointer; padding:0 2px; }
 .town-log .hunt-log-list{ height:96px; }
 @media (max-width:480px){ .town-hud-slot{ margin-left:6px; } .town-panel{ padding-left:4px; padding-right:4px; } }
+@media (max-width:340px){ .town-hud-slot{ margin-left:0; } .town-nav-slot{ flex-direction:column; gap:4px; } } /* 아주 좁은 화면: 공지/메뉴 버튼을 세로로 쌓아 버프 칸 폭을 확보 */

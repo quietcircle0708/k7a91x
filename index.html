@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=434">
+<link rel="stylesheet" href="css/style.css?v=435">
 </head>
 <body>
 <div class="wrap">
@@ -50,13 +50,15 @@
   <!-- 마을 화면(기본 화면, town.js): 위 줄(HUD·지역명·로그 버튼) + 마을 이미지(건물 클릭 영역) + 이미지 위 로그 상자 -->
   <div id="townView">
     <div class="town-card">
-      <!-- 상단 패널(9-slice 프레임): HUD(왼쪽) + 버튼들(오른쪽: 로그·공지사항·메뉴 — 공지/메뉴는 마을에 들어올 때 위쪽 줄에서 옮겨 오고 나가면 되돌림, town.js townUiPlace) + 마을 이름(디바이더) -->
+      <!-- 상단 패널(9-slice 프레임): HUD(왼쪽, 효과 버튼으로 버프 아이콘과 토글) + 효과·로그 버튼(가운데) + 공지사항·메뉴 버튼(오른쪽) + 마을 이름(디바이더). HUD·버프 아이콘·공지/메뉴는 마을에 들어올 때 옮겨 오고 나가면 원래 자리로 되돌림(town.js townUiPlace) -->
       <div class="town-panel" id="townPanel">
         <div class="town-panel-row">
           <div class="town-hud-slot" id="townHudSlot"></div>
-          <div class="town-nav-slot" id="townNavSlot">
-            <button type="button" class="hunt-img-btn town-log-btn" id="townLogBtn" title="로그" aria-label="로그"></button>
+          <div class="town-tool-slot" id="townToolSlot">
+            <button type="button" class="hunt-img-btn town-tool-btn" id="townBuffBtn" title="적용 중인 효과" aria-label="적용 중인 효과"><img src="assets/ui/icon_town_prayer.png" class="town-tool-icon" alt="" draggable="false"></button><!-- 누르면 HUD 자리에 적용 중인 버프·망자의 저주 아이콘이 토글로 표시됨 -->
+            <button type="button" class="hunt-img-btn town-tool-btn" id="townLogBtn" title="로그" aria-label="로그"></button>
           </div>
+          <div class="town-nav-slot" id="townNavSlot"></div>
         </div>
         <div class="town-name-row">
           <i class="town-divider town-divider-l"></i>
@@ -1149,30 +1151,30 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=434"></script>
-<script src="js/formulas.js?v=434"></script>
-<script src="js/catalyst.js?v=434"></script>
-<script src="js/state.js?v=434"></script>
-<script src="js/effects.js?v=434"></script>
-<script src="js/render.js?v=434"></script>
-<script src="js/actions.js?v=434"></script>
-<script src="js/dungeon.js?v=434"></script>
-<script src="js/navigation.js?v=434"></script>
-<script src="js/inventory_box.js?v=434"></script>
-<script src="js/notify.js?v=434"></script>
-<script src="js/codex.js?v=434"></script>
-<script src="js/codex_monster.js?v=434"></script>
-<script src="js/craft_menu.js?v=434"></script>
-<script src="js/craft_multi.js?v=434"></script>
-<script src="js/shop_menu.js?v=434"></script>
-<script src="js/box_menu.js?v=434"></script>
-<script src="js/forge_menu.js?v=434"></script>
-<script src="js/menu_popup.js?v=434"></script>
-<script src="js/hunt_log.js?v=434"></script>
-<script src="js/town.js?v=434"></script>
-<script src="js/achievements.js?v=434"></script>
-<script src="js/hotkeys.js?v=434"></script>
-<script src="js/data_transfer.js?v=434"></script>
-<script src="js/main.js?v=434"></script>
+<script src="js/data.js?v=435"></script>
+<script src="js/formulas.js?v=435"></script>
+<script src="js/catalyst.js?v=435"></script>
+<script src="js/state.js?v=435"></script>
+<script src="js/effects.js?v=435"></script>
+<script src="js/render.js?v=435"></script>
+<script src="js/actions.js?v=435"></script>
+<script src="js/dungeon.js?v=435"></script>
+<script src="js/navigation.js?v=435"></script>
+<script src="js/inventory_box.js?v=435"></script>
+<script src="js/notify.js?v=435"></script>
+<script src="js/codex.js?v=435"></script>
+<script src="js/codex_monster.js?v=435"></script>
+<script src="js/craft_menu.js?v=435"></script>
+<script src="js/craft_multi.js?v=435"></script>
+<script src="js/shop_menu.js?v=435"></script>
+<script src="js/box_menu.js?v=435"></script>
+<script src="js/forge_menu.js?v=435"></script>
+<script src="js/menu_popup.js?v=435"></script>
+<script src="js/hunt_log.js?v=435"></script>
+<script src="js/town.js?v=435"></script>
+<script src="js/achievements.js?v=435"></script>
+<script src="js/hotkeys.js?v=435"></script>
+<script src="js/data_transfer.js?v=435"></script>
+<script src="js/main.js?v=435"></script>
 </body>
 </html>

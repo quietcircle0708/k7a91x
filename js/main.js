@@ -532,6 +532,7 @@ document.addEventListener('click', (e)=>{ // 지도 밖을 누르면 열려 있�
   if(townUI.selected && !e.target.closest('#townMap')){ townUI.selected = null; townRenderBubble(); }
 });
 el('townLogBtn').addEventListener('click', townLogToggle); // 로그 상자 열기/닫기
+el('townBuffBtn').addEventListener('click', townBuffsToggle); // HUD ↔ 적용 중인 효과(버프) 아이콘 토글
 el('townLogCloseBtn').addEventListener('click', townLogToggle);
 el('krRetryBtn').addEventListener('click', retryDungeon);
 // 보상창 클릭 위임 — #krRewards는 innerHTML로 매번 다시 그려지므로 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.

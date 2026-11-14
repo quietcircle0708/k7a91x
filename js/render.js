@@ -2336,7 +2336,9 @@ function renderHuntBuffUi(){
   }
   // 플레이어에게 걸린 상태이상(몬스터 스킬의 기절 등)도 같은 영역에 같은 정렬 규칙으로 표시 — 아이콘·이름·설명은 몬스터 상태이상 줄과 같은 데이터(STATUS_EFFECTS·용어사전)를 씀.
   // 지속 피해형(중독 등)의 남은 시간은 남은 틱 수 × 틱 간격(몬스터 상태이상 줄과 같은 방식).
-  ((hunt.player && hunt.player.statusEffects) || []).forEach(s => {
+  // 마을에서는 표시하지 않음: 던전 몬스터가 건 상태이상은 던전 안에서만 진행(틱 타이머가 던전과 함께 멈춤)이라 마을로 나오면 멈춘 채 남아 보이기 때문.
+  // 버프(스킬)와 망자의 저주는 실제 시간으로 줄어들기 때문에 마을에서도 그대로 표시됨.
+  (currentView === 'hunt' ? ((hunt.player && hunt.player.statusEffects) || []) : []).forEach(s => {
     const def = STATUS_EFFECTS[s.key];
     if(!def) return;
     const remainMs = def.type === 'dot' ? s.ticksRemaining * def.tickIntervalMs : s.expiresAt - Date.now();
