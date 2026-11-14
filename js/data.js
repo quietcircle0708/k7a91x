@@ -3144,7 +3144,7 @@ const MISC_ITEMS = {
     catalyst: {
       kind: 'reviveStone',
       enhanceDestroyReducePct: { normal: 45, rare: 30, epic: 20, unique: 10 }, enhanceDestroyReduceMaxPct: 90,
-      restoreBonusPct: { normal: 30, rare: 20, epic: 15, unique: 10 },
+      restoreBonusPct: { normal: 50, rare: 40, epic: 30, unique: 12 },
     },
   },
   creationShard: {
@@ -5433,11 +5433,11 @@ const MONSTERS = {
 //   고정 레벨(level)로만 등장함.
 // 마석 파편 드랍 규칙은 던전별 dropTable이 아니라 전역 설정(STONE_DROP_CHANCE / STONE_DROP_TABLE)으로 관리됨.
 // 모험가의 유해(무기) 드랍도 마찬가지로 던전별 설정을 쓰지 않고 위의 RELIC_* 전역 설정값으로 통일됨.
-// region: 던전이 속한 지역 이름(예: '일반', 추후 '일본' 등). 몬스터 데이터에는 지역을 두지 않고, 던전의 region +
+// region: 던전이 속한 지역 이름(예: '모험가 도시', 추후 '일본' 등). 몬스터 데이터에는 지역을 두지 않고, 던전의 region +
 //   그 던전의 monsters 목록으로 "이 몬스터가 어느 지역에 나오는지"를 판단함(몬스터 도감의 세로 탭이 이 값으로 자동 생성됨).
 //   같은 몬스터가 여러 던전에 등록되면 여러 지역에 포함될 수 있음. 등급(일반/에픽 등)과는 무관한 지역 이름이며,
 //   지금은 던전 메뉴/카드에 표시하지 않음. 새 지역은 던전에 region 값만 넣으면 됨.
-const DEFAULT_DUNGEON_REGION = '일반'; // region이 비어 있는 던전에 쓰는 기본 지역(dungeonRegionOf, formulas.js)
+const DEFAULT_DUNGEON_REGION = '모험가 도시'; // region이 비어 있는 던전에 쓰는 기본 지역(dungeonRegionOf, formulas.js)
 const DUNGEONS = [
   {
     id: 'squirrel_hole',
@@ -5446,7 +5446,7 @@ const DUNGEONS = [
     desc: '숲에서 으스나무의 알 수 없는 힘에 빨려들어온 다람쥐들이 사는 굴입니다. 이들은 이성이 없고 침입자를 무차별적으로 공격합니다.',
     monsters: ['squirrel'],
     levelRange: 2,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'rat_den',
@@ -5455,7 +5455,7 @@ const DUNGEONS = [
     desc: '하수도 깊은 곳에 자리 잡은 쥐떼의 소굴입니다. 가끔 흡혈 박쥐가 함께 서식하기도 합니다.',
     monsters: ['rat', 'bat'],
     levelRange: 2,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'snake_den',
@@ -5464,7 +5464,7 @@ const DUNGEONS = [
     desc: '습하고 어두운 동굴 깊은 곳에 뱀들이 똬리를 튼 소굴입니다. 방울뱀의 독은 매우 위험합니다.',
     monsters: ['blue_snake', 'tailless_snake', 'rattlesnake'],
     levelRange: 2,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'deer_den',
@@ -5473,7 +5473,7 @@ const DUNGEONS = [
     desc: '깊은 숲 속, 신령한 기운이 감도는 사슴들의 서식지입니다.',
     monsters: ['blue_deer', 'red_deer', 'bluehorn_deer'],
     levelRange: 4,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'bear_den',
@@ -5482,7 +5482,7 @@ const DUNGEONS = [
     desc: '곰들의 울음소리가 끊이지 않는 어두운 굴. 용기 있는 자만이 발을 들일 수 있다.',
     monsters: ['red_bear', 'fierce_bear', 'black_bear'],
     levelRange: 4,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'boar_den',
@@ -5491,7 +5491,7 @@ const DUNGEONS = [
     desc: '거친 숨소리와 발굽 소리가 울려 퍼지는 맷돼지들의 소굴',
     monsters: ['mountain_boar', 'forest_boar', 'red_boar'],
     levelRange: 4,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'fox_den',
@@ -5500,7 +5500,7 @@ const DUNGEONS = [
     desc: '붉은 노을이 지는 언덕 아래, 영악한 여우들이 무리 지어 사는 굴',
     monsters: ['fox', 'greenfox', 'blackfox', 'ninetailfox'],
     levelRange: 4,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'tiger_den',
@@ -5509,7 +5509,7 @@ const DUNGEONS = [
     desc: '호랑이들이 서식하는 깊고 험난한 동굴',
     monsters: ['tiger1', 'tiger2', 'tiger3', 'tiger4'],
     levelRange: 6,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'mantis_den',
@@ -5518,7 +5518,7 @@ const DUNGEONS = [
     desc: '어둠 속에서 낫을 휘두르는 사마귀들의 소굴',
     monsters: ['mantis', 'mantis2', 'epicmantis1', 'epicmantis2'],
     levelRange: 6,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'spider_den',
@@ -5527,7 +5527,7 @@ const DUNGEONS = [
     desc: '어둠 속에 끝없이 이어진 거미들의 소굴',
     monsters: ['spider', 'spider2', 'epicspider1', 'epicspider2'],
     levelRange: 6,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'scorpion_den',
@@ -5536,7 +5536,7 @@ const DUNGEONS = [
     desc: '전갈들이 지배하는 거대한 지하 동굴',
     monsters: ['scorpion', 'scorpion2', 'epicscorpion', 'epicscorpion2'],
     levelRange: 7,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'puppet_den',
@@ -5545,7 +5545,7 @@ const DUNGEONS = [
     desc: '버려진 인형들이 저주받은 채 살아 움직이는 동굴',
     monsters: ['woodpuppet', 'ironpuppet', 'emeraldpuppet', 'puppeteer'],
     levelRange: 7,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'ghost_den',
@@ -5554,7 +5554,7 @@ const DUNGEONS = [
     desc: '산 자의 발걸음을 기다리는 원혼들의 지하묘지',
     monsters: ['ghost', 'ghost2', 'epicghost', 'epicghost2'],
     levelRange: 5,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'black_ghost_den',
@@ -5563,7 +5563,7 @@ const DUNGEONS = [
     desc: '깊숙한 곳에 자리잡은 원혼들의 지하묘지',
     monsters: ['blackghost', 'blackghost2', 'epicblackghost', 'epicblackghost2'],
     levelRange: 5,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'skeleton_den',
@@ -5572,7 +5572,7 @@ const DUNGEONS = [
     desc: '해골이 잠든 저주받은 지하 동굴',
     monsters: ['skeleton', 'skeleton2', 'epicskeleton', 'epicskeleton2'],
     levelRange: 5,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'black_skeleton_den',
@@ -5581,7 +5581,7 @@ const DUNGEONS = [
     desc: '해골이 잠든 저주받은 지하 동굴의 깊은 곳',
     monsters: ['blackskeleton', 'blackskeleton2', 'epicblackskeleton', 'epicblackskeleton2'],
     levelRange: 5,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'mulmang_den',
@@ -5590,7 +5590,7 @@ const DUNGEONS = [
     desc: '오래전부터 요괴들이 모여들었다는 동굴의 초입',
     monsters: ['goblinfire', 'goblin', 'epicgoblin', 'epicgoblin2'],
     levelRange: 5,
-    region: '일반',
+    region: '모험가 도시',
   },
   {
     id: 'baengnyun_den',
@@ -5599,7 +5599,7 @@ const DUNGEONS = [
     desc: '도깨비왕이 지배하는 동굴',
     monsters: ['goblin3', 'goblin4', 'epicgoblin3', 'goblinking'],
     levelRange: 3,
-    region: '일반',
+    region: '모험가 도시',
   },
 ];
 
@@ -5723,6 +5723,50 @@ const MONSTER_ENCOUNTER_MSGS = [
 
 // 마을 귀환 시(스테이지 클리어 후 행동 선택에서 "마을 귀환" 선택) 출력되는 안내 문구
 const STAGE_RETURN_MSG = '지친 몸을 이끌고 마을로 귀환했습니다.';
+
+// ============================================================
+// 마을 (town.js가 화면을 그림)
+// ------------------------------------------------------------
+// ■ TOWNS: 마을 하나 = 지역(region) 하나. region은 던전 데이터(DUNGEONS[].region)와 같은 이름이며, 마을 화면의 던전 목록·
+//   상점 품목이 현재 마을(state.currentTown)에 맞춰 걸러짐. 새 마을은 이 표에 항목을 추가하고 image/buildings만 채우면 됨.
+// ■ buildings: 이미지 위의 클릭 영역. rect = [왼쪽%, 위%, 너비%, 높이%] (이미지 크기 대비 비율이라 화면이 줄어도 같이 움직임).
+//     kind: 'view'(해당 화면으로 입장: view) / 'soon'(준비 중: notice 문구) / 'shrine'(성소) / 'portal'(지역 이동 포탈)
+// ■ 상점 품목의 지역 한정: 아이템 데이터(WEAPON_TYPES/ARMOR_TYPES/CONSUMABLES/ARTIFACTS 등)에 towns: ['마을 id', ...]를 적으면
+//   그 마을에서만 판매됨. 필드가 없으면 모든 마을에서 판매(townSellsItem, town.js).
+// ============================================================
+const TOWNS = {
+  adventurer_city: {
+    id: 'adventurer_city',
+    name: '모험가 도시',
+    region: '모험가 도시',
+    image: 'assets/town/town_adventurer_city.png',
+    buildings: [
+      { id: 'dungeon', name: '던전',       kind: 'view',   view: 'dungeonlist', rect: [3.9, 0.7, 34, 21] },
+      { id: 'shop',    name: '상점',       kind: 'view',   view: 'shop',        rect: [50.3, 6.2, 47, 22.5] },
+      { id: 'guild',   name: '모험가 길드', kind: 'soon',   notice: '모험가 길드는 아직 준비 중입니다.', rect: [56.6, 37.4, 42.5, 30.6] },
+      { id: 'shrine',  name: '성소',       kind: 'shrine', rect: [1, 52.4, 33, 20] },
+      { id: 'portal',  name: '지역 이동 포탈', kind: 'portal', rect: [35, 45, 20, 11.5] },
+    ],
+  },
+};
+const TOWN_ORDER = ['adventurer_city'];   // 포탈 목록에 보이는 순서
+const DEFAULT_TOWN_ID = 'adventurer_city'; // 새 게임·이전 세이브의 시작 마을
+const SHRINE_COOLDOWN_MS = 60 * 1000;      // 성소 [회복] 재사용 대기 시간(실제 시간 기준)
+const TOWN_REGEN_SPEED = 10;               // 마을 안에서 자연 회복(재생) 주기를 90% 단축 = 같은 시간에 10배 빠르게 진행
+const TOWN_TEXT = {
+  imageFail: '마을 이미지를 불러올 수 없습니다.',
+  enterBtn: '입장',
+  portalBtn: '이동',
+  portalNone: '아직 이동할 수 있는 지역이 없습니다.',
+  shrineHeal: '회복',
+  shrinePray: '기도',
+  shrineHealed: '성소의 기운으로 체력과 마나가 회복되었습니다.',
+  shrineFull: '이미 체력과 마나가 가득 찼습니다.',
+  shrineWait: '성소를 다시 쓰려면 {time} 남았습니다.',
+  prayerSoon: '기도는 아직 준비 중입니다.',
+  arrive: '{town}에 도착했습니다.',
+  regenNotice: '마을에서는 재생 주기가 90% 단축됩니다.',
+};
 
 // 몬스터 처치 연출
 const MONSTER_DEAD_ANIM_MS = 400;     // 몬스터 사망(scale/rotate/fade) 애니메이션 재생 시간(css .monster-icon.dead와 동일)
@@ -5949,7 +5993,7 @@ const SETTINGS_SCHEMA = [
 // 키는 글자(e.key)가 아니라 물리 키 위치(e.code)로 저장함 — 한글 입력 상태에서도 같은 키로 동작.
 // 메뉴 그리드 버튼 id → 기본 키. 여기 없는 새 메뉴는 아직 안 쓰는 첫 알파벳 키가 자동 배정됨(메뉴 단축키는 필수 등록이라서).
 const HOTKEY_MENU_DEFAULTS = {
-  openCharacterBtn: 'KeyS', openShopBtn: 'KeyB', openInventoryBtn: 'KeyI', openDungeonBtn: 'KeyD',
+  openTownBtn: 'KeyG', openCharacterBtn: 'KeyS', openShopBtn: 'KeyB', openInventoryBtn: 'KeyI', openDungeonBtn: 'KeyD',
   openForgeMenuBtn: 'KeyF', openCraftBtn: 'KeyC', openCollectionBtn: 'KeyN', openSettingsBtn: 'KeyO',
 };
 // 스킬 퀵슬롯 칸 순서대로(1번 = 첫 줄 가장 왼쪽). 슬롯이 이보다 많아지면 남는 칸은 기본값 없이 비어 있음(선택 항목이라 붉은색 아님).

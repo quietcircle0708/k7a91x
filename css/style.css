@@ -2411,3 +2411,75 @@ body.mobile-preset #spawnToast.show{ transform:translate(0,0); }
    몬스터·상태이상 이펙트(슬롯 안) 위, 메뉴 팝업(20)·하단 메뉴(40)·말풍선(45)보다 아래. 위치·크기는 JS가 정함(data.js SKILL_FX_SHEETS·SKILL_FX). */
 #skillFxLayer{ position:fixed; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:15; overflow:visible; }
 .skill-fx{ position:absolute; background-repeat:no-repeat; pointer-events:none; }
+
+/* ============================================================
+   마을 화면(town.js) — 위 줄(HUD·지역명·로그 버튼) + 마을 이미지(건물 클릭 영역 %) + 이미지 위 로그 상자
+   ============================================================ */
+#townView{ display:block; }
+.town-card{ width:100%; }
+/* 상단 패널: panel-town-013.png(9-slice, 모서리 12px 고정·가장자리/가운데 늘임). 프레임이 안쪽 6px까지 겹쳐 그려지므로 padding으로 내용을 띄움.
+   높이는 HUD(65px) + 이름 줄뿐이라 길어지지 않고, 버튼이 모자라면 오른쪽 버튼 영역이 두 줄로 접힘(패널 높이는 그대로). */
+.town-panel{
+  position:relative; z-index:30; /* 메뉴 그리드가 아래 마을 이미지 위로 펼쳐지게 */
+  box-sizing:border-box; margin-bottom:6px; padding:4px 8px 2px;
+  border:6px solid transparent; border-image:url(../assets/ui/frames/panel-town-013.png) 12 fill / 12px stretch; image-rendering:pixelated;
+}
+.town-panel-row{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.town-hud-slot{ flex:0 0 auto; width:168px; height:65px; margin:9px 0 2px 11px; } /* HUD 아바타가 왼쪽·위로 튀어나온 만큼 여백 */
+.town-hud-slot .hunt-hud{ margin-bottom:0; }
+.town-nav-slot{ flex:1 1 0; min-width:0; max-height:76px; display:flex; flex-wrap:wrap; justify-content:flex-end; align-content:center; gap:6px; }
+.town-nav-slot .menu-wrap{ display:block; }
+.town-name-row{ display:flex; align-items:center; gap:8px; height:22px; }
+.town-divider{ flex:1 1 0; height:10px; background:url(../assets/ui/frames/divider-town-002.png) center / 100% 100% no-repeat; image-rendering:pixelated; }
+.town-divider-r{ transform:scaleX(-1); } /* 왼쪽은 서서히 짙어지고 오른쪽은 반대로 사라지게 좌우를 뒤집음 */
+.town-region{ flex:0 0 auto; font-family:'Noto Serif KR',serif; font-weight:900; font-size:16px; line-height:1; color:var(--forge-gold); text-shadow:0 2px 4px rgba(0,0,0,.6); }
+.town-log-btn{ flex:0 0 auto; }
+/* 마을 이미지 테두리: 팝업(.modal-box)과 같은 프레임 이미지 panel-transparent-center-009.png (9-slice, 모서리 10px 고정·가장자리 늘임) */
+.town-stage-wrap{
+  position:relative; box-sizing:border-box; background:#17120f;
+  border:4px solid transparent; border-image:url(../assets/ui/frames/panel-transparent-center-009.png) 10 / 10px stretch; image-rendering:pixelated;
+}
+.town-stage{
+  max-height:min(720px, max(360px, calc(100vh - 250px))); /* 이미지가 더 길면 이 높이까지만 보이고 끌어서 이동, 더 짧으면 이미지 높이에 맞춤 */
+  overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+  scrollbar-width:none; cursor:grab; user-select:none; -webkit-user-select:none;
+}
+.town-stage::-webkit-scrollbar{ display:none; }
+.town-stage.is-dragging{ cursor:grabbing; }
+.town-map{ position:relative; width:100%; line-height:0; }
+.town-map.img-failed{ min-height:240px; }
+.town-img{ display:block; width:100%; height:auto; image-rendering:pixelated; -webkit-user-drag:none; user-select:none; pointer-events:none; }
+.town-img-fail{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--forge-cream-dim); line-height:1.4; }
+.town-spot{
+  position:absolute; padding:0; margin:0; border:0; background:transparent; cursor:pointer;
+  border-radius:10px; display:flex; align-items:flex-start; justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+}
+.town-spot:hover, .town-spot.selected{ outline:2px solid rgba(240,200,100,.85); background:rgba(240,200,100,.12); }
+.town-spot-tag{
+  margin-top:6px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; line-height:1.3; white-space:nowrap;
+  color:var(--forge-cream); background:rgba(10,7,5,.72); border:1px solid rgba(240,200,100,.55); pointer-events:none;
+}
+.town-spot.selected .town-spot-tag{ opacity:0; }
+.town-bubble{
+  position:absolute; transform:translate(-50%,-50%); z-index:5; flex-direction:column; align-items:center; gap:6px;
+  padding:8px 10px; line-height:1.3; background:rgba(10,7,5,.94); border:1px solid var(--forge-gold); border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,.55); min-width:104px; cursor:default;
+}
+.town-bubble-title{ font-size:12px; font-weight:800; color:var(--forge-gold); white-space:nowrap; }
+.town-bubble-row{ display:flex; flex-direction:column; gap:4px; width:100%; }
+.town-bubble-btn{
+  display:flex; align-items:center; justify-content:center; gap:6px; padding:4px 10px; font-size:12px; font-weight:700; white-space:nowrap;
+  color:var(--forge-cream); background:#2c241d; border:1px solid #7a6548; border-radius:999px; cursor:pointer;
+}
+.town-bubble-btn:hover{ background:#3a2f25; border-color:var(--forge-gold); }
+.town-bubble-btn.cooling{ opacity:.6; }
+.town-bubble-icon{ width:24px; height:24px; image-rendering:pixelated; flex:0 0 auto; }
+.town-log{
+  position:absolute; left:8px; bottom:8px; width:64%; max-width:300px; z-index:6; flex-direction:column;
+  background:rgba(14,10,8,.88); border:2px solid var(--forge-gold); border-radius:4px; padding:0 6px 4px;
+}
+.town-log-head{ display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:800; color:var(--forge-cream); padding:4px 2px; border-bottom:1px solid #5a4c3c; margin-bottom:3px; }
+.town-log-close{ background:none; border:0; color:var(--forge-cream-dim); font-size:12px; cursor:pointer; padding:0 2px; }
+.town-log .hunt-log-list{ height:96px; }
+@media (max-width:480px){ .town-hud-slot{ margin-left:6px; } .town-panel{ padding-left:4px; padding-right:4px; } }

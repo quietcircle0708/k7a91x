@@ -2081,10 +2081,11 @@ function renderDungeonList(){
   const pagerWrap = el('dungeonListPager');
 
   const pageSize = PAGE_SIZE.dungeonList;
-  const totalPageCount = pageCount(DUNGEONS.length, pageSize);
+  const townDungeonList = townDungeons(); // 현재 마을(지역)의 던전만(town.js)
+  const totalPageCount = pageCount(townDungeonList.length, pageSize);
   pageState.dungeonList = clampPage(pageState.dungeonList, totalPageCount);
   if(pagerWrap) pagerWrap.innerHTML = pagerHtml('dungeonList', pageState.dungeonList, totalPageCount);
-  const pageDungeons = pageSlice(DUNGEONS, pageState.dungeonList, pageSize);
+  const pageDungeons = pageSlice(townDungeonList, pageState.dungeonList, pageSize);
 
   wrap.innerHTML = pageDungeons.map(d => {
     const range = dungeonLevelRange(d);

@@ -1,5 +1,5 @@
 // ============================================================
-// 전투 로그 (던전 화면 — 처치 보상·스킬/플라스크 사용·안내 메시지를 시간 순으로 보여주는 대화창)
+// 로그 (던전 화면 + 마을 화면 — 처치 보상·스킬/플라스크 사용·성소/안내 메시지를 시간 순으로 보여주는 대화창)
 // ------------------------------------------------------------
 // ■ 문구·모양을 바꾸는 곳은 "표" 3개와 CSS뿐이고, 호출부(dungeon.js·actions.js 등)에는 문장이 하나도 없음.
 //     ① HUNT_LOG_MESSAGES  메시지 id → { text: 문장 틀, tone: 줄 색 종류, merge: 같은 줄 연속 시 (×N)으로 합칠지 }
@@ -38,6 +38,14 @@ const HUNT_LOG_MESSAGES = {
   skillUse:       { text: '{skill|을/를} 시전합니다.', tone: 'base' },
   flaskUse:       { text: '{item|을/를} 사용했습니다.', tone: 'base' },
   monsterSkillUse:{ text: '{target|이/가} {skill|을/를} 시전합니다.', tone: 'base' }, // 몬스터 스킬(dungeon.js useMonsterSkill) — target은 몬스터 이름·등급 색
+  // 마을(town.js) — 성소·기도·안내
+  shrineUse:      { text: '성소의 기운으로 체력과 마나가 회복되었습니다.', tone: 'system' },
+  shrineWait:     { text: '성소를 다시 쓰려면 {time} 남았습니다.', tone: 'warn', merge: true },
+  shrineFull:     { text: '이미 체력과 마나가 가득 찼습니다.', tone: 'warn', merge: true },
+  prayerUse:      { text: '기도를 올렸습니다.', tone: 'system' }, // 기도 효과 작업 때 호출(town.js)
+  townArrive:     { text: '{town}에 도착했습니다.', tone: 'system' },
+  townNotice:     { text: '{text}', tone: 'warn' },              // 마을 안내 한 줄(문장 그대로 표시)
+  itemLose:       { text: '{item|을/를} 잃었습니다.', tone: 'warn' }, // 아이템을 잃을 때(퀘스트 제출·대가 등) 호출
   // 안내·경고
   inventoryFull:  { text: '{category} 인벤토리가 가득 찼습니다.', tone: 'warn', merge: true },
   combatLocked:   { text: '전투 중에는 할 수 없습니다.', tone: 'warn', merge: true },
@@ -65,6 +73,8 @@ const HUNT_LOG_TOKENS = {
   status:   { fmt: v => String(v) },
   skill:    { fmt: v => String(v) },       // 스킬 이름은 기본 회색(색을 주고 싶으면 cls를 추가)
   dungeon:  { fmt: v => String(v) },
+  town:     { fmt: v => String(v) },
+  text:     { fmt: v => String(v) },
   stage:    { fmt: v => String(v) },
   category: { fmt: v => String(v) },
   time:     { fmt: v => String(v) },
@@ -110,9 +120,10 @@ function huntLogRender(id, params){
 
 // ---- 줄 보관 / 화면 갱신 ----
 const huntLogUI = { lines: [], seq: 0 };
-function huntLogActive(){ return currentView === 'hunt' && !!hunt.dungeon; }
+function huntLogInDungeon(){ return currentView === 'hunt' && !!hunt.dungeon; }
+function huntLogActive(){ return huntLogInDungeon() || currentView === 'town'; } // 던전 화면과 마을 화면에서 로그를 남김
 function huntLogLists(){
-  return ['huntLogList', 'huntLogInlineList'].map(id => el(id)).filter(Boolean);
+  return ['huntLogList', 'huntLogInlineList', 'townLogList'].map(id => el(id)).filter(Boolean);
 }
 function huntLogLineHtml(line){
   const count = line.count > 1 ? ` <span class="hl-count">(×${line.count})</span>` : '';
@@ -253,7 +264,7 @@ function huntLogApplyVisibility(){
   const inline = el('huntLogInline');
   const btn = el('huntLogBtn');
   if(btn) btn.classList.toggle('log-closed', !open);
-  if(!huntLogActive()){
+  if(!huntLogInDungeon()){
     if(inline) inline.style.display = 'none';
     return;
   }
@@ -270,7 +281,7 @@ function huntLogApplyVisibility(){
   }
 }
 function huntLogToggle(){
-  if(!huntLogActive()) return;
+  if(!huntLogInDungeon()) return;
   huntLogSetOpenSetting(!huntLogIsOpenSetting());
   huntLogApplyVisibility();
 }

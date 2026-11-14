@@ -242,6 +242,7 @@ el('openDungeonBtn').addEventListener('click', openDungeonList);
 el('openCharacterBtn').addEventListener('click', openCharacterMenu);
 el('openCraftBtn').addEventListener('click', openCraft);
 // ---- 상단 메뉴 버튼 + 그리드: 표현 방식만 담당(각 항목은 위의 기존 열기 함수에 그대로 연결됨) ----
+el('openTownBtn').addEventListener('click', ()=>{ if(isEnhancing || currentView === 'town') return; guardedNav('town'); }); // 마을(기본 화면, town.js) — 메뉴 그리드 첫 번째
 el('openForgeMenuBtn').addEventListener('click', ()=>{ if(isEnhancing || currentView === 'forge') return; guardedNav('forge'); });
 el('openCollectionBtn').addEventListener('click', openCollection); // 도감: 기본 목록 UI(codex.js)
 el('openAchievementsBtn').addEventListener('click', openAchievements); // 업적(achievements.js)
@@ -255,13 +256,14 @@ el('menuGrid').addEventListener('click', (e)=>{ if(e.target.closest('.menu-grid-
 document.addEventListener('click', (e)=>{ if(!e.target.closest('#menuWrap')) setMenuGridOpen(false); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') setMenuGridOpen(false); });
 el('resetLink').addEventListener('click', resetGame);
-document.querySelector('.back-from-shop').addEventListener('click', closeToForge);
-document.querySelector('.back-from-inv').addEventListener('click', closeToForge);
-document.querySelector('.back-from-craft').addEventListener('click', closeToForge);
-document.querySelector('.back-from-character').addEventListener('click', closeToForge);
-document.querySelector('.back-from-dlist').addEventListener('click', closeToForge);
-document.querySelector('.back-from-collection').addEventListener('click', closeToForge);
-document.querySelector('.back-from-achievements').addEventListener('click', closeToForge);
+document.querySelector('.back-from-forge').addEventListener('click', closeToTown);
+document.querySelector('.back-from-shop').addEventListener('click', closeToTown);
+document.querySelector('.back-from-inv').addEventListener('click', closeToTown);
+document.querySelector('.back-from-craft').addEventListener('click', closeToTown);
+document.querySelector('.back-from-character').addEventListener('click', closeToTown);
+document.querySelector('.back-from-dlist').addEventListener('click', closeToTown);
+document.querySelector('.back-from-collection').addEventListener('click', closeToTown);
+document.querySelector('.back-from-achievements').addEventListener('click', closeToTown);
 el('exitHuntBtn').addEventListener('click', ()=> guardedNav('dungeonlist'));
 el('huntTopToggleBtn').addEventListener('click', toggleHuntTopUi);
 el('treasureChest').addEventListener('click', clickTreasureChest);
@@ -523,6 +525,14 @@ setInterval(updateHuntPrepUi, 100);
 el('huntRewardBtn').addEventListener('click', openLiveRewardView);
 el('huntLogBtn').innerHTML = uiIconHtml('huntLog', 'hunt-img-btn-icon');
 el('huntLogBtn').addEventListener('click', huntLogToggle); // 전투 로그 열기/닫기(hunt_log.js)
+// ---- 마을 화면(town.js) ----
+el('townMap').addEventListener('click', townMapClick); // 건물 클릭 영역 → 말풍선 → 입장/회복 등
+enableDragScroll(el('townStage'), '.town-stage', { axis: 'y', suppressClick: true }); // 이미지가 화면보다 길면 마우스로 잡아서 끌어 이동(기존 드래그 이동 재사용)
+document.addEventListener('click', (e)=>{ // 지도 밖을 누르면 열려 있던 말풍선을 닫음
+  if(townUI.selected && !e.target.closest('#townMap')){ townUI.selected = null; townRenderBubble(); }
+});
+el('townLogBtn').addEventListener('click', townLogToggle); // 로그 상자 열기/닫기
+el('townLogCloseBtn').addEventListener('click', townLogToggle);
 el('krRetryBtn').addEventListener('click', retryDungeon);
 // 보상창 클릭 위임 — #krRewards는 innerHTML로 매번 다시 그려지므로 리스너는 항상 존재하는 #krRewards에 위임해서 등록함.
 // ("획득 아이템" 그리드는 이제 페이지 버튼 없이 영역 안 스크롤이라 아래 .pager-btn 처리는 이 창에서는 쓰이지 않음 — 처치 몬스터 툴팁 처리가 이 리스너의 현재 용도)
@@ -936,23 +946,29 @@ initPatchNoteSystem();
 function enableDragScroll(host, rowSelector, opts){
   const DRAG_START_PX = 4; // 이 이상 움직여야 드래그로 인정(그 미만은 일반 클릭/호버)
   const suppressClick = !!(opts && opts.suppressClick);
+  const axis = (opts && opts.axis) || 'x'; // 'x'(기본, 가로 줄) / 'y'(세로) / 'xy'(마을 지도처럼 양방향이 필요할 때)
   let drag = null;
   host.addEventListener('pointerdown', (e)=>{
     if(e.pointerType !== 'mouse' || e.button !== 0) return;
     const row = e.target.closest(rowSelector);
-    if(!row || row.scrollWidth <= row.clientWidth + 1) return;
-    drag = { row, pointerId: e.pointerId, startX: e.clientX, startLeft: row.scrollLeft, moved: false };
+    if(!row) return;
+    const canX = axis !== 'y' && row.scrollWidth > row.clientWidth + 1;
+    const canY = axis !== 'x' && row.scrollHeight > row.clientHeight + 1;
+    if(!canX && !canY) return;
+    drag = { row, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startLeft: row.scrollLeft, startTop: row.scrollTop, canX, canY, moved: false };
   });
   window.addEventListener('pointermove', (e)=>{
     if(!drag || e.pointerId !== drag.pointerId) return;
-    const dx = e.clientX - drag.startX;
+    const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
     if(!drag.moved){
-      if(Math.abs(dx) < DRAG_START_PX) return;
+      const dist = axis === 'x' ? Math.abs(dx) : (axis === 'y' ? Math.abs(dy) : Math.hypot(dx, dy));
+      if(dist < DRAG_START_PX) return;
       drag.moved = true;
       drag.row.classList.add('is-dragging');
       try{ drag.row.setPointerCapture(e.pointerId); }catch(_){}
     }
-    drag.row.scrollLeft = drag.startLeft - dx;
+    if(drag.canX) drag.row.scrollLeft = drag.startLeft - dx;
+    if(drag.canY) drag.row.scrollTop = drag.startTop - dy;
   });
   const endDrag = (e)=>{
     if(!drag || e.pointerId !== drag.pointerId) return;

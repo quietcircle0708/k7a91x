@@ -6,7 +6,7 @@
 <title>Enhance & Slay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=430">
+<link rel="stylesheet" href="css/style.css?v=434">
 </head>
 <body>
 <div class="wrap">
@@ -16,18 +16,20 @@
     <div class="gold-badge"><span id="goldText">0</span><img class="ui-icon-inline" src="assets/ui/ui_gold_icon.png" alt="G" draggable="false"></div>
   </div>
   <div class="main-nav" id="mainNav">
-    <button class="back-btn back-from-shop" id="backFromShopBtn" style="display:none;">← 대장간으로 돌아가기</button>
-    <button class="back-btn back-from-inv" id="backFromInvBtn" style="display:none;">← 대장간으로 돌아가기</button>
-    <button class="back-btn back-from-craft" id="backFromCraftBtn" style="display:none;">← 대장간으로 돌아가기</button>
-    <button class="back-btn back-from-character" id="backFromCharacterBtn" style="display:none;">← 대장간으로 돌아가기</button>
-    <button class="back-btn back-from-collection" id="backFromCollectionBtn" style="display:none;">← 대장간으로 돌아가기</button>
-    <button class="back-btn back-from-achievements" id="backFromAchievementsBtn" style="display:none;">← 대장간으로 돌아가기</button>
-    <button class="back-btn back-from-dlist" id="backFromDlistBtn" style="display:none;">← 대장간으로 돌아가기</button>
+    <button class="back-btn back-from-forge" id="backFromForgeBtn" style="display:none;">← 마을로 돌아가기</button>
+    <button class="back-btn back-from-shop" id="backFromShopBtn" style="display:none;">← 마을로 돌아가기</button>
+    <button class="back-btn back-from-inv" id="backFromInvBtn" style="display:none;">← 마을로 돌아가기</button>
+    <button class="back-btn back-from-craft" id="backFromCraftBtn" style="display:none;">← 마을로 돌아가기</button>
+    <button class="back-btn back-from-character" id="backFromCharacterBtn" style="display:none;">← 마을로 돌아가기</button>
+    <button class="back-btn back-from-collection" id="backFromCollectionBtn" style="display:none;">← 마을로 돌아가기</button>
+    <button class="back-btn back-from-achievements" id="backFromAchievementsBtn" style="display:none;">← 마을로 돌아가기</button>
+    <button class="back-btn back-from-dlist" id="backFromDlistBtn" style="display:none;">← 마을로 돌아가기</button>
     <button class="back-btn" id="exitHuntBtn" style="display:none;">← 던전 나가기</button>
     <button class="topmenu-btn" id="openPatchNoteBtn" title="공지사항"><img src="assets/ui/patchnote_icon.png" class="patchnote-icon-img" alt="공지사항" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'patchnote-icon-fallback',textContent:'📣'}))"></button>
     <div class="menu-wrap" id="menuWrap">
       <button class="topmenu-btn" id="menuToggleBtn" data-notify-path="*" aria-expanded="false" aria-label="메뉴"><img src="assets/ui/icon_menu_button.png" class="topmenu-icon-img" alt="" draggable="false"><span class="topmenu-tip">메뉴</span></button>
       <div class="menu-grid" id="menuGrid" style="display:none;">
+      <button class="menu-grid-item" id="openTownBtn"><img src="assets/ui/icon_menu_town.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">마을</span></button>
       <button class="menu-grid-item" id="openCharacterBtn" data-notify-path="character" data-popup="character"><img src="assets/ui/icon_menu_character.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">캐릭터</span></button>
       <button class="menu-grid-item" id="openShopBtn"><img src="assets/ui/icon_menu_shop.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">상점</span></button>
       <button class="menu-grid-item" id="openInventoryBtn" data-notify-path="inventory" data-popup="inventory"><img src="assets/ui/icon_menu_inventory.png" class="menu-grid-icon" width="32" height="32" alt="" draggable="false"><span class="menu-grid-label">인벤토리</span></button>
@@ -42,8 +44,39 @@
     </div>
   </div>
 
-  <div id="forgeView">
-    <div id="townToast" class="town-toast"></div>
+  <!-- 마을 토스트(귀환·성소 안내 등): 어느 화면에서든 뜨도록 화면 밖에 둠(position:fixed) -->
+  <div id="townToast" class="town-toast"></div>
+
+  <!-- 마을 화면(기본 화면, town.js): 위 줄(HUD·지역명·로그 버튼) + 마을 이미지(건물 클릭 영역) + 이미지 위 로그 상자 -->
+  <div id="townView">
+    <div class="town-card">
+      <!-- 상단 패널(9-slice 프레임): HUD(왼쪽) + 버튼들(오른쪽: 로그·공지사항·메뉴 — 공지/메뉴는 마을에 들어올 때 위쪽 줄에서 옮겨 오고 나가면 되돌림, town.js townUiPlace) + 마을 이름(디바이더) -->
+      <div class="town-panel" id="townPanel">
+        <div class="town-panel-row">
+          <div class="town-hud-slot" id="townHudSlot"></div>
+          <div class="town-nav-slot" id="townNavSlot">
+            <button type="button" class="hunt-img-btn town-log-btn" id="townLogBtn" title="로그" aria-label="로그"></button>
+          </div>
+        </div>
+        <div class="town-name-row">
+          <i class="town-divider town-divider-l"></i>
+          <span class="town-region" id="townRegionName">모험가 도시</span>
+          <i class="town-divider town-divider-r"></i>
+        </div>
+      </div>
+      <div class="town-stage-wrap">
+        <div class="town-stage" id="townStage">
+          <div class="town-map" id="townMap"></div>
+        </div>
+        <div class="town-log" id="townLog">
+          <div class="town-log-head"><span>로그</span><button type="button" class="town-log-close" id="townLogCloseBtn" aria-label="로그 닫기">✕</button></div>
+          <div class="hunt-log-list" id="townLogList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="forgeView" style="display:none;">
     <div class="forge-card" id="forgeCard">
       <div id="curseBadgeForge" class="curse-badge" style="display:none;">
         <span class="curse-badge-icon">💀</span>
@@ -339,7 +372,7 @@
   <!-- 전투 로그 팝업 상자(데스크탑 던전 화면 전용, hunt_log.js·menu_popup.js 'log'). 모바일은 아래 #huntLogInline을 씀 -->
   <div id="logView" style="display:none;">
     <div class="hunt-log-wrap">
-      <div class="shop-title">전투 로그</div>
+      <div class="shop-title">로그</div>
       <div class="hunt-log-list" id="huntLogList"></div>
     </div>
   </div>
@@ -399,7 +432,7 @@
           <button type="button" class="hunt-img-btn" id="huntLeaveBtn" title="던전 나가기" aria-label="던전 나가기"></button>
           <button type="button" class="hunt-img-btn" id="huntRewardBtn" title="보상창" aria-label="보상창"></button>
           <!-- [전투 로그] 열기/닫기 토글(hunt_log.js). data-popup="log": 데스크탑에서는 메뉴 팝업(menu_popup.js)으로, 모바일에서는 #huntLogInline로 표시 -->
-          <button type="button" class="hunt-img-btn" id="huntLogBtn" data-popup="log" title="전투 로그" aria-label="전투 로그"></button>
+          <button type="button" class="hunt-img-btn" id="huntLogBtn" data-popup="log" title="로그" aria-label="로그"></button>
         </div>
         <div id="spawnToast"></div>
       </div>
@@ -447,7 +480,7 @@
 
       <!-- 모바일 프리셋 전투 로그: 던전 카드 아래 인라인 상자(데스크탑에서는 숨김, hunt_log.js huntLogApplyVisibility) -->
       <div class="hunt-log-inline" id="huntLogInline" style="display:none;">
-        <div class="hunt-log-inline-head">전투 로그</div>
+        <div class="hunt-log-inline-head">로그</div>
         <div class="hunt-log-list" id="huntLogInlineList"></div>
       </div>
 
@@ -1116,29 +1149,30 @@
 <!-- 도감 툴팁: main.js의 전역 툴팁 위치 보정(findTooltipHost)은 호버 대상의 조상 중 '직계 자식으로 .tooltip을 가진 요소'를 찾아
      위치를 덮어쓰므로, 도감 툴팁은 어떤 화면 요소의 직계 자식도 아닌 body 바로 아래에 두고 codex.js가 위치를 직접 지정함 -->
 <div class="tooltip codex-tip" id="codexTip"></div>
-<script src="js/data.js?v=430"></script>
-<script src="js/formulas.js?v=430"></script>
-<script src="js/catalyst.js?v=430"></script>
-<script src="js/state.js?v=430"></script>
-<script src="js/effects.js?v=430"></script>
-<script src="js/render.js?v=430"></script>
-<script src="js/actions.js?v=430"></script>
-<script src="js/dungeon.js?v=430"></script>
-<script src="js/navigation.js?v=430"></script>
-<script src="js/inventory_box.js?v=430"></script>
-<script src="js/notify.js?v=430"></script>
-<script src="js/codex.js?v=430"></script>
-<script src="js/codex_monster.js?v=430"></script>
-<script src="js/craft_menu.js?v=430"></script>
-<script src="js/craft_multi.js?v=430"></script>
-<script src="js/shop_menu.js?v=430"></script>
-<script src="js/box_menu.js?v=430"></script>
-<script src="js/forge_menu.js?v=430"></script>
-<script src="js/menu_popup.js?v=430"></script>
-<script src="js/hunt_log.js?v=430"></script>
-<script src="js/achievements.js?v=430"></script>
-<script src="js/hotkeys.js?v=430"></script>
-<script src="js/data_transfer.js?v=430"></script>
-<script src="js/main.js?v=430"></script>
+<script src="js/data.js?v=434"></script>
+<script src="js/formulas.js?v=434"></script>
+<script src="js/catalyst.js?v=434"></script>
+<script src="js/state.js?v=434"></script>
+<script src="js/effects.js?v=434"></script>
+<script src="js/render.js?v=434"></script>
+<script src="js/actions.js?v=434"></script>
+<script src="js/dungeon.js?v=434"></script>
+<script src="js/navigation.js?v=434"></script>
+<script src="js/inventory_box.js?v=434"></script>
+<script src="js/notify.js?v=434"></script>
+<script src="js/codex.js?v=434"></script>
+<script src="js/codex_monster.js?v=434"></script>
+<script src="js/craft_menu.js?v=434"></script>
+<script src="js/craft_multi.js?v=434"></script>
+<script src="js/shop_menu.js?v=434"></script>
+<script src="js/box_menu.js?v=434"></script>
+<script src="js/forge_menu.js?v=434"></script>
+<script src="js/menu_popup.js?v=434"></script>
+<script src="js/hunt_log.js?v=434"></script>
+<script src="js/town.js?v=434"></script>
+<script src="js/achievements.js?v=434"></script>
+<script src="js/hotkeys.js?v=434"></script>
+<script src="js/data_transfer.js?v=434"></script>
+<script src="js/main.js?v=434"></script>
 </body>
 </html>

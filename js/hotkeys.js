@@ -377,14 +377,15 @@ function hotkeyLocalEscLayerOpen(){
   if(typeof codexMUI !== 'undefined' && codexMUI && codexMUI.infoKey) return true;
   return false;
 }
-// 맨 위 화면에서 한 단계 나감: 던전 화면 → 던전 나가기 흐름(보상창 + [계속 전투]/[던전 나가기]), 그 밖의 메뉴 화면 → 대장간(각 화면의 ← 버튼과 같음)
+// 맨 위 화면에서 한 단계 나감: 던전 화면 → 던전 나가기 흐름(보상창 + [계속 전투]/[던전 나가기]), 그 밖의 메뉴 화면 → 마을(각 화면의 ← 버튼과 같음), 마을에서는 아무 일도 없음
 function hotkeyLeaveCurrentView(){
   if(currentView === 'hunt'){
     if(hunt.dungeon && hunt.pendingRewards) openHuntLeaveFlow();
     else guardedNav('dungeonlist');
     return;
   }
-  if(currentView && currentView !== 'forge') closeToForge();
+  if(currentView === 'town'){ if(townUI.selected){ townUI.selected = null; townRenderBubble(); } return; } // 마을: 열려 있는 건물 말풍선만 닫음(마을이 맨 위 화면이라 더 나갈 곳이 없음)
+  if(currentView) closeToTown();
 }
 // 나가기(Esc 또는 사용자가 지정한 추가 키). 순서: 열린 창(모달) → 기존 Esc 층 → 떠 있는 메뉴 팝업 → 화면 나가기
 function hotkeyDoExit(e, isRealEsc){

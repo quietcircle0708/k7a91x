@@ -44,6 +44,7 @@ function viewEnterInit(view){
 }
 
 function showView(name){
+  const prevView = currentView; // 마을 화면 진입 처리(townOnEnter)가 어디서 왔는지 알 수 있게 보관
   notifyRequestSync(); // 알림 점(notify.js) — 화면을 옮기면 떠난 탭의 새 항목이 확인 처리됨
   if(typeof menuPopupCloseAll === 'function') menuPopupCloseAll(); // 던전 위에 떠 있던 메뉴 팝업은 화면이 바뀌면 모두 닫음(menu_popup.js)
   if(currentView !== name) viewLeaveCleanup(currentView);
@@ -104,6 +105,7 @@ function showView(name){
     el('restoreConfirmModal').style.display = 'none';
     el('restoreResultModal').style.display = 'none';
   }
+  el('townView').style.display = name === 'town' ? 'block' : 'none';
   el('forgeView').style.display = name === 'forge' ? 'block' : 'none';
   el('shopView').style.display = name === 'shop' ? 'block' : 'none';
   el('inventoryView').style.display = name === 'inventory' ? 'block' : 'none';
@@ -114,16 +116,18 @@ function showView(name){
   el('characterView').style.display = name === 'character' ? 'block' : 'none';
   el('huntView').style.display = name === 'hunt' ? 'block' : 'none';
   el('exitHuntBtn').style.display = name === 'hunt' ? '' : 'none'; // 전투 화면의 나가기 버튼은 상단 메뉴 영역(메뉴 버튼과 같은 줄, 왼쪽)에 있음
-  el('backFromDlistBtn').style.display = name === 'dungeonlist' ? '' : 'none'; // 던전 입구의 대장간 돌아가기 버튼도 상단 메뉴 영역에 있음
+  el('backFromDlistBtn').style.display = name === 'dungeonlist' ? '' : 'none'; // 던전 입구의 마을 돌아가기 버튼도 상단 메뉴 영역에 있음
   // 상점/인벤토리/제작소/캐릭터 화면의 [대장간으로 돌아가기] 버튼도 상단 메뉴 영역에 있고, 해당 화면에서만 표시함
-  [['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character'],['backFromCollectionBtn','collection'],['backFromAchievementsBtn','achievements']]
+  [['backFromForgeBtn','forge'],['backFromShopBtn','shop'],['backFromInvBtn','inventory'],['backFromCraftBtn','craft'],['backFromCharacterBtn','character'],['backFromCollectionBtn','collection'],['backFromAchievementsBtn','achievements']]
     .forEach(([id, view]) => { el(id).style.display = name === view ? '' : 'none'; });
   currentView = name;
+  townUiPlace(name); // 플레이어 HUD·공지/메뉴 버튼을 마을 패널 ↔ 원래 자리로 옮김(town.js)
   if(name !== 'dungeonlist') dungeonDropScroll = {}; // 던전 입구를 벗어나면 카드별 "획득 가능 아이템" 가로 스크롤 위치 초기화
   if(name === 'dungeonlist') renderDungeonList();
   if(name === 'collection') viewEnterInit('collection');
   if(name === 'achievements') viewEnterInit('achievements');
   if(name === 'hunt') renderHunt();
+  if(name === 'town') townOnEnter(prevView); // 마을: 지도·말풍선·로그 상자 준비(town.js)
   alignHuntHeader();
   if(name === 'craft') craftMenuOpen(); // 제작소 메뉴(craft_menu.js)
   if(name === 'shop') shopMenuOpen(); // 상점 새 메뉴(shop_menu.js): 진입할 때마다 목록을 현재 데이터로 새로 구성
@@ -192,6 +196,9 @@ function openCraft(){ if(isEnhancing) return; guardedNav('craft'); }
 function openCollection(){ if(isEnhancing) return; guardedNav('collection'); }
 function openAchievements(){ if(isEnhancing) return; guardedNav('achievements'); }
 function closeToForge(){ showView('forge'); }
+// 기본 화면(마을)으로 돌아감 — 각 화면의 [← 마을로 돌아가기]와 Esc(나가기)가 이 함수를 씀. closeToForge는 "대장간으로 이동"이 필요한 곳(장비 강화 대상 지정)만 씀.
+function closeToTown(){ showView('town'); }
+function openTown(){ if(isEnhancing) return; guardedNav('town'); }
 
 // ---- 인벤토리 탭 ----
 // "장비" 최상위 탭(subTabs를 가진 탭)을 클릭하면 마지막으로 보던

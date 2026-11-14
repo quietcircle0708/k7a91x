@@ -68,12 +68,14 @@ let state = {
   quickSlots: [null, null], // 사냥 화면 퀵슬롯에 등록된 소비 아이템 id
   settings: {}, // 설정값 저장 (키: SETTINGS_SCHEMA의 항목 id). ensureSettingsDefaults()가 누락된 키를 기본값으로 채움
   deathCurseUntil: null, // 망자의 저주(사망 패널티) 만료 시각(epoch ms). null이면 미적용
+  currentTown: DEFAULT_TOWN_ID, // 현재 위치한 마을(TOWNS의 id) — 마을 화면·상점 품목·던전 목록이 이 값을 따름
+  shrineReadyAt: 0, // 성소 [회복]을 다시 쓸 수 있게 되는 시각(epoch ms, 실제 시간 기준). 0이면 바로 사용 가능
   bestLevel: 0, totalAttempts: 0, totalDestroys: 0, totalSold: 0, legendCount: 0, totalKills: 0,
   codexFavorites: [], // 도감 즐겨찾기한 장비 키 목록(codex.js의 엔트리 key: '장비종류:타입id'). 저장 데이터(state)에 그대로 포함됨
   craftPity: {}, // 제작 천장 누적 실패 횟수 { 제작 아이템 id: 횟수 } — 천장(pityLimit)이 있는 아이템만 기록됨(formulas.js craftPity* 참고)
 };
 let isEnhancing = false;
-let currentView = 'forge';
+let currentView = 'town'; // 기본 화면은 현재 위치한 마을(town.js). 대장간은 메뉴 그리드에서 이동
 // hunt(던전/전투 진행 상태) 기본값. 게임 최초 로드(아래 let hunt=...)와 resetGame()의 "새 게임 시작"
 // 양쪽에서 이 함수 하나만 사용하도록 통일함 — 예전엔 두 곳에 각각 객체 리터럴을 따로 두고 있었는데,
 // hunt에 새 필드(deathAnimTimeouts/rewardModalTimeout/player/topUiExpanded 등)가 추가될 때마다 resetGame()
@@ -368,6 +370,7 @@ function grantArtifactSafe(id){
   // 빈 장착 슬롯이 있을 때만 자동 장착. 슬롯이 가득 차 있으면 장착하지 않고 보유 목록에만 추가하며,
   // 이미 장착 중인 다른 아티팩트를 교체하지 않음.
   if(state.equippedArtifacts.length < ARTIFACT_SLOT_MAX && !artifactEquipBlocker(id)) state.equippedArtifacts.push(id); // 같은 효과 그룹의 아티팩트가 이미 장착 중이면 자동 장착하지 않음
+  return true; // 지급 성공을 알림(던전 보상창·전투 로그·드랍 연출·알림 점이 이 값으로 기록 여부를 판단함)
 }
 
 // ---- 상태 이상(디버프) 적용 ----
@@ -696,8 +699,10 @@ async function loadState(){
   ensurePlayerVitals();
   ensureSettingsDefaults();
   ensureAchievementDefaults(); // 업적(achievements.js): 수령 기록 기본값 — 이전 세이브에는 없는 필드
+  ensureTownDefaults(); // 마을(town.js): 이전 세이브에는 없는 현재 마을/성소 대기 시각 보정
   if(isDeathCurseActive()) startDeathCurseTicker(); else renderDeathCurseBadge();
   render();
+  townOnEnter('load'); // 기본 화면(마을) 준비: 지도·HUD·로그 상자(town.js)
   resumePendingEnhance(); // 연출 도중 새로고침·종료로 반영되지 못한 강화 결과가 있으면 선저장된 결과를 그대로 반영(actions.js)
 }
 // 마지막 저장 결과(옵션 > 데이터 탭이 표시): { at: 시각(ms), where: 'claude'|'local', ok: 성공 여부 }
@@ -771,6 +776,7 @@ function resetGame(){
     quickSlots: [null, null],
     settings: {},
     deathCurseUntil: null,
+    currentTown: DEFAULT_TOWN_ID, shrineReadyAt: 0,
     bestLevel:0, totalAttempts:0, totalDestroys:0, totalSold:0, legendCount:0, totalKills:0,
     codexFavorites: [],
     craftPity: {}
@@ -778,8 +784,9 @@ function resetGame(){
   ensurePlayerVitals();
   ensureSettingsDefaults();
   ensureAchievementDefaults(); // 처음부터 다시 시작하면 업적(수령 기록)도 초기화됨
+  ensureTownDefaults();
   renderDeathCurseBadge();
   showMsg('', '');
-  showView('forge');
+  showView('town');
   saveState();
 }

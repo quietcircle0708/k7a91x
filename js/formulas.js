@@ -3122,7 +3122,9 @@ function resolveDrops(monsterDef, dungeon, level, options){
   // 원칙). 한 몬스터가 아티팩트 드랍을 여러 개 가질 수 있어 전부 독립 판정하도록 배열로 모음.
   const artifactDropIds = [];
   for(const drop of (monsterDef.drops || [])){
-    if(drop.artifactId && canGrantArtifact(drop.artifactId) && Math.random() * 100 < drop.chance){
+    // 이미 보유한 아티팩트만 굴리지 않음. 인벤토리가 가득 찬 경우는 여기서 걸러내지 않고 드랍 판정을 그대로 진행해,
+    // 지급 단계(dungeon.js)가 "아티팩트 인벤토리가 가득 찼습니다" 안내(보상창 문구·전투 로그)를 남기게 함.
+    if(drop.artifactId && !ownsArtifact(drop.artifactId) && Math.random() * 100 < drop.chance){
       artifactDropIds.push(drop.artifactId);
     }
   }

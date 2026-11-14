@@ -693,14 +693,14 @@ function openDeathModal(monsterDef){
 function closeDeathModal(){
   el('deathModal').style.display = 'none';
 }
-// 마을에서 부활: 체력/마나를 최대치로 회복하고 메인 화면으로 이동 (showView가 hunt 상태 정리까지 처리)
+// 마을에서 부활: 체력/마나를 최대치로 회복하고 마을 화면으로 이동 (showView가 hunt 상태 정리까지 처리)
 function respawnAtVillage(){
   closeDeathModal();
   state.playerHp = effectiveMaxHp(state.playerLevel);
   state.playerMp = effectiveMaxMp(state.playerLevel);
   state.deathCurseUntil = Date.now() + DEATH_CURSE_DURATION_MS; // 망자의 저주 부여
   saveState();
-  showView('forge');
+  showView('town');
   startDeathCurseTicker();
   showTownToast('마을로 돌아와 지친 육신을 회복했습니다.');
 }
@@ -813,14 +813,15 @@ function naturalRegenTick(){
   const maxHp = effectiveMaxHp(state.playerLevel);
   const maxMp = effectiveMaxMp(state.playerLevel);
   const regen = effectivePlayerRegen();
+  const speed = townRegenSpeed(); // 마을 화면에서는 재생 주기 90% 단축(TOWN_REGEN_SPEED, town.js), 그 밖에는 1배
   let changed = false;
 
   if(state.playerHp >= maxHp){
     hpRegenElapsedMs = 0; // 요구사항: 가득 찬 상태에서는 쿨타임을 불필요하게 진행하지 않음
   } else {
-    hpRegenElapsedMs += NATURAL_REGEN_TICK_MS;
+    hpRegenElapsedMs += NATURAL_REGEN_TICK_MS * speed;
     if(hpRegenElapsedMs >= HP_REGEN_INTERVAL_MS){
-      hpRegenElapsedMs = 0; // 발동 후 다음 주기를 처음부터 다시 시작
+      hpRegenElapsedMs -= HP_REGEN_INTERVAL_MS; // 발동 후 남은 시간은 이월(1배속에서는 항상 0이라 예전과 동일, 마을 가속에서만 의미 있음)
       state.playerHp = Math.min(maxHp, state.playerHp + naturalHpRegenAmount(maxHp, regen));
       changed = true;
     }
@@ -829,9 +830,9 @@ function naturalRegenTick(){
   if(state.playerMp >= maxMp){
     mpRegenElapsedMs = 0;
   } else {
-    mpRegenElapsedMs += NATURAL_REGEN_TICK_MS;
+    mpRegenElapsedMs += NATURAL_REGEN_TICK_MS * speed;
     if(mpRegenElapsedMs >= MP_REGEN_INTERVAL_MS){
-      mpRegenElapsedMs = 0;
+      mpRegenElapsedMs -= MP_REGEN_INTERVAL_MS;
       state.playerMp = Math.min(maxMp, state.playerMp + naturalMpRegenAmount(maxMp, regen));
       changed = true;
     }
@@ -1133,13 +1134,12 @@ function leaveFromRewardModal(){
   pendingNavTarget = 'dungeonlist';
   el('leaveConfirmModal').style.display = 'flex';
 }
-// "마을 귀환": 체력/마나 회복 후 메인 화면(대장간)으로 이동 (스테이지 클리어 후 행동 선택 / 숨겨진 장소 보상 이후 공통)
+// "마을 귀환": 기본 화면(마을)으로 이동 (스테이지 클리어 후 행동 선택 / 숨겨진 장소 보상 이후 공통).
+// 예전과 달리 체력/마나를 자동으로 회복하지 않음 — 마을의 자연 회복 가속(TOWN_REGEN_SPEED)이나 성소(town.js)로 회복함. 안내 팝업은 그대로.
 function returnToVillage(){
   closeKillResultModal();
-  state.playerHp = effectiveMaxHp(state.playerLevel);
-  state.playerMp = effectiveMaxMp(state.playerLevel);
   saveState();
-  showView('forge');
+  showView('town');
   showTownToast(STAGE_RETURN_MSG);
 }
 // "재탐험"(11스테이지 보상 팝업 전용): 마을로 이동하지 않고, 체력/마나 회복도 없이, 현재 클리어한

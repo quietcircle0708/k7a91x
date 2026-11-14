@@ -57,6 +57,7 @@ function shopMenuBuyRows(leaf){
   if(leaf === 'consumable') base = Object.values(CONSUMABLES).filter(c => c.buyPrice != null).map(c => ({ id: c.id, price: c.buyPrice, levelReq: null, action: 'buy-consumable' }));
   else if(['weapon', 'armor', 'sub', 'accessory'].includes(leaf)) base = shopEntriesForTab(leaf).map(e => ({ ...e, action: 'buy-weapon' }));
   else if(leaf === 'artifact') base = shopEntriesForTab(leaf).map(e => ({ ...e, action: 'buy-artifact' }));
+  base = base.filter(b => townSellsItem(townShopDef(b.action, b.id))); // 현재 마을에서 파는 품목만(아이템 데이터에 towns가 없으면 모든 마을에서 판매, town.js)
   return base.map(b => {
     const d = shopBuyItemDisplay(b.action, b.id); // 아이콘/툴팁은 구매 팝업과 같은 함수
     let name, color, pre = '', border = d.borderColor, bg = '#242424';
